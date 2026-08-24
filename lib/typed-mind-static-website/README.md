@@ -22,7 +22,7 @@ TypedMind Playground is an interactive web-based development environment that al
 
 ## Live Demo
 
-Visit the live playground at: **[https://sammons.github.io/typed-mind-playground](https://sammons.github.io/typed-mind-playground)**
+Visit the live playground at: **[https://typedmind.sammons.io](https://typedmind.sammons.io)**
 
 ## Development
 
