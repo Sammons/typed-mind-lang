@@ -9,6 +9,8 @@ on:
       - 'lib/typed-mind/**'
       - 'lib/typed-mind-cli/**'
       - 'lib/typed-mind-renderer/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
       - '.gitea/workflows/deploy-static-site.yml'
   workflow_dispatch:
 
