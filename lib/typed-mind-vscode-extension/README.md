@@ -4,9 +4,9 @@ VS Code language support for TypedMind Domain Specific Language (.tmd files).
 
 <div align="center">
   <h3>
-    <a href="https://sammons2.github.io/typed-mind-lang/">🌐 Try TypedMind Online</a> • 
-    <a href="https://sammons2.github.io/typed-mind-lang/#getting-started">📚 Documentation</a> • 
-    <a href="https://sammons2.github.io/typed-mind-lang/#examples">🎯 Examples</a>
+    <a href="https://typedmind.sammons.io/">🌐 Try TypedMind Online</a> • 
+    <a href="https://typedmind.sammons.io/#getting-started">📚 Documentation</a> • 
+    <a href="https://typedmind.sammons.io/#examples">🎯 Examples</a>
   </h3>
 </div>
 
@@ -18,7 +18,7 @@ TypedMind is a domain-specific language (DSL) for describing program architectur
 - Validate architectural constraints
 - Generate interactive documentation
 
-[Learn more about TypedMind →](https://sammons2.github.io/typed-mind-lang/)
+[Learn more about TypedMind →](https://typedmind.sammons.io/)
 
 ## Commands
 
@@ -62,8 +62,8 @@ code --install-extension Sammons.typed-mind
 **For Cursor IDE or other VS Code-compatible editors that may not have marketplace access:**
 
 1. **Download the latest VSIX file:**
-   - [Latest Release (v0.2.0)](https://github.com/sammons2/typed-mind-lang/releases/latest) - Download `typed-mind-0.2.0.vsix`
-   - Or browse all releases: [GitHub Releases](https://github.com/sammons2/typed-mind-lang/releases)
+   - [Latest Release (v0.2.0)](https://github.com/Sammons/typed-mind-lang/releases/latest) - Download `typed-mind-0.2.0.vsix`
+   - Or browse all releases: [GitHub Releases](https://github.com/Sammons/typed-mind-lang/releases)
 
 2. **Install in VS Code/Cursor:**
    - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)

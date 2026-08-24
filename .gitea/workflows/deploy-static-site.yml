@@ -1,0 +1,60 @@
+name: Deploy Static Site
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lib/typed-mind-static-website/**'
+      - 'lib/typed-mind/**'
+      - 'lib/typed-mind-cli/**'
+      - 'lib/typed-mind-renderer/**'
+      - '.gitea/workflows/deploy-static-site.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mise
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install toolchain
+        run: mise install
+
+      - name: Install pnpm
+        run: |
+          mise exec -- corepack enable
+          mise exec -- corepack prepare pnpm@11 --activate
+
+      - name: Install dependencies
+        run: mise exec -- pnpm install --ignore-scripts
+
+      - name: Build packages
+        run: |
+          mise exec -- pnpm --dir lib/typed-mind build
+          mise exec -- pnpm --dir lib/typed-mind-renderer build
+          mise exec -- pnpm --dir lib/typed-mind-cli build
+
+      - name: Build site
+        run: cd lib/typed-mind-static-website && mise exec -- node build.js
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          cd lib/typed-mind-static-website
+          mise exec -- node node_modules/wrangler/bin/wrangler.js pages deploy dist --project-name=typedmind --branch=main --commit-dirty=true

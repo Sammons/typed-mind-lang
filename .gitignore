@@ -12,3 +12,4 @@ coverage/
 # Generated documentation
 lib/typed-mind/grammar.json
 lib/typed-mind/grammar.ebnf
+worktree-description.md
