@@ -19,4 +19,4 @@ Allow: /
 User-agent: PerplexityBot
 Allow: /
 
-Sitemap: https://typedmind.dev/sitemap.xml
+Sitemap: https://typedmind.sammons.io/sitemap.xml

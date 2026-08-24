@@ -7,21 +7,20 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sammons2/typed-mind-lang"
+    "url": "https://github.com/Sammons/typed-mind-lang"
   },
-  "homepage": "https://sammons2.github.io/typed-mind-lang",
+  "homepage": "https://typedmind.sammons.io",
   "scripts": {
-    "dev": "npx http-server dist -p 8080 -c-1",
-    "prebuild": "cd ../typed-mind && pnpm build && cd ../typed-mind-cli && pnpm build",
+    "dev": "pnpm exec http-server dist -p 8080 -c-1",
+    "prebuild": "cd ../typed-mind && pnpm build && cd ../typed-mind-renderer && pnpm build && cd ../typed-mind-cli && pnpm build",
     "build": "node build.js",
-    "serve": "npm run build && npm run dev",
-    "deploy": "npm run build && npx gh-pages -d dist",
-    "predeploy": "npm run build"
+    "serve": "pnpm build && pnpm dev",
+    "deploy": "pnpm build && pnpm exec wrangler pages deploy dist --project-name=typedmind --branch=main --commit-dirty=true"
   },
   "devDependencies": {
-    "gh-pages": "^6.1.1",
     "http-server": "^14.1.1",
     "marked": "^16.2.1",
-    "prismjs": "^1.29.0"
+    "prismjs": "^1.29.0",
+    "wrangler": "^4.125.0"
   }
 }

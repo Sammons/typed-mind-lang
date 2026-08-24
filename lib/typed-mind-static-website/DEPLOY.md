@@ -1,89 +1,47 @@
 # Deployment Guide
 
-This guide explains how to deploy the TypedMind Playground to GitHub Pages.
+The TypedMind site deploys to Cloudflare Pages. The live URL is **https://typedmind.sammons.io** (project `typedmind`, also served at https://typedmind.pages.dev).
 
-## Prerequisites
+## Automatic Deployment
 
-1. **GitHub Repository**: Ensure your code is pushed to a GitHub repository
-2. **Node.js 20+**: Required for building the project
-3. **GitHub Pages**: Must be enabled in repository settings
+The Gitea Actions workflow `.gitea/workflows/deploy-static-site.yml` deploys on every push to `main` that touches the site or the packages it builds against.
 
-## Automatic Deployment (Recommended)
+Required repo secrets (set with `pnpm gitea-admin secrets set` from claude-home):
 
-The project includes a GitHub Actions workflow that automatically deploys to GitHub Pages when you push to the main branch.
-
-### Setup Steps:
-
-1. **Enable GitHub Pages**:
-   - Go to your repository settings
-   - Navigate to "Pages" section
-   - Set source to "GitHub Actions"
-
-2. **Push to Main Branch**:
-   ```bash
-   git add .
-   git commit -m "Deploy TypedMind Playground"
-   git push origin main
-   ```
-
-3. **Verify Deployment**:
-   - Check the "Actions" tab in your repository
-   - Wait for the deployment to complete
-   - Visit your GitHub Pages URL: `https://[username].github.io/[repository-name]`
+| Secret | Value |
+|--------|-------|
+| `CLOUDFLARE_API_TOKEN` | Scoped token `typedmind-pages-deploy` (Pages Read + Write). Canonical copy: `secrets/typedmind-cloudflare-pages-token.age` in claude-home. |
+| `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account id. |
 
 ## Manual Deployment
 
-You can also deploy manually using the gh-pages package:
-
-### Setup Steps:
-
-1. **Install Dependencies**:
+1. Install dependencies from the repo root:
    ```bash
-   npm install
+   pnpm install --ignore-scripts
+   ```
+2. Build the packages the site build validates against:
+   ```bash
+   pnpm --dir lib/typed-mind build
+   pnpm --dir lib/typed-mind-renderer build
+   pnpm --dir lib/typed-mind-cli build
+   ```
+3. Build the site:
+   ```bash
+   cd lib/typed-mind-static-website && node build.js
+   ```
+4. Deploy with wrangler (needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in the environment):
+   ```bash
+   pnpm exec wrangler pages deploy dist --project-name=typedmind --branch=main --commit-dirty=true
    ```
 
-2. **Build and Deploy**:
-   ```bash
-   npm run deploy
-   ```
-
-This will build the project and push the `dist/` directory to the `gh-pages` branch.
-
-## Configuration
-
-The project is pre-configured for GitHub Pages deployment:
-
-- ✅ **Homepage URL**: Set to `https://sammons.github.io/typed-mind-playground`
-- ✅ **Relative Paths**: All asset paths are relative for subdirectory deployment
-- ✅ **Jekyll Bypass**: `.nojekyll` file prevents Jekyll processing
-- ✅ **Build Optimization**: All assets are properly structured for static hosting
-
-## Troubleshooting
-
-### Build Failures
-- Ensure Node.js 20+ is installed
-- Check that all dependencies are installed: `npm ci`
-- Verify the build works locally: `npm run build`
-
-### 404 Errors
-- Ensure GitHub Pages is enabled in repository settings
-- Check that the source is set to "GitHub Actions"
-- Verify the deployment completed successfully in the Actions tab
-
-### Missing Assets
-- Ensure all paths in HTML/CSS/JS files are relative
-- Check that the build process copied all necessary files
-- Verify the `.nojekyll` file exists in the root of the deployed site
+WARNING: `--branch=main` targets the production deployment. Omitting it on a non-main checkout lands the deploy in preview, and the custom domain keeps serving the old build.
 
 ## Custom Domain
 
-To use a custom domain:
+`typedmind.sammons.io` is a proxied CNAME to `typedmind.pages.dev` in the sammons.io Cloudflare zone, attached to the Pages project as a custom domain. Manage the DNS record with `pnpm cloudflare-dns` from claude-home.
 
-1. Add your domain to the repository settings under "Pages"
-2. Create a `CNAME` file in the `src/` directory with your domain name
-3. Update the `homepage` field in `package.json` to your custom domain
+## Troubleshooting
 
-## Live URL
-
-Once deployed, your TypedMind Playground will be available at:
-**https://sammons.github.io/typed-mind-lang**
+- **Snippet validation fails with every snippet red**: the site build shells out to `lib/typed-mind-cli/dist/cli.cjs`. Build the CLI first (step 2 above).
+- **Deploy lands in preview instead of production**: pass `--branch=main` explicitly (see warning above).
+- **401 from wrangler**: the token is scoped to Pages only; regenerate from claude-home secrets if rotated.

@@ -22,11 +22,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sammons2/typed-mind-lang"
+    "url": "https://github.com/Sammons/typed-mind-lang"
   },
-  "homepage": "https://github.com/sammons2/typed-mind-lang#readme",
+  "homepage": "https://github.com/Sammons/typed-mind-lang#readme",
   "bugs": {
-    "url": "https://github.com/sammons2/typed-mind-lang/issues"
+    "url": "https://github.com/Sammons/typed-mind-lang/issues"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

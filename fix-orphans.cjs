@@ -5,7 +5,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const supplementaryDir = 'lib/typed-mind-static-website/snippets-supplementary';
-const cliPath = 'lib/typed-mind-cli/dist/cli.js';
+const cliPath = 'lib/typed-mind-cli/dist/cli.cjs';
 
 // Get all .tmd files in supplementary directory
 const files = fs.readdirSync(supplementaryDir)

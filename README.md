@@ -6,9 +6,9 @@
   <p>A domain-specific language (DSL) for describing and visualizing program architecture.</p>
   
   <h3>
-    <a href="https://sammons2.github.io/typed-mind-lang/">🌐 Try TypedMind Online</a> • 
-    <a href="https://sammons2.github.io/typed-mind-lang/#getting-started">📚 Getting Started</a> • 
-    <a href="https://sammons2.github.io/typed-mind-lang/#examples">🎯 Examples</a>
+    <a href="https://typedmind.sammons.io/">🌐 Try TypedMind Online</a> • 
+    <a href="https://typedmind.sammons.io/#getting-started">📚 Getting Started</a> • 
+    <a href="https://typedmind.sammons.io/#examples">🎯 Examples</a>
   </h3>
 </div>
 
@@ -24,7 +24,7 @@ This monorepo contains five packages:
 
 ## Quick Start
 
-Visit [TypedMind Online](https://sammons2.github.io/typed-mind-lang/) to try TypedMind in your browser, or install the CLI:
+Visit [TypedMind Online](https://typedmind.sammons.io/) to try TypedMind in your browser, or install the CLI:
 
 ```bash
 npm install -g @sammons/typed-mind-cli
@@ -49,16 +49,16 @@ pnpm test
 
 ```bash
 # Check a DSL file for errors
-node lib/typed-mind-cli/dist/cli.js --check examples/example.tmd
+node lib/typed-mind-cli/dist/cli.cjs --check examples/example.tmd
 
 # Render a DSL file interactively
-node lib/typed-mind-cli/dist/cli.js --render examples/example.tmd
+node lib/typed-mind-cli/dist/cli.cjs --render examples/example.tmd
 
 # Generate static HTML output
-node lib/typed-mind-cli/dist/cli.js --render examples/example.tmd --output output.html
+node lib/typed-mind-cli/dist/cli.cjs --render examples/example.tmd --output output.html
 
 # Custom port and disable auto-browser
-node lib/typed-mind-cli/dist/cli.js --render examples/dto-example.tmd --port 8080 --no-browser
+node lib/typed-mind-cli/dist/cli.cjs --render examples/dto-example.tmd --port 8080 --no-browser
 ```
 
 ## Examples
@@ -91,7 +91,7 @@ if (result.valid) {
 
 ## DSL Syntax
 
-> **Note**: For comprehensive grammar documentation and examples, see the [TypedMind Grammar Documentation](https://github.com/sammons2/typed-mind-lang/blob/main/lib/typed-mind/generated-grammar.md). This is especially useful for LLMs learning to write TypedMind syntax.
+> **Note**: For comprehensive grammar documentation and examples, see the [TypedMind Grammar Documentation](https://github.com/Sammons/typed-mind-lang/blob/main/lib/typed-mind/generated-grammar.md). This is especially useful for LLMs learning to write TypedMind syntax.
 
 ### Short Form Example
 
