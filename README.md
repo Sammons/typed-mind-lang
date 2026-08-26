@@ -148,6 +148,37 @@ pnpm lint
 pnpm clean
 ```
 
+### Paired-bump procedure: tree-sitter CLI, wasi-sdk, web-tree-sitter
+
+The tree-sitter CLI, wasi-sdk, and (from RFC-TM-3) `web-tree-sitter` bump only together, in a
+**single PR**. `mise.toml` is the single version source of truth for the first two; splitting
+the bump across multiple PRs leaves the CLI and wasi-sdk versions out of sync, which breaks the
+wasm build silently (a mismatched SDK produces wrong codegen, not an error).
+
+The wasi-sdk version pinned in `mise.toml` MUST equal the value in the tree-sitter CLI's own
+`crates/loader/wasi-sdk-version` file at the CLI's pinned release tag — this is the
+`wasi-sdk-version` coupling that makes the two tools compatible.
+
+Steps, in order, all in one PR:
+
+1. Bump the `tree-sitter` version in `mise.toml`.
+2. Read `crates/loader/wasi-sdk-version` at that CLI's release tag (in the upstream
+   [tree-sitter](https://github.com/tree-sitter/tree-sitter) repo) and copy its value into the
+   `http:wasi-sdk` `version` in `mise.toml`.
+3. Update each platform's URL in `mise.toml` to the new wasi-sdk release tag and compute a fresh
+   sha256 for each downloaded tarball.
+4. Cross-check every new checksum against the GitHub Releases API digest for the same asset
+   (`gh api repos/WebAssembly/wasi-sdk/releases/tags/wasi-sdk-<major>` → `.assets[].digest`). A
+   mismatch blocks the bump — this is a live independent check, not trust-on-first-use.
+5. Bump `web-tree-sitter`'s exact pin in `package.json`.
+6. Regenerate the generated artifacts: `parser.c`, `grammar.json`, `node-types.json`, and the
+   `S-AST-2` `<Kind>Base` skeletons.
+7. Run the wasm load smoke test: `pnpm run check:toolchain` must pass, proving the regenerated
+   grammar builds and loads under the newly-pinned toolchain.
+
+This bump PR is the only sanctioned way the `check:generated` baseline changes. See
+`rfc-tm-1-diamond.md` (RFC-TM-1) for the full design and rationale.
+
 ## License
 
 MIT
