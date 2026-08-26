@@ -726,7 +726,7 @@ class DiffRenderer {
   constructor(
     private diff: ArchitectureDiff,
     private container: HTMLElement,
-    _mode: DiffVisualization['mode'],
+    private mode: DiffVisualization['mode'],
   ) {}
 
   render(): void {

@@ -99,7 +99,9 @@ export class SyntaxGenerator {
       }
 
       // Check for continuation lines (could be either format)
+      // These are neutral - don't count toward either format
       if (GENERAL_PATTERNS.CONTINUATION.test(line)) {
+        continue;
       }
     }
 

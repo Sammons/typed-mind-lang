@@ -1726,7 +1726,7 @@ ${this.generateInteractiveRendererJS()}
       this.currentViewState.searchQuery = query;
 
       // Multi-field search
-      const searchTerms = query.toLowerCase().split(/s+/);
+      const searchTerms = query.toLowerCase().split(/\s+/);
       const matchedEntities = new Set();
 
       this.data.entities.forEach(entity => {
