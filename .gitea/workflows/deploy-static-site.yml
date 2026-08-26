@@ -62,7 +62,9 @@ jobs:
             exit 0
           fi
           cd lib/typed-mind/grammar
-          mise exec -- tree-sitter build --wasm
+          # TM-1 defect fix (found in TM-2 Q0): without this env the CLI falls back to
+          # its unverified wasi-sdk downloader instead of the mise-pinned, checksummed SDK.
+          TREE_SITTER_WASI_SDK_PATH="$(mise where http:wasi-sdk)" mise exec -- tree-sitter build --wasm
           cp *.wasm ../../typed-mind-static-website/dist/
 
       - name: Deploy to Cloudflare Pages

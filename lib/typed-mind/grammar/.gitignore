@@ -1,0 +1,3 @@
+# S-ARTIFACT-2: grammar.wasm is NEVER committed. CI builds it pre-merge
+# (check:generated step 4, discarded) and post-merge (deploy wasm step).
+*.wasm

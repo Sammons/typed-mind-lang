@@ -1,0 +1,25 @@
+{
+  "grammars": [
+    {
+      "name": "typed_mind",
+      "camelcase": "TypedMind",
+      "title": "TypedMind",
+      "scope": "source.typed-mind",
+      "path": ".",
+      "file-types": ["tmd"]
+    }
+  ],
+  "metadata": {
+    "version": "0.0.1",
+    "license": "MIT",
+    "description": "TypedMind DSL grammar (RFC-TM-2)",
+    "authors": [
+      {
+        "name": "sammons"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/Sammons/typed-mind-lang"
+    }
+  }
+}
