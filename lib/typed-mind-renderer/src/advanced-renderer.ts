@@ -655,7 +655,7 @@ class AdvancedTypedMindRenderer {
         <p style="text-align: center; padding: 50px;">Load a TypedMind graph to see advanced visualization</p>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js" integrity="sha384-su5kReKyYlIFrI62mbQRKXHzFobMa7BHp1cK6julLPbnYcCW9NIZKJiTODjLPeDh" crossorigin="anonymous"></script>
     <script src="advanced-renderer.js"></script>
 </body>
 </html>
