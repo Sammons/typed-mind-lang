@@ -40,6 +40,7 @@
     "test": "node --test",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
+    "check:golden-deltas": "node scripts/check-golden-deltas.mjs",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },
   "dependencies": {

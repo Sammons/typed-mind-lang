@@ -1,0 +1,25 @@
+IndexApp -> IndexFile v1.0.0
+  -> [main]
+
+IndexFile @ project/src/index.ts:
+  <- [UserService]
+  -> [main]
+
+UserServiceFile @ project/src/services/user-service.ts:
+  <- [UserDTO, CreateUserDTO]
+  -> [UserService]
+
+UserService <: BaseService, IUserService
+  => [createUser, findUser]
+
+main :: async main() => Promise<void>
+
+UserDTO %
+  - id: string
+  - name: string
+  - email: string
+  - createdAt?: Date
+
+CreateUserDTO %
+  - name: string
+  - email: string

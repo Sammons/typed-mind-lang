@@ -1,35 +1,49 @@
-import type { AnyEntity, ProgramGraph } from '@sammons/typed-mind';
-import { DSLChecker } from '@sammons/typed-mind';
+import { type EntityNode, TypedMind } from '@sammons/typed-mind';
 import type { AssertionResult, ConversionResult, Deviation } from './types.ts';
 
 export class AssertionEngine {
-  private readonly checker = new DSLChecker();
+  // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — moved off the legacy sync DSLChecker
+  // onto TypedMind.create() + check()/parse(). The new surface's construction
+  // is async (wasm init), so #typedMind is created lazily on first use and
+  // cached — no side effects in the constructor (no_side_effects_in_constructors).
+  #typedMind: TypedMind | undefined;
+
+  async #getTypedMind(): Promise<TypedMind> {
+    if (this.#typedMind === undefined) {
+      this.#typedMind = await TypedMind.create();
+    }
+    return this.#typedMind;
+  }
 
   /**
    * Compare TypeScript-derived entities against a TypedMind file
    */
-  assert(conversionResult: ConversionResult, tmdFilePath: string, tmdContent: string): AssertionResult {
+  async assert(conversionResult: ConversionResult, tmdFilePath: string, tmdContent: string): Promise<AssertionResult> {
     try {
+      const typedMind = await this.#getTypedMind();
+
       // Parse the expected TMD content
-      const validationResult = this.checker.check(tmdContent, tmdFilePath);
+      const validationResult = typedMind.check(tmdContent, tmdFilePath);
 
       if (!validationResult.valid) {
         return {
           success: false,
-          deviations: validationResult.errors.map((error) => ({
-            entityName: '<parsing>',
-            property: 'syntax',
-            expected: 'valid syntax',
-            actual: error.message,
-            severity: 'error' as const,
-          })),
+          deviations: validationResult.diagnostics
+            .filter((diagnostic) => diagnostic.severity === 'error')
+            .map((diagnostic) => ({
+              entityName: '<parsing>',
+              property: 'syntax',
+              expected: 'valid syntax',
+              actual: diagnostic.message,
+              severity: 'error' as const,
+            })),
           missingEntities: [],
           extraEntities: [],
         };
       }
 
-      const expectedGraph = this.checker.parse(tmdContent, tmdFilePath);
-      return this.compareGraphs(conversionResult.entities, expectedGraph);
+      const expectedOutput = typedMind.parse(tmdContent, tmdFilePath);
+      return this.compareGraphs(conversionResult.entities, expectedOutput.entities);
     } catch (error) {
       return {
         success: false,
@@ -48,14 +62,14 @@ export class AssertionEngine {
     }
   }
 
-  private compareGraphs(actualEntities: readonly AnyEntity[], expectedGraph: ProgramGraph): AssertionResult {
+  private compareGraphs(actualEntities: readonly EntityNode[], expectedEntities: readonly EntityNode[]): AssertionResult {
     const deviations: Deviation[] = [];
     const actualEntityMap = new Map(actualEntities.map((e) => [e.name, e]));
-    const expectedEntityMap = expectedGraph.entities;
+    const expectedEntityMap = new Map(expectedEntities.map((e) => [e.name, e]));
 
     // Find missing entities (in expected but not in actual)
     const missingEntities: string[] = [];
-    for (const [name] of expectedEntityMap) {
+    for (const name of expectedEntityMap.keys()) {
       if (!actualEntityMap.has(name)) {
         missingEntities.push(name);
       }
@@ -63,7 +77,7 @@ export class AssertionEngine {
 
     // Find extra entities (in actual but not in expected)
     const extraEntities: string[] = [];
-    for (const [name] of actualEntityMap) {
+    for (const name of actualEntityMap.keys()) {
       if (!expectedEntityMap.has(name)) {
         extraEntities.push(name);
       }
@@ -90,22 +104,22 @@ export class AssertionEngine {
     };
   }
 
-  private compareEntities(actual: AnyEntity, expected: AnyEntity): Deviation[] {
+  private compareEntities(actual: EntityNode, expected: EntityNode): Deviation[] {
     const deviations: Deviation[] = [];
 
-    // Compare entity type
-    if (actual.type !== expected.type) {
+    // Compare entity kind
+    if (actual.kind !== expected.kind) {
       deviations.push({
         entityName: actual.name,
         property: 'type',
-        expected: expected.type,
-        actual: actual.type,
+        expected: expected.kind,
+        actual: actual.kind,
         severity: 'error',
       });
     }
 
     // Type-specific comparisons
-    switch (expected.type) {
+    switch (expected.kind) {
       case 'Program':
         this.compareProgramEntities(actual, expected, deviations);
         break;
@@ -133,7 +147,7 @@ export class AssertionEngine {
     return deviations;
   }
 
-  private compareProgramEntities(actual: AnyEntity, expected: AnyEntity, deviations: Deviation[]): void {
+  private compareProgramEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
     const actualProg = actual as any;
     const expectedProg = expected as any;
 
@@ -158,7 +172,7 @@ export class AssertionEngine {
     }
   }
 
-  private compareFileEntities(actual: AnyEntity, expected: AnyEntity, deviations: Deviation[]): void {
+  private compareFileEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
     const actualFile = actual as any;
     const expectedFile = expected as any;
 
@@ -176,7 +190,7 @@ export class AssertionEngine {
     this.compareArrayProperty(actual.name, 'exports', actualFile.exports, expectedFile.exports, deviations);
   }
 
-  private compareFunctionEntities(actual: AnyEntity, expected: AnyEntity, deviations: Deviation[]): void {
+  private compareFunctionEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
     const actualFunc = actual as any;
     const expectedFunc = expected as any;
 
@@ -196,7 +210,7 @@ export class AssertionEngine {
     this.compareArrayProperty(actual.name, 'calls', actualFunc.calls, expectedFunc.calls, deviations);
   }
 
-  private compareClassEntities(actual: AnyEntity, expected: AnyEntity, deviations: Deviation[]): void {
+  private compareClassEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
     const actualClass = actual as any;
     const expectedClass = expected as any;
 
@@ -205,7 +219,7 @@ export class AssertionEngine {
     this.compareArrayProperty(actual.name, 'methods', actualClass.methods, expectedClass.methods, deviations);
   }
 
-  private compareClassFileEntities(actual: AnyEntity, expected: AnyEntity, deviations: Deviation[]): void {
+  private compareClassFileEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
     const actualCF = actual as any;
     const expectedCF = expected as any;
 
@@ -226,7 +240,7 @@ export class AssertionEngine {
     this.compareArrayProperty(actual.name, 'exports', actualCF.exports, expectedCF.exports, deviations);
   }
 
-  private compareDTOEntities(actual: AnyEntity, expected: AnyEntity, deviations: Deviation[]): void {
+  private compareDTOEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
     const actualDTO = actual as any;
     const expectedDTO = expected as any;
 
@@ -298,7 +312,7 @@ export class AssertionEngine {
     }
   }
 
-  private compareConstantsEntities(actual: AnyEntity, expected: AnyEntity, deviations: Deviation[]): void {
+  private compareConstantsEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
     const actualConst = actual as any;
     const expectedConst = expected as any;
 

@@ -1,4 +1,4 @@
-import type { AnyEntity } from '@sammons/typed-mind';
+import type { EntityNode } from '@sammons/typed-mind';
 import * as ts from 'typescript';
 
 export interface ParsedFunction {
@@ -116,7 +116,7 @@ export interface ConversionOptions {
 
 export interface ConversionResult {
   readonly success: boolean;
-  readonly entities: readonly AnyEntity[];
+  readonly entities: readonly EntityNode[];
   readonly tmdContent: string;
   readonly errors: readonly ConversionError[];
   readonly warnings: readonly ConversionWarning[];
