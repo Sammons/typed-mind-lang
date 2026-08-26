@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,52 +17,52 @@ describe('scenario-27-runparameter-orphaned', () => {
     const content = readFileSync(filePath, 'utf-8');
     const result = checker.check(content, filePath);
     
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(3);
+    assert.equal(result.valid, false);
+    assert.equal((result.errors).length, 3);
 
     // Should detect orphaned UNUSED_PARAM
     const unusedParamError = result.errors.find(err =>
       err.message === "Orphaned entity 'UNUSED_PARAM'"
     );
-    expect(unusedParamError).toBeDefined();
-    expect(unusedParamError?.position.line).toBe(12);
-    expect(unusedParamError?.severity).toBe('error');
-    expect(unusedParamError?.suggestion).toBe('Remove or reference this entity');
+    assert.notEqual(unusedParamError, undefined);
+    assert.equal(unusedParamError?.position.line, 12);
+    assert.equal(unusedParamError?.severity, 'error');
+    assert.equal(unusedParamError?.suggestion, 'Remove or reference this entity');
 
     // Should detect orphaned SECRET_KEY
     const secretKeyError = result.errors.find(err =>
       err.message === "Orphaned entity 'SECRET_KEY'"
     );
-    expect(secretKeyError).toBeDefined();
-    expect(secretKeyError?.position.line).toBe(13);
-    expect(secretKeyError?.severity).toBe('error');
-    expect(secretKeyError?.suggestion).toBe('Remove or reference this entity');
+    assert.notEqual(secretKeyError, undefined);
+    assert.equal(secretKeyError?.position.line, 13);
+    assert.equal(secretKeyError?.severity, 'error');
+    assert.equal(secretKeyError?.suggestion, 'Remove or reference this entity');
 
     // Should detect orphaned processData function
     const processDataError = result.errors.find(err =>
       err.message === "Orphaned entity 'processData'"
     );
-    expect(processDataError).toBeDefined();
-    expect(processDataError?.position.line).toBe(16);
-    expect(processDataError?.severity).toBe('error');
-    expect(processDataError?.suggestion).toBe('Remove or reference this entity');
+    assert.notEqual(processDataError, undefined);
+    assert.equal(processDataError?.position.line, 16);
+    assert.equal(processDataError?.severity, 'error');
+    assert.equal(processDataError?.suggestion, 'Remove or reference this entity');
     
     // Get parsed entities using parse method  
     const parseResult = checker.parse(content, filePath);
     const entities = parseResult.entities;
-    expect(entities.has('UNUSED_PARAM')).toBe(true);
-    expect(entities.has('SECRET_KEY')).toBe(true);
-    expect(entities.has('API_KEY')).toBe(true);
-    expect(entities.has('DATABASE_URL')).toBe(true);
+    assert.equal(entities.has('UNUSED_PARAM'), true);
+    assert.equal(entities.has('SECRET_KEY'), true);
+    assert.equal(entities.has('API_KEY'), true);
+    assert.equal(entities.has('DATABASE_URL'), true);
     
     // Verify types
     const unusedParam = entities.get('UNUSED_PARAM') as any;
-    expect(unusedParam?.type).toBe('RunParameter');
-    expect(unusedParam?.paramType).toBe('env');
+    assert.equal(unusedParam?.type, 'RunParameter');
+    assert.equal(unusedParam?.paramType, 'env');
     
     const secretKey = entities.get('SECRET_KEY') as any;
-    expect(secretKey?.type).toBe('RunParameter');
-    expect(secretKey?.paramType).toBe('config');
-    expect(secretKey?.defaultValue).toBe('secret123');
+    assert.equal(secretKey?.type, 'RunParameter');
+    assert.equal(secretKey?.paramType, 'config');
+    assert.equal(secretKey?.defaultValue, 'secret123');
   });
 });

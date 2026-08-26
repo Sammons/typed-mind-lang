@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('Scenario 62: Dependency consumption patterns', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-62-dependency-consumption.tmd');
@@ -17,23 +22,23 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     const react = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'react' && e.type === 'Dependency'
     );
-    expect(react).toBeDefined();
-    expect(react?.purpose).toBe('UI framework');
-    expect(react?.version).toBe('18.2.0'); // Parser strips 'v' prefix
+    assert.notEqual(react, undefined);
+    assert.equal(react?.purpose, 'UI framework');
+    assert.equal(react?.version, '18.2.0'); // Parser strips 'v' prefix
     
     // Scoped package
     const awsS3 = Array.from(parseResult.entities.values()).find(e => 
       e.name === '@aws-sdk/client-s3' && e.type === 'Dependency'
     );
-    expect(awsS3).toBeDefined();
-    expect(awsS3?.purpose).toBe('AWS S3 client');
+    assert.notEqual(awsS3, undefined);
+    assert.equal(awsS3?.purpose, 'AWS S3 client');
     
     // Package without version
     const noVersion = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'no-version-dep' && e.type === 'Dependency'
     );
-    expect(noVersion).toBeDefined();
-    expect(noVersion?.version).toBeUndefined();
+    assert.notEqual(noVersion, undefined);
+    assert.equal(noVersion?.version, undefined);
   });
 
   it('should handle function consuming dependencies', () => {
@@ -43,21 +48,21 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     const httpClient = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'httpClient' && e.type === 'Function'
     );
-    expect(httpClient?.consumes).toContain('axios');
+    assert.ok((httpClient?.consumes).includes('axios'));
     
     // Multiple dependencies
     const serverSetup = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'serverSetup' && e.type === 'Function'
     );
-    expect(serverSetup?.consumes).toContain('express');
-    expect(serverSetup?.consumes).toContain('dotenv');
-    expect(serverSetup?.consumes).toContain('winston');
+    assert.ok((serverSetup?.consumes).includes('express'));
+    assert.ok((serverSetup?.consumes).includes('dotenv'));
+    assert.ok((serverSetup?.consumes).includes('winston'));
     
     // Scoped package
     const s3Upload = Array.from(parseResult.entities.values()).find(e => 
       e.name === 's3Upload' && e.type === 'Function'
     );
-    expect(s3Upload?.consumes).toContain('@aws-sdk/client-s3');
+    assert.ok((s3Upload?.consumes).includes('@aws-sdk/client-s3'));
   });
 
   it.skip('should auto-distribute mixed dependencies', () => {
@@ -68,10 +73,10 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     );
     
     // lodash (Dependency) should go to consumes
-    expect(mixedConsumer?.consumes).toContain('lodash');
+    assert.ok((mixedConsumer?.consumes).includes('lodash'));
     
     // helperFunction (Function) should go to calls
-    expect(mixedConsumer?.calls).toContain('helperFunction');
+    assert.ok((mixedConsumer?.calls).includes('helperFunction'));
     
     // DataService (ClassFile) - might be in calls or its methods
     const hasDataService = 
@@ -87,9 +92,9 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     );
     
     // ClassFiles can import dependencies
-    expect(appInitializer?.imports).toContain('react');
-    expect(appInitializer?.imports).toContain('typescript');
-    expect(appInitializer?.imports).toContain('ConfigLoader');
+    assert.ok((appInitializer?.imports).includes('react'));
+    assert.ok((appInitializer?.imports).includes('typescript'));
+    assert.ok((appInitializer?.imports).includes('ConfigLoader'));
   });
 
   it('should handle various version formats', () => {
@@ -99,20 +104,20 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     const semanticVersion = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'semantic-version' && e.type === 'Dependency'
     );
-    expect(semanticVersion).toBeDefined();
-    expect(semanticVersion?.version).toBe('1.2.3'); // Parser strips 'v' prefix
+    assert.notEqual(semanticVersion, undefined);
+    assert.equal(semanticVersion?.version, '1.2.3'); // Parser strips 'v' prefix
     
     const betaVersion = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'beta-version' && e.type === 'Dependency'
     );
-    expect(betaVersion).toBeDefined();
-    expect(betaVersion?.version).toBe('2.0.0-beta.1'); // Parser strips 'v' prefix
+    assert.notEqual(betaVersion, undefined);
+    assert.equal(betaVersion?.version, '2.0.0-beta.1'); // Parser strips 'v' prefix
     
     const versionConsumer = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'versionConsumer' && e.type === 'Function'
     );
-    expect(versionConsumer?.consumes).toContain('semantic-version');
-    expect(versionConsumer?.consumes).toContain('beta-version');
+    assert.ok((versionConsumer?.consumes).includes('semantic-version'));
+    assert.ok((versionConsumer?.consumes).includes('beta-version'));
   });
 
   it('should validate invalid consumption patterns', () => {
@@ -122,10 +127,10 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     const errors = validationResult.errors.map(e => e.message);
     
     // Non-existent dependency
-    expect(errors.some(e => 
+    assert.equal(errors.some(e => 
       e.includes('non-existent-package') && 
       (e.includes('unknown') || e.includes('undefined'))
-    )).toBe(true);
+    ), true);
     
     // UIComponent can't be consumed via $<
     const invalidConsumer = Array.from(parseResult.entities.values()).find(e => 
@@ -133,10 +138,10 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     );
     
     // Check if validator catches these invalid consumptions
-    expect(errors.some(e => 
+    assert.equal(errors.some(e => 
       e.includes('invalidConsumer') || 
       (e.includes('AppUI') && e.includes('consume'))
-    )).toBe(true);
+    ), true);
   });
 
   it('should handle RunParameter consumption', () => {
@@ -146,19 +151,19 @@ describe('Scenario 62: Dependency consumption patterns', () => {
       e.name === 'configuredFunction' && e.type === 'Function'
     );
     
-    expect(configuredFunction?.consumes).toContain('DATABASE_URL');
-    expect(configuredFunction?.consumes).toContain('API_KEY');
-    expect(configuredFunction?.consumes).toContain('MAX_WORKERS');
+    assert.ok((configuredFunction?.consumes).includes('DATABASE_URL'));
+    assert.ok((configuredFunction?.consumes).includes('API_KEY'));
+    assert.ok((configuredFunction?.consumes).includes('MAX_WORKERS'));
     
     // Mixed RunParameters and Dependencies
     const hybridConsumer = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'hybridConsumer' && e.type === 'Function'
     );
     
-    expect(hybridConsumer?.consumes).toContain('axios');
-    expect(hybridConsumer?.consumes).toContain('DATABASE_URL');
-    expect(hybridConsumer?.consumes).toContain('winston');
-    expect(hybridConsumer?.consumes).toContain('API_KEY');
+    assert.ok((hybridConsumer?.consumes).includes('axios'));
+    assert.ok((hybridConsumer?.consumes).includes('DATABASE_URL'));
+    assert.ok((hybridConsumer?.consumes).includes('winston'));
+    assert.ok((hybridConsumer?.consumes).includes('API_KEY'));
   });
 
   it('should handle Asset consumption', () => {
@@ -168,13 +173,13 @@ describe('Scenario 62: Dependency consumption patterns', () => {
       e.name === 'displayLogo' && e.type === 'Function'
     );
     
-    expect(displayLogo?.consumes).toContain('Logo');
+    assert.ok((displayLogo?.consumes).includes('Logo'));
     
     // Logo contains ClientApp
     const logo = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'Logo' && e.type === 'Asset'
     );
-    expect(logo?.containsProgram).toBe('ClientApp');
+    assert.equal(logo?.containsProgram, 'ClientApp');
   });
 
   it('should handle Constants consumption', () => {
@@ -184,18 +189,18 @@ describe('Scenario 62: Dependency consumption patterns', () => {
       e.name === 'constantsUser' && e.type === 'Function'
     );
     
-    expect(constantsUser?.consumes).toContain('AppConstants');
+    assert.ok((constantsUser?.consumes).includes('AppConstants'));
     
     // Complex consumption chain
     const complexMethod = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'complexMethod' && e.type === 'Function'
     );
     
-    expect(complexMethod?.consumes).toContain('DATABASE_URL');
-    expect(complexMethod?.consumes).toContain('API_KEY');
-    expect(complexMethod?.consumes).toContain('AppConstants');
-    expect(complexMethod?.calls).toContain('helperFunction');
-    expect(complexMethod?.calls).toContain('getData');
+    assert.ok((complexMethod?.consumes).includes('DATABASE_URL'));
+    assert.ok((complexMethod?.consumes).includes('API_KEY'));
+    assert.ok((complexMethod?.consumes).includes('AppConstants'));
+    assert.ok((complexMethod?.calls).includes('helperFunction'));
+    assert.ok((complexMethod?.calls).includes('getData'));
   });
 
   it.skip('should detect orphaned dependencies', () => {
@@ -207,9 +212,9 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     const errors = validationResult.errors.map(e => e.message);
     
     // unused-package is not consumed by anyone - should have an orphaned error
-    expect(errors.some(e => 
+    assert.equal(errors.some(e => 
       e.includes('unused-package') && (e.includes('orphaned') || e.includes('Orphaned'))
-    )).toBe(true);
+    ), true);
   });
 
   it('should validate circular imports between services', () => {
@@ -219,10 +224,10 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     const errors = validationResult.errors.map(e => e.message);
     
     // ServiceA imports ServiceB, ServiceB imports ServiceA
-    expect(errors.some(e => 
+    assert.equal(errors.some(e => 
       e.includes('Circular') && 
       (e.includes('ServiceA') || e.includes('ServiceB'))
-    )).toBe(true);
+    ), true);
   });
 
   it('should handle UI component relationships with dependencies', () => {
@@ -233,11 +238,11 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     );
     
     // Function affects UI
-    expect(renderUI?.affects).toContain('AppUI');
-    expect(renderUI?.affects).toContain('Dashboard');
+    assert.ok((renderUI?.affects).includes('AppUI'));
+    assert.ok((renderUI?.affects).includes('Dashboard'));
     
     // Function consumes dependencies
-    expect(renderUI?.consumes).toContain('react');
-    expect(renderUI?.consumes).toContain('@testing-library/react');
+    assert.ok((renderUI?.consumes).includes('react'));
+    assert.ok((renderUI?.consumes).includes('@testing-library/react'));
   });
 });

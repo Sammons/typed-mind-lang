@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import {
+import { createEntityName } from './types.ts';
+import type {
   TypeScriptProjectAnalysis,
   ParsedModule,
   ParsedFunction,
@@ -11,9 +12,8 @@ import {
   ConversionOptions,
   ConversionError,
   ConversionWarning,
-  createEntityName,
 } from './types.ts';
-import {
+import type {
   AnyEntity,
   ProgramEntity,
   FileEntity,

@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('Scenario 65: Bidirectional consumedBy for RunParameters', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-65-bidirectional-consumedby.tmd');
@@ -18,11 +23,11 @@ describe('Scenario 65: Bidirectional consumedBy for RunParameters', () => {
       e.name === 'DATABASE_URL' && e.type === 'RunParameter'
     ) as any;
     
-    expect(databaseUrl).toBeDefined();
-    expect(databaseUrl.consumedBy).toBeDefined();
-    expect(databaseUrl.consumedBy).toContain('connectDB');
-    expect(databaseUrl.consumedBy).toContain('startServer');
-    expect(databaseUrl.consumedBy.length).toBe(2);
+    assert.notEqual(databaseUrl, undefined);
+    assert.notEqual(databaseUrl.consumedBy, undefined);
+    assert.ok((databaseUrl.consumedBy).includes('connectDB'));
+    assert.ok((databaseUrl.consumedBy).includes('startServer'));
+    assert.equal(databaseUrl.consumedBy.length, 2);
   });
 
   it('should handle multiple functions consuming the same RunParameter', () => {
@@ -33,9 +38,9 @@ describe('Scenario 65: Bidirectional consumedBy for RunParameters', () => {
       e.name === 'DATABASE_URL' && e.type === 'RunParameter'
     ) as any;
     
-    expect(databaseUrl.consumedBy).toEqual(
-      expect.arrayContaining(['connectDB', 'startServer'])
-    );
+    for (const expected of ['connectDB', 'startServer']) {
+      assert.ok(databaseUrl.consumedBy.includes(expected));
+    }
   });
 
   it('should handle single function consuming RunParameter', () => {
@@ -46,8 +51,8 @@ describe('Scenario 65: Bidirectional consumedBy for RunParameters', () => {
       e.name === 'API_KEY' && e.type === 'RunParameter'
     ) as any;
     
-    expect(apiKey).toBeDefined();
-    expect(apiKey.consumedBy).toEqual(['processData']);
+    assert.notEqual(apiKey, undefined);
+    assert.deepEqual(apiKey.consumedBy, ['processData']);
   });
 
   it('should handle RunParameter with no consuming functions', () => {
@@ -58,8 +63,8 @@ describe('Scenario 65: Bidirectional consumedBy for RunParameters', () => {
       e.name === 'UNUSED_PARAM' && e.type === 'RunParameter'
     ) as any;
     
-    expect(unusedParam).toBeDefined();
-    expect(unusedParam.consumedBy).toEqual([]);
+    assert.notEqual(unusedParam, undefined);
+    assert.deepEqual(unusedParam.consumedBy, []);
   });
 
   it('should maintain consistency between Function.consumes and RunParameter.consumedBy', () => {
@@ -73,8 +78,8 @@ describe('Scenario 65: Bidirectional consumedBy for RunParameters', () => {
       e.name === 'DATABASE_URL' && e.type === 'RunParameter'
     ) as any;
     
-    expect(connectDB.consumes).toContain('DATABASE_URL');
-    expect(databaseUrl.consumedBy).toContain('connectDB');
+    assert.ok((connectDB.consumes).includes('DATABASE_URL'));
+    assert.ok((databaseUrl.consumedBy).includes('connectDB'));
   });
 
   it('should handle different RunParameter types', () => {
@@ -91,14 +96,14 @@ describe('Scenario 65: Bidirectional consumedBy for RunParameters', () => {
       e.name === 'MAX_RETRIES' && e.type === 'RunParameter'
     ) as any;
     
-    expect(port.paramType).toBe('config');
-    expect(port.consumedBy).toEqual(['startServer']);
+    assert.equal(port.paramType, 'config');
+    assert.deepEqual(port.consumedBy, ['startServer']);
     
-    expect(dbTimeout.paramType).toBe('runtime');
-    expect(dbTimeout.consumedBy).toEqual(['connectDB']);
+    assert.equal(dbTimeout.paramType, 'runtime');
+    assert.deepEqual(dbTimeout.consumedBy, ['connectDB']);
     
-    expect(maxRetries.paramType).toBe('config');
-    expect(maxRetries.consumedBy).toEqual(['processData']);
+    assert.equal(maxRetries.paramType, 'config');
+    assert.deepEqual(maxRetries.consumedBy, ['processData']);
   });
 
   it('should validate without errors when bidirectional relationships are correct', () => {
@@ -110,7 +115,7 @@ describe('Scenario 65: Bidirectional consumedBy for RunParameters', () => {
       e.message.includes('consumedBy')
     );
     
-    expect(consumedByErrors).toEqual([]);
+    assert.deepEqual(consumedByErrors, []);
   });
 
   it('should handle required and optional RunParameters with consumedBy', () => {
@@ -126,10 +131,10 @@ describe('Scenario 65: Bidirectional consumedBy for RunParameters', () => {
       e.name === 'PORT' && e.type === 'RunParameter'
     ) as any;
     
-    expect(databaseUrl.required).toBe(true);
-    expect(databaseUrl.consumedBy.length).toBeGreaterThan(0);
+    assert.equal(databaseUrl.required, true);
+    assert.ok((databaseUrl.consumedBy.length) > (0));
     
-    expect(port.defaultValue).toBe('3000');
-    expect(port.consumedBy).toEqual(['startServer']);
+    assert.equal(port.defaultValue, '3000');
+    assert.deepEqual(port.consumedBy, ['startServer']);
   });
 });

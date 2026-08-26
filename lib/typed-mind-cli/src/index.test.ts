@@ -1,41 +1,42 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 describe('Package exports', () => {
   it('should re-export DSLChecker from @sammons/typed-mind', async () => {
-    const exports = await import('./index.js');
+    const exports = await import('./index.ts');
 
-    expect(exports.DSLChecker).toBeDefined();
-    expect(typeof exports.DSLChecker).toBe('function');
+    assert.notEqual(exports.DSLChecker, undefined);
+    assert.equal(typeof exports.DSLChecker, 'function');
   });
 
   it('should re-export TypedMindRenderer from @sammons/typed-mind-renderer', async () => {
-    const exports = await import('./index.js');
+    const exports = await import('./index.ts');
 
-    expect(exports.TypedMindRenderer).toBeDefined();
-    expect(typeof exports.TypedMindRenderer).toBe('function');
+    assert.notEqual(exports.TypedMindRenderer, undefined);
+    assert.equal(typeof exports.TypedMindRenderer, 'function');
   });
 
   it('should have all expected exports', async () => {
-    const exports = await import('./index.js');
+    const exports = await import('./index.ts');
 
     // Check that we have the main exports we expect
-    expect(exports.DSLChecker).toBeDefined();
-    expect(exports.TypedMindRenderer).toBeDefined();
+    assert.notEqual(exports.DSLChecker, undefined);
+    assert.notEqual(exports.TypedMindRenderer, undefined);
 
     // These exports should be constructor functions/classes
-    expect(typeof exports.DSLChecker).toBe('function');
-    expect(typeof exports.TypedMindRenderer).toBe('function');
+    assert.equal(typeof exports.DSLChecker, 'function');
+    assert.equal(typeof exports.TypedMindRenderer, 'function');
   });
 
   it('should support both named and namespace imports', async () => {
     // Test named imports
-    const { DSLChecker, TypedMindRenderer } = await import('./index.js');
-    expect(DSLChecker).toBeDefined();
-    expect(TypedMindRenderer).toBeDefined();
+    const { DSLChecker, TypedMindRenderer } = await import('./index.ts');
+    assert.notEqual(DSLChecker, undefined);
+    assert.notEqual(TypedMindRenderer, undefined);
 
     // Test namespace import
-    const allExports = await import('./index.js');
-    expect(allExports.DSLChecker).toBeDefined();
-    expect(allExports.TypedMindRenderer).toBeDefined();
+    const allExports = await import('./index.ts');
+    assert.notEqual(allExports.DSLChecker, undefined);
+    assert.notEqual(allExports.TypedMindRenderer, undefined);
   });
 });

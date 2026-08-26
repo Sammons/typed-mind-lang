@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,21 +17,21 @@ describe('Scenario 54: Entity Name Boundaries', () => {
     const result = checker.check(content);
     
     // Should have errors for invalid names
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // Names starting with numbers are parsed but become orphaned entities
     const numberStartError = result.errors.find(e =>
       e.message.includes('123Name') &&
       e.message.includes('Orphaned')
     );
-    expect(numberStartError).toBeDefined();
+    assert.notEqual(numberStartError, undefined);
 
     // Names with special cases get parsed but may cause orphaned entity errors
     const errorMessages = result.errors.map(e => e.message);
 
     // Check that various entity names are detected as orphaned (this shows they were parsed)
-    expect(errorMessages.some(msg => msg.includes('123Name'))).toBe(true);
+    assert.equal(errorMessages.some(msg => msg.includes('123Name')), true);
     
     // Check for various naming boundary conditions in the errors
     // Most entities become orphaned, which confirms they were parsed
@@ -43,22 +44,22 @@ describe('Scenario 54: Entity Name Boundaries', () => {
     const hasTESTCASE = parseResult.entities.has('TESTCASE');
 
     // TypedMind should be case-sensitive, so all three variants should exist
-    expect(hasTestCase).toBe(true);
-    expect(hasTestcase).toBe(true);
-    expect(hasTESTCASE).toBe(true);
+    assert.equal(hasTestCase, true);
+    assert.equal(hasTestcase, true);
+    assert.equal(hasTESTCASE, true);
     
     // Valid names should not have errors
     const validNameError = result.errors.find(e => 
       e.message.includes('ValidName') &&
       !e.message.includes('Orphaned')
     );
-    expect(validNameError).toBeUndefined();
+    assert.equal(validNameError, undefined);
     
     // Long names should be valid (no arbitrary length limit)
     const longNameError = result.errors.find(e => 
       e.message.includes('VeryLongEntityName') &&
       e.message.includes('too long')
     );
-    expect(longNameError).toBeUndefined();
+    assert.equal(longNameError, undefined);
   });
 });

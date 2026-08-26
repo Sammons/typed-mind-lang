@@ -80,8 +80,7 @@
     "copy-static": "mkdir -p dist && cp -r src/static dist/",
     "dev": "tsc --build --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
-    "test": "vitest --run --passWithNoTests",
-    "test:watch": "vitest --watch",
+    "test": "echo 'no tests in renderer package'",
     "lint": "echo 'Skipping lint for now'",
     "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
@@ -93,8 +92,7 @@
   "devDependencies": {
     "@types/d3": "^7.4.3",
     "@types/node": "^22.18.1",
-    "tsup": "^8.3.5",
-    "vitest": "^3.2.4"
+    "tsup": "^8.3.5"
   },
   "publishConfig": {
     "access": "public"

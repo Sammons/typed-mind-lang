@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('Scenario 64: Bidirectional affectedBy for UIComponents', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-64-bidirectional-affectedby.tmd');
@@ -18,11 +23,11 @@ describe('Scenario 64: Bidirectional affectedBy for UIComponents', () => {
       e.name === 'UserList' && e.type === 'UIComponent'
     ) as any;
     
-    expect(userList).toBeDefined();
-    expect(userList.affectedBy).toBeDefined();
-    expect(userList.affectedBy).toContain('updateUserList');
-    expect(userList.affectedBy).toContain('refreshDashboard');
-    expect(userList.affectedBy.length).toBe(2);
+    assert.notEqual(userList, undefined);
+    assert.notEqual(userList.affectedBy, undefined);
+    assert.ok((userList.affectedBy).includes('updateUserList'));
+    assert.ok((userList.affectedBy).includes('refreshDashboard'));
+    assert.equal(userList.affectedBy.length, 2);
   });
 
   it('should handle multiple functions affecting the same UIComponent', () => {
@@ -33,9 +38,9 @@ describe('Scenario 64: Bidirectional affectedBy for UIComponents', () => {
       e.name === 'UserList' && e.type === 'UIComponent'
     ) as any;
     
-    expect(userList.affectedBy).toEqual(
-      expect.arrayContaining(['updateUserList', 'refreshDashboard'])
-    );
+    for (const expected of ['updateUserList', 'refreshDashboard']) {
+      assert.ok(userList.affectedBy.includes(expected));
+    }
   });
 
   it('should handle single function affecting UIComponent', () => {
@@ -46,8 +51,8 @@ describe('Scenario 64: Bidirectional affectedBy for UIComponents', () => {
       e.name === 'Button' && e.type === 'UIComponent'
     ) as any;
     
-    expect(button).toBeDefined();
-    expect(button.affectedBy).toEqual(['handleClick']);
+    assert.notEqual(button, undefined);
+    assert.deepEqual(button.affectedBy, ['handleClick']);
   });
 
   it('should handle UIComponent with no affecting functions', () => {
@@ -58,8 +63,8 @@ describe('Scenario 64: Bidirectional affectedBy for UIComponents', () => {
       e.name === 'Footer' && e.type === 'UIComponent'
     ) as any;
     
-    expect(footer).toBeDefined();
-    expect(footer.affectedBy).toEqual([]);
+    assert.notEqual(footer, undefined);
+    assert.deepEqual(footer.affectedBy, []);
   });
 
   it('should maintain consistency between Function.affects and UIComponent.affectedBy', () => {
@@ -73,8 +78,8 @@ describe('Scenario 64: Bidirectional affectedBy for UIComponents', () => {
       e.name === 'UserList' && e.type === 'UIComponent'
     ) as any;
     
-    expect(updateUserList.affects).toContain('UserList');
-    expect(userList.affectedBy).toContain('updateUserList');
+    assert.ok((updateUserList.affects).includes('UserList'));
+    assert.ok((userList.affectedBy).includes('updateUserList'));
   });
 
   it('should validate without errors when bidirectional relationships are correct', () => {
@@ -86,7 +91,7 @@ describe('Scenario 64: Bidirectional affectedBy for UIComponents', () => {
       e.message.includes('affectedBy')
     );
     
-    expect(affectedByErrors).toEqual([]);
+    assert.deepEqual(affectedByErrors, []);
   });
 
   it('should handle root UIComponent with affectedBy', () => {
@@ -97,8 +102,8 @@ describe('Scenario 64: Bidirectional affectedBy for UIComponents', () => {
       e.name === 'Dashboard' && e.type === 'UIComponent'
     ) as any;
     
-    expect(dashboard).toBeDefined();
-    expect(dashboard.root).toBe(true);
-    expect(dashboard.affectedBy).toEqual(['refreshDashboard']);
+    assert.notEqual(dashboard, undefined);
+    assert.equal(dashboard.root, true);
+    assert.deepEqual(dashboard.affectedBy, ['refreshDashboard']);
   });
 });

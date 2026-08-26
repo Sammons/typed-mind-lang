@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,12 +17,12 @@ describe('scenario-68-multiple-entities-same-path', () => {
     const result = checker.check(content);
     
     // The DSL should be invalid due to orphaned entities, even though path sharing is allowed
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(4);
+    assert.equal(result.valid, false);
+    assert.equal((result.errors).length, 4);
 
     // Verify all errors are about orphaned entities, not path conflicts
     result.errors.forEach(error => {
-      expect(error.message).toMatch(/^Orphaned entity/);
+      assert.match(error.message, /^Orphaned entity/);
     });
   });
 });

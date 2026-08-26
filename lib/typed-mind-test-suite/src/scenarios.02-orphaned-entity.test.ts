@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,77 +17,77 @@ describe('scenario-02-orphaned-entity', () => {
     const result = checker.check(content);
     
     // Should fail validation due to orphaned entities
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 7 errors
-    expect(result.errors).toHaveLength(7);
+    assert.equal((result.errors).length, 7);
     
     // Check for orphaned entity errors
     const orphanedFunctionError = result.errors.find(err => 
       err.message === "Orphaned entity 'OrphanedFunction'" && err.position.line === 9
     );
-    expect(orphanedFunctionError).toBeDefined();
-    expect(orphanedFunctionError?.severity).toBe('error');
-    expect(orphanedFunctionError?.suggestion).toBe('Remove or reference this entity');
-    expect(orphanedFunctionError?.position.column).toBe(1);
+    assert.notEqual(orphanedFunctionError, undefined);
+    assert.equal(orphanedFunctionError?.severity, 'error');
+    assert.equal(orphanedFunctionError?.suggestion, 'Remove or reference this entity');
+    assert.equal(orphanedFunctionError?.position.column, 1);
     
     const orphanedClassError = result.errors.find(err => 
       err.message === "Orphaned entity 'OrphanedClass'" && err.position.line === 11
     );
-    expect(orphanedClassError).toBeDefined();
-    expect(orphanedClassError?.severity).toBe('error');
-    expect(orphanedClassError?.suggestion).toBe('Remove or reference this entity');
-    expect(orphanedClassError?.position.column).toBe(1);
+    assert.notEqual(orphanedClassError, undefined);
+    assert.equal(orphanedClassError?.severity, 'error');
+    assert.equal(orphanedClassError?.suggestion, 'Remove or reference this entity');
+    assert.equal(orphanedClassError?.position.column, 1);
     
     const orphanedFileError = result.errors.find(err =>
       err.message === "Orphaned file 'OrphanedFile' - none of its exports are imported" && err.position.line === 14
     );
-    expect(orphanedFileError).toBeDefined();
-    expect(orphanedFileError?.severity).toBe('error');
-    expect(orphanedFileError?.suggestion).toBe('Remove this file or import its exports somewhere');
-    expect(orphanedFileError?.position.column).toBe(1);
+    assert.notEqual(orphanedFileError, undefined);
+    assert.equal(orphanedFileError?.severity, 'error');
+    assert.equal(orphanedFileError?.suggestion, 'Remove this file or import its exports somewhere');
+    assert.equal(orphanedFileError?.position.column, 1);
     
     // Check for function not exported errors
     const functionNotExportedError = result.errors.find(err => 
       err.message === "Function 'OrphanedFunction' is not exported by any file and is not a class method"
     );
-    expect(functionNotExportedError).toBeDefined();
-    expect(functionNotExportedError?.severity).toBe('error');
-    expect(functionNotExportedError?.suggestion).toBe("Either add 'OrphanedFunction' to the exports of a file entity or define it as a method of a class");
-    expect(functionNotExportedError?.position.line).toBe(9);
-    expect(functionNotExportedError?.position.column).toBe(1);
+    assert.notEqual(functionNotExportedError, undefined);
+    assert.equal(functionNotExportedError?.severity, 'error');
+    assert.equal(functionNotExportedError?.suggestion, "Either add 'OrphanedFunction' to the exports of a file entity or define it as a method of a class");
+    assert.equal(functionNotExportedError?.position.line, 9);
+    assert.equal(functionNotExportedError?.position.column, 1);
     
     // Check for class not exported errors
     const classNotExportedError = result.errors.find(err => 
       err.message === "Class 'OrphanedClass' is not exported by any file"
     );
-    expect(classNotExportedError).toBeDefined();
-    expect(classNotExportedError?.severity).toBe('error');
-    expect(classNotExportedError?.suggestion).toBe("Add 'OrphanedClass' to the exports of a file entity or convert to ClassFile with #: operator");
-    expect(classNotExportedError?.position.line).toBe(11);
-    expect(classNotExportedError?.position.column).toBe(1);
+    assert.notEqual(classNotExportedError, undefined);
+    assert.equal(classNotExportedError?.severity, 'error');
+    assert.equal(classNotExportedError?.suggestion, "Add 'OrphanedClass' to the exports of a file entity or convert to ClassFile with #: operator");
+    assert.equal(classNotExportedError?.position.line, 11);
+    assert.equal(classNotExportedError?.position.column, 1);
 
     // Check for additional orphaned entities
     const orphanedActiveServiceError = result.errors.find(err =>
       err.message === "Orphaned entity 'ActiveService'" && err.position.line === 6
     );
-    expect(orphanedActiveServiceError).toBeDefined();
-    expect(orphanedActiveServiceError?.severity).toBe('error');
+    assert.notEqual(orphanedActiveServiceError, undefined);
+    assert.equal(orphanedActiveServiceError?.severity, 'error');
 
     const orphanedSomethingError = result.errors.find(err =>
       err.message === "Orphaned entity 'something'" && err.position.line === 18
     );
-    expect(orphanedSomethingError).toBeDefined();
-    expect(orphanedSomethingError?.severity).toBe('error');
+    assert.notEqual(orphanedSomethingError, undefined);
+    assert.equal(orphanedSomethingError?.severity, 'error');
 
     // Verify that all errors are about orphaned entities
     const errorMessages = result.errors.map(err => err.message);
-    expect(errorMessages).toContain("Orphaned entity 'ActiveService'");
-    expect(errorMessages).toContain("Orphaned entity 'OrphanedFunction'");
-    expect(errorMessages).toContain("Orphaned entity 'OrphanedClass'");
-    expect(errorMessages).toContain("Orphaned file 'OrphanedFile' - none of its exports are imported");
-    expect(errorMessages).toContain("Orphaned entity 'something'");
-    expect(errorMessages).toContain("Function 'OrphanedFunction' is not exported by any file and is not a class method");
-    expect(errorMessages).toContain("Class 'OrphanedClass' is not exported by any file");
+    assert.ok((errorMessages).includes("Orphaned entity 'ActiveService'"));
+    assert.ok((errorMessages).includes("Orphaned entity 'OrphanedFunction'"));
+    assert.ok((errorMessages).includes("Orphaned entity 'OrphanedClass'"));
+    assert.ok((errorMessages).includes("Orphaned file 'OrphanedFile' - none of its exports are imported"));
+    assert.ok((errorMessages).includes("Orphaned entity 'something'"));
+    assert.ok((errorMessages).includes("Function 'OrphanedFunction' is not exported by any file and is not a class method"));
+    assert.ok((errorMessages).includes("Class 'OrphanedClass' is not exported by any file"));
   });
 });

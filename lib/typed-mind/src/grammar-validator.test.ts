@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { GrammarValidator } from './grammar-validator.ts';
 import type { AnyEntity, ProgramEntity, FileEntity, DTOEntity } from './types.ts';
 
@@ -21,8 +22,8 @@ describe('GrammarValidator', () => {
       if (!result.valid) {
         console.log('Validation errors:', result.errors);
       }
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      assert.equal(result.valid, true);
+      assert.equal(result.errors.length, 0);
     });
 
     it('should detect missing required fields', () => {
@@ -35,10 +36,10 @@ describe('GrammarValidator', () => {
       } as AnyEntity;
 
       const result = validator.validateEntity(invalidProgram);
-      expect(result.valid).toBe(false);
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].field).toBe('entry');
-      expect(result.errors[0].message).toContain('Required field');
+      assert.equal(result.valid, false);
+      assert.equal(result.errors.length, 1);
+      assert.equal(result.errors[0].field, 'entry');
+      assert.ok(result.errors[0].message.includes('Required field'));
     });
 
     it('should validate invalid entity type', () => {
@@ -50,8 +51,11 @@ describe('GrammarValidator', () => {
       } as AnyEntity;
 
       const result = validator.validateEntity(invalidEntity);
-      expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.field === 'type')).toBe(true);
+      assert.equal(result.valid, false);
+      assert.equal(
+        result.errors.some((e) => e.field === 'type'),
+        true,
+      );
     });
 
     it('should validate File entity with arrays', () => {
@@ -66,7 +70,7 @@ describe('GrammarValidator', () => {
       };
 
       const result = validator.validateEntity(file);
-      expect(result.valid).toBe(true);
+      assert.equal(result.valid, true);
     });
 
     it('should validate DTO fields', () => {
@@ -92,7 +96,7 @@ describe('GrammarValidator', () => {
       };
 
       const result = validator.validateEntity(dto);
-      expect(result.valid).toBe(true);
+      assert.equal(result.valid, true);
     });
 
     it('should detect invalid DTO field structure', () => {
@@ -110,8 +114,11 @@ describe('GrammarValidator', () => {
       };
 
       const result = validator.validateEntity(invalidDto);
-      expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.field.includes('fields[0].name'))).toBe(true);
+      assert.equal(result.valid, false);
+      assert.equal(
+        result.errors.some((e) => e.field.includes('fields[0].name')),
+        true,
+      );
     });
 
     it('should validate pattern matching for version', () => {
@@ -125,8 +132,11 @@ describe('GrammarValidator', () => {
       };
 
       const result = validator.validateEntity(program);
-      expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.field === 'version')).toBe(true);
+      assert.equal(result.valid, false);
+      assert.equal(
+        result.errors.some((e) => e.field === 'version'),
+        true,
+      );
     });
 
     it('should validate RunParameter paramType enum', () => {
@@ -141,7 +151,7 @@ describe('GrammarValidator', () => {
       } as AnyEntity;
 
       const result = validator.validateEntity(validParam);
-      expect(result.valid).toBe(true);
+      assert.equal(result.valid, true);
 
       const invalidParam = {
         ...validParam,
@@ -149,8 +159,11 @@ describe('GrammarValidator', () => {
       } as AnyEntity;
 
       const result2 = validator.validateEntity(invalidParam);
-      expect(result2.valid).toBe(false);
-      expect(result2.errors.some((e) => e.field === 'paramType')).toBe(true);
+      assert.equal(result2.valid, false);
+      assert.equal(
+        result2.errors.some((e) => e.field === 'paramType'),
+        true,
+      );
     });
   });
 
@@ -182,8 +195,8 @@ describe('GrammarValidator', () => {
       ]);
 
       const result = validator.validateEntities(entities);
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      assert.equal(result.valid, true);
+      assert.equal(result.errors.length, 0);
     });
   });
 
@@ -201,14 +214,14 @@ describe('GrammarValidator', () => {
       ];
 
       const formatted = validator.formatErrors(errors);
-      expect(formatted).toContain('Grammar validation errors found:');
-      expect(formatted).toContain('TodoApp (Program)');
-      expect(formatted).toContain("Required field 'entry' is missing");
+      assert.ok(formatted.includes('Grammar validation errors found:'));
+      assert.ok(formatted.includes('TodoApp (Program)'));
+      assert.ok(formatted.includes("Required field 'entry' is missing"));
     });
 
     it('should handle empty errors', () => {
       const formatted = validator.formatErrors([]);
-      expect(formatted).toBe('No grammar validation errors found.');
+      assert.equal(formatted, 'No grammar validation errors found.');
     });
   });
 });

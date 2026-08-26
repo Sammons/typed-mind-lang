@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('scenario-38-dependency-validation', () => {
   it('should validate dependency entities', () => {
@@ -16,32 +21,32 @@ describe('scenario-38-dependency-validation', () => {
     const validationResult = validator.validate(parseResult.entities);
     
     // Should be invalid due to multiple dependency validation errors
-    expect(validationResult.valid).toBe(false);
-    expect(validationResult.errors).toHaveLength(5);
+    assert.equal(validationResult.valid, false);
+    assert.equal((validationResult.errors).length, 5);
     
     const errorMessages = validationResult.errors.map(err => err.message);
     
     // Should detect that 'calls' cannot reference a Dependency
-    expect(errorMessages).toContain("Cannot use 'calls' to reference Dependency 'axios'");
+    assert.ok((errorMessages).includes("Cannot use 'calls' to reference Dependency 'axios'"));
     
     // Should detect orphaned entity
-    expect(errorMessages).toContain("Orphaned entity 'User'");
+    assert.ok((errorMessages).includes("Orphaned entity 'User'"));
     
     // Should detect that class is not exported by any file
-    expect(errorMessages).toContain("Class 'AuthService' is not exported by any file");
+    assert.ok((errorMessages).includes("Class 'AuthService' is not exported by any file"));
     
     // Should detect that method calls cannot be made on dependencies
-    expect(errorMessages).toContain("Cannot call method 'post' on Dependency 'axios'. Only Classes and ClassFiles can have methods");
+    assert.ok((errorMessages).includes("Cannot call method 'post' on Dependency 'axios'. Only Classes and ClassFiles can have methods"));
     
     // Verify specific error positions for key validation errors
     const axiosCallError = validationResult.errors.find(err => err.message.includes("Cannot use 'calls' to reference Dependency 'axios'"));
-    expect(axiosCallError?.position.line).toBe(29);
-    expect(axiosCallError?.position.column).toBe(1);
+    assert.equal(axiosCallError?.position.line, 29);
+    assert.equal(axiosCallError?.position.column, 1);
     
     const orphanedUserError = validationResult.errors.find(err => err.message.includes("Orphaned entity 'User'"));
-    expect(orphanedUserError?.position.line).toBe(43);
+    assert.equal(orphanedUserError?.position.line, 43);
     
     const authServiceError = validationResult.errors.find(err => err.message.includes("Class 'AuthService' is not exported by any file"));
-    expect(authServiceError?.position.line).toBe(21);
+    assert.equal(authServiceError?.position.line, 21);
   });
 });

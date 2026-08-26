@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,36 +17,36 @@ describe('scenario-19-uicomponent-containment', () => {
     const result = checker.check(content);
     
     // Should be invalid due to containment errors and orphaned entities
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
 
     // Should have exactly 6 errors (4 orphaned + 2 containment)
-    expect(result.errors).toHaveLength(6);
+    assert.equal((result.errors).length, 6);
 
     // Check for orphaned entity errors
     const errorMessages = result.errors.map(err => err.message);
-    expect(errorMessages).toContain("Orphaned entity 'RootApp'");
-    expect(errorMessages).toContain("Orphaned entity 'Sidebar'");
-    expect(errorMessages).toContain("Orphaned entity 'OrphanedComponent'");
-    expect(errorMessages).toContain("Orphaned entity 'AnotherRootApp'");
+    assert.ok((errorMessages).includes("Orphaned entity 'RootApp'"));
+    assert.ok((errorMessages).includes("Orphaned entity 'Sidebar'"));
+    assert.ok((errorMessages).includes("Orphaned entity 'OrphanedComponent'"));
+    assert.ok((errorMessages).includes("Orphaned entity 'AnotherRootApp'"));
 
     // Check for Sidebar containment error
     const sidebarError = result.errors.find(err =>
       err.message.includes("UIComponent 'Sidebar' is not contained by any other UIComponent")
     );
-    expect(sidebarError).toBeDefined();
-    expect(sidebarError?.position.line).toBe(12);
-    expect(sidebarError?.position.column).toBe(1);
-    expect(sidebarError?.severity).toBe('error');
-    expect(sidebarError?.suggestion).toBe("Either add 'Sidebar' to another UIComponent's contains list, or mark it as a root component with &!");
+    assert.notEqual(sidebarError, undefined);
+    assert.equal(sidebarError?.position.line, 12);
+    assert.equal(sidebarError?.position.column, 1);
+    assert.equal(sidebarError?.severity, 'error');
+    assert.equal(sidebarError?.suggestion, "Either add 'Sidebar' to another UIComponent's contains list, or mark it as a root component with &!");
 
     // Check for OrphanedComponent containment error
     const orphanedError = result.errors.find(err =>
       err.message.includes("UIComponent 'OrphanedComponent' is not contained by any other UIComponent")
     );
-    expect(orphanedError).toBeDefined();
-    expect(orphanedError?.position.line).toBe(20);
-    expect(orphanedError?.position.column).toBe(1);
-    expect(orphanedError?.severity).toBe('error');
-    expect(orphanedError?.suggestion).toBe("Either add 'OrphanedComponent' to another UIComponent's contains list, or mark it as a root component with &!");
+    assert.notEqual(orphanedError, undefined);
+    assert.equal(orphanedError?.position.line, 20);
+    assert.equal(orphanedError?.position.column, 1);
+    assert.equal(orphanedError?.severity, 'error');
+    assert.equal(orphanedError?.suggestion, "Either add 'OrphanedComponent' to another UIComponent's contains list, or mark it as a root component with &!");
   });
 });

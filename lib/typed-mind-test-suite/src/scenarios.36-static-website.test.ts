@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -17,141 +18,141 @@ describe('scenario-36-static-website', () => {
     const parsed = checker.parse(content);
     
     // Should be invalid due to orphaned entities
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // Should have the main program
-    expect(parsed.entities.has('PortfolioSite')).toBe(true);
+    assert.equal(parsed.entities.has('PortfolioSite'), true);
     const app = parsed.entities.get('PortfolioSite');
-    expect(app?.type).toBe('Program');
+    assert.equal(app?.type, 'Program');
     if (app?.type === 'Program') {
-      expect(app.entry).toBe('BuildFile');
-      expect(app.version).toBe('1.0.0');
+      assert.equal(app.entry, 'BuildFile');
+      assert.equal(app.version, '1.0.0');
     }
     
     // Should have build system files
-    expect(parsed.entities.has('BuildFile')).toBe(true);
-    expect(parsed.entities.has('PostCSSConfigFile')).toBe(true);
-    expect(parsed.entities.has('TailwindConfigFile')).toBe(true);
+    assert.equal(parsed.entities.has('BuildFile'), true);
+    assert.equal(parsed.entities.has('PostCSSConfigFile'), true);
+    assert.equal(parsed.entities.has('TailwindConfigFile'), true);
     
     // Should have page files
-    expect(parsed.entities.has('HomePageFile')).toBe(true);
-    expect(parsed.entities.has('BlogPageFile')).toBe(true);
-    expect(parsed.entities.has('BlogPostFile')).toBe(true);
-    expect(parsed.entities.has('ProjectsPageFile')).toBe(true);
-    expect(parsed.entities.has('AboutPageFile')).toBe(true);
-    expect(parsed.entities.has('ContactPageFile')).toBe(true);
+    assert.equal(parsed.entities.has('HomePageFile'), true);
+    assert.equal(parsed.entities.has('BlogPageFile'), true);
+    assert.equal(parsed.entities.has('BlogPostFile'), true);
+    assert.equal(parsed.entities.has('ProjectsPageFile'), true);
+    assert.equal(parsed.entities.has('AboutPageFile'), true);
+    assert.equal(parsed.entities.has('ContactPageFile'), true);
     
     // Should have API routes
-    expect(parsed.entities.has('ContactAPIFile')).toBe(true);
-    expect(parsed.entities.has('OGImageAPIFile')).toBe(true);
+    assert.equal(parsed.entities.has('ContactAPIFile'), true);
+    assert.equal(parsed.entities.has('OGImageAPIFile'), true);
     
     // Should have layout files
-    expect(parsed.entities.has('RootLayoutFile')).toBe(true);
-    expect(parsed.entities.has('HeaderFile')).toBe(true);
-    expect(parsed.entities.has('FooterFile')).toBe(true);
+    assert.equal(parsed.entities.has('RootLayoutFile'), true);
+    assert.equal(parsed.entities.has('HeaderFile'), true);
+    assert.equal(parsed.entities.has('FooterFile'), true);
     
     // Should have utility files
-    expect(parsed.entities.has('ContentLoaderFile')).toBe(true);
-    expect(parsed.entities.has('MDXComponentsFile')).toBe(true);
-    expect(parsed.entities.has('UtilsFile')).toBe(true);
-    expect(parsed.entities.has('HooksFile')).toBe(true);
+    assert.equal(parsed.entities.has('ContentLoaderFile'), true);
+    assert.equal(parsed.entities.has('MDXComponentsFile'), true);
+    assert.equal(parsed.entities.has('UtilsFile'), true);
+    assert.equal(parsed.entities.has('HooksFile'), true);
     
     // Should have UI components
-    expect(parsed.entities.has('HomePage')).toBe(true);
-    expect(parsed.entities.has('BlogListPage')).toBe(true);
-    expect(parsed.entities.has('BlogPostPage')).toBe(true);
-    expect(parsed.entities.has('ProjectsPage')).toBe(true);
-    expect(parsed.entities.has('AboutPage')).toBe(true);
-    expect(parsed.entities.has('ContactPage')).toBe(true);
+    assert.equal(parsed.entities.has('HomePage'), true);
+    assert.equal(parsed.entities.has('BlogListPage'), true);
+    assert.equal(parsed.entities.has('BlogPostPage'), true);
+    assert.equal(parsed.entities.has('ProjectsPage'), true);
+    assert.equal(parsed.entities.has('AboutPage'), true);
+    assert.equal(parsed.entities.has('ContactPage'), true);
     
     // Should have shared components
-    expect(parsed.entities.has('Header')).toBe(true);
-    expect(parsed.entities.has('Footer')).toBe(true);
-    expect(parsed.entities.has('Navigation')).toBe(true);
-    expect(parsed.entities.has('ThemeToggle')).toBe(true);
+    assert.equal(parsed.entities.has('Header'), true);
+    assert.equal(parsed.entities.has('Footer'), true);
+    assert.equal(parsed.entities.has('Navigation'), true);
+    assert.equal(parsed.entities.has('ThemeToggle'), true);
     
     // Should have content components
-    expect(parsed.entities.has('BlogCard')).toBe(true);
-    expect(parsed.entities.has('ProjectCard')).toBe(true);
-    expect(parsed.entities.has('ContactForm')).toBe(true);
-    expect(parsed.entities.has('Newsletter')).toBe(true);
+    assert.equal(parsed.entities.has('BlogCard'), true);
+    assert.equal(parsed.entities.has('ProjectCard'), true);
+    assert.equal(parsed.entities.has('ContactForm'), true);
+    assert.equal(parsed.entities.has('Newsletter'), true);
     
     // Should have environment variables
-    expect(parsed.entities.has('NEXT_PUBLIC_SITE_URL')).toBe(true);
-    expect(parsed.entities.has('RESEND_API_KEY')).toBe(true);
-    expect(parsed.entities.has('NODE_VERSION')).toBe(true);
+    assert.equal(parsed.entities.has('NEXT_PUBLIC_SITE_URL'), true);
+    assert.equal(parsed.entities.has('RESEND_API_KEY'), true);
+    assert.equal(parsed.entities.has('NODE_VERSION'), true);
     
     // Check environment variable types
     const siteUrl = parsed.entities.get('NEXT_PUBLIC_SITE_URL');
-    expect(siteUrl?.type).toBe('RunParameter');
+    assert.equal(siteUrl?.type, 'RunParameter');
     if (siteUrl?.type === 'RunParameter') {
-      expect(siteUrl.paramType).toBe('env');
-      expect(siteUrl.required).toBe(true);
+      assert.equal(siteUrl.paramType, 'env');
+      assert.equal(siteUrl.required, true);
     }
     
     const nodeVersion = parsed.entities.get('NODE_VERSION');
-    expect(nodeVersion?.type).toBe('RunParameter');
+    assert.equal(nodeVersion?.type, 'RunParameter');
     if (nodeVersion?.type === 'RunParameter') {
-      expect(nodeVersion.paramType).toBe('runtime');
-      expect(nodeVersion.defaultValue).toBe('20.x');
+      assert.equal(nodeVersion.paramType, 'runtime');
+      assert.equal(nodeVersion.defaultValue, '20.x');
     }
     
     // Should have content processing classes
-    expect(parsed.entities.has('MDXProcessor')).toBe(true);
-    expect(parsed.entities.has('ImageOptimizer')).toBe(true);
-    expect(parsed.entities.has('RSSGenerator')).toBe(true);
-    expect(parsed.entities.has('SitemapGenerator')).toBe(true);
+    assert.equal(parsed.entities.has('MDXProcessor'), true);
+    assert.equal(parsed.entities.has('ImageOptimizer'), true);
+    assert.equal(parsed.entities.has('RSSGenerator'), true);
+    assert.equal(parsed.entities.has('SitemapGenerator'), true);
     
     // Should have key functions
-    expect(parsed.entities.has('build')).toBe(true);
-    expect(parsed.entities.has('getAllPosts')).toBe(true);
-    expect(parsed.entities.has('getPostBySlug')).toBe(true);
-    expect(parsed.entities.has('getProjects')).toBe(true);
-    expect(parsed.entities.has('generateRSSFeed')).toBe(true);
-    expect(parsed.entities.has('generateSitemap')).toBe(true);
+    assert.equal(parsed.entities.has('build'), true);
+    assert.equal(parsed.entities.has('getAllPosts'), true);
+    assert.equal(parsed.entities.has('getPostBySlug'), true);
+    assert.equal(parsed.entities.has('getProjects'), true);
+    assert.equal(parsed.entities.has('generateRSSFeed'), true);
+    assert.equal(parsed.entities.has('generateSitemap'), true);
     
     // Should have DTOs
-    expect(parsed.entities.has('Post')).toBe(true);
-    expect(parsed.entities.has('PostParams')).toBe(true);
-    expect(parsed.entities.has('MDXSource')).toBe(true);
-    expect(parsed.entities.has('ProcessedMDX')).toBe(true);
-    expect(parsed.entities.has('ContactRequest')).toBe(true);
-    expect(parsed.entities.has('ContactResponse')).toBe(true);
+    assert.equal(parsed.entities.has('Post'), true);
+    assert.equal(parsed.entities.has('PostParams'), true);
+    assert.equal(parsed.entities.has('MDXSource'), true);
+    assert.equal(parsed.entities.has('ProcessedMDX'), true);
+    assert.equal(parsed.entities.has('ContactRequest'), true);
+    assert.equal(parsed.entities.has('ContactResponse'), true);
     
     // Check that key functions consume environment variables
     const buildFunc = parsed.entities.get('build');
-    expect(buildFunc?.type).toBe('Function');
+    assert.equal(buildFunc?.type, 'Function');
     if (buildFunc?.type === 'Function') {
-      expect(buildFunc.consumes).toContain('NODE_VERSION');
-      expect(buildFunc.consumes).toContain('DEPLOYMENT_TARGET');
+      assert.ok((buildFunc.consumes).includes('NODE_VERSION'));
+      assert.ok((buildFunc.consumes).includes('DEPLOYMENT_TARGET'));
     }
     
     const rssFunc = parsed.entities.get('generateRSSFeed');
-    expect(rssFunc?.type).toBe('Function');
+    assert.equal(rssFunc?.type, 'Function');
     if (rssFunc?.type === 'Function') {
-      expect(rssFunc.consumes).toContain('NEXT_PUBLIC_SITE_URL');
+      assert.ok((rssFunc.consumes).includes('NEXT_PUBLIC_SITE_URL'));
     }
     
     const postFunc = parsed.entities.get('POST');
-    expect(postFunc?.type).toBe('Function');
+    assert.equal(postFunc?.type, 'Function');
     if (postFunc?.type === 'Function') {
-      expect(postFunc.consumes).toContain('RESEND_API_KEY');
+      assert.ok((postFunc.consumes).includes('RESEND_API_KEY'));
     }
     
     // Should have external dependencies
-    expect(parsed.dependencies.has('next')).toBe(true);
-    expect(parsed.dependencies.has('react')).toBe(true);
-    expect(parsed.dependencies.has('tailwindcss')).toBe(true);
-    expect(parsed.dependencies.has('@mdx-js/loader')).toBe(true);
-    expect(parsed.dependencies.has('sharp')).toBe(true);
+    assert.equal(parsed.dependencies.has('next'), true);
+    assert.equal(parsed.dependencies.has('react'), true);
+    assert.equal(parsed.dependencies.has('tailwindcss'), true);
+    assert.equal(parsed.dependencies.has('@mdx-js/loader'), true);
+    assert.equal(parsed.dependencies.has('sharp'), true);
     
     // Should have assets
-    expect(parsed.entities.has('logo')).toBe(true);
-    expect(parsed.entities.has('favicon')).toBe(true);
-    expect(parsed.entities.has('fontInter')).toBe(true);
+    assert.equal(parsed.entities.has('logo'), true);
+    assert.equal(parsed.entities.has('favicon'), true);
+    assert.equal(parsed.entities.has('fontInter'), true);
     
     // Verify entity count is reasonable for a static website
-    expect(parsed.entities.size).toBeGreaterThan(100);
+    assert.ok((parsed.entities.size) > (100));
   });
 });

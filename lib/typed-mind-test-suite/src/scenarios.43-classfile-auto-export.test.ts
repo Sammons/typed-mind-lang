@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,26 +17,26 @@ describe('scenario-43-classfile-auto-export', () => {
     const result = checker.check(content);
     
     // The scenario should be invalid due to the regular class without export
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(4); // More errors than expected
+    assert.equal(result.valid, false);
+    assert.equal((result.errors).length, 4); // More errors than expected
     
     // Should find error for RegularClass being orphaned
     const orphanedError = result.errors.find(err => 
       err.message.includes('RegularClass') && 
       err.message.includes('Orphaned entity')
     );
-    expect(orphanedError).toBeDefined();
-    expect(orphanedError?.severity).toBe('error');
-    expect(orphanedError?.position.line).toBe(31); // Line where RegularClass is defined
+    assert.notEqual(orphanedError, undefined);
+    assert.equal(orphanedError?.severity, 'error');
+    assert.equal(orphanedError?.position.line, 31); // Line where RegularClass is defined
     
     // Should find error for RegularClass not being exported
     const notExportedError = result.errors.find(err => 
       err.message.includes('RegularClass') && 
       err.message.includes('is not exported by any file')
     );
-    expect(notExportedError).toBeDefined();
-    expect(notExportedError?.severity).toBe('error');
-    expect(notExportedError?.position.line).toBe(31); // Line where RegularClass is defined
+    assert.notEqual(notExportedError, undefined);
+    assert.equal(notExportedError?.severity, 'error');
+    assert.equal(notExportedError?.position.line, 31); // Line where RegularClass is defined
     
     // Should not have errors for ClassFile entities (they auto-export)
     const classFileErrors = result.errors.filter(err => 
@@ -43,6 +44,6 @@ describe('scenario-43-classfile-auto-export', () => {
       err.message.includes('ProductController') ||
       err.message.includes('BaseController')
     );
-    expect(classFileErrors.length).toBeGreaterThan(0);
+    assert.ok((classFileErrors.length) > (0));
   });
 });

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,43 +17,43 @@ describe('scenario-28-runparameter-invalid-consumes', () => {
     const content = readFileSync(filePath, 'utf-8');
     const result = checker.check(content, filePath);
     
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(3);
+    assert.equal(result.valid, false);
+    assert.equal((result.errors).length, 3);
 
     // Check for orphaned entities
     const orphanedBadFunction = result.errors.find(err =>
       err.message === "Orphaned entity 'badFunction'"
     );
-    expect(orphanedBadFunction).toBeDefined();
+    assert.notEqual(orphanedBadFunction, undefined);
 
     const orphanedAnotherBadFunction = result.errors.find(err =>
       err.message === "Orphaned entity 'anotherBadFunction'"
     );
-    expect(orphanedAnotherBadFunction).toBeDefined();
+    assert.notEqual(orphanedAnotherBadFunction, undefined);
 
     // Should detect consuming unknown parameter
     const unknownParamError = result.errors.find(err =>
       err.message === "Function 'badFunction' consumes unknown entity 'NON_EXISTENT_PARAM'"
     );
-    expect(unknownParamError).toBeDefined();
-    expect(unknownParamError?.position.line).toBe(12);
-    expect(unknownParamError?.severity).toBe('error');
-    expect(unknownParamError?.suggestion).toBe("Define 'NON_EXISTENT_PARAM' as one of: RunParameter, Asset, Dependency, Constants");
+    assert.notEqual(unknownParamError, undefined);
+    assert.equal(unknownParamError?.position.line, 12);
+    assert.equal(unknownParamError?.severity, 'error');
+    assert.equal(unknownParamError?.suggestion, "Define 'NON_EXISTENT_PARAM' as one of: RunParameter, Asset, Dependency, Constants");
     
     // Get parsed entities using parse method
     const parseResult = checker.parse(content, filePath);
     const entities = parseResult.entities;
-    expect(entities.has('DATABASE_URL')).toBe(true);
-    expect(entities.has('APP_CONFIG')).toBe(true);
-    expect(entities.has('badFunction')).toBe(true);
-    expect(entities.has('anotherBadFunction')).toBe(true);
+    assert.equal(entities.has('DATABASE_URL'), true);
+    assert.equal(entities.has('APP_CONFIG'), true);
+    assert.equal(entities.has('badFunction'), true);
+    assert.equal(entities.has('anotherBadFunction'), true);
     
     // Verify types
     const databaseUrl = entities.get('DATABASE_URL') as any;
-    expect(databaseUrl?.type).toBe('RunParameter');
-    expect(databaseUrl?.paramType).toBe('env');
+    assert.equal(databaseUrl?.type, 'RunParameter');
+    assert.equal(databaseUrl?.paramType, 'env');
     
     const appConfig = entities.get('APP_CONFIG');
-    expect(appConfig?.type).toBe('Constants');
+    assert.equal(appConfig?.type, 'Constants');
   });
 });

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -17,105 +18,105 @@ describe('scenario-33-electron-desktop-app', () => {
     const parsed = checker.parse(content);
     
     // Should be invalid due to orphaned entities
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // Should have the main program
-    expect(parsed.entities.has('CodeEditorApp')).toBe(true);
+    assert.equal(parsed.entities.has('CodeEditorApp'), true);
     const app = parsed.entities.get('CodeEditorApp');
-    expect(app?.type).toBe('Program');
+    assert.equal(app?.type, 'Program');
     if (app?.type === 'Program') {
-      expect(app.entry).toBe('MainFile');
-      expect(app.version).toBe('3.0.0');
+      assert.equal(app.entry, 'MainFile');
+      assert.equal(app.version, '3.0.0');
     }
     
     // Should have main process files
-    expect(parsed.entities.has('MainFile')).toBe(true);
-    expect(parsed.entities.has('WindowManagerFile')).toBe(true);
-    expect(parsed.entities.has('MenuBuilderFile')).toBe(true);
-    expect(parsed.entities.has('IPCHandlerFile')).toBe(true);
+    assert.equal(parsed.entities.has('MainFile'), true);
+    assert.equal(parsed.entities.has('WindowManagerFile'), true);
+    assert.equal(parsed.entities.has('MenuBuilderFile'), true);
+    assert.equal(parsed.entities.has('IPCHandlerFile'), true);
     
     // Should have main process services
-    expect(parsed.entities.has('FileSystemFile')).toBe(true);
-    expect(parsed.entities.has('GitIntegrationFile')).toBe(true);
-    expect(parsed.entities.has('TerminalServiceFile')).toBe(true);
-    expect(parsed.entities.has('PluginManagerFile')).toBe(true);
+    assert.equal(parsed.entities.has('FileSystemFile'), true);
+    assert.equal(parsed.entities.has('GitIntegrationFile'), true);
+    assert.equal(parsed.entities.has('TerminalServiceFile'), true);
+    assert.equal(parsed.entities.has('PluginManagerFile'), true);
     
     // Should have renderer process files
-    expect(parsed.entities.has('RendererFile')).toBe(true);
-    expect(parsed.entities.has('AppRendererFile')).toBe(true);
-    expect(parsed.entities.has('StoreRendererFile')).toBe(true);
+    assert.equal(parsed.entities.has('RendererFile'), true);
+    assert.equal(parsed.entities.has('AppRendererFile'), true);
+    assert.equal(parsed.entities.has('StoreRendererFile'), true);
     
     // Should have UI components
-    expect(parsed.entities.has('App')).toBe(true);
-    expect(parsed.entities.has('TabBar')).toBe(true);
-    expect(parsed.entities.has('EditorView')).toBe(true);
-    expect(parsed.entities.has('SidebarView')).toBe(true);
-    expect(parsed.entities.has('StatusBarView')).toBe(true);
-    expect(parsed.entities.has('TerminalView')).toBe(true);
+    assert.equal(parsed.entities.has('App'), true);
+    assert.equal(parsed.entities.has('TabBar'), true);
+    assert.equal(parsed.entities.has('EditorView'), true);
+    assert.equal(parsed.entities.has('SidebarView'), true);
+    assert.equal(parsed.entities.has('StatusBarView'), true);
+    assert.equal(parsed.entities.has('TerminalView'), true);
     
     // Should have editor components
-    expect(parsed.entities.has('CodeEditor')).toBe(true);
-    expect(parsed.entities.has('LineNumbers')).toBe(true);
-    expect(parsed.entities.has('Minimap')).toBe(true);
-    expect(parsed.entities.has('FileTree')).toBe(true);
+    assert.equal(parsed.entities.has('CodeEditor'), true);
+    assert.equal(parsed.entities.has('LineNumbers'), true);
+    assert.equal(parsed.entities.has('Minimap'), true);
+    assert.equal(parsed.entities.has('FileTree'), true);
     
     // Should have environment variables
-    expect(parsed.entities.has('NODE_ENV')).toBe(true);
-    expect(parsed.entities.has('UPDATE_SERVER_URL')).toBe(true);
-    expect(parsed.entities.has('ELECTRON_VERSION')).toBe(true);
+    assert.equal(parsed.entities.has('NODE_ENV'), true);
+    assert.equal(parsed.entities.has('UPDATE_SERVER_URL'), true);
+    assert.equal(parsed.entities.has('ELECTRON_VERSION'), true);
     
     // Check environment variable types
     const nodeEnv = parsed.entities.get('NODE_ENV');
-    expect(nodeEnv?.type).toBe('RunParameter');
+    assert.equal(nodeEnv?.type, 'RunParameter');
     if (nodeEnv?.type === 'RunParameter') {
-      expect(nodeEnv.paramType).toBe('env');
-      expect(nodeEnv.defaultValue).toBe('development');
+      assert.equal(nodeEnv.paramType, 'env');
+      assert.equal(nodeEnv.defaultValue, 'development');
     }
     
     const electronVersion = parsed.entities.get('ELECTRON_VERSION');
-    expect(electronVersion?.type).toBe('RunParameter');
+    assert.equal(electronVersion?.type, 'RunParameter');
     if (electronVersion?.type === 'RunParameter') {
-      expect(electronVersion.paramType).toBe('runtime');
-      expect(electronVersion.defaultValue).toBe('28.0.0');
+      assert.equal(electronVersion.paramType, 'runtime');
+      assert.equal(electronVersion.defaultValue, '28.0.0');
     }
     
     // Should have service classes
-    expect(parsed.entities.has('WindowManager')).toBe(true);
-    expect(parsed.entities.has('FileSystem')).toBe(true);
-    expect(parsed.entities.has('GitIntegration')).toBe(true);
-    expect(parsed.entities.has('TerminalService')).toBe(true);
+    assert.equal(parsed.entities.has('WindowManager'), true);
+    assert.equal(parsed.entities.has('FileSystem'), true);
+    assert.equal(parsed.entities.has('GitIntegration'), true);
+    assert.equal(parsed.entities.has('TerminalService'), true);
     
     // Should have key functions
-    expect(parsed.entities.has('createWindow')).toBe(true);
-    expect(parsed.entities.has('readFile')).toBe(true);
-    expect(parsed.entities.has('writeFile')).toBe(true);
-    expect(parsed.entities.has('getStatus')).toBe(true);
-    expect(parsed.entities.has('commit')).toBe(true);
+    assert.equal(parsed.entities.has('createWindow'), true);
+    assert.equal(parsed.entities.has('readFile'), true);
+    assert.equal(parsed.entities.has('writeFile'), true);
+    assert.equal(parsed.entities.has('getStatus'), true);
+    assert.equal(parsed.entities.has('commit'), true);
     
     // Should have DTOs
-    expect(parsed.entities.has('WindowOptions')).toBe(true);
-    expect(parsed.entities.has('FileContent')).toBe(true);
-    expect(parsed.entities.has('GitStatusResult')).toBe(true);
-    expect(parsed.entities.has('Terminal')).toBe(true);
+    assert.equal(parsed.entities.has('WindowOptions'), true);
+    assert.equal(parsed.entities.has('FileContent'), true);
+    assert.equal(parsed.entities.has('GitStatusResult'), true);
+    assert.equal(parsed.entities.has('Terminal'), true);
     
     // Check that key functions consume environment variables
     const createWindowFunc = parsed.entities.get('createWindow');
-    expect(createWindowFunc?.type).toBe('Function');
+    assert.equal(createWindowFunc?.type, 'Function');
     if (createWindowFunc?.type === 'Function') {
-      expect(createWindowFunc.consumes).toContain('NODE_ENV');
-      expect(createWindowFunc.consumes).toContain('ELECTRON_VERSION');
-      expect(createWindowFunc.consumes).toContain('UPDATE_SERVER_URL');
+      assert.ok((createWindowFunc.consumes).includes('NODE_ENV'));
+      assert.ok((createWindowFunc.consumes).includes('ELECTRON_VERSION'));
+      assert.ok((createWindowFunc.consumes).includes('UPDATE_SERVER_URL'));
     }
     
     // Should have external dependencies
-    expect(parsed.dependencies.has('electron')).toBe(true);
-    expect(parsed.dependencies.has('react')).toBe(true);
-    expect(parsed.dependencies.has('@reduxjs/toolkit')).toBe(true);
-    expect(parsed.dependencies.has('fs-extra')).toBe(true);
-    expect(parsed.dependencies.has('simple-git')).toBe(true);
+    assert.equal(parsed.dependencies.has('electron'), true);
+    assert.equal(parsed.dependencies.has('react'), true);
+    assert.equal(parsed.dependencies.has('@reduxjs/toolkit'), true);
+    assert.equal(parsed.dependencies.has('fs-extra'), true);
+    assert.equal(parsed.dependencies.has('simple-git'), true);
     
     // Verify entity count is reasonable for a full Electron app
-    expect(parsed.entities.size).toBeGreaterThan(60);
+    assert.ok((parsed.entities.size) > (60));
   });
 });

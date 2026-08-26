@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,14 +17,14 @@ describe('scenario-08-multiple-programs', () => {
     const result = checker.check(content);
     
     // Multiple programs should be valid when each references an existing File entity
-    expect(result.valid).toBe(true);
-    expect(result.errors).toHaveLength(0);
+    assert.equal(result.valid, true);
+    assert.equal((result.errors).length, 0);
     
     // Verify the specific content being tested
-    expect(content).toContain('TestApp -> MainFile v1.0.0');
-    expect(content).toContain('AnotherApp -> OtherFile v2.0.0');
-    expect(content).toContain('MainFile @ src/main.ts:');
-    expect(content).toContain('OtherFile @ src/other.ts:');
+    assert.ok((content).includes('TestApp -> MainFile v1.0.0'));
+    assert.ok((content).includes('AnotherApp -> OtherFile v2.0.0'));
+    assert.ok((content).includes('MainFile @ src/main.ts:'));
+    assert.ok((content).includes('OtherFile @ src/other.ts:'));
   });
 
   it('should parse both Program and File entities correctly', () => {
@@ -32,37 +33,37 @@ describe('scenario-08-multiple-programs', () => {
     const entities = programGraph.entities;
     
     // Should have exactly 4 entities: 2 Programs + 2 Files
-    expect(entities.size).toBe(4);
+    assert.equal(entities.size, 4);
     
     // Check that both programs exist
-    expect(entities.has('TestApp')).toBe(true);
-    expect(entities.has('AnotherApp')).toBe(true);
+    assert.equal(entities.has('TestApp'), true);
+    assert.equal(entities.has('AnotherApp'), true);
     
     // Check that both files exist  
-    expect(entities.has('MainFile')).toBe(true);
-    expect(entities.has('OtherFile')).toBe(true);
+    assert.equal(entities.has('MainFile'), true);
+    assert.equal(entities.has('OtherFile'), true);
     
     // Verify program entities point to correct entry files
     const testApp = entities.get('TestApp');
     const anotherApp = entities.get('AnotherApp');
     
-    expect(testApp?.type).toBe('Program');
-    expect(testApp?.entry).toBe('MainFile');
-    expect(testApp?.version).toBe('1.0.0');
+    assert.equal(testApp?.type, 'Program');
+    assert.equal(testApp?.entry, 'MainFile');
+    assert.equal(testApp?.version, '1.0.0');
     
-    expect(anotherApp?.type).toBe('Program');
-    expect(anotherApp?.entry).toBe('OtherFile');  
-    expect(anotherApp?.version).toBe('2.0.0');
+    assert.equal(anotherApp?.type, 'Program');
+    assert.equal(anotherApp?.entry, 'OtherFile');  
+    assert.equal(anotherApp?.version, '2.0.0');
     
     // Verify file entities have correct paths
     const mainFile = entities.get('MainFile');
     const otherFile = entities.get('OtherFile');
     
-    expect(mainFile?.type).toBe('File');
-    expect(mainFile?.path).toBe('src/main.ts');
+    assert.equal(mainFile?.type, 'File');
+    assert.equal(mainFile?.path, 'src/main.ts');
     
-    expect(otherFile?.type).toBe('File');
-    expect(otherFile?.path).toBe('src/other.ts');
+    assert.equal(otherFile?.type, 'File');
+    assert.equal(otherFile?.path, 'src/other.ts');
   });
 
   it('should demonstrate that TypedMind DSL allows multiple independent programs', () => {
@@ -74,19 +75,19 @@ describe('scenario-08-multiple-programs', () => {
     // - Microservices architectures with multiple entry points
     // - Client/server applications with separate programs
     // - Multi-target builds (web, desktop, mobile)
-    expect(result.valid).toBe(true);
-    expect(result.errors).toHaveLength(0);
+    assert.equal(result.valid, true);
+    assert.equal((result.errors).length, 0);
     
     // Verify no circular dependency errors between programs
     const circularDepErrors = result.errors.filter(err => 
       err.message.includes('Circular dependency')
     );
-    expect(circularDepErrors).toHaveLength(0);
+    assert.equal((circularDepErrors).length, 0);
     
     // Verify no entry point validation errors
     const entryPointErrors = result.errors.filter(err => 
       err.message.includes('entry point')
     );
-    expect(entryPointErrors).toHaveLength(0);
+    assert.equal((entryPointErrors).length, 0);
   });
 });

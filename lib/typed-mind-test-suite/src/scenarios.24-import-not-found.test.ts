@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -17,26 +18,26 @@ describe('scenario-24-import-not-found', () => {
     const result = checker.check(content, filePath);
     
     // Should be invalid due to import file not found
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 2 errors (1 failed import + 1 orphaned entity)
-    expect(result.errors).toHaveLength(2);
+    assert.equal((result.errors).length, 2);
 
     // Check for import file not found error
     const importError = result.errors.find(err => err.message.includes('Failed to import'));
-    expect(importError).toBeDefined();
-    expect(importError?.message).toMatch(/Failed to import '\.\/non-existent-file\.tmd'/);
-    expect(importError?.message).toMatch(/ENOENT: no such file or directory/);
-    expect(importError?.position.line).toBe(2);
-    expect(importError?.position.column).toBe(1);
-    expect(importError?.severity).toBe('error');
+    assert.notEqual(importError, undefined);
+    assert.match(importError?.message, /Failed to import '\.\/non-existent-file\.tmd'/);
+    assert.match(importError?.message, /ENOENT: no such file or directory/);
+    assert.equal(importError?.position.line, 2);
+    assert.equal(importError?.position.column, 1);
+    assert.equal(importError?.severity, 'error');
 
     // Check for orphaned entity error
     const orphanedError = result.errors.find(err => err.message.includes("Orphaned entity 'main'"));
-    expect(orphanedError).toBeDefined();
-    expect(orphanedError?.position.line).toBe(9);
-    expect(orphanedError?.position.column).toBe(1);
-    expect(orphanedError?.severity).toBe('error');
-    expect(orphanedError?.suggestion).toBe('Remove or reference this entity');
+    assert.notEqual(orphanedError, undefined);
+    assert.equal(orphanedError?.position.line, 9);
+    assert.equal(orphanedError?.position.column, 1);
+    assert.equal(orphanedError?.severity, 'error');
+    assert.equal(orphanedError?.suggestion, 'Remove or reference this entity');
   });
 });

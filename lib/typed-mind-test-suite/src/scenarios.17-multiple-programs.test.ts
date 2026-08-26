@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,17 +17,17 @@ describe('scenario-17-multiple-programs', () => {
     const result = checker.check(content);
     
     // Should be invalid due to validation errors
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 13 validation errors (including extra orphaned entities)
-    expect(result.errors).toHaveLength(13);
+    assert.equal((result.errors).length, 13);
     
     // Check for entry point validation errors
     const entryPointErrors = result.errors.filter(err => 
       err.message.includes("Cannot use 'entry' to reference Asset 'IndexHTML'") ||
       err.message.includes("Program 'UIProgram' entry point 'IndexHTML' must be a File entity")
     );
-    expect(entryPointErrors).toHaveLength(2);
+    assert.equal((entryPointErrors).length, 2);
     
     // Check for orphaned UIComponent entities
     const orphanedUIErrors = result.errors.filter(err => 
@@ -37,28 +38,28 @@ describe('scenario-17-multiple-programs', () => {
        err.message.includes('DetailsPanel') || 
        err.message.includes('ErrorPanel'))
     );
-    expect(orphanedUIErrors).toHaveLength(5);
+    assert.equal((orphanedUIErrors).length, 5);
     
     // Check for UIComponent containment errors
     const uiContainmentErrors = result.errors.filter(err => 
       err.message.includes('is not contained by any other UIComponent')
     );
-    expect(uiContainmentErrors).toHaveLength(5);
+    assert.equal((uiContainmentErrors).length, 5);
     
     // Verify specific error messages exist
-    expect(result.errors.some(err => err.message.includes("Cannot use 'entry' to reference Asset 'IndexHTML'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Program 'UIProgram' entry point 'IndexHTML' must be a File entity"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Orphaned entity 'AppContainer'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Orphaned entity 'Sidebar'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Orphaned entity 'GraphCanvas'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Orphaned entity 'DetailsPanel'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Orphaned entity 'ErrorPanel'"))).toBe(true);
+    assert.equal(result.errors.some(err => err.message.includes("Cannot use 'entry' to reference Asset 'IndexHTML'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Program 'UIProgram' entry point 'IndexHTML' must be a File entity")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned entity 'AppContainer'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned entity 'Sidebar'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned entity 'GraphCanvas'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned entity 'DetailsPanel'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned entity 'ErrorPanel'")), true);
     
     // Verify UIComponent containment errors for each component
-    expect(result.errors.some(err => err.message.includes("UIComponent 'AppContainer' is not contained by any other UIComponent"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("UIComponent 'Sidebar' is not contained by any other UIComponent"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("UIComponent 'GraphCanvas' is not contained by any other UIComponent"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("UIComponent 'DetailsPanel' is not contained by any other UIComponent"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("UIComponent 'ErrorPanel' is not contained by any other UIComponent"))).toBe(true);
+    assert.equal(result.errors.some(err => err.message.includes("UIComponent 'AppContainer' is not contained by any other UIComponent")), true);
+    assert.equal(result.errors.some(err => err.message.includes("UIComponent 'Sidebar' is not contained by any other UIComponent")), true);
+    assert.equal(result.errors.some(err => err.message.includes("UIComponent 'GraphCanvas' is not contained by any other UIComponent")), true);
+    assert.equal(result.errors.some(err => err.message.includes("UIComponent 'DetailsPanel' is not contained by any other UIComponent")), true);
+    assert.equal(result.errors.some(err => err.message.includes("UIComponent 'ErrorPanel' is not contained by any other UIComponent")), true);
   });
 });

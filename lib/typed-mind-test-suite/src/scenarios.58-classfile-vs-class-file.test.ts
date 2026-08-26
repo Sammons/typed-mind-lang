@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-58-classfile-vs-class-file.tmd');
@@ -14,7 +19,7 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
     const parseResult = parser.parse(content);
     const validationResult = validator.validate(parseResult.entities);
     
-    expect(validationResult.valid).toBe(false);
+    assert.equal(validationResult.valid, false);
     const errors = validationResult.errors;
 
     // There should be validation errors from ClassFile vs Class+File conflicts
@@ -24,18 +29,18 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
       e.message.includes("Circular import detected") &&
       e.message.includes("ServiceA -> ServiceB -> ServiceA")
     );
-    expect(circularError).toBeDefined();
+    assert.notEqual(circularError, undefined);
     
     // Mistake 4: Cannot import non-existent entities
     const importError = errors.find(e =>
       e.message.includes("Import 'UserRepository' not found")
     );
-    expect(importError).toBeDefined();
+    assert.notEqual(importError, undefined);
     
     // Mistake 5: ClassFile duplicate export
     // ClassFile auto-exports itself, so manual export is redundant
     if (!parseResult || !parseResult.entities) {
-      expect.fail('parseResult or entities is undefined');
+      assert.fail('parseResult or entities is undefined');
       return;
     }
 
@@ -44,19 +49,19 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
       e.name === 'GoodService' && e.type === 'ClassFile'
     );
     // The exports should include helper but GoodService is implicit
-    expect(goodService?.exports).toContain('helper');
+    assert.ok((goodService?.exports).includes('helper'));
     
     // Mistake 6: Cannot call ClassFile directly (method call syntax)
     const processUserError = errors.find(e =>
       e.message.includes("Cannot use 'calls' to reference ClassFile 'UserService'")
     );
-    expect(processUserError).toBeDefined();
+    assert.notEqual(processUserError, undefined);
     
     // Mistake 7: Classes not exported by any file
     const orphanedClassError = errors.find(e =>
       e.message.includes("Class 'DataClass' is not exported by any file")
     );
-    expect(orphanedClassError).toBeDefined();
+    assert.notEqual(orphanedClassError, undefined);
   });
 
   it('should properly parse ClassFile features', () => {
@@ -64,7 +69,7 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
     
     // UserService ClassFile
     if (!parseResult || !parseResult.entities) {
-      expect.fail('parseResult or entities is undefined');
+      assert.fail('parseResult or entities is undefined');
       return;
     }
 
@@ -72,31 +77,31 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
     const userService = entitiesArray.find(e =>
       e.name === 'UserService' && e.type === 'ClassFile'
     );
-    expect(userService).toBeDefined();
-    expect(userService?.path).toBe('src/services/user.ts');
-    expect(userService?.methods).toContain('createUser');
-    expect(userService?.imports).toContain('UserRepository');
-    expect(userService?.exports).toContain('userHelper');
+    assert.notEqual(userService, undefined);
+    assert.equal(userService?.path, 'src/services/user.ts');
+    assert.ok((userService?.methods).includes('createUser'));
+    assert.ok((userService?.imports).includes('UserRepository'));
+    assert.ok((userService?.exports).includes('userHelper'));
     
     // EmptyService with no methods (valid)
     const emptyService = entitiesArray.find(e =>
       e.name === 'EmptyService' && e.type === 'ClassFile'
     );
-    expect(emptyService).toBeDefined();
-    expect(emptyService?.methods?.length || 0).toBe(0);
+    assert.notEqual(emptyService, undefined);
+    assert.equal(emptyService?.methods?.length || 0, 0);
     
     // ExtendedService extending another ClassFile
     const extendedService = entitiesArray.find(e =>
       e.name === 'ExtendedService' && e.type === 'ClassFile'
     );
-    expect(extendedService?.extends).toContain('UserService');
+    assert.ok((extendedService?.extends).includes('UserService'));
   });
 
   it('should distinguish when to use ClassFile vs Class+File', () => {
     const parseResult = parser.parse(content);
 
     if (!parseResult || !parseResult.entities) {
-      expect.fail('parseResult or entities is undefined');
+      assert.fail('parseResult or entities is undefined');
       return;
     }
 
@@ -106,28 +111,28 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
     const moduleService = entitiesArray.find(e =>
       e.name === 'ModuleService' && e.type === 'ClassFile'
     );
-    expect(moduleService).toBeDefined();
+    assert.notEqual(moduleService, undefined);
     
     // SharedFile: Good use of separate File (multiple class exports)
     const sharedFile = entitiesArray.find(e =>
       e.name === 'SharedFile' && e.type === 'File'
     );
-    expect(sharedFile?.exports).toContain('SharedClass');
-    expect(sharedFile?.exports).toContain('AnotherClass');
-    expect(sharedFile?.exports).toContain('utilFunc');
+    assert.ok((sharedFile?.exports).includes('SharedClass'));
+    assert.ok((sharedFile?.exports).includes('AnotherClass'));
+    assert.ok((sharedFile?.exports).includes('utilFunc'));
     
     // Both SharedClass and AnotherClass exist as separate entities
     const sharedClass = entitiesArray.find(e =>
       e.name === 'SharedClass' && e.type === 'Class'
     );
-    expect(sharedClass).toBeDefined();
+    assert.notEqual(sharedClass, undefined);
   });
 
   it('should handle invalid syntax attempts', () => {
     const parseResult = parser.parse(content);
 
     if (!parseResult || !parseResult.entities) {
-      expect.fail('parseResult or entities is undefined');
+      assert.fail('parseResult or entities is undefined');
       return;
     }
 
@@ -137,12 +142,12 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
     const dataFile = entitiesArray.find(e =>
       e.name === 'DataFile' && e.type === 'File'
     );
-    expect(dataFile?.methods).toBeUndefined();
+    assert.equal(dataFile?.methods, undefined);
     
     // Classes can't have paths (@ syntax)
     const dataClass = entitiesArray.find(e =>
       e.name === 'DataClass' && e.type === 'Class'
     );
-    expect(dataClass?.path).toBeUndefined();
+    assert.equal(dataClass?.path, undefined);
   });
 });

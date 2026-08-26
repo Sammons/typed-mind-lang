@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('Scenario 63: File isolation patterns', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-63-file-isolation-patterns.tmd');
@@ -18,17 +23,17 @@ describe('Scenario 63: File isolation patterns', () => {
     );
     
     // Imports internal modules
-    expect(publicAPI?.imports).toContain('InternalService');
-    expect(publicAPI?.imports).toContain('PrivateHelper');
-    expect(publicAPI?.imports).toContain('SharedUtils');
+    assert.ok((publicAPI?.imports).includes('InternalService'));
+    assert.ok((publicAPI?.imports).includes('PrivateHelper'));
+    assert.ok((publicAPI?.imports).includes('SharedUtils'));
     
     // Selectively exports only public methods
-    expect(publicAPI?.exports).toContain('publicMethod');
-    expect(publicAPI?.exports).toContain('utilityFunction');
+    assert.ok((publicAPI?.exports).includes('publicMethod'));
+    assert.ok((publicAPI?.exports).includes('utilityFunction'));
     
     // Does not export internal helpers
-    expect(publicAPI?.exports).not.toContain('processInternal');
-    expect(publicAPI?.exports).not.toContain('privateProcess');
+    assert.ok(!(publicAPI?.exports).includes('processInternal'));
+    assert.ok(!(publicAPI?.exports).includes('privateProcess'));
   });
 
   it('should enforce module boundaries', () => {
@@ -39,16 +44,16 @@ describe('Scenario 63: File isolation patterns', () => {
       e.name === 'AuthModule' && e.type === 'File'
     );
     
-    expect(authModule?.imports).toContain('AuthService');
-    expect(authModule?.imports).toContain('AuthValidator');
-    expect(authModule?.imports).toContain('AuthConfig');
+    assert.ok((authModule?.imports).includes('AuthService'));
+    assert.ok((authModule?.imports).includes('AuthValidator'));
+    assert.ok((authModule?.imports).includes('AuthConfig'));
     
-    expect(authModule?.exports).toContain('authenticate');
-    expect(authModule?.exports).toContain('authorize');
+    assert.ok((authModule?.exports).includes('authenticate'));
+    assert.ok((authModule?.exports).includes('authorize'));
     
     // Internal auth components not exposed
-    expect(authModule?.exports).not.toContain('AuthService');
-    expect(authModule?.exports).not.toContain('validateUser');
+    assert.ok(!(authModule?.exports).includes('AuthService'));
+    assert.ok(!(authModule?.exports).includes('validateUser'));
   });
 
   it('should handle layered architecture', () => {
@@ -58,21 +63,21 @@ describe('Scenario 63: File isolation patterns', () => {
     const presentation = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'PresentationLayer' && e.type === 'File'
     );
-    expect(presentation?.imports).toContain('BusinessLayer');
-    expect(presentation?.imports).not.toContain('DataLayer'); // No direct access
+    assert.ok((presentation?.imports).includes('BusinessLayer'));
+    assert.ok(!(presentation?.imports).includes('DataLayer')); // No direct access
     
     // Business depends on Data
     const business = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'BusinessLayer' && e.type === 'File'
     );
-    expect(business?.imports).toContain('DataLayer');
-    expect(business?.imports).not.toContain('Database'); // No direct DB access
+    assert.ok((business?.imports).includes('DataLayer'));
+    assert.ok(!(business?.imports).includes('Database')); // No direct DB access
     
     // Data encapsulates Database
     const data = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'DataLayer' && e.type === 'File'
     );
-    expect(data?.imports).toContain('Database');
+    assert.ok((data?.imports).includes('Database'));
   });
 
   it('should detect circular dependencies between modules', () => {
@@ -82,10 +87,10 @@ describe('Scenario 63: File isolation patterns', () => {
     const errors = validationResult.errors.map(e => e.message);
     
     // ModuleA imports ModuleB, ModuleB imports ModuleA
-    expect(errors.some(e => 
+    assert.equal(errors.some(e => 
       e.includes('Circular') && 
       (e.includes('ModuleA') || e.includes('ModuleB'))
-    )).toBe(true);
+    ), true);
   });
 
   it('should detect orphaned functions', () => {
@@ -95,17 +100,17 @@ describe('Scenario 63: File isolation patterns', () => {
     const errors = validationResult.errors.map(e => e.message);
     
     // orphanedFunction is not exported from any file
-    expect(errors.some(e => 
+    assert.equal(errors.some(e => 
       e.includes('orphanedFunction') && 
       (e.includes('not exported') || e.includes('orphaned'))
-    )).toBe(true);
+    ), true);
     
     // Private implementation details are exported from their file
     const implDetail = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'ImplementationDetail' && e.type === 'File'
     );
-    expect(implDetail?.exports).toContain('privateImpl');
-    expect(implDetail?.exports).toContain('secretAlgorithm');
+    assert.ok((implDetail?.exports).includes('privateImpl'));
+    assert.ok((implDetail?.exports).includes('secretAlgorithm'));
   });
 
   it('should handle re-export patterns', () => {
@@ -116,17 +121,17 @@ describe('Scenario 63: File isolation patterns', () => {
     );
     
     // Re-exports imported entities
-    expect(coreExports?.imports).toContain('CoreService');
-    expect(coreExports?.imports).toContain('CoreUtils');
-    expect(coreExports?.imports).toContain('CoreTypes');
+    assert.ok((coreExports?.imports).includes('CoreService'));
+    assert.ok((coreExports?.imports).includes('CoreUtils'));
+    assert.ok((coreExports?.imports).includes('CoreTypes'));
     
-    expect(coreExports?.exports).toContain('CoreService');
-    expect(coreExports?.exports).toContain('coreUtil');
-    expect(coreExports?.exports).toContain('CoreConfig');
+    assert.ok((coreExports?.exports).includes('CoreService'));
+    assert.ok((coreExports?.exports).includes('coreUtil'));
+    assert.ok((coreExports?.exports).includes('CoreConfig'));
     
     // Doesn't export everything (selective re-export)
-    expect(coreExports?.exports).not.toContain('coreHelper');
-    expect(coreExports?.exports).not.toContain('CoreState');
+    assert.ok(!(coreExports?.exports).includes('coreHelper'));
+    assert.ok(!(coreExports?.exports).includes('CoreState'));
   });
 
   it('should handle files with no exports', () => {
@@ -137,16 +142,16 @@ describe('Scenario 63: File isolation patterns', () => {
       e.name === 'NoExportFile' && e.type === 'File'
     );
     
-    expect(noExportFile?.imports).toContain('Logger');
-    expect(noExportFile?.exports?.length || 0).toBe(0);
+    assert.ok((noExportFile?.imports).includes('Logger'));
+    assert.equal(noExportFile?.exports?.length || 0, 0);
     
     // Import only file with explicit empty exports
     const importOnlyFile = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'ImportOnlyFile' && e.type === 'File'
     );
     
-    expect(importOnlyFile?.imports?.length).toBeGreaterThan(0);
-    expect(importOnlyFile?.exports?.length || 0).toBe(0);
+    assert.ok((importOnlyFile?.imports?.length) > (0));
+    assert.equal(importOnlyFile?.exports?.length || 0, 0);
   });
 
   it('should handle test file isolation', () => {
@@ -157,19 +162,19 @@ describe('Scenario 63: File isolation patterns', () => {
     );
     
     // Test file imports public APIs
-    expect(testFile?.imports).toContain('PublicAPI');
-    expect(testFile?.imports).toContain('CoreExports');
+    assert.ok((testFile?.imports).includes('PublicAPI'));
+    assert.ok((testFile?.imports).includes('CoreExports'));
     
     // Exports test suite
-    expect(testFile?.exports).toContain('testSuite');
+    assert.ok((testFile?.exports).includes('testSuite'));
     
     const testSuite = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'testSuite' && e.type === 'Function'
     );
     
     // Test calls public methods
-    expect(testSuite?.calls).toContain('publicMethod');
-    expect(testSuite?.calls).toContain('coreUtil');
+    assert.ok((testSuite?.calls).includes('publicMethod'));
+    assert.ok((testSuite?.calls).includes('coreUtil'));
   });
 
   it('should handle environment-specific files', () => {
@@ -179,13 +184,13 @@ describe('Scenario 63: File isolation patterns', () => {
     const devFile = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'DevFile' && e.type === 'File'
     );
-    expect(devFile?.path).toContain('dev/');
+    assert.ok((devFile?.path).includes('dev/'));
     
     // Prod-specific file
     const prodFile = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'ProdFile' && e.type === 'File'
     );
-    expect(prodFile?.path).toContain('prod/');
+    assert.ok((prodFile?.path).includes('prod/'));
     
     // Different entry points
     const devEntry = Array.from(parseResult.entities.values()).find(e => 
@@ -195,8 +200,8 @@ describe('Scenario 63: File isolation patterns', () => {
       e.name === 'ProdEntry' && e.type === 'File'
     );
     
-    expect(devEntry?.imports).toContain('DevFile');
-    expect(prodEntry?.imports).toContain('ProdFile');
+    assert.ok((devEntry?.imports).includes('DevFile'));
+    assert.ok((prodEntry?.imports).includes('ProdFile'));
   });
 
   it.skip('should handle multiple programs for different builds', () => {
@@ -209,13 +214,13 @@ describe('Scenario 63: File isolation patterns', () => {
     const devApp = programs.find(p => p.name === 'DevApp');
     const prodApp = programs.find(p => p.name === 'ProdApp');
     
-    expect(isolationApp?.entry).toBe('main');
-    expect(devApp?.entry).toBe('DevEntry');
-    expect(prodApp?.entry).toBe('ProdEntry');
+    assert.equal(isolationApp?.entry, 'main');
+    assert.equal(devApp?.entry, 'DevEntry');
+    assert.equal(prodApp?.entry, 'ProdEntry');
     
     // Different versions
-    expect(devApp?.version).toBe('v1.0.0-dev');
-    expect(prodApp?.version).toBe('v1.0.0');
+    assert.equal(devApp?.version, 'v1.0.0-dev');
+    assert.equal(prodApp?.version, 'v1.0.0');
   });
 
   it('should validate file isolation integrity', () => {
@@ -228,7 +233,7 @@ describe('Scenario 63: File isolation patterns', () => {
     );
     
     // InternalService is imported by PublicAPI
-    expect(internalService).toBeDefined();
+    assert.notEqual(internalService, undefined);
     
     // Private functions should be traceable
     const privateHelper = Array.from(parseResult.entities.values()).find(e => 
@@ -236,7 +241,7 @@ describe('Scenario 63: File isolation patterns', () => {
     );
     
     // PrivateHelper is imported by PublicAPI and InternalService
-    expect(privateHelper).toBeDefined();
+    assert.notEqual(privateHelper, undefined);
   });
 
   it('should validate all layer dependencies', () => {
@@ -249,18 +254,18 @@ describe('Scenario 63: File isolation patterns', () => {
     const layerViolations = errors.filter(e => 
       e.includes('PresentationLayer') && e.includes('DataLayer')
     );
-    expect(layerViolations.length).toBe(0);
+    assert.equal(layerViolations.length, 0);
     
     // All layer functions should be properly connected
     const handleRequest = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'handleRequest' && e.type === 'Function'
     );
-    expect(handleRequest?.calls).toContain('processBusinessLogic');
+    assert.ok((handleRequest?.calls).includes('processBusinessLogic'));
     
     const processBusinessLogic = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'processBusinessLogic' && e.type === 'Function'
     );
-    expect(processBusinessLogic?.calls).toContain('queryData');
-    expect(processBusinessLogic?.calls).toContain('updateData');
+    assert.ok((processBusinessLogic?.calls).includes('queryData'));
+    assert.ok((processBusinessLogic?.calls).includes('updateData'));
   });
 });

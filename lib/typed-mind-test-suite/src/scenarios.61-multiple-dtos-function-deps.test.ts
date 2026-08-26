@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('Scenario 61: Multiple DTOs in function dependencies', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-61-multiple-dtos-function-deps.tmd');
@@ -18,8 +23,8 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
       e.name === 'simpleTransform' && e.type === 'Function'
     );
     
-    expect(simpleTransform?.input).toBe('InputDTO');
-    expect(simpleTransform?.output).toBe('OutputDTO');
+    assert.equal(simpleTransform?.input, 'InputDTO');
+    assert.equal(simpleTransform?.output, 'OutputDTO');
   });
 
   it('should handle multiple DTOs in dependencies', () => {
@@ -31,7 +36,7 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
     );
     
     // First DTO should be input if signature matches
-    expect(complexTransform?.input).toBe('ComplexInput');
+    assert.equal(complexTransform?.input, 'ComplexInput');
     
     // Other DTOs might be in consumes or remain in dependencies
     const allDTOs = [
@@ -40,7 +45,7 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
       ...(complexTransform?.calls || [])
     ].filter(Boolean);
     
-    expect(allDTOs).toContain('ComplexInput');
+    assert.ok((allDTOs).includes('ComplexInput'));
     // ValidationRules and TransformConfig should be somewhere
   });
 
@@ -51,8 +56,8 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
       e.name === 'explicitFunction' && e.type === 'Function'
     );
     
-    expect(explicitFunction?.input).toBe('RequestDTO');
-    expect(explicitFunction?.output).toBe('ResponseDTO');
+    assert.equal(explicitFunction?.input, 'RequestDTO');
+    assert.equal(explicitFunction?.output, 'ResponseDTO');
     
     // ConfigDTO and StateDTO should be in dependencies somewhere
     const deps = [
@@ -72,10 +77,10 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
     
     // Function signature has two parameters
     // Parser should assign first DTO as input
-    expect(ambiguousFunction?.input).toBe('AmbiguousA');
+    assert.equal(ambiguousFunction?.input, 'AmbiguousA');
     
     // Extra DTOs beyond first are ignored (they should use explicit syntax)
-    expect(ambiguousFunction?.consumes).toEqual([]);
+    assert.deepEqual(ambiguousFunction?.consumes, []);
     // Note: AmbiguousB and AmbiguousC are ignored since only one DTO can be auto-assigned as input
   });
 
@@ -86,8 +91,8 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
       e.name === 'selfTransform' && e.type === 'Function'
     );
     
-    expect(selfTransform?.input).toBe('SelfDTO');
-    expect(selfTransform?.output).toBe('SelfDTO');
+    assert.equal(selfTransform?.input, 'SelfDTO');
+    assert.equal(selfTransform?.output, 'SelfDTO');
   });
 
   it('should auto-distribute mixed dependencies', () => {
@@ -98,8 +103,8 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
     );
     
     // Check auto-distribution
-    expect(mixedDependencies?.input).toBe('MixedInput');
-    expect(mixedDependencies?.calls).toContain('helperFunction');
+    assert.equal(mixedDependencies?.input, 'MixedInput');
+    assert.ok((mixedDependencies?.calls).includes('helperFunction'));
     
     // DataProcessor might be in calls (for its methods)
     const hasDataProcessor = 
@@ -107,7 +112,7 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
       mixedDependencies?.calls?.includes('process') ||
       mixedDependencies?.calls?.includes('validate');
     
-    expect(mixedDependencies?.consumes).toContain('DATABASE_URL');
+    assert.ok((mixedDependencies?.consumes).includes('DATABASE_URL'));
   });
 
   it('should handle functions with only DTO dependencies', () => {
@@ -117,8 +122,8 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
       e.name === 'pureDataFunction' && e.type === 'Function'
     );
     
-    expect(pureDataFunction?.input).toBe('PureInput');
-    expect(pureDataFunction?.output).toBe('PureOutput');
+    assert.equal(pureDataFunction?.input, 'PureInput');
+    assert.equal(pureDataFunction?.output, 'PureOutput');
     
     // PureConfig and PureState should be distributed somewhere
     const allDeps = [
@@ -127,7 +132,7 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
       ...(pureDataFunction?.calls || [])
     ].filter(Boolean);
     
-    expect(allDeps).toContain('PureInput');
+    assert.ok((allDeps).includes('PureInput'));
     // PureConfig and PureState handling depends on parser logic
   });
 
@@ -148,16 +153,16 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
       e.name === 'InnerDTO' && e.type === 'DTO'
     );
     
-    expect(nestedInput?.fields?.some(f => f.type === 'OuterDTO')).toBe(true);
-    expect(outerDTO?.fields?.some(f => f.type === 'MiddleDTO')).toBe(true);
-    expect(middleDTO?.fields?.some(f => f.type === 'InnerDTO')).toBe(true);
+    assert.equal(nestedInput?.fields?.some(f => f.type === 'OuterDTO'), true);
+    assert.equal(outerDTO?.fields?.some(f => f.type === 'MiddleDTO'), true);
+    assert.equal(middleDTO?.fields?.some(f => f.type === 'InnerDTO'), true);
     
     const nestedFunction = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'nestedFunction' && e.type === 'Function'
     );
     
-    expect(nestedFunction?.input).toBe('NestedInput');
-    expect(nestedFunction?.output).toBe('NestedOutput');
+    assert.equal(nestedFunction?.input, 'NestedInput');
+    assert.equal(nestedFunction?.output, 'NestedOutput');
   });
 
   it('should handle DTO arrays and optional fields', () => {
@@ -169,19 +174,19 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
     
     // Check array field
     const itemsField = arrayInput?.fields?.find(f => f.name === 'items');
-    expect(itemsField?.type).toBe('ItemDTO[]');
+    assert.equal(itemsField?.type, 'ItemDTO[]');
     
     // Check optional field
     const optionalField = arrayInput?.fields?.find(f => f.name === 'optional');
-    expect(optionalField?.optional).toBe(true);
-    expect(optionalField?.type).toBe('OptionalDTO');
+    assert.equal(optionalField?.optional, true);
+    assert.equal(optionalField?.type, 'OptionalDTO');
     
     const arrayFunction = Array.from(parseResult.entities.values()).find(e => 
       e.name === 'arrayFunction' && e.type === 'Function'
     );
     
-    expect(arrayFunction?.input).toBe('ArrayInput');
-    expect(arrayFunction?.output).toBe('ArrayOutput');
+    assert.equal(arrayFunction?.input, 'ArrayInput');
+    assert.equal(arrayFunction?.output, 'ArrayOutput');
   });
 
   it('should validate all DTOs are properly defined', () => {
@@ -190,7 +195,7 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
     
     // All DTOs should be valid
     const dtos = Array.from(parseResult.entities.values()).filter(e => e.type === 'DTO');
-    expect(dtos.length).toBeGreaterThan(20); // We have many DTOs
+    assert.ok((dtos.length) > (20)); // We have many DTOs
     
     // Check for any undefined type references
     const errors = validationResult.errors.filter(e => 
@@ -199,7 +204,7 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
     );
     
     // Should have no undefined types
-    expect(errors.length).toBe(0);
+    assert.equal(errors.length, 0);
   });
 
   it('should export all functions properly', () => {
@@ -217,7 +222,7 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
     ];
     
     for (const fname of functionNames) {
-      expect(processorFile?.exports).toContain(fname);
+      assert.ok((processorFile?.exports).includes(fname));
     }
     
     const validationResult = validator.validate(parseResult.entities, parseResult);
@@ -228,6 +233,6 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
       e.message.includes('not exported')
     );
     
-    expect(orphanedFunctions.length).toBe(0);
+    assert.equal(orphanedFunctions.length, 0);
   });
 });

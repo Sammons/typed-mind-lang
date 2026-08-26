@@ -4,15 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest --run",
-    "test:update": "vitest run -u"
+    "test": "node --test 'src/*.test.ts'"
   },
   "dependencies": {
     "@sammons/typed-mind": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.18.1",
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "typescript": "^5.9.2"
   }
 }

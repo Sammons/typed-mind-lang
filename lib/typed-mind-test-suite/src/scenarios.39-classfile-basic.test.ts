@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,32 +17,32 @@ describe('scenario-39-classfile-basic', () => {
     const result = checker.check(content);
     
     // Should be invalid due to issues with ClassFile parsing and orphaned entities
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(3);
+    assert.equal(result.valid, false);
+    assert.equal((result.errors).length, 3);
 
     const errorMessages = result.errors.map(err => err.message);
 
     // Should detect that calls cannot reference ClassFile entities
-    expect(errorMessages).toContain("Cannot use 'calls' to reference ClassFile 'TodoController'");
+    assert.ok((errorMessages).includes("Cannot use 'calls' to reference ClassFile 'TodoController'"));
 
     // Should detect orphaned entities
-    expect(errorMessages).toContain("Orphaned entity 'startApp'");
-    expect(errorMessages).toContain("Orphaned entity 'BaseController'");
+    assert.ok((errorMessages).includes("Orphaned entity 'startApp'"));
+    assert.ok((errorMessages).includes("Orphaned entity 'BaseController'"));
 
     // Verify specific error positions
     const callError = result.errors.find(err => err.message.includes("Cannot use 'calls' to reference ClassFile 'TodoController'"));
-    expect(callError?.position.line).toBe(10);
-    expect(callError?.position.column).toBe(1);
-    expect(callError?.suggestion).toBe("'calls' can only reference: Function, Class");
+    assert.equal(callError?.position.line, 10);
+    assert.equal(callError?.position.column, 1);
+    assert.equal(callError?.suggestion, "'calls' can only reference: Function, Class");
 
     const orphanedStartAppError = result.errors.find(err => err.message === "Orphaned entity 'startApp'");
-    expect(orphanedStartAppError?.position.line).toBe(10);
+    assert.equal(orphanedStartAppError?.position.line, 10);
 
     const orphanedBaseControllerError = result.errors.find(err => err.message === "Orphaned entity 'BaseController'");
-    expect(orphanedBaseControllerError?.position.line).toBe(18);
+    assert.equal(orphanedBaseControllerError?.position.line, 18);
     
     // Verify the file contains expected ClassFile syntax
-    expect(content).toContain('TodoController #: src/controllers/todo.ts <: BaseController');
-    expect(content).toContain('BaseController #: src/controllers/base.ts');
+    assert.ok((content).includes('TodoController #: src/controllers/todo.ts <: BaseController'));
+    assert.ok((content).includes('BaseController #: src/controllers/base.ts'));
   });
 });

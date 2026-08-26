@@ -1,26 +1,28 @@
 import {
   createConnection,
   TextDocuments,
-  Diagnostic,
   DiagnosticSeverity,
   ProposedFeatures,
+  TextDocumentSyncKind,
+  CompletionItemKind,
+  MarkupKind,
+  SemanticTokensBuilder,
+  SemanticTokenTypes,
+  SemanticTokenModifiers,
+} from 'vscode-languageserver/node.js';
+import type {
+  Diagnostic,
   InitializeParams,
   InitializeResult,
-  TextDocumentSyncKind,
   CompletionItem,
-  CompletionItemKind,
   TextDocumentPositionParams,
   Hover,
-  MarkupKind,
   DefinitionParams,
   Location,
   ReferenceParams,
-  SemanticTokensBuilder,
   SemanticTokensParams,
   SemanticTokens,
-  SemanticTokenTypes,
-  SemanticTokenModifiers,
-} from 'vscode-languageserver/node';
+} from 'vscode-languageserver/node.js';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { DSLParser, DSLValidator, SyntaxGenerator, DSLChecker } from '@sammons/typed-mind';

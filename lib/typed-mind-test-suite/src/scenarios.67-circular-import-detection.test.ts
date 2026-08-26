@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('Scenario 67: Circular import detection', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-67-circular-import-detection.tmd');
@@ -20,8 +25,8 @@ describe('Scenario 67: Circular import detection', () => {
       (e.message.includes('ModuleA') || e.message.includes('ModuleB'))
     );
     
-    expect(circularErrors.length).toBeGreaterThan(0);
-    expect(validationResult.valid).toBe(false);
+    assert.ok((circularErrors.length) > (0));
+    assert.equal(validationResult.valid, false);
   });
 
   it('should detect indirect circular imports through chain', () => {
@@ -36,7 +41,7 @@ describe('Scenario 67: Circular import detection', () => {
        e.message.includes('ServiceC'))
     );
     
-    expect(circularErrors.length).toBeGreaterThan(0);
+    assert.ok((circularErrors.length) > (0));
   });
 
   it('should detect self-imports as circular', () => {
@@ -49,7 +54,7 @@ describe('Scenario 67: Circular import detection', () => {
       e.message.includes('SelfImporter')
     );
     
-    expect(selfImportErrors.length).toBeGreaterThan(0);
+    assert.ok((selfImportErrors.length) > (0));
   });
 
   it('should not flag valid non-circular imports', () => {
@@ -64,7 +69,7 @@ describe('Scenario 67: Circular import detection', () => {
        e.message.includes('HelperB'))
     );
     
-    expect(validModuleErrors.length).toBe(0);
+    assert.equal(validModuleErrors.length, 0);
   });
 
   it('should report specific files involved in circular dependency', () => {
@@ -83,20 +88,20 @@ describe('Scenario 67: Circular import detection', () => {
       e.message.includes('SelfImporter')
     );
     
-    expect(hasSpecificFileInfo).toBe(true);
+    assert.equal(hasSpecificFileInfo, true);
   });
 
   it('should mark validation as invalid when circular imports exist', () => {
     const parseResult = parser.parse(content);
     const validationResult = validator.validate(parseResult.entities, parseResult);
     
-    expect(validationResult.valid).toBe(false);
+    assert.equal(validationResult.valid, false);
     
     const circularErrors = validationResult.errors.filter(e => 
       e.message.toLowerCase().includes('circular')
     );
     
-    expect(circularErrors.length).toBeGreaterThan(0);
+    assert.ok((circularErrors.length) > (0));
   });
 
   it('should handle circular imports in Files not ClassFiles', () => {
@@ -110,8 +115,8 @@ describe('Scenario 67: Circular import detection', () => {
       e.name === 'ModuleB'
     );
     
-    expect(moduleA?.type).toBe('File');
-    expect(moduleB?.type).toBe('File');
+    assert.equal(moduleA?.type, 'File');
+    assert.equal(moduleB?.type, 'File');
   });
 
   it('should provide severity level for circular import errors', () => {
@@ -124,7 +129,7 @@ describe('Scenario 67: Circular import detection', () => {
     
     // Circular imports should be errors, not warnings
     circularErrors.forEach(error => {
-      expect(error.severity).toBe('error');
+      assert.equal(error.severity, 'error');
     });
   });
 });

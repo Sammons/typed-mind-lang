@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,20 +17,20 @@ describe('scenario-03-circular-dependency', () => {
     const result = checker.check(content);
     
     // The result should be invalid due to circular dependency
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 1 error
-    expect(result.errors).toHaveLength(1);
+    assert.equal((result.errors).length, 1);
     
     const error = result.errors[0];
     
     // Check error properties
-    expect(error.position.line).toBe(3);
-    expect(error.position.column).toBe(1);
-    expect(error.severity).toBe('error');
-    expect(error.suggestion).toBeDefined();
+    assert.equal(error.position.line, 3);
+    assert.equal(error.position.column, 1);
+    assert.equal(error.severity, 'error');
+    assert.notEqual(error.suggestion, undefined);
 
     // Check that the error message describes the circular dependency
-    expect(error.message).toBe('Circular import detected: ServiceA -> ServiceB -> ServiceC -> ServiceA');
+    assert.equal(error.message, 'Circular import detected: ServiceA -> ServiceB -> ServiceC -> ServiceA');
   });
 });

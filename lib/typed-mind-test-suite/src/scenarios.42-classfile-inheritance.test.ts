@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,35 +17,35 @@ describe('scenario-42-classfile-inheritance', () => {
     const result = checker.check(content);
     
     // Should be invalid due to import and export issues (based on actual error output)
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(10);
+    assert.equal(result.valid, false);
+    assert.equal((result.errors).length, 10);
     
     const errorMessages = result.errors.map(err => err.message);
     
     // Should detect that calls cannot reference ClassFile entities
-    expect(errorMessages.filter(msg => msg.includes("Cannot use 'calls' to reference ClassFile")).length).toBe(2);
+    assert.equal(errorMessages.filter(msg => msg.includes("Cannot use 'calls' to reference ClassFile")).length, 2);
     
     // Should detect orphaned interface entities
-    expect(errorMessages).toContain("Orphaned entity 'IUserController'");
-    expect(errorMessages).toContain("Orphaned entity 'IAdminController'");
-    expect(errorMessages).toContain("Orphaned entity 'IAuditController'");
+    assert.ok((errorMessages).includes("Orphaned entity 'IUserController'"));
+    assert.ok((errorMessages).includes("Orphaned entity 'IAdminController'"));
+    assert.ok((errorMessages).includes("Orphaned entity 'IAuditController'"));
     
     // Should detect classes not exported by files
-    expect(errorMessages).toContain("Class 'IUserController' is not exported by any file");
-    expect(errorMessages).toContain("Class 'IAdminController' is not exported by any file");
-    expect(errorMessages).toContain("Class 'IAuditController' is not exported by any file");
+    assert.ok((errorMessages).includes("Class 'IUserController' is not exported by any file"));
+    assert.ok((errorMessages).includes("Class 'IAdminController' is not exported by any file"));
+    assert.ok((errorMessages).includes("Class 'IAuditController' is not exported by any file"));
     
     // Verify specific error positions
     const orphanedIUserError = result.errors.find(err => err.message.includes("Orphaned entity 'IUserController'"));
-    expect(orphanedIUserError?.position.line).toBe(28);
+    assert.equal(orphanedIUserError?.position.line, 28);
     
     const callsError = result.errors.find(err => err.message.includes("Cannot use 'calls' to reference ClassFile 'UserController'"));
-    expect(callsError?.position.line).toBe(10);
-    expect(callsError?.suggestion).toBe("'calls' can only reference: Function, Class");
+    assert.equal(callsError?.position.line, 10);
+    assert.equal(callsError?.suggestion, "'calls' can only reference: Function, Class");
     
     // Verify the file contains expected ClassFile inheritance syntax
-    expect(content).toContain('UserController #: src/controllers/user.ts <: BaseController, IUserController');
-    expect(content).toContain('AdminController #: src/controllers/admin.ts <: BaseController, IAdminController, IAuditController');
-    expect(content).toContain('BaseController #: src/controllers/base.ts');
+    assert.ok((content).includes('UserController #: src/controllers/user.ts <: BaseController, IUserController'));
+    assert.ok((content).includes('AdminController #: src/controllers/admin.ts <: BaseController, IAdminController, IAuditController'));
+    assert.ok((content).includes('BaseController #: src/controllers/base.ts'));
   });
 });

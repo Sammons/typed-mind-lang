@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { DSLParser } from './parser.ts';
 
 describe('Longform Syntax', () => {
@@ -14,11 +15,11 @@ program TodoApp {
       const result = parser.parse(input);
       const program = result.entities.get('TodoApp');
 
-      expect(program).toBeDefined();
-      expect(program?.type).toBe('Program');
+      assert.notEqual(program, undefined);
+      assert.equal(program?.type, 'Program');
       if (program?.type === 'Program') {
-        expect(program.entry).toBe('AppEntry');
-        expect(program.version).toBe('1.0.0');
+        assert.equal(program.entry, 'AppEntry');
+        assert.equal(program.version, '1.0.0');
       }
     });
 
@@ -34,9 +35,9 @@ program APIServer {
 }`;
       const result = parser.parse(input);
 
-      expect(result.entities.size).toBe(2);
-      expect(result.entities.has('WebApp')).toBe(true);
-      expect(result.entities.has('APIServer')).toBe(true);
+      assert.equal(result.entities.size, 2);
+      assert.equal(result.entities.has('WebApp'), true);
+      assert.equal(result.entities.has('APIServer'), true);
     });
   });
 
@@ -51,12 +52,12 @@ file AppEntry {
       const result = parser.parse(input);
       const file = result.entities.get('AppEntry');
 
-      expect(file).toBeDefined();
-      expect(file?.type).toBe('File');
+      assert.notEqual(file, undefined);
+      assert.equal(file?.type, 'File');
       if (file?.type === 'File') {
-        expect(file.path).toBe('src/index.ts');
-        expect(file.imports).toEqual(['Express', 'Database', 'Config']);
-        expect(file.exports).toEqual(['startServer', 'app']);
+        assert.equal(file.path, 'src/index.ts');
+        assert.deepEqual(file.imports, ['Express', 'Database', 'Config']);
+        assert.deepEqual(file.exports, ['startServer', 'app']);
       }
     });
   });
@@ -76,16 +77,16 @@ function createUser {
       const result = parser.parse(input);
       const func = result.entities.get('createUser');
 
-      expect(func).toBeDefined();
-      expect(func?.type).toBe('Function');
+      assert.notEqual(func, undefined);
+      assert.equal(func?.type, 'Function');
       if (func?.type === 'Function') {
-        expect(func.signature).toBe('(data: UserDTO) => Promise<User>');
-        expect(func.description).toBe('Creates a new user in the database');
-        expect(func.input).toBe('UserDTO');
-        expect(func.output).toBe('User');
-        expect(func.calls).toEqual(['validateUser', 'Database.save', 'sendEmail']);
-        expect(func.affects).toEqual(['UserList', 'UserCount']);
-        expect(func.consumes).toEqual(['DATABASE_URL', 'SMTP_CONFIG']);
+        assert.equal(func.signature, '(data: UserDTO) => Promise<User>');
+        assert.equal(func.description, 'Creates a new user in the database');
+        assert.equal(func.input, 'UserDTO');
+        assert.equal(func.output, 'User');
+        assert.deepEqual(func.calls, ['validateUser', 'Database.save', 'sendEmail']);
+        assert.deepEqual(func.affects, ['UserList', 'UserCount']);
+        assert.deepEqual(func.consumes, ['DATABASE_URL', 'SMTP_CONFIG']);
       }
     });
   });
@@ -101,12 +102,12 @@ class UserService {
       const result = parser.parse(input);
       const cls = result.entities.get('UserService');
 
-      expect(cls).toBeDefined();
-      expect(cls?.type).toBe('Class');
+      assert.notEqual(cls, undefined);
+      assert.equal(cls?.type, 'Class');
       if (cls?.type === 'Class') {
-        expect(cls.extends).toBe('BaseService');
-        expect(cls.implements).toEqual(['IUserService', 'ICacheable']);
-        expect(cls.methods).toEqual(['create', 'read', 'update', 'delete', 'findByEmail']);
+        assert.equal(cls.extends, 'BaseService');
+        assert.deepEqual(cls.implements, ['IUserService', 'ICacheable']);
+        assert.deepEqual(cls.methods, ['create', 'read', 'update', 'delete', 'findByEmail']);
       }
     });
   });
@@ -139,18 +140,18 @@ dto UserDTO {
       const result = parser.parse(input);
       const dto = result.entities.get('UserDTO');
 
-      expect(dto).toBeDefined();
-      expect(dto?.type).toBe('DTO');
+      assert.notEqual(dto, undefined);
+      assert.equal(dto?.type, 'DTO');
       if (dto?.type === 'DTO') {
-        expect(dto.purpose).toBe('User data transfer object');
-        expect(dto.fields).toHaveLength(4);
-        expect(dto.fields[0]).toEqual({
+        assert.equal(dto.purpose, 'User data transfer object');
+        assert.equal(dto.fields.length, 4);
+        assert.deepEqual(dto.fields[0], {
           name: 'id',
           type: 'string',
           description: 'Unique identifier',
           optional: false,
         });
-        expect(dto.fields[3]).toEqual({
+        assert.deepEqual(dto.fields[3], {
           name: 'age',
           type: 'number',
           description: 'Age in years',
@@ -172,14 +173,14 @@ component UserProfile {
       const result = parser.parse(input);
       const component = result.entities.get('UserProfile');
 
-      expect(component).toBeDefined();
-      expect(component?.type).toBe('UIComponent');
+      assert.notEqual(component, undefined);
+      assert.equal(component?.type, 'UIComponent');
       if (component?.type === 'UIComponent') {
-        expect(component.purpose).toBe('User profile display component');
-        expect(component.containedBy).toEqual(['Dashboard', 'UserPage']);
-        expect(component.contains).toEqual(['Avatar', 'UserInfo', 'UserStats']);
-        expect(component.affectedBy).toEqual(['updateProfile', 'refreshUser']);
-        expect(component.root).toBe(false);
+        assert.equal(component.purpose, 'User profile display component');
+        assert.deepEqual(component.containedBy, ['Dashboard', 'UserPage']);
+        assert.deepEqual(component.contains, ['Avatar', 'UserInfo', 'UserStats']);
+        assert.deepEqual(component.affectedBy, ['updateProfile', 'refreshUser']);
+        assert.equal(component.root, false);
       }
     });
 
@@ -193,9 +194,9 @@ component App {
       const result = parser.parse(input);
       const component = result.entities.get('App');
 
-      expect(component).toBeDefined();
+      assert.notEqual(component, undefined);
       if (component?.type === 'UIComponent') {
-        expect(component.root).toBe(true);
+        assert.equal(component.root, true);
       }
     });
   });
@@ -214,15 +215,15 @@ asset IndexHTML {
       const result = parser.parse(input);
 
       const logo = result.entities.get('Logo');
-      expect(logo?.type).toBe('Asset');
+      assert.equal(logo?.type, 'Asset');
       if (logo?.type === 'Asset') {
-        expect(logo.description).toBe('Company logo SVG file');
-        expect(logo.containsProgram).toBeUndefined();
+        assert.equal(logo.description, 'Company logo SVG file');
+        assert.equal(logo.containsProgram, undefined);
       }
 
       const html = result.entities.get('IndexHTML');
       if (html?.type === 'Asset') {
-        expect(html.containsProgram).toBe('ClientApp');
+        assert.equal(html.containsProgram, 'ClientApp');
       }
     });
   });
@@ -237,11 +238,11 @@ constants Config {
       const result = parser.parse(input);
       const constants = result.entities.get('Config');
 
-      expect(constants).toBeDefined();
-      expect(constants?.type).toBe('Constants');
+      assert.notEqual(constants, undefined);
+      assert.equal(constants?.type, 'Constants');
       if (constants?.type === 'Constants') {
-        expect(constants.path).toBe('src/config.ts');
-        expect(constants.schema).toBe('ConfigSchema');
+        assert.equal(constants.path, 'src/config.ts');
+        assert.equal(constants.schema, 'ConfigSchema');
       }
     });
   });
@@ -279,19 +280,19 @@ parameter MAX_CONNECTIONS {
 }`;
       const result = parser.parse(input);
 
-      expect(result.entities.size).toBe(5);
+      assert.equal(result.entities.size, 5);
 
       const dbUrl = result.entities.get('DATABASE_URL');
       if (dbUrl?.type === 'RunParameter') {
-        expect(dbUrl.paramType).toBe('env');
-        expect(dbUrl.required).toBe(true);
-        expect(dbUrl.defaultValue).toBeUndefined();
+        assert.equal(dbUrl.paramType, 'env');
+        assert.equal(dbUrl.required, true);
+        assert.equal(dbUrl.defaultValue, undefined);
       }
 
       const apiKey = result.entities.get('API_KEY');
       if (apiKey?.type === 'RunParameter') {
-        expect(apiKey.defaultValue).toBe('dev-key');
-        expect(apiKey.required).toBe(false);
+        assert.equal(apiKey.defaultValue, 'dev-key');
+        assert.equal(apiKey.required, false);
       }
     });
   });
@@ -304,18 +305,18 @@ import "./utils/helpers.tmd"
 @import "./legacy.tmd" as Legacy`;
 
       const result = parser.parse(input);
-      expect(result.imports).toHaveLength(3);
-      expect(result.imports[0]).toEqual({
+      assert.equal(result.imports.length, 3);
+      assert.deepEqual(result.imports[0], {
         path: './shared/auth.tmd',
         alias: 'Auth',
         position: { line: 2, column: 1 },
       });
-      expect(result.imports[1]).toEqual({
+      assert.deepEqual(result.imports[1], {
         path: './utils/helpers.tmd',
         alias: undefined,
         position: { line: 3, column: 1 },
       });
-      expect(result.imports[2]).toEqual({
+      assert.deepEqual(result.imports[2], {
         path: './legacy.tmd',
         alias: 'Legacy',
         position: { line: 4, column: 1 },
@@ -368,19 +369,19 @@ dto UserDTO {
 }`;
 
       const result = parser.parse(input);
-      expect(result.entities.size).toBe(8);
+      assert.equal(result.entities.size, 8);
 
       // Check shortform entities
-      expect(result.entities.get('TodoApp')?.type).toBe('Program');
-      expect(result.entities.get('AppEntry')?.type).toBe('File');
-      expect(result.entities.get('createTodo')?.type).toBe('Function');
-      expect(result.entities.get('TodoDTO')?.type).toBe('DTO');
+      assert.equal(result.entities.get('TodoApp')?.type, 'Program');
+      assert.equal(result.entities.get('AppEntry')?.type, 'File');
+      assert.equal(result.entities.get('createTodo')?.type, 'Function');
+      assert.equal(result.entities.get('TodoDTO')?.type, 'DTO');
 
       // Check longform entities
-      expect(result.entities.get('APIServer')?.type).toBe('Program');
-      expect(result.entities.get('ApiMain')?.type).toBe('File');
-      expect(result.entities.get('deleteTodo')?.type).toBe('Function');
-      expect(result.entities.get('UserDTO')?.type).toBe('DTO');
+      assert.equal(result.entities.get('APIServer')?.type, 'Program');
+      assert.equal(result.entities.get('ApiMain')?.type, 'File');
+      assert.equal(result.entities.get('deleteTodo')?.type, 'Function');
+      assert.equal(result.entities.get('UserDTO')?.type, 'DTO');
     });
   });
 });

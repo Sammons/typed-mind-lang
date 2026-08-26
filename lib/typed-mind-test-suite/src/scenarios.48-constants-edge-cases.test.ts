@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -15,17 +16,17 @@ describe('Scenario 48: Constants Edge Cases', () => {
     const checker = new DSLChecker();
     const result = checker.check(content);
     
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(3); // More errors than expected
+    assert.equal(result.valid, false);
+    assert.equal((result.errors).length, 3); // More errors than expected
     
     // Should find error for orphaned ConfigSchema
     const orphanedSchemaError = result.errors.find(e => 
       e.message.includes('ConfigSchema') && 
       e.message.includes('Orphaned entity')
     );
-    expect(orphanedSchemaError).toBeDefined();
-    expect(orphanedSchemaError?.severity).toBe('error');
-    expect(orphanedSchemaError?.position.line).toBe(24); // Line where ConfigSchema is defined
+    assert.notEqual(orphanedSchemaError, undefined);
+    assert.equal(orphanedSchemaError?.severity, 'error');
+    assert.equal(orphanedSchemaError?.position.line, 24); // Line where ConfigSchema is defined
     
     // Constants with non-existent schema should be valid but the schema should not be found
     // (but the validator might not specifically flag this as missing schema anymore)
@@ -38,14 +39,14 @@ describe('Scenario 48: Constants Edge Cases', () => {
     const noSchemaError = result.errors.find(e => 
       e.message.includes('NoSchemaConfig')
     );
-    expect(noSchemaError).toBeUndefined();
+    assert.equal(noSchemaError, undefined);
     
     // Valid constants with schema should be valid (no error)
     const validConfigError = result.errors.find(e => 
       e.message.includes('ValidConfig') && 
       !e.message.includes('NonExistentSchema')
     );
-    expect(validConfigError).toBeUndefined();
+    assert.equal(validConfigError, undefined);
     
     // Verify that all expected entities are present in the parsed result
     // (by absence of "not found" errors for them)
@@ -56,6 +57,6 @@ describe('Scenario 48: Constants Edge Cases', () => {
        e.message.includes('ConfigSchema') ||
        e.message.includes('processConfig'))
     );
-    expect(entityNotFoundErrors).toHaveLength(0);
+    assert.equal((entityNotFoundErrors).length, 0);
   });
 });

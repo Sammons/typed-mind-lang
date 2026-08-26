@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,10 +17,10 @@ describe('scenario-13-asset-validation', () => {
     const result = checker.check(content);
     
     // Should be invalid due to orphaned entities
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 5 errors (including orphaned entities)
-    expect(result.errors).toHaveLength(5);
+    assert.equal((result.errors).length, 5);
     
     // Check for orphaned AssetsFile error
     const orphanedAssetsFileError = result.errors.find(err =>
@@ -27,9 +28,9 @@ describe('scenario-13-asset-validation', () => {
       err.position.line === 6 &&
       err.position.column === 1
     );
-    expect(orphanedAssetsFileError).toBeDefined();
-    expect(orphanedAssetsFileError?.severity).toBe('error');
-    expect(orphanedAssetsFileError?.suggestion).toBe('Remove this file or import its exports somewhere');
+    assert.notEqual(orphanedAssetsFileError, undefined);
+    assert.equal(orphanedAssetsFileError?.severity, 'error');
+    assert.equal(orphanedAssetsFileError?.suggestion, 'Remove this file or import its exports somewhere');
     
     // Check for orphaned UnexportedAsset error
     const orphanedUnexportedAssetError = result.errors.find(err => 
@@ -37,11 +38,11 @@ describe('scenario-13-asset-validation', () => {
       err.position.line === 15 &&
       err.position.column === 1
     );
-    expect(orphanedUnexportedAssetError).toBeDefined();
-    expect(orphanedUnexportedAssetError?.severity).toBe('error');
-    expect(orphanedUnexportedAssetError?.suggestion).toBe('Remove or reference this entity');
+    assert.notEqual(orphanedUnexportedAssetError, undefined);
+    assert.equal(orphanedUnexportedAssetError?.severity, 'error');
+    assert.equal(orphanedUnexportedAssetError?.suggestion, 'Remove or reference this entity');
     
     // All errors should be of severity 'error'
-    expect(result.errors.every(err => err.severity === 'error')).toBe(true);
+    assert.equal(result.errors.every(err => err.severity === 'error'), true);
   });
 });

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,41 +17,41 @@ describe('Scenario 53: ClassFile Inheritance Edge Cases', () => {
     const result = checker.check(content);
     
     // Should have errors for invalid inheritance
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // Should find orphaned entities instead of circular inheritance
     const orphanedErrors = result.errors.filter(e =>
       e.message.includes('Orphaned entity')
     );
-    expect(orphanedErrors.length).toBeGreaterThan(0);
+    assert.ok((orphanedErrors.length) > (0));
 
     // Should find ClassFile reference errors
     const callsErrors = result.errors.filter(e =>
       e.message.includes("Cannot use 'calls' to reference ClassFile")
     );
-    expect(callsErrors.length).toBeGreaterThan(0);
+    assert.ok((callsErrors.length) > (0));
     
     // Inheriting from non-existent class
     const nonExistentBaseError = result.errors.find(e =>
       e.message.includes('NonExistentBase') &&
       (e.message.includes('not found') || e.message.includes('does not exist'))
     );
-    expect(nonExistentBaseError).toBeDefined(); // Missing base class should be detected
+    assert.notEqual(nonExistentBaseError, undefined); // Missing base class should be detected
     
     // Self-inheriting class should error
     const selfInheritingError = result.errors.find(e =>
       e.message.includes('SelfInheriting') &&
       (e.message.includes('itself') || e.message.includes('circular'))
     );
-    expect(selfInheritingError).toBeDefined(); // Self-inheritance should be detected
+    assert.notEqual(selfInheritingError, undefined); // Self-inheritance should be detected
     
     // Valid inheritance should not error
     const validChildError = result.errors.find(e => 
       e.message.includes('ValidChild') &&
       e.message.includes('inheritance')
     );
-    expect(validChildError).toBeUndefined();
+    assert.equal(validChildError, undefined);
     
     // Deep inheritance chain should be valid
     const deepInheritanceError = result.errors.find(e => 
@@ -60,6 +61,6 @@ describe('Scenario 53: ClassFile Inheritance Edge Cases', () => {
       e.message.includes('inheritance') &&
       !e.message.includes('Orphaned')
     );
-    expect(deepInheritanceError).toBeUndefined();
+    assert.equal(deepInheritanceError, undefined);
   });
 });

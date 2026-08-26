@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -17,35 +18,35 @@ describe('scenario-21-aliased-import', () => {
     const result = checker.check(content, filePath);
     
     // Should be invalid due to multiple validation errors
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have many errors due to undefined entities and containment issues
-    expect(result.errors.length).toBeGreaterThan(10);
+    assert.ok((result.errors.length) > (10));
     
     // Check for key orphaned entities
     const orphanedErrors = result.errors.filter(err => err.message.includes('Orphaned entity'));
-    expect(orphanedErrors.length).toBeGreaterThan(0);
+    assert.ok((orphanedErrors.length) > (0));
     
     // Should have orphaned ComponentsFile and DatabaseFile
-    expect(result.errors.some(err => err.message.includes("Orphaned file 'UI.ComponentsFile'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Orphaned file 'DB.DatabaseFile'"))).toBe(true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned file 'UI.ComponentsFile'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned file 'DB.DatabaseFile'")), true);
     
     // Check for undefined exports
     const exportErrors = result.errors.filter(err => err.message.includes('is not defined anywhere in the codebase'));
-    expect(exportErrors.length).toBeGreaterThan(0);
-    expect(result.errors.some(err => err.message.includes("Export 'Button' is not defined anywhere in the codebase"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Export 'Form' is not defined anywhere in the codebase"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Export 'Connection' is not defined anywhere in the codebase"))).toBe(true);
+    assert.ok((exportErrors.length) > (0));
+    assert.equal(result.errors.some(err => err.message.includes("Export 'Button' is not defined anywhere in the codebase")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Export 'Form' is not defined anywhere in the codebase")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Export 'Connection' is not defined anywhere in the codebase")), true);
     
     // Check for containment validation errors
-    expect(result.errors.some(err => err.message.includes("UIComponent 'UI.Input' is not contained by any other UIComponent"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("contains unknown component 'Input'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("contains unknown component 'Button'"))).toBe(true);
+    assert.equal(result.errors.some(err => err.message.includes("UIComponent 'UI.Input' is not contained by any other UIComponent")), true);
+    assert.equal(result.errors.some(err => err.message.includes("contains unknown component 'Input'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("contains unknown component 'Button'")), true);
     
     // Check for class export errors
-    expect(result.errors.some(err => err.message.includes("Class 'DB.Connection' is not exported by any file"))).toBe(true);
+    assert.equal(result.errors.some(err => err.message.includes("Class 'DB.Connection' is not exported by any file")), true);
     
     // All errors should be severity 'error'
-    expect(result.errors.every(err => err.severity === 'error')).toBe(true);
+    assert.equal(result.errors.every(err => err.severity === 'error'), true);
   });
 });
