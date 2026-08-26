@@ -2,11 +2,11 @@
 # Define your data models
 dto User {
   description: "User entity"
-  fields: [
-    { name: "id", type: "string", description: "Unique identifier" },
-    { name: "name", type: "string", description: "Full name" },
-    { name: "email", type: "string", description: "Email address" }
-  ]
+  fields: {
+    id: { type: "string", description: "Unique identifier" }
+    name: { type: "string", description: "Full name" }
+    email: { type: "string", description: "Email address" }
+  }
 }
 
 # Add service classes
@@ -16,7 +16,7 @@ class UserService {
 }
 
 function getUser {
-  signature: (id: string) => User
+  signature: "(id: string) => User"
   description: "Retrieves a user by ID"
   output: User
   calls: [validateId, queryDatabase]

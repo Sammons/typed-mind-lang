@@ -72,6 +72,25 @@ See the [`examples/`](./examples/) directory for comprehensive examples demonstr
 
 ### Programmatic API
 
+`@sammons/typed-mind`'s primary surface is `TypedMind.create()` (async — it
+awaits the wasm-backed grammar once):
+
+```typescript
+import { TypedMind } from '@sammons/typed-mind';
+
+const typedMind = await TypedMind.create();
+
+const { valid, diagnostics } = typedMind.check(dslContent);
+const { entities, links } = typedMind.parse(dslContent);
+const shortform = typedMind.emitShortform(dslContent);
+const longform = typedMind.emitLongform(dslContent);
+```
+
+`DSLChecker` (below) is a transient legacy bridge — synchronous, Map-shaped
+entities — kept running unchanged for the LSP, the TypeScript converter, and
+`@sammons/typed-mind-renderer` while those packages migrate onto the surface
+above. New integrations should use `TypedMind.create()`.
+
 ```typescript
 import { DSLChecker } from '@sammons/typed-mind';
 import { TypedMindRenderer } from '@sammons/typed-mind-renderer';
@@ -147,6 +166,16 @@ pnpm lint
 # Clean build artifacts
 pnpm clean
 ```
+
+### 2.0.0-ready structurally (RFC-TM-4 §3)
+
+The five published packages (`@sammons/typed-mind`, `-cli`, `-lsp`,
+`-renderer`, `-typescript`) are structurally ready for a 2.0.0 major release:
+`engines.node` is `>=24.0.0` across all five, the new `TypedMind.create()`
+surface is primary, and `grammar.wasm` ships in the core package's `files` set
+at the dist-adjacent published-layout path. No version bump lands in this
+change — the actual publish act and version bump are owned by D-5/S-CI-2 at
+release time, not by this Quantum.
 
 ### Paired-bump procedure: tree-sitter CLI, wasi-sdk, web-tree-sitter
 

@@ -111,12 +111,21 @@ const main = () => {
     rmSync(scratchDir, { recursive: true, force: true });
   }
 
-  // Step 5: grammar.wasm is never committed.
-  const trackedWasm = run('git', ['ls-files', 'lib/typed-mind/grammar/**/*.wasm', 'lib/typed-mind/grammar/*.wasm']).trim();
+  // Step 5: grammar.wasm is never committed — the dev-layout build output
+  // (lib/typed-mind/grammar/grammar.wasm, S-ARTIFACT-2) AND the RFC-TM-4 §3
+  // dist-adjacent staged copy (lib/typed-mind/grammar.wasm,
+  // scripts/stage-published-wasm.mjs's prepack output) are both build
+  // artifacts a fresh checkout regenerates; neither belongs in git.
+  const trackedWasm = run('git', [
+    'ls-files',
+    'lib/typed-mind/grammar/**/*.wasm',
+    'lib/typed-mind/grammar/*.wasm',
+    'lib/typed-mind/grammar.wasm',
+  ]).trim();
   if (trackedWasm !== '') {
-    throw new GeneratedCheckError(`tracked wasm artifacts found under lib/typed-mind/grammar/ (never commit these):\n${trackedWasm}`);
+    throw new GeneratedCheckError(`tracked wasm artifacts found (never commit these):\n${trackedWasm}`);
   }
-  console.log('[check:generated] step 5: no tracked *.wasm under the grammar dir (OK)');
+  console.log('[check:generated] step 5: no tracked *.wasm under the grammar dir or the package root (OK)');
 
   // Step 6: RFC-TM-2 Q3 (review SD-CB-1) — the node-types completeness check.
   // Diffs the named-node set in the just-regenerated src/node-types.json

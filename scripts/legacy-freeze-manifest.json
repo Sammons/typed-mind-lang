@@ -1,0 +1,13 @@
+{
+  "$comment": "RFC-TM-4 §3 (rfc-tm-4-diamond.md) legacy-freeze manifest. sha256 per file over the frozen bridge-engine set. Update ONLY via the documented exception procedure: a scoped, justified review AND a re-run of the shadow-verdict harness over the 142 documents proving equivalence still holds. See scripts/check-legacy-freeze.mjs.",
+  "files": {
+    "lib/typed-mind/src/parser.ts": "4e45e90cd18396418c7e6097923479b5f436acbe74c9d4c7fb4fe373bb4983c9",
+    "lib/typed-mind/src/longform-parser.ts": "ad1e1f387b4a7d206f434876cfaa93dfbb5485bf4bad69f12511d3f65a507766",
+    "lib/typed-mind/src/validator.ts": "14556bea081b8fb534d9bc9792e84f102a572aed3a370981a8b229cde9b4b37c",
+    "lib/typed-mind/src/syntax-generator.ts": "692d7daf5903608c779c9461a640c078d35cef84a071ab0b9e841607c09f97fc",
+    "lib/typed-mind/src/import-resolver.ts": "a7ffaaf69d5064f84632d708f409fa6f17cbe46332121875ce7d3b2d0c57585b",
+    "lib/typed-mind/src/formatter.ts": "e974156fd9ade1846e417dba37a52c93b4aaee83afceec5ea2a5a11b68e998a5",
+    "lib/typed-mind/src/parser-patterns.ts": "3fb07f4fdf389d1431766913cc621dac625f08694ff6ed4b5db44ce737fb609b",
+    "lib/typed-mind/src/grammar-validator.ts": "68d7f0c6ed40a535b60932878310810691caf045941facd5d0fd6a4a35341c7a"
+  }
+}

@@ -8,15 +8,10 @@ import { type SyntaxGenerationError, SyntaxGenerator } from './syntax-generator.
 import type { AnyEntity, ProgramGraph, ValidationError, ValidationResult } from './types.ts';
 import { DSLValidator } from './validator.ts';
 
-// Export branded types
+// Export branded types (trimmed to the FilePath half index.ts itself
+// consumes — the EntityName/Version/Description/etc. half died with
+// entity-builder.ts/entity-map.ts/error-types.ts, its only consumers).
 export * from './branded-types.ts';
-// Export EntityBuilder
-export * from './entity-builder.ts';
-// Export EntityMap
-export * from './entity-map.ts';
-
-// Export error types
-export * from './error-types.ts';
 export { ErrorFormatter } from './formatter.ts';
 export { GrammarDocGenerator } from './grammar-doc-generator.ts';
 export { type GrammarValidationError, type GrammarValidationResult, GrammarValidator } from './grammar-validator.ts';
@@ -34,6 +29,12 @@ export {
   type SyntaxGeneratorOptions,
   toggleSyntaxFormat,
 } from './syntax-generator.ts';
+// RFC-TM-4 §3 (rfc-tm-4-diamond.md) — the new primary surface. This is the
+// only new export added to index.ts by the flip; everything below is the
+// bounded legacy bridge (frozen through Q5) for the three named consumers
+// (lsp, typescript converter, renderer) plus the new-surface exports listed
+// above.
+export { type CheckOutcome, type ParseOutput, TypedMind, type TypedMindOptions } from './typed-mind.ts';
 // Export all types explicitly for better TypeScript experience
 export type {
   AnyEntity,

@@ -13,7 +13,7 @@ startTodoApp :: () => void
   ~> [createTodo]
 
 # Base service needs to be a ClassFile to be properly referenced
-BaseService #: base-service.ts:
+BaseService #: base-service.ts
   => [validate]
 
 # Validate function called by base service

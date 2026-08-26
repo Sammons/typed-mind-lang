@@ -341,10 +341,13 @@ RandomText 123 !!@#
     it('should handle unknown entity types', () => {
       const entities = new Map<string, AnyEntity>();
 
-      // Create an entity with an unknown type (this shouldn't happen in practice)
+      // Create an entity with an unknown type (this shouldn't happen in practice).
+      // EntityType is a closed string union; this test's whole point is to
+      // exercise the generator's fallback for a value outside that union, so
+      // the cast is unavoidable — narrowed to the one field instead of `any`.
       const invalidEntity = {
         name: 'Invalid',
-        type: 'UnknownType' as any,
+        type: 'UnknownType' as unknown as AnyEntity['type'],
         position: { line: 1, column: 1 },
         raw: 'Invalid entity',
       };

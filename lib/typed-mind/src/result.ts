@@ -157,21 +157,9 @@ export const Result = {
   },
 };
 
-// Async Result utilities
-export const AsyncResult = {
-  /**
-   * Map over an async Result
-   */
-  map: async <T, U, E>(result: Promise<Result<T, E>>, fn: (value: T) => U | Promise<U>): Promise<Result<U, E>> => {
-    const resolved = await result;
-    return isOk(resolved) ? Ok(await fn(resolved.value)) : resolved;
-  },
-
-  /**
-   * Chain async operations that return Results
-   */
-  andThen: async <T, U, E>(result: Promise<Result<T, E>>, fn: (value: T) => Promise<Result<U, E>>): Promise<Result<U, E>> => {
-    const resolved = await result;
-    return isOk(resolved) ? await fn(resolved.value) : resolved;
-  },
-};
+// RFC-TM-4 §5 (rfc-tm-4-diamond.md, dead-today deletion inventory): AsyncResult
+// dropped here — zero consumers anywhere in the workspace (grep-verified),
+// the "unconsumed result half" named in the deletion inventory. Result/Ok/Err/
+// isOk/isErr stay: index.ts (checkSafe/toggleFormat/toShortform/toLongform)
+// and syntax-generator.ts both consume them, and both are live bridge code
+// through Q5.
