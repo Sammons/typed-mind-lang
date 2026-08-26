@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
-import type { ProgramGraph, ValidationResult } from '@sammons/typed-mind';
+import { ClassFileNode, DependencyNode, type Diagnostic, FileNode, FunctionNode, type ParseOutput, ProgramNode } from '@sammons/typed-mind';
 
 export interface InteractiveRendererOptions {
   port?: number;
@@ -38,8 +38,14 @@ export interface InteractionEvent {
 }
 
 class InteractiveTypedMindRenderer {
-  private programGraph: ProgramGraph | null = null;
-  private validationResult: ValidationResult | null = null;
+  private graph: ParseOutput | null = null;
+  // RFC-TM-6 §2/FAQ Q3 (rfc-tm-6-diamond.md) — getGraphSnapshot().errors is
+  // field-for-field the Diagnostic[] from TypedMind.check() (CheckOutcome),
+  // not ParseOutput.diagnostics (parse-only). setValidationResult's shape
+  // changes from legacy ValidationResult to this list; the setter itself is
+  // not named for deletion by the doc (only setProgramGraph is), so it
+  // survives, retyped.
+  private diagnostics: readonly Diagnostic[] = [];
   private viewHistory: InteractionEvent[] = [];
   private undoStack: ViewState[] = [];
   private redoStack: ViewState[] = [];
@@ -72,12 +78,12 @@ class InteractiveTypedMindRenderer {
     };
   }
 
-  setProgramGraph(graph: ProgramGraph): void {
-    this.programGraph = graph;
+  setGraph(output: ParseOutput): void {
+    this.graph = output;
   }
 
-  setValidationResult(result: ValidationResult): void {
-    this.validationResult = result;
+  setValidationResult(diagnostics: readonly Diagnostic[]): void {
+    this.diagnostics = diagnostics;
   }
 
   async serve(): Promise<void> {
@@ -1728,7 +1734,7 @@ ${this.generateInteractiveRendererJS()}
       this.currentViewState.searchQuery = query;
 
       // Multi-field search
-      const searchTerms = query.toLowerCase().split(/\s+/);
+      const searchTerms = query.toLowerCase().split(/s+/);
       const matchedEntities = new Set();
 
       this.data.entities.forEach(entity => {
@@ -3115,7 +3121,7 @@ ${this.generateInteractiveRendererJS()}
 
   private getGraphData() {
     // Same as enhanced renderer
-    if (!this.programGraph) {
+    if (!this.graph) {
       return {
         entities: [],
         links: [],
@@ -3123,62 +3129,53 @@ ${this.generateInteractiveRendererJS()}
       };
     }
 
-    const entities = Array.from(this.programGraph.entities.values());
+    const entities = this.graph.entities;
+    const byName = new Map(entities.map((entity) => [entity.name, entity]));
     const links: any[] = [];
 
+    // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — class dispatch over EntityNode
+    // subclasses replaces the legacy 'imports' in entity / 'exports' in
+    // entity / 'calls' in entity duck-typing. Every branch mirrors the
+    // legacy field read exactly (imports/exports on File|ClassFile|
+    // Dependency|Program, calls on Function, entry on Program) — same
+    // link set, kind-safe construction.
     for (const entity of entities) {
-      if ('imports' in entity && entity.imports) {
+      if (entity instanceof FileNode || entity instanceof ClassFileNode) {
         for (const imp of entity.imports) {
-          if (this.programGraph.entities.has(imp)) {
-            links.push({
-              source: entity.name,
-              target: imp,
-              type: 'import',
-            });
+          if (byName.has(imp)) {
+            links.push({ source: entity.name, target: imp, type: 'import' });
           }
         }
-      }
-
-      if ('exports' in entity && entity.exports) {
         for (const exp of entity.exports) {
-          if (this.programGraph.entities.has(exp)) {
-            links.push({
-              source: entity.name,
-              target: exp,
-              type: 'export',
-            });
+          if (byName.has(exp)) {
+            links.push({ source: entity.name, target: exp, type: 'export' });
+          }
+        }
+      } else if (entity instanceof DependencyNode || entity instanceof ProgramNode) {
+        for (const exp of entity.exports ?? []) {
+          if (byName.has(exp)) {
+            links.push({ source: entity.name, target: exp, type: 'export' });
           }
         }
       }
 
-      if ('calls' in entity && entity.calls) {
+      if (entity instanceof FunctionNode) {
         for (const call of entity.calls) {
-          if (this.programGraph.entities.has(call)) {
-            links.push({
-              source: entity.name,
-              target: call,
-              type: 'call',
-            });
+          if (byName.has(call)) {
+            links.push({ source: entity.name, target: call, type: 'call' });
           }
         }
       }
 
-      if (entity.type === 'Program' && 'entry' in entity) {
-        const progEntity = entity as any;
-        if (this.programGraph.entities.has(progEntity.entry)) {
-          links.push({
-            source: entity.name,
-            target: progEntity.entry,
-            type: 'entry',
-          });
-        }
+      if (entity instanceof ProgramNode && byName.has(entity.entry)) {
+        links.push({ source: entity.name, target: entity.entry, type: 'entry' });
       }
     }
 
     return {
       entities,
       links,
-      errors: this.validationResult?.errors || [],
+      errors: this.diagnostics,
     };
   }
 

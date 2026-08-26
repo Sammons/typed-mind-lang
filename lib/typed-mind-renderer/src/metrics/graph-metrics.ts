@@ -4,7 +4,17 @@
  * Author: Enhanced by Claude Code in Matt Pocock style
  */
 
-import type { AnyEntity, EntityType, ProgramGraph } from '@sammons/typed-mind';
+import {
+  ClassFileNode,
+  ClassNode,
+  type EntityKind,
+  type EntityNode,
+  FileNode,
+  FunctionNode,
+  type ParseOutput,
+  ProgramNode,
+  UiComponentNode,
+} from '@sammons/typed-mind';
 
 /**
  * Architectural health metric categories
@@ -64,15 +74,13 @@ export interface Risk {
  * Comprehensive graph metrics analyzer
  */
 export class GraphMetricsAnalyzer {
-  private graph: ProgramGraph;
-  private entities: AnyEntity[];
-  private entityMap: Map<string, AnyEntity>;
+  private entities: readonly EntityNode[];
+  private entityMap: Map<string, EntityNode>;
   private dependencyGraph: Map<string, Set<string>> = new Map();
   private reverseDependencyGraph: Map<string, Set<string>> = new Map();
 
-  constructor(graph: ProgramGraph) {
-    this.graph = graph;
-    this.entities = Array.from(graph.entities.values());
+  constructor(graph: ParseOutput) {
+    this.entities = graph.entities;
     this.entityMap = new Map(this.entities.map((e) => [e.name, e]));
     this.buildDependencyGraphs();
   }
@@ -452,7 +460,7 @@ export class GraphMetricsAnalyzer {
     }
   }
 
-  private addDependenciesForEntity(entity: AnyEntity): void {
+  private addDependenciesForEntity(entity: EntityNode): void {
     const deps = this.dependencyGraph.get(entity.name)!;
     const addDependency = (target: string) => {
       if (this.entityMap.has(target)) {
@@ -461,35 +469,34 @@ export class GraphMetricsAnalyzer {
       }
     };
 
-    // Add dependencies based on entity type
-    switch (entity.type) {
-      case 'File':
-      case 'ClassFile':
-        entity.imports?.forEach(addDependency);
-        break;
-      case 'Function':
-        entity.calls?.forEach(addDependency);
-        if (entity.input) addDependency(entity.input);
-        if (entity.output) addDependency(entity.output);
-        entity.consumes?.forEach(addDependency);
-        break;
-      case 'Class':
-        if (entity.extends) addDependency(entity.extends);
-        entity.implements?.forEach(addDependency);
-        break;
-      case 'Program':
-        addDependency(entity.entry);
-        break;
-      case 'UIComponent':
-        entity.containedBy?.forEach(addDependency);
-        break;
+    // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — class dispatch over EntityNode
+    // subclasses replaces the legacy switch(entity.type). The UIComponent
+    // branch reads declaredContainedBy (the entity's OWN declared parent
+    // list, ui-component-node.ts:17) — NOT LinkIndex.containedBy(name),
+    // which is the reverse derivation from other entities' `contains`
+    // arrays. tm6-branches.tmd's OrphanPanel mismatch is the check that
+    // this join direction is right (§2, mismatch-fixture class).
+    if (entity instanceof FileNode || entity instanceof ClassFileNode) {
+      entity.imports.forEach(addDependency);
+    } else if (entity instanceof FunctionNode) {
+      entity.calls.forEach(addDependency);
+      if (entity.input) addDependency(entity.input);
+      if (entity.output) addDependency(entity.output);
+      entity.consumes?.forEach(addDependency);
+    } else if (entity instanceof ClassNode) {
+      if (entity.extends) addDependency(entity.extends);
+      entity.implements.forEach(addDependency);
+    } else if (entity instanceof ProgramNode) {
+      addDependency(entity.entry);
+    } else if (entity instanceof UiComponentNode) {
+      entity.declaredContainedBy?.forEach(addDependency);
     }
   }
 
-  private getEntityTypeDistribution(): Record<EntityType, number> {
-    const distribution = {} as Record<EntityType, number>;
+  private getEntityTypeDistribution(): Record<EntityKind, number> {
+    const distribution = {} as Record<EntityKind, number>;
     for (const entity of this.entities) {
-      distribution[entity.type] = (distribution[entity.type] || 0) + 1;
+      distribution[entity.kind] = (distribution[entity.kind] || 0) + 1;
     }
     return distribution;
   }
@@ -501,7 +508,7 @@ export class GraphMetricsAnalyzer {
 
   private calculateCyclomaticComplexity(): number {
     // Simplified cyclomatic complexity based on function signatures
-    const functions = this.entities.filter((e) => e.type === 'Function');
+    const functions = this.entities.filter((e) => e.kind === 'Function');
     return functions.reduce((total, func) => {
       const deps = this.dependencyGraph.get(func.name)?.size || 0;
       return total + Math.max(1, deps - 1); // Basic approximation
@@ -516,12 +523,12 @@ export class GraphMetricsAnalyzer {
 
       visited.add(entityName);
       const entity = this.entityMap.get(entityName);
-      if (!entity || (entity.type !== 'Class' && entity.type !== 'ClassFile')) {
+      if (!entity || !(entity instanceof ClassNode || entity instanceof ClassFileNode)) {
         return 0;
       }
 
       let depth = 0;
-      if ('extends' in entity && entity.extends) {
+      if (entity.extends) {
         depth = 1 + calculateDepth(entity.extends, new Set(visited));
       }
 
@@ -529,7 +536,7 @@ export class GraphMetricsAnalyzer {
     };
 
     for (const entity of this.entities) {
-      if (entity.type === 'Class' || entity.type === 'ClassFile') {
+      if (entity.kind === 'Class' || entity.kind === 'ClassFile') {
         const depth = calculateDepth(entity.name);
         maxDepth = Math.max(maxDepth, depth);
       }
@@ -619,7 +626,7 @@ export class GraphMetricsAnalyzer {
     return this.entities
       .filter((entity) => {
         const dependents = this.reverseDependencyGraph.get(entity.name);
-        return dependents?.size === 0 && entity.type !== 'Program';
+        return dependents?.size === 0 && entity.kind !== 'Program';
       })
       .map((entity) => entity.name);
   }
@@ -641,8 +648,24 @@ export class GraphMetricsAnalyzer {
   private calculateChangeImpactScore(): number {
     return 0.3;
   }
+  // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — verified against LIVE entity objects
+  // from both engines (not the JSON goldens, which lose `undefined`-valued
+  // keys to JSON.stringify per the Q1 harness's own documented gotcha).
+  // Legacy's regex-driven parser conditionally includes `purpose`/
+  // `description` in the object literal only when the source text supplied
+  // it — key presence varies per-entity even within one kind (e.g.
+  // scenario-31's `AppEntry` File has neither key, `ApiMain` File has
+  // `purpose`). EntityNode subclasses always assign the field in the
+  // constructor (present as `undefined` when unsupplied), so 'x' in entity
+  // reads true for every entity of a kind that HAS the field regardless of
+  // whether the source populated it — verified via probe: 20/20 vs legacy's
+  // 11/20 on scenario-31. Truthiness on the value is what reproduces
+  // legacy's "populated by the source," not merely "declared by the kind."
   private calculateDocumentationCoverage(): number {
-    const documented = this.entities.filter((e) => 'description' in e || 'purpose' in e || e.comment).length;
+    const documented = this.entities.filter((e) => {
+      const withPurpose = e as { purpose?: string; description?: string };
+      return Boolean(withPurpose.purpose) || Boolean(withPurpose.description) || Boolean(e.comment);
+    }).length;
     return documented / this.entities.length;
   }
   private calculateConsistencyScore(): number {

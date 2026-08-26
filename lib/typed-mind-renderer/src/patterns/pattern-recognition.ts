@@ -4,7 +4,7 @@
  * Author: Enhanced by Claude Code in Matt Pocock style
  */
 
-import type { AnyEntity, EntityType, ProgramGraph } from '@sammons/typed-mind';
+import { ClassFileNode, ClassNode, type EntityKind, type EntityNode, FileNode, FunctionNode, type ParseOutput } from '@sammons/typed-mind';
 
 /**
  * Architectural pattern definition
@@ -26,7 +26,7 @@ export interface ArchitecturalPattern {
 export interface PatternEntity {
   role: string;
   entityId: string;
-  entityType: EntityType;
+  entityType: EntityKind;
   description: string;
   optional?: boolean;
 }
@@ -50,12 +50,12 @@ export interface PatternMatcher {
   /**
    * Detect if pattern exists in the graph
    */
-  detect(graph: ProgramGraph): ArchitecturalPattern[];
+  detect(graph: ParseOutput): ArchitecturalPattern[];
 
   /**
    * Calculate confidence score for a potential match
    */
-  calculateConfidence(entities: AnyEntity[], relationships: Map<string, Set<string>>): number;
+  calculateConfidence(entities: EntityNode[], relationships: Map<string, Set<string>>): number;
 }
 
 /**
@@ -64,7 +64,7 @@ export interface PatternMatcher {
 export class PatternRecognitionEngine {
   private matchers: Map<string, PatternMatcher> = new Map();
   private detectedPatterns: ArchitecturalPattern[] = [];
-  private graph: ProgramGraph | null = null;
+  private graph: ParseOutput | null = null;
 
   constructor() {
     this.registerBuiltInMatchers();
@@ -80,7 +80,7 @@ export class PatternRecognitionEngine {
   /**
    * Analyze graph for architectural patterns
    */
-  analyzePatterns(graph: ProgramGraph): {
+  analyzePatterns(graph: ParseOutput): {
     patterns: ArchitecturalPattern[];
     patternsByCategory: Record<string, ArchitecturalPattern[]>;
     recommendations: PatternRecommendation[];
@@ -184,10 +184,10 @@ export class PatternRecognitionEngine {
     const recommendations: PatternRecommendation[] = [];
 
     // Recommend missing patterns based on current architecture
-    const entities = Array.from(this.graph?.entities.values() || []);
+    const entities = this.graph?.entities ?? [];
     const hasControllers = entities.some((e) => e.name.toLowerCase().includes('controller'));
     const hasServices = entities.some((e) => e.name.toLowerCase().includes('service'));
-    const hasModels = entities.some((e) => e.type === 'DTO' || e.name.toLowerCase().includes('model'));
+    const hasModels = entities.some((e) => e.kind === 'DTO' || e.name.toLowerCase().includes('model'));
 
     if (hasControllers && hasModels && !hasServices) {
       recommendations.push({
@@ -274,19 +274,19 @@ class MVCPatternMatcher implements PatternMatcher {
   readonly description = 'Classic MVC architectural pattern with clear separation of concerns';
   readonly category = 'architectural' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
-    const entities = Array.from(graph.entities.values());
+  detect(graph: ParseOutput): ArchitecturalPattern[] {
+    const entities = graph.entities;
     const patterns: ArchitecturalPattern[] = [];
 
     // Find potential controllers, models, and views
-    const controllers = entities.filter((e) => e.name.toLowerCase().includes('controller') || e.type === 'Class' || e.type === 'ClassFile');
+    const controllers = entities.filter((e) => e.name.toLowerCase().includes('controller') || e.kind === 'Class' || e.kind === 'ClassFile');
 
     const models = entities.filter(
-      (e) => e.type === 'DTO' || e.name.toLowerCase().includes('model') || e.name.toLowerCase().includes('entity'),
+      (e) => e.kind === 'DTO' || e.name.toLowerCase().includes('model') || e.name.toLowerCase().includes('entity'),
     );
 
     const views = entities.filter(
-      (e) => e.type === 'UIComponent' || e.name.toLowerCase().includes('view') || e.name.toLowerCase().includes('component'),
+      (e) => e.kind === 'UIComponent' || e.name.toLowerCase().includes('view') || e.name.toLowerCase().includes('component'),
     );
 
     // Look for MVC triads
@@ -308,19 +308,19 @@ class MVCPatternMatcher implements PatternMatcher {
               {
                 role: 'controller',
                 entityId: controller.name,
-                entityType: controller.type,
+                entityType: controller.kind,
                 description: 'Handles user input and coordinates model and view',
               },
               ...relatedModels.map((m) => ({
                 role: 'model',
                 entityId: m.name,
-                entityType: m.type,
+                entityType: m.kind,
                 description: 'Represents data and business logic',
               })),
               ...relatedViews.map((v) => ({
                 role: 'view',
                 entityId: v.name,
-                entityType: v.type,
+                entityType: v.kind,
                 description: 'Presents data to user',
               })),
             ],
@@ -348,13 +348,13 @@ class MVCPatternMatcher implements PatternMatcher {
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     // Basic confidence calculation based on naming conventions and relationships
     let score = 0.5; // Base score
 
     const hasController = entities.some((e) => e.name.toLowerCase().includes('controller'));
-    const hasModel = entities.some((e) => e.type === 'DTO' || e.name.toLowerCase().includes('model'));
-    const hasView = entities.some((e) => e.type === 'UIComponent');
+    const hasModel = entities.some((e) => e.kind === 'DTO' || e.name.toLowerCase().includes('model'));
+    const hasView = entities.some((e) => e.kind === 'UIComponent');
 
     if (hasController) score += 0.2;
     if (hasModel) score += 0.2;
@@ -363,8 +363,8 @@ class MVCPatternMatcher implements PatternMatcher {
     return Math.min(1.0, score);
   }
 
-  private findRelatedEntities(entity: AnyEntity, candidates: AnyEntity[], graph: ProgramGraph): AnyEntity[] {
-    const related: AnyEntity[] = [];
+  private findRelatedEntities(entity: EntityNode, candidates: EntityNode[], graph: ParseOutput): EntityNode[] {
+    const related: EntityNode[] = [];
 
     for (const candidate of candidates) {
       if (this.entitiesAreRelated(entity, candidate, graph)) {
@@ -375,13 +375,19 @@ class MVCPatternMatcher implements PatternMatcher {
     return related;
   }
 
-  private entitiesAreRelated(entity1: AnyEntity, entity2: AnyEntity, _graph: ProgramGraph): boolean {
-    // Check for various types of relationships
-    if ('imports' in entity1 && entity1.imports?.includes(entity2.name)) return true;
-    if ('calls' in entity1 && entity1.calls?.includes(entity2.name)) return true;
-    if ('affects' in entity1 && entity1.affects?.includes(entity2.name)) return true;
-    if ('input' in entity1 && entity1.input === entity2.name) return true;
-    if ('output' in entity1 && entity1.output === entity2.name) return true;
+  // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — class dispatch over EntityNode
+  // subclasses replaces the legacy 'imports' in entity1 / 'calls' in entity1
+  // / 'affects' in entity1 duck-typing. File/ClassFile carry imports,
+  // Function carries calls/affects/input/output — same field set the legacy
+  // duck-typing probed.
+  private entitiesAreRelated(entity1: EntityNode, entity2: EntityNode, _graph: ParseOutput): boolean {
+    if ((entity1 instanceof FileNode || entity1 instanceof ClassFileNode) && entity1.imports.includes(entity2.name)) return true;
+    if (entity1 instanceof FunctionNode) {
+      if (entity1.calls.includes(entity2.name)) return true;
+      if (entity1.affects?.includes(entity2.name)) return true;
+      if (entity1.input === entity2.name) return true;
+      if (entity1.output === entity2.name) return true;
+    }
 
     return false;
   }
@@ -396,8 +402,8 @@ class RepositoryPatternMatcher implements PatternMatcher {
   readonly description = 'Data access abstraction layer pattern';
   readonly category = 'structural' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
-    const entities = Array.from(graph.entities.values());
+  detect(graph: ParseOutput): ArchitecturalPattern[] {
+    const entities = graph.entities;
     const patterns: ArchitecturalPattern[] = [];
 
     const repositories = entities.filter((e) => e.name.toLowerCase().includes('repository') || e.name.toLowerCase().includes('dao'));
@@ -416,7 +422,7 @@ class RepositoryPatternMatcher implements PatternMatcher {
             {
               role: 'repository',
               entityId: repo.name,
-              entityType: repo.type,
+              entityType: repo.kind,
               description: 'Provides data access abstraction',
             },
           ],
@@ -430,13 +436,13 @@ class RepositoryPatternMatcher implements PatternMatcher {
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     const repo = entities[0];
     let confidence = 0.3;
 
     if (repo.name.toLowerCase().includes('repository')) confidence += 0.4;
     if (repo.name.toLowerCase().includes('dao')) confidence += 0.3;
-    if (repo.type === 'Class' || repo.type === 'ClassFile') confidence += 0.2;
+    if (repo.kind === 'Class' || repo.kind === 'ClassFile') confidence += 0.2;
 
     return Math.min(1.0, confidence);
   }
@@ -451,8 +457,8 @@ class FactoryPatternMatcher implements PatternMatcher {
   readonly description = 'Object creation abstraction pattern';
   readonly category = 'creational' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
-    const entities = Array.from(graph.entities.values());
+  detect(graph: ParseOutput): ArchitecturalPattern[] {
+    const entities = graph.entities;
     const factories = entities.filter((e) => e.name.toLowerCase().includes('factory') || e.name.toLowerCase().includes('builder'));
 
     return factories.map((factory) => ({
@@ -465,7 +471,7 @@ class FactoryPatternMatcher implements PatternMatcher {
         {
           role: 'factory',
           entityId: factory.name,
-          entityType: factory.type,
+          entityType: factory.kind,
           description: 'Creates objects without exposing instantiation logic',
         },
       ],
@@ -475,7 +481,7 @@ class FactoryPatternMatcher implements PatternMatcher {
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     const factory = entities[0];
     return factory.name.toLowerCase().includes('factory') ? 0.8 : 0.6;
   }
@@ -487,13 +493,13 @@ class ObserverPatternMatcher implements PatternMatcher {
   readonly description = 'Event-driven pattern with subjects and observers';
   readonly category = 'behavioral' as const;
 
-  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ParseOutput): ArchitecturalPattern[] {
     // Implementation would detect observer/subject relationships
     return [];
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(_entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(_entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     return 0.5;
   }
 }
@@ -504,13 +510,13 @@ class SingletonPatternMatcher implements PatternMatcher {
   readonly description = 'Ensures single instance of a class';
   readonly category = 'creational' as const;
 
-  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ParseOutput): ArchitecturalPattern[] {
     // Implementation would detect singleton patterns
     return [];
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(_entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(_entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     return 0.5;
   }
 }
@@ -521,13 +527,13 @@ class AdapterPatternMatcher implements PatternMatcher {
   readonly description = 'Interface compatibility pattern';
   readonly category = 'structural' as const;
 
-  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ParseOutput): ArchitecturalPattern[] {
     // Implementation would detect adapter patterns
     return [];
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(_entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(_entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     return 0.5;
   }
 }
@@ -538,13 +544,13 @@ class LayeredArchitectureMatcher implements PatternMatcher {
   readonly description = 'Hierarchical layers with unidirectional dependencies';
   readonly category = 'architectural' as const;
 
-  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ParseOutput): ArchitecturalPattern[] {
     // Implementation would detect layered architecture
     return [];
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(_entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(_entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     return 0.5;
   }
 }
@@ -555,13 +561,13 @@ class MicroservicesPatternMatcher implements PatternMatcher {
   readonly description = 'Distributed architecture with independent services';
   readonly category = 'architectural' as const;
 
-  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ParseOutput): ArchitecturalPattern[] {
     // Implementation would detect microservices patterns
     return [];
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(_entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(_entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     return 0.5;
   }
 }
@@ -574,15 +580,19 @@ class GodObjectAntiPatternMatcher implements PatternMatcher {
   readonly description = 'Object that knows too much or does too much';
   readonly category = 'anti-pattern' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
-    const entities = Array.from(graph.entities.values());
+  detect(graph: ParseOutput): ArchitecturalPattern[] {
+    const entities = graph.entities;
     const patterns: ArchitecturalPattern[] = [];
 
-    // Look for entities with too many dependencies or responsibilities
+    // Look for entities with too many dependencies or responsibilities.
+    // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — class dispatch replaces the
+    // legacy 'methods' in entity / 'imports' in entity duck-typing.
+    // ClassNode carries no imports field (RFC-TM-3 §2.2 F3 disposition,
+    // already-approved, out of this RFC's scope) — only ClassFileNode does.
     for (const entity of entities) {
-      if (entity.type === 'Class' || entity.type === 'ClassFile') {
-        const methods = 'methods' in entity ? entity.methods?.length || 0 : 0;
-        const imports = 'imports' in entity ? entity.imports?.length || 0 : 0;
+      if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
+        const methods = entity.methods.length;
+        const imports = entity instanceof ClassFileNode ? entity.imports.length : 0;
 
         if (methods > 20 || imports > 15) {
           patterns.push({
@@ -595,7 +605,7 @@ class GodObjectAntiPatternMatcher implements PatternMatcher {
               {
                 role: 'god-object',
                 entityId: entity.name,
-                entityType: entity.type,
+                entityType: entity.kind,
                 description: 'Object with excessive responsibilities',
               },
             ],
@@ -616,11 +626,11 @@ class GodObjectAntiPatternMatcher implements PatternMatcher {
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     const entity = entities[0];
-    if (entity.type === 'Class' || entity.type === 'ClassFile') {
-      const methods = 'methods' in entity ? entity.methods?.length || 0 : 0;
-      const imports = 'imports' in entity ? entity.imports?.length || 0 : 0;
+    if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
+      const methods = entity.methods.length;
+      const imports = entity instanceof ClassFileNode ? entity.imports.length : 0;
 
       let score = 0;
       if (methods > 20) score += 0.5;
@@ -639,13 +649,13 @@ class CircularDependencyAntiPatternMatcher implements PatternMatcher {
   readonly description = 'Entities that depend on each other in a cycle';
   readonly category = 'anti-pattern' as const;
 
-  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ParseOutput): ArchitecturalPattern[] {
     // Implementation would detect circular dependencies
     return [];
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(_entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(_entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     return 0.8;
   }
 }
@@ -656,13 +666,13 @@ class DeadCodeAntiPatternMatcher implements PatternMatcher {
   readonly description = 'Code that is never used or executed';
   readonly category = 'anti-pattern' as const;
 
-  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ParseOutput): ArchitecturalPattern[] {
     // Implementation would detect dead code
     return [];
   }
 
   // Required by PatternMatcher interface
-  calculateConfidence(_entities: AnyEntity[], _relationships: Map<string, Set<string>>): number {
+  calculateConfidence(_entities: EntityNode[], _relationships: Map<string, Set<string>>): number {
     return 0.9;
   }
 }

@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { DSLChecker, TypedMind } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 import { TypedMindRenderer } from '@sammons/typed-mind-renderer';
 
 const options = {
@@ -98,15 +98,15 @@ async function main() {
     const content = readFileSync(absolutePath, 'utf-8');
 
     if (values.render) {
-      // RFC-TM-4 \u00a73 bridge: the renderer stays on the legacy Map-shaped
-      // ProgramGraph until TM-6 migrates it, so --render keeps the legacy
-      // DSLChecker for now.
+      // RFC-TM-6 \u00a72 (rfc-tm-6-diamond.md) \u2014 the renderer's input seam moved
+      // to setGraph(ParseOutput); --render's one in-repo TypedMindRenderer
+      // caller moves with it, off TypedMind.create()'s parse()/check().
       console.log(`Rendering ${filePath}...`);
-      const checker = new DSLChecker({
+      const typedMind = await TypedMind.create({
         skipOrphanCheck: values['skip-orphan-check'] as boolean,
       });
-      const programGraph = checker.parse(content, absolutePath);
-      const validationResult = checker.check(content, absolutePath);
+      const graph = typedMind.parse(content, absolutePath);
+      const { diagnostics } = typedMind.check(content, absolutePath);
 
       const renderer = new TypedMindRenderer({
         port: parseInt(values.port || '3000', 10),
@@ -118,8 +118,8 @@ async function main() {
         enablePerformanceMonitoring: true,
       });
 
-      renderer.setProgramGraph(programGraph);
-      renderer.setValidationResult(validationResult);
+      renderer.setGraph(graph);
+      renderer.setValidationResult(diagnostics);
 
       if (values.output) {
         const html = renderer.generateStaticHTML();
