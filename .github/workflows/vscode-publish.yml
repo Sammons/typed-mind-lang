@@ -61,7 +61,7 @@ jobs:
           echo "Checking if $EXTENSION_ID@$VERSION exists on marketplace..."
           
           # Check if version already exists
-          if npx @vscode/vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
+          if pnpm exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
             echo "Version $VERSION already exists on marketplace"
             echo "should_publish=false" >> $GITHUB_OUTPUT
           else
@@ -82,7 +82,7 @@ jobs:
           done
           
           # Validate package.json
-          npx @vscode/vsce ls --no-dependencies
+          pnpm exec vsce ls --no-dependencies
           
           cd ../..
 
@@ -109,11 +109,11 @@ jobs:
         run: |
           cd lib/typed-mind-vscode-extension
           
-          # Install vsce locally if needed
-          npm install --save-dev @vscode/vsce
+          
+          
           
           # Package the extension
-          npx @vscode/vsce package --no-dependencies
+          pnpm exec vsce package --no-dependencies
           
           # Verify VSIX was created
           VSIX_FILE=$(ls *.vsix | head -1)
@@ -169,9 +169,9 @@ jobs:
           echo "Publishing $VSIX_FILE..."
           
           if [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
-            npx @vscode/vsce publish --pre-release --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
+            pnpm exec vsce publish --pre-release --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
           else
-            npx @vscode/vsce publish --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
+            pnpm exec vsce publish --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
           fi
 
       - name: Dry run summary
@@ -196,7 +196,7 @@ jobs:
           RETRY_COUNT=0
           
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if npx @vscode/vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
+            if pnpm exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
               echo "✓ Extension $EXTENSION_ID@$VERSION is now available on marketplace"
               break
             fi

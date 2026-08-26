@@ -18,7 +18,7 @@ echo "Creating NPM packages tarball..."
 for package_dir in lib/typed-mind lib/typed-mind-cli lib/typed-mind-lsp lib/typed-mind-renderer; do
   if [ -d "$package_dir" ]; then
     cd "$package_dir"
-    npm pack --pack-destination "../../$ARTIFACTS_DIR"
+    pnpm pack --pack-destination "../../$ARTIFACTS_DIR"
     cd ../..
   fi
 done

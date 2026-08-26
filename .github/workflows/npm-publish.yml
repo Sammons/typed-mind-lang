@@ -106,7 +106,7 @@ jobs:
       - name: Configure npm authentication
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          npm whoami
+          pnpm whoami
 
       - name: Publish packages
         run: |
@@ -124,7 +124,7 @@ jobs:
               package_name=$(jq -r '.name' "$package_dir/package.json")
               version=$(jq -r '.version' "$package_dir/package.json")
               echo "Verifying $package_name@$version..."
-              npm view "$package_name@$version" version || exit 1
+              pnpm view "$package_name@$version" version || exit 1
             fi
           done
 

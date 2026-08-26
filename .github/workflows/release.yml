@@ -165,7 +165,7 @@ jobs:
       - name: Configure npm authentication
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          npm whoami
+          pnpm whoami
 
       - name: Publish packages
         run: .github/scripts/publish-npm-packages.sh
@@ -178,7 +178,7 @@ jobs:
             if [ -f "$package_json" ] && [[ "$package_json" != *"vscode-extension"* ]] && [[ "$package_json" != *"static-website"* ]] && [[ "$package_json" != *"test-suite"* ]]; then
               PACKAGE_NAME=$(jq -r '.name' "$package_json")
               echo "Verifying $PACKAGE_NAME@$VERSION..."
-              npm view "$PACKAGE_NAME@$VERSION" version || exit 1
+              pnpm view "$PACKAGE_NAME@$VERSION" version || exit 1
             fi
           done
 
@@ -201,14 +201,14 @@ jobs:
         run: |
           cd lib/typed-mind-vscode-extension
           pnpm install
-          npx @vscode/vsce package --no-dependencies
+          pnpm exec vsce package --no-dependencies
           echo "VSIX_FILE=$(ls *.vsix)" >> $GITHUB_ENV
           cd ../..
 
       - name: Publish to VS Code Marketplace
         run: |
           cd lib/typed-mind-vscode-extension
-          npx @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }} --no-dependencies
+          pnpm exec vsce publish --pat ${{ secrets.VSCE_PAT }} --no-dependencies
           cd ../..
 
       - name: Upload VSIX artifact
@@ -338,7 +338,7 @@ jobs:
       - name: Build documentation site
         run: |
           cd lib/typed-mind-static-website
-          npm run build
+          pnpm run build
           cd ../..
 
       - name: Setup Pages

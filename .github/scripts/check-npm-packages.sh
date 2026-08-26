@@ -32,7 +32,7 @@ for package_dir in "${PACKAGE_ORDER[@]}"; do
   local_version=$(jq -r '.version' "$package_json")
   
   # Check if package exists on npm
-  if npm_version=$(npm view "$package_name" version 2>/dev/null); then
+  if npm_version=$(pnpm view "$package_name" version 2>/dev/null); then
     if [ "$npm_version" != "$local_version" ]; then
       echo "Package $package_name needs publishing (local: $local_version, npm: $npm_version)" >&2
       PACKAGES="$PACKAGES $package_dir"

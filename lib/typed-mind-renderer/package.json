@@ -76,7 +76,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "build": "tsc --build && npm run copy-static",
+    "build": "tsc --build && pnpm run copy-static",
     "copy-static": "mkdir -p dist && cp -r src/static dist/",
     "dev": "tsc --build --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
@@ -85,7 +85,7 @@
     "lint": "echo 'Skipping lint for now'",
     "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run clean && npm run build && npm test"
+    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },
   "dependencies": {
     "@sammons/typed-mind": "workspace:*"

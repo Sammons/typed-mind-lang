@@ -27,7 +27,7 @@ This monorepo contains five packages:
 Visit [TypedMind Online](https://typedmind.sammons.io/) to try TypedMind in your browser, or install the CLI:
 
 ```bash
-npm install -g @sammons/typed-mind-cli
+pnpm add -g @sammons/typed-mind-cli
 ```
 
 ## Installation (Development)

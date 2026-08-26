@@ -43,7 +43,7 @@
     "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist dist-bundled *.tsbuildinfo",
-    "prepublishOnly": "npm run clean && npm run build && npm test"
+    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },
   "dependencies": {
     "@sammons/typed-mind": "workspace:*",
