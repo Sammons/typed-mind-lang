@@ -5,8 +5,8 @@
  * that provide better type safety and IntelliSense support.
  */
 
-import type { Position } from './types';
-import type { EntityName, EntityTypeName } from './branded-types';
+import type { Position } from './types.ts';
+import type { EntityName, EntityTypeName } from './branded-types.ts';
 
 // Base error structure
 interface BaseError {

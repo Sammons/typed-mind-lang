@@ -15,8 +15,8 @@ import type {
   ValidationResult,
   EntityType,
   ReferenceType,
-} from './types';
-import type { ParseResult } from './parser';
+} from './types.ts';
+import type { ParseResult } from './parser.ts';
 
 export interface ValidatorOptions {
   skipOrphanCheck?: boolean;

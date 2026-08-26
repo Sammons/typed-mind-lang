@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SyntaxGenerator, detectSyntaxFormat, toggleSyntaxFormat } from './syntax-generator';
-import type { AnyEntity, ProgramEntity, FileEntity, FunctionEntity, DTOEntity, ClassFileEntity } from './types';
+import { SyntaxGenerator, detectSyntaxFormat, toggleSyntaxFormat } from './syntax-generator.ts';
+import type { AnyEntity, ProgramEntity, FileEntity, FunctionEntity, DTOEntity, ClassFileEntity } from './types.ts';
 
 describe('SyntaxGenerator', () => {
   let generator: SyntaxGenerator;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GrammarDocGenerator } from './grammar-doc-generator';
+import { GrammarDocGenerator } from './grammar-doc-generator.ts';
 
 describe('GrammarDocGenerator', () => {
   const generator = new GrammarDocGenerator();

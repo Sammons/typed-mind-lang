@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { DSLParser } from '../../typed-mind/src/parser';
-import { DSLValidator } from '../../typed-mind/src/validator';
+import { DSLParser } from '../../typed-mind/src/parser.ts';
+import { DSLValidator } from '../../typed-mind/src/validator.ts';
 
 describe('Scenario 57: Import and export confusion', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-57-import-export-confusion.tmd');

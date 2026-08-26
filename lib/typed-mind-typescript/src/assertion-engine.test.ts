@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { AssertionEngine } from './assertion-engine';
-import type { ConversionResult } from './types';
+import { AssertionEngine } from './assertion-engine.ts';
+import type { ConversionResult } from './types.ts';
 import { FunctionEntity, DTOEntity } from '@sammons/typed-mind';
 
 const createMockConversionResult = (): ConversionResult => ({

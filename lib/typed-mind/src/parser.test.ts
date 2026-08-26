@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DSLParser } from './parser';
+import { DSLParser } from './parser.ts';
 
 describe('DSLParser', () => {
   const parser = new DSLParser();

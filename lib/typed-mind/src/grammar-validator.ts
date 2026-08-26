@@ -1,5 +1,5 @@
-import type { AnyEntity, EntityType } from './types';
-import { ENTITY_TYPE_NAMES, type EntityTypeName } from './parser-patterns';
+import type { AnyEntity, EntityType } from './types.ts';
+import { ENTITY_TYPE_NAMES, type EntityTypeName } from './parser-patterns.ts';
 
 export interface GrammarValidationError {
   entity: string;

@@ -15,10 +15,10 @@ import type {
   DependencyEntity,
   Position,
   ImportStatement,
-} from './types';
-import { LongformParser } from './longform-parser';
-import { ENTITY_PATTERNS, CONTINUATION_PATTERNS, GENERAL_PATTERNS } from './parser-patterns';
-import { GrammarValidator } from './grammar-validator';
+} from './types.ts';
+import { LongformParser } from './longform-parser.ts';
+import { ENTITY_PATTERNS, CONTINUATION_PATTERNS, GENERAL_PATTERNS } from './parser-patterns.ts';
+import { GrammarValidator } from './grammar-validator.ts';
 
 export interface ParseError {
   line: number;

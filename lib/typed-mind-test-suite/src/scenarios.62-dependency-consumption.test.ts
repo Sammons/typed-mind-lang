@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { DSLParser } from '../../typed-mind/src/parser';
-import { DSLValidator } from '../../typed-mind/src/validator';
+import { DSLParser } from '../../typed-mind/src/parser.ts';
+import { DSLValidator } from '../../typed-mind/src/validator.ts';
 
 describe('Scenario 62: Dependency consumption patterns', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-62-dependency-consumption.tmd');

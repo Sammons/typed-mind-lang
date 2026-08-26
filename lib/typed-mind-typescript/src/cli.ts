@@ -3,11 +3,11 @@
 import { readFileSync, writeFileSync, existsSync, statSync } from 'fs';
 import { resolve, extname, dirname } from 'path';
 import { parseArgs } from 'util';
-import { TypeScriptAnalyzer } from './typescript-analyzer';
-import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter';
-import { AssertionEngine } from './assertion-engine';
+import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
+import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
+import { AssertionEngine } from './assertion-engine.ts';
 import { DSLChecker } from '@sammons/typed-mind';
-import type { ConversionOptions } from './types';
+import type { ConversionOptions } from './types.ts';
 
 const options = {
   help: {

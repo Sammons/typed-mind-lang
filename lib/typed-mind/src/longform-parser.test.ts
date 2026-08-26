@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DSLParser } from './parser';
+import { DSLParser } from './parser.ts';
 
 describe('Longform Syntax', () => {
   const parser = new DSLParser();

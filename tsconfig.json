@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    "rewriteRelativeImportExtensions": true,
     "allowJs": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

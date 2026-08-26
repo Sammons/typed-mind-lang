@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { TypeScriptAnalyzer } from './typescript-analyzer';
+import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
 
 const testProjectDir = '/tmp/typed-mind-ts-test';
 

@@ -1,4 +1,4 @@
-import { TypedMindLanguageServer } from './server';
+import { TypedMindLanguageServer } from './server.ts';
 
 export function startServer(): void {
   // Add minimal error handlers to prevent silent crashes

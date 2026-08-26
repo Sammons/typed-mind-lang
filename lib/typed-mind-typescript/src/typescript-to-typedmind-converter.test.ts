@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter';
-import type { TypeScriptProjectAnalysis, ParsedModule } from './types';
-import { createFilePath } from './types';
+import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
+import type { TypeScriptProjectAnalysis, ParsedModule } from './types.ts';
+import { createFilePath } from './types.ts';
 
 const createMockAnalysis = (): TypeScriptProjectAnalysis => ({
   modules: [

@@ -19,9 +19,9 @@ import type {
   UIComponentEntity,
   RunParameterEntity,
   DependencyEntity,
-} from './types';
-import { EntityName } from './branded-types';
-import type { Result } from './result';
+} from './types.ts';
+import { EntityName } from './branded-types.ts';
+import type { Result } from './result.ts';
 
 // Entity type mapping for type-safe retrieval
 export type EntityTypeMap = {
