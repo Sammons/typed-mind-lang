@@ -1,16 +1,19 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  AnyEntity,
-  ClassEntity,
-  ClassFileEntity,
-  ConstantsEntity,
-  DependencyEntity,
-  DTOEntity,
-  DTOField,
-  FileEntity,
-  FunctionEntity,
-  ProgramEntity,
+import {
+  ClassFileNode,
+  ClassNode,
+  ConstantsNode,
+  DependencyNode,
+  DtoFieldNode,
+  DtoNode,
+  type EntityKind,
+  type EntityNode,
+  FileNode,
+  FunctionNode,
+  ProgramNode,
+  type Span,
+  SyntaxEmitter,
 } from '@sammons/typed-mind';
 import type {
   ConversionError,
@@ -25,6 +28,29 @@ import type {
   TypeScriptProjectAnalysis,
 } from './types.ts';
 import { createEntityName } from './types.ts';
+
+// RFC-TM-6 §3 (rfc-tm-6-diamond.md, M8 disposition) — converter-built nodes
+// have no source text, so every node shares one zero-width synthetic span.
+// I-6 (token-accurate diagnostic spans) governs positions derived from real
+// source; this converter emits no source-backed diagnostics, so I-6 does not
+// apply here by declaration — the column-1 tripwire's scope (lib/typed-mind
+// src/checker, src/emitter, src/pipeline) must not extend to this package.
+const SYNTHETIC_SPAN: Span = { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } };
+
+// RFC-TM-6 §3 — the converter pre-sorts its synthetic entity list into the
+// legacy private emitter's eight-bucket section order (Program, Dependency,
+// File, ClassFile, Class, Function, DTO, Constants) before emission, so
+// checked-in `.tmd` diffs keep their structure even though the shared
+// SyntaxEmitter (unlike the now-deleted private emitter) has no notion of
+// section grouping — it emits entities in list order, blank-line separated.
+const LEGACY_SECTION_ORDER: readonly EntityKind[] = ['Program', 'Dependency', 'File', 'ClassFile', 'Class', 'Function', 'DTO', 'Constants'];
+
+const sortIntoLegacySectionOrder = (entities: readonly EntityNode[]): EntityNode[] => {
+  const rank = new Map(LEGACY_SECTION_ORDER.map((kind, index) => [kind, index]));
+  return [...entities].sort(
+    (a, b) => (rank.get(a.kind) ?? LEGACY_SECTION_ORDER.length) - (rank.get(b.kind) ?? LEGACY_SECTION_ORDER.length),
+  );
+};
 
 // Two-pass architecture data structures
 interface ExportRegistry {
@@ -53,12 +79,15 @@ interface EntityRegistry {
 }
 
 export class TypeScriptToTypedMindConverter {
+  // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — the shared SyntaxEmitter replaces the
+  // converter's now-deleted private TMD-content emitter.
+  private readonly emitter = new SyntaxEmitter();
   private readonly options: Required<ConversionOptions>;
   private readonly errors: ConversionError[] = [];
   private readonly warnings: ConversionWarning[] = [];
-  private readonly entities: AnyEntity[] = [];
+  private readonly entities: EntityNode[] = [];
   private readonly entityNames = new Set<string>();
-  private readonly dependencies = new Map<string, DependencyEntity>();
+  private readonly dependencies = new Map<string, DependencyNode>();
   private readonly externalTypeToPackage = new Map<string, string>(); // Maps external types to their package
   private entryPoints = new Set<string>();
 
@@ -102,12 +131,17 @@ export class TypeScriptToTypedMindConverter {
         this.generatePrograms(analysis.entryPoints, filteredModules);
       }
 
-      // Generate TMD content
-      const tmdContent = this.generateTMDContent();
+      // RFC-TM-6 §3 — pre-sort into the legacy section order so checked-in
+      // `.tmd` diffs keep their structure, then emit through the shared
+      // SyntaxEmitter (the `# Section` header comments are the named,
+      // accepted EMITTER-STRUCTURE regression — SyntaxEmitter has no
+      // comment-synthesis surface, per the RFC's Rejected Alternatives).
+      const sortedEntities = sortIntoLegacySectionOrder(this.entities);
+      const tmdContent = this.emitter.emitShortform({ entities: sortedEntities, imports: [], diagnostics: [] });
 
       return {
         success: this.errors.length === 0,
-        entities: [...this.entities],
+        entities: sortedEntities,
         tmdContent,
         errors: [...this.errors],
         warnings: [...this.warnings],
@@ -236,14 +270,14 @@ export class TypeScriptToTypedMindConverter {
     const version = this.extractVersionFromPackageJson(specifier);
     const purpose = this.derivePurpose(specifier);
 
-    const dependencyEntity: DependencyEntity = {
+    const dependencyEntity = new DependencyNode({
       name: entityName,
-      type: 'Dependency',
-      position: { line: 1, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: `${entityName} ^ "${purpose}"${version ? ` v${version}` : ''}`,
+      sourceForm: 'shortform',
       purpose,
       version,
-    };
+    });
 
     this.dependencies.set(specifier, dependencyEntity);
     this.entityNames.add(entityName);
@@ -605,22 +639,19 @@ export class TypeScriptToTypedMindConverter {
 
     this.entityNames.add(entityName);
 
-    const classFileEntity: ClassFileEntity = {
+    const classFileEntity = new ClassFileNode({
       name: entityName,
-      type: 'ClassFile',
-      position: { line: 1, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: `${entityName} #: ${this.getRelativePath(module.filePath)}`,
+      sourceForm: 'shortform',
       path: this.getRelativePath(module.filePath),
       extends: primaryClass.extends[0] || undefined, // TypedMind supports single inheritance
       implements: [...primaryClass.extends.slice(1), ...primaryClass.implements],
       methods: this.convertMethods(primaryClass),
       imports: this.convertImports(module.imports, module.exports),
       exports: this.convertExports(module, entityName),
-    };
-
-    if (primaryClass.description) {
-      classFileEntity.purpose = primaryClass.description;
-    }
+      purpose: primaryClass.description || undefined,
+    });
 
     this.entities.push(classFileEntity);
 
@@ -663,15 +694,15 @@ export class TypeScriptToTypedMindConverter {
     if (!this.entityNames.has(fileEntityName)) {
       this.entityNames.add(fileEntityName);
 
-      const fileEntity: FileEntity = {
+      const fileEntity = new FileNode({
         name: fileEntityName,
-        type: 'File',
-        position: { line: 1, column: 1 },
+        span: SYNTHETIC_SPAN,
         raw: `${fileEntityName} @ ${this.getRelativePath(module.filePath)}:`,
+        sourceForm: 'shortform',
         path: this.getRelativePath(module.filePath),
         imports: this.convertImports(module.imports, module.exports),
         exports: this.convertExports(module),
-      };
+      });
 
       this.entities.push(fileEntity);
     }
@@ -715,20 +746,21 @@ export class TypeScriptToTypedMindConverter {
 
     this.entityNames.add(entityName);
 
-    const classEntity: ClassEntity = {
+    // sourceFile is not carried on ClassNode: RFC-TM-3 §2.2 drops the legacy
+    // `container`/`path` fields for Class (dead per the honest-fields table —
+    // the File->Class lookahead heuristic's product is a ClassFileNode).
+    void sourceFile;
+
+    const classEntity = new ClassNode({
       name: entityName,
-      type: 'Class',
-      position: { line: 1, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: `${entityName} <: ${cls.extends.join(', ')}`,
+      sourceForm: 'shortform',
       extends: cls.extends[0] || undefined, // TypedMind supports single inheritance
-      path: sourceFile, // Store source file path
       implements: [...cls.extends.slice(1), ...cls.implements],
       methods: this.convertMethods(cls),
-    };
-
-    if (cls.description) {
-      classEntity.purpose = cls.description;
-    }
+      purpose: cls.description || undefined,
+    });
 
     this.entities.push(classEntity);
   }
@@ -743,31 +775,26 @@ export class TypeScriptToTypedMindConverter {
 
     this.entityNames.add(entityName);
 
-    const functionEntity: FunctionEntity = {
-      name: entityName,
-      type: 'Function',
-      position: { line: 1, column: 1 },
-      raw: `${entityName} :: ${func.signature}`,
-      signature: func.signature,
-      calls: [], // Will be populated by analyzing function bodies if needed
-      container: sourceFile, // Store source file in container field
-    };
-
-    if (func.description) {
-      functionEntity.description = func.description;
-    }
+    // sourceFile is not carried on FunctionNode: RFC-TM-3 §2.2 drops the
+    // legacy `container` field for Function (dead).
+    void sourceFile;
 
     // Extract input/output DTOs from signature
     const inputDTO = this.extractInputDTO(func);
     const outputDTO = this.extractOutputDTO(func);
 
-    if (inputDTO) {
-      (functionEntity as any).input = inputDTO;
-    }
-
-    if (outputDTO) {
-      (functionEntity as any).output = outputDTO;
-    }
+    const functionEntity = new FunctionNode({
+      name: entityName,
+      span: SYNTHETIC_SPAN,
+      raw: `${entityName} :: ${func.signature}`,
+      sourceForm: 'shortform',
+      signature: func.signature,
+      calls: [], // Will be populated by analyzing function bodies if needed
+      pendingDependencies: [],
+      description: func.description || undefined,
+      input: inputDTO,
+      output: outputDTO,
+    });
 
     this.entities.push(functionEntity);
   }
@@ -782,28 +809,24 @@ export class TypeScriptToTypedMindConverter {
 
     this.addEntityName(entityName, 'convertInterfaceToDTO');
 
-    const fields: DTOField[] = iface.properties.map((prop) => {
-      const field: DTOField = {
-        name: prop.name,
-        type: this.sanitizeFieldType(prop.type),
-        optional: prop.isOptional,
-      };
-      // Only add description if we have one
-      // if (description) field.description = description;
-      return field;
-    });
+    const fields = iface.properties.map(
+      (prop) =>
+        new DtoFieldNode({
+          name: prop.name,
+          type: this.sanitizeFieldType(prop.type),
+          optionalityMarker: prop.isOptional ? 'question' : 'none',
+          span: SYNTHETIC_SPAN,
+        }),
+    );
 
-    const dtoEntity: DTOEntity = {
+    const dtoEntity = new DtoNode({
       name: entityName,
-      type: 'DTO',
-      position: { line: 1, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: `${entityName} %`,
+      sourceForm: 'shortform',
       fields,
-    };
-
-    if (iface.description) {
-      dtoEntity.purpose = iface.description;
-    }
+      purpose: iface.description || undefined,
+    });
 
     this.entities.push(dtoEntity);
   }
@@ -827,17 +850,14 @@ export class TypeScriptToTypedMindConverter {
     if (this.isObjectLikeType(typeAlias.type)) {
       this.addEntityName(entityName, 'convertTypeAliasToDTO-objectLike');
 
-      const dtoEntity: DTOEntity = {
+      const dtoEntity = new DtoNode({
         name: entityName,
-        type: 'DTO',
-        position: { line: 1, column: 1 },
+        span: SYNTHETIC_SPAN,
         raw: `${entityName} %`,
+        sourceForm: 'shortform',
         fields: this.parseTypeToFields(typeAlias.type),
-      };
-
-      if (typeAlias.description) {
-        dtoEntity.purpose = typeAlias.description;
-      }
+        purpose: typeAlias.description || undefined,
+      });
 
       this.entities.push(dtoEntity);
       return;
@@ -873,18 +893,15 @@ export class TypeScriptToTypedMindConverter {
     // Use the real path - multiple constants can share the same file path
     const realPath = this.getRelativePath(module.filePath);
 
-    const constantsEntity: ConstantsEntity = {
+    const constantsEntity = new ConstantsNode({
       name: entityName,
-      type: 'Constants',
-      position: { line: 1, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: `${entityName} ! ${realPath}`,
+      sourceForm: 'shortform',
       path: realPath,
-    };
-
-    // Add schema information if we can infer it from the type
-    if (constant.type && constant.type !== 'any') {
-      constantsEntity.schema = this.convertTypeToSchema(constant.type);
-    }
+      // Add schema information if we can infer it from the type
+      schema: constant.type && constant.type !== 'any' ? this.convertTypeToSchema(constant.type) : undefined,
+    });
 
     this.entities.push(constantsEntity);
   }
@@ -899,18 +916,15 @@ export class TypeScriptToTypedMindConverter {
 
     // Use the real path - multiple constants can share the same file path
     const realPath = `src/types.ts`;
-    const constantsEntity: ConstantsEntity = {
+    const constantsEntity = new ConstantsNode({
       name: entityName,
-      type: 'Constants',
-      position: { line: 1, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: `${entityName} ! ${realPath} : ${typeAlias.name}`,
+      sourceForm: 'shortform',
       path: realPath,
       schema: typeAlias.name,
-    };
-
-    if (typeAlias.description) {
-      constantsEntity.purpose = typeAlias.description;
-    }
+      purpose: typeAlias.description || undefined,
+    });
 
     this.entities.push(constantsEntity);
   }
@@ -952,15 +966,15 @@ export class TypeScriptToTypedMindConverter {
     // Extract public exports from the entry point for library support
     const publicExports = this.extractPublicExportsFromEntrypoint(entryFilePath);
 
-    const programEntity: ProgramEntity = {
+    const programEntity = new ProgramNode({
       name: entityName,
-      type: 'Program',
-      position: { line: 1, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: `${entityName} -> ${entryEntityName} v${this.options.programVersion}`,
+      sourceForm: 'shortform',
       entry: entryEntityName,
       version: this.options.programVersion,
       exports: publicExports.length > 0 ? publicExports : undefined,
-    };
+    });
 
     this.entities.push(programEntity);
   }
@@ -1195,31 +1209,45 @@ export class TypeScriptToTypedMindConverter {
       // Find the dependency entity
       const depEntity = this.dependencies.get(packageName);
       if (depEntity) {
-        // Add the type to the dependency's exports if not already there
-        if (!depEntity.exports) {
-          depEntity.exports = [];
-        }
-        if (!depEntity.exports.includes(cleanedType)) {
-          depEntity.exports.push(cleanedType);
+        // DependencyNode.exports is readonly (EntityNode fields are populated
+        // once at construction, never written back — no_side_effects rule).
+        // Add the type to a rebuilt node's exports if not already there.
+        const existingExports = depEntity.exports ?? [];
+        if (!existingExports.includes(cleanedType)) {
+          this.dependencies.set(
+            packageName,
+            new DependencyNode({
+              name: depEntity.name,
+              span: depEntity.span,
+              raw: depEntity.raw,
+              sourceForm: depEntity.sourceForm,
+              purpose: depEntity.purpose,
+              version: depEntity.version,
+              exports: [...existingExports, cleanedType],
+            }),
+          );
         }
       }
     }
   }
 
-  private parseTypeToFields(type: string): DTOField[] {
+  private parseTypeToFields(type: string): DtoFieldNode[] {
     // Simple parsing - could be enhanced with proper TypeScript type parsing
-    const fields: DTOField[] = [];
+    const fields: DtoFieldNode[] = [];
 
     if (type.startsWith('{') && type.endsWith('}')) {
       const content = type.slice(1, -1);
       const properties = this.parseObjectProperties(content);
 
       for (const prop of properties) {
-        fields.push({
-          name: prop.name,
-          type: this.sanitizeFieldType(prop.type),
-          optional: prop.optional,
-        });
+        fields.push(
+          new DtoFieldNode({
+            name: prop.name,
+            type: this.sanitizeFieldType(prop.type),
+            optionalityMarker: prop.optional ? 'question' : 'none',
+            span: SYNTHETIC_SPAN,
+          }),
+        );
       }
     }
 
@@ -1287,206 +1315,6 @@ export class TypeScriptToTypedMindConverter {
     return properties;
   }
 
-  private generateTMDContent(): string {
-    const lines: string[] = [];
-
-    // Group entities by type for better organization
-    const programs = this.entities.filter((e) => e.type === 'Program');
-    const dependencies = this.entities.filter((e) => e.type === 'Dependency');
-    const files = this.entities.filter((e) => e.type === 'File');
-    const classFiles = this.entities.filter((e) => e.type === 'ClassFile');
-    const classes = this.entities.filter((e) => e.type === 'Class');
-    const functions = this.entities.filter((e) => e.type === 'Function');
-    const dtos = this.entities.filter((e) => e.type === 'DTO');
-    const constants = this.entities.filter((e) => e.type === 'Constants');
-
-    // Generate content in logical order
-    if (programs.length > 0) {
-      lines.push('# Programs');
-      for (const entity of programs) {
-        lines.push(this.generateEntityTMD(entity));
-      }
-      lines.push('');
-    }
-
-    if (dependencies.length > 0) {
-      lines.push('# Dependencies');
-      for (const entity of dependencies) {
-        lines.push(this.generateEntityTMD(entity));
-      }
-      lines.push('');
-    }
-
-    if (files.length > 0) {
-      lines.push('# Files');
-      for (const entity of files) {
-        lines.push(this.generateEntityTMD(entity));
-      }
-      lines.push('');
-    }
-
-    if (classFiles.length > 0) {
-      lines.push('# ClassFiles (Services/Controllers)');
-      for (const entity of classFiles) {
-        lines.push(this.generateEntityTMD(entity));
-      }
-      lines.push('');
-    }
-
-    if (classes.length > 0) {
-      lines.push('# Classes');
-      for (const entity of classes) {
-        lines.push(this.generateEntityTMD(entity));
-      }
-      lines.push('');
-    }
-
-    if (functions.length > 0) {
-      lines.push('# Functions');
-      for (const entity of functions) {
-        lines.push(this.generateEntityTMD(entity));
-      }
-      lines.push('');
-    }
-
-    if (dtos.length > 0) {
-      lines.push('# DTOs');
-      for (const entity of dtos) {
-        lines.push(this.generateEntityTMD(entity));
-      }
-      lines.push('');
-    }
-
-    if (constants.length > 0) {
-      lines.push('# Constants');
-      for (const entity of constants) {
-        lines.push(this.generateEntityTMD(entity));
-      }
-      lines.push('');
-    }
-
-    return lines.join('\n');
-  }
-
-  private generateEntityTMD(entity: AnyEntity): string {
-    const lines: string[] = [];
-
-    switch (entity.type) {
-      case 'Program': {
-        const prog = entity as ProgramEntity;
-        lines.push(`${prog.name} -> ${prog.entry}${prog.version ? ` v${prog.version}` : ''}`);
-        if (prog.exports && prog.exports.length > 0) {
-          lines.push(`  -> [${prog.exports.join(', ')}]`);
-        }
-        break;
-      }
-
-      case 'File': {
-        const file = entity as FileEntity;
-        lines.push(`${file.name} @ ${file.path}:`);
-        if (file.imports.length > 0) {
-          lines.push(`  <- [${file.imports.join(', ')}]`);
-        }
-        if (file.exports.length > 0) {
-          lines.push(`  -> [${file.exports.join(', ')}]`);
-        }
-        break;
-      }
-
-      case 'ClassFile': {
-        const cf = entity as ClassFileEntity;
-        let declaration = `${cf.name} #: ${cf.path}`;
-        if (cf.extends) {
-          declaration += ` <: ${cf.extends}`;
-          if (cf.implements.length > 0) {
-            declaration += `, ${cf.implements.join(', ')}`;
-          }
-        } else if (cf.implements.length > 0) {
-          declaration += ` <: ${cf.implements.join(', ')}`;
-        }
-        lines.push(declaration);
-
-        if (cf.imports.length > 0) {
-          lines.push(`  <- [${cf.imports.join(', ')}]`);
-        }
-        if (cf.methods.length > 0) {
-          lines.push(`  => [${cf.methods.join(', ')}]`);
-        }
-        if (cf.exports.length > 0) {
-          lines.push(`  -> [${cf.exports.join(', ')}]`);
-        }
-        break;
-      }
-
-      case 'Class': {
-        const cls = entity as ClassEntity;
-        let declaration = `${cls.name}`;
-        if (cls.extends || cls.implements.length > 0) {
-          const inheritance = [cls.extends, ...cls.implements].filter(Boolean).join(', ');
-          declaration += ` <: ${inheritance}`;
-        } else {
-          // Even without inheritance, need the <: marker for Classes
-          declaration += ` <:`;
-        }
-        lines.push(declaration);
-
-        if (cls.methods.length > 0) {
-          lines.push(`  => [${cls.methods.join(', ')}]`);
-        }
-        break;
-      }
-
-      case 'Function': {
-        const func = entity as FunctionEntity;
-        lines.push(`${func.name} :: ${func.signature}`);
-        if (func.description) {
-          lines.push(`  "${func.description}"`);
-        }
-        if (func.input) {
-          lines.push(`  <- ${func.input}`);
-        }
-        if (func.output) {
-          lines.push(`  -> ${func.output}`);
-        }
-        if (func.calls.length > 0) {
-          lines.push(`  ~> [${func.calls.join(', ')}]`);
-        }
-        break;
-      }
-
-      case 'DTO': {
-        const dto = entity as DTOEntity;
-        lines.push(`${dto.name} %`);
-        if (dto.purpose) {
-          lines.push(`  "${dto.purpose}"`);
-        }
-        for (const field of dto.fields) {
-          const optional = field.optional ? '?' : '';
-          const desc = field.description ? ` "${field.description}"` : '';
-          lines.push(`  - ${field.name}${optional}: ${field.type}${desc}`);
-        }
-        break;
-      }
-
-      case 'Constants': {
-        const constants = entity as ConstantsEntity;
-        lines.push(`${constants.name} ! ${constants.path}`);
-        break;
-      }
-
-      case 'Dependency': {
-        const dep = entity as DependencyEntity;
-        lines.push(`${dep.name} ^ "${dep.purpose}"${dep.version ? ` v${dep.version}` : ''}`);
-        if (dep.exports && dep.exports.length > 0) {
-          lines.push(`  -> [${dep.exports.join(', ')}]`);
-        }
-        break;
-      }
-    }
-
-    return lines.join('\n');
-  }
-
   private getRelativePath(filePath: string): string {
     return path.relative(process.cwd(), filePath);
   }
@@ -1552,7 +1380,7 @@ export class TypeScriptToTypedMindConverter {
 
     // Look for a File entity (Programs can only reference File entities)
     const matchingFileEntity = this.entities.find((entity) => {
-      if (entity.type === 'File' && 'path' in entity) {
+      if (entity.kind === 'File' && 'path' in entity) {
         return entity.path === relativePath;
       }
       return false;
@@ -1581,16 +1409,16 @@ export class TypeScriptToTypedMindConverter {
     // For external packages, check if it's a known namespace with methods
     const methods = this.extractNamespaceMethods(namespaceName, specifier);
 
-    const namespaceEntity: ClassEntity = {
+    const namespaceEntity = new ClassNode({
       name: entityName,
-      type: 'Class',
-      position: { line: 1, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: `${entityName} <: NamespaceImport`,
+      sourceForm: 'shortform',
       extends: undefined,
       implements: ['NamespaceImport'], // Mark as namespace import
       methods: methods,
       purpose: `Namespace import: ${namespaceName} from ${specifier}`,
-    };
+    });
 
     this.entities.push(namespaceEntity);
   }

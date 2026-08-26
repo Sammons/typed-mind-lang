@@ -37,6 +37,13 @@ export { UiComponentNode } from './ast/ui-component-node.ts';
 // consumes — the EntityName/Version/Description/etc. half died with
 // entity-builder.ts/entity-map.ts/error-types.ts, its only consumers).
 export * from './branded-types.ts';
+// RFC-TM-6 §3 (rfc-tm-6-diamond.md) — the TypeScript converter builds a
+// synthetic ParseOutcome directly (it never runs source through the parser),
+// so it needs SyntaxEmitter itself rather than going through TypedMind's
+// source-string-only emit* methods. Re-exported here because index.ts is the
+// only path into lib/typed-mind/src for sibling workspace packages (no
+// `exports` map, no ast/ barrel, per the no-barrel house rule).
+export { type EmitOptions, SyntaxEmitter } from './emitter/syntax-emitter.ts';
 export { ErrorFormatter } from './formatter.ts';
 export { GrammarDocGenerator } from './grammar-doc-generator.ts';
 export { type GrammarValidationError, type GrammarValidationResult, GrammarValidator } from './grammar-validator.ts';
@@ -59,11 +66,11 @@ export {
   type SyntaxGeneratorOptions,
   toggleSyntaxFormat,
 } from './syntax-generator.ts';
-// RFC-TM-4 §3 (rfc-tm-4-diamond.md) — the new primary surface. This is the
-// only new export added to index.ts by the flip; everything below is the
-// bounded legacy bridge (frozen through Q5) for the three named consumers
-// (lsp, typescript converter, renderer) plus the new-surface exports listed
-// above.
+// RFC-TM-4 §3 (rfc-tm-4-diamond.md) — the new primary surface (the flip's
+// original new export); everything below `TypedMind` up to the `SyntaxEmitter`
+// re-export is the bounded legacy bridge (frozen through Q5) for the three
+// named consumers (lsp, typescript converter, renderer) plus the new-surface
+// exports listed above.
 export { type CheckOutcome, type ParseOutput, TypedMind, type TypedMindOptions } from './typed-mind.ts';
 // Export all types explicitly for better TypeScript experience
 export type {

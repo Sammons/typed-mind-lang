@@ -1,65 +1,62 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { DTOEntity, FunctionEntity } from '@sammons/typed-mind';
+import { ClassFileNode, DtoFieldNode, DtoNode, FunctionNode, ProgramNode, type Span } from '@sammons/typed-mind';
 import { AssertionEngine } from './assertion-engine.ts';
 import type { ConversionResult } from './types.ts';
+
+// RFC-TM-6 §3 (rfc-tm-6-diamond.md) — this fixture now builds real
+// EntityNode subclasses (the converter's own construction shape post-flip)
+// instead of legacy bridge-type object literals (`type: 'ClassFile'` +
+// `position`). SYNTHETIC_SPAN mirrors the converter's own zero-width span
+// per the M8 disposition — this fixture is not itself a converter output,
+// but it stands in for one in these (currently skipped) assertion tests.
+const SYNTHETIC_SPAN: Span = { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } };
 
 const createMockConversionResult = (): ConversionResult => ({
   success: true,
   entities: [
-    {
+    new ClassFileNode({
       name: 'UserService',
-      type: 'ClassFile',
-      position: { line: 1, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: 'UserService #: src/services/user-service.ts',
+      sourceForm: 'shortform',
       path: 'src/services/user-service.ts',
       extends: 'BaseService',
       implements: ['IUserService'],
       methods: ['createUser', 'findUser'],
       imports: ['UserDTO', 'CreateUserDTO'],
       exports: [],
-    },
-    {
+    }),
+    new FunctionNode({
       name: 'createUser',
-      type: 'Function',
-      position: { line: 5, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: 'createUser :: async createUser(data: CreateUserDTO) => Promise<UserDTO>',
+      sourceForm: 'shortform',
       signature: 'async createUser(data: CreateUserDTO) => Promise<UserDTO>',
       calls: [],
+      pendingDependencies: [],
       input: 'CreateUserDTO',
       output: 'UserDTO',
-    } as FunctionEntity,
-    {
+    }),
+    new DtoNode({
       name: 'UserDTO',
-      type: 'DTO',
-      position: { line: 10, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: 'UserDTO %',
+      sourceForm: 'shortform',
       fields: [
-        {
-          name: 'id',
-          type: 'string',
-          optional: false,
-        },
-        {
-          name: 'name',
-          type: 'string',
-          optional: false,
-        },
-        {
-          name: 'email',
-          type: 'string',
-          optional: false,
-        },
+        new DtoFieldNode({ name: 'id', type: 'string', optionalityMarker: 'none', span: SYNTHETIC_SPAN }),
+        new DtoFieldNode({ name: 'name', type: 'string', optionalityMarker: 'none', span: SYNTHETIC_SPAN }),
+        new DtoFieldNode({ name: 'email', type: 'string', optionalityMarker: 'none', span: SYNTHETIC_SPAN }),
       ],
-    } as DTOEntity,
-    {
+    }),
+    new ProgramNode({
       name: 'IndexApp',
-      type: 'Program',
-      position: { line: 1, column: 1 },
+      span: SYNTHETIC_SPAN,
       raw: 'IndexApp -> main v1.0.0',
+      sourceForm: 'shortform',
       entry: 'main',
       version: '1.0.0',
-    },
+    }),
   ],
   tmdContent: `
 # Programs

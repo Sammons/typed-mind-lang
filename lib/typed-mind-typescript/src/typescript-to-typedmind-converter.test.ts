@@ -224,7 +224,7 @@ describe('TypeScriptToTypedMindConverter', () => {
 
     const userServiceEntity = result.entities.find((e) => e.name === 'UserService');
     assert.notEqual(userServiceEntity, undefined);
-    assert.equal(userServiceEntity?.type, 'ClassFile');
+    assert.equal(userServiceEntity?.kind, 'ClassFile');
 
     // Should have both class methods and file imports/exports
     const classFile = userServiceEntity as any;
@@ -244,9 +244,9 @@ describe('TypeScriptToTypedMindConverter', () => {
     const classEntity = result.entities.find((e) => e.name === 'UserService');
 
     assert.notEqual(fileEntity, undefined);
-    assert.equal(fileEntity?.type, 'File');
+    assert.equal(fileEntity?.kind, 'File');
     assert.notEqual(classEntity, undefined);
-    assert.equal(classEntity?.type, 'Class');
+    assert.equal(classEntity?.kind, 'Class');
   });
 
   it('should convert interfaces to DTOs', () => {
@@ -257,17 +257,17 @@ describe('TypeScriptToTypedMindConverter', () => {
 
     const userDTO = result.entities.find((e) => e.name === 'UserDTO');
     assert.notEqual(userDTO, undefined);
-    assert.equal(userDTO?.type, 'DTO');
+    assert.equal(userDTO?.kind, 'DTO');
 
     const dto = userDTO as any;
     assert.equal(dto.fields.length, 4);
 
     const idField = dto.fields.find((f: any) => f.name === 'id');
     assert.equal(idField.type, 'string');
-    assert.equal(idField.optional, false);
+    assert.equal(idField.isOptional, false);
 
     const createdAtField = dto.fields.find((f: any) => f.name === 'createdAt');
-    assert.equal(createdAtField.optional, true);
+    assert.equal(createdAtField.isOptional, true);
   });
 
   it('should generate programs by default', () => {
@@ -276,7 +276,7 @@ describe('TypeScriptToTypedMindConverter', () => {
 
     const result = converter.convert(analysis);
 
-    const program = result.entities.find((e) => e.type === 'Program');
+    const program = result.entities.find((e) => e.kind === 'Program');
     assert.notEqual(program, undefined);
     assert.match(program?.name as string, /App$/);
   });
@@ -335,13 +335,20 @@ describe('TypeScriptToTypedMindConverter', () => {
 
     const result = converter.convert(analysis);
 
+    // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — the `# Section` header comments are
+    // the named, accepted EMITTER-STRUCTURE regression: the shared
+    // SyntaxEmitter has no comment-synthesis surface, so section headers are
+    // dropped. Entities still emit pre-sorted into the legacy section order
+    // (Program, then ClassFile, then DTO here), so content-order assertions
+    // stay meaningful without the header lines.
     assert.ok(result.tmdContent);
-    assert.ok(result.tmdContent.includes('# Programs'));
-    assert.ok(result.tmdContent.includes('# ClassFiles'));
-    assert.ok(result.tmdContent.includes('# DTOs'));
+    assert.ok(!result.tmdContent.includes('# Programs'));
+    assert.ok(!result.tmdContent.includes('# ClassFiles'));
+    assert.ok(!result.tmdContent.includes('# DTOs'));
     assert.ok(result.tmdContent.includes('UserService #:'));
     assert.ok(result.tmdContent.includes('UserDTO %'));
     assert.ok(result.tmdContent.includes('=> [createUser, findUser]'));
+    assert.ok(result.tmdContent.indexOf('UserService #:') < result.tmdContent.indexOf('UserDTO %'));
   });
 
   it('should handle duplicate entity names', () => {
@@ -476,11 +483,11 @@ describe('TypeScriptToTypedMindConverter', () => {
     // Should create DTOs for exported interface and type
     const publicInterface = result.entities.find((e) => e.name === 'PublicInterface');
     assert.notEqual(publicInterface, undefined);
-    assert.equal(publicInterface?.type, 'DTO');
+    assert.equal(publicInterface?.kind, 'DTO');
 
     const publicType = result.entities.find((e) => e.name === 'PublicType');
     assert.notEqual(publicType, undefined);
-    assert.equal(publicType?.type, 'Constants'); // Type aliases become Constants
+    assert.equal(publicType?.kind, 'Constants'); // Type aliases become Constants
 
     // Should NOT create DTOs for non-exported interface and type
     const internalInterface = result.entities.find((e) => e.name === 'InternalInterface');

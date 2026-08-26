@@ -3,7 +3,7 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 import { AssertionEngine } from './assertion-engine.ts';
 import type { ConversionOptions } from './types.ts';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
@@ -297,14 +297,14 @@ async function handleExport(values: any): Promise<void> {
     console.log(`\nEntity summary:`);
     const entityCounts = result.entities.reduce(
       (counts, entity) => {
-        counts[entity.type] = (counts[entity.type] || 0) + 1;
+        counts[entity.kind] = (counts[entity.kind] || 0) + 1;
         return counts;
       },
       {} as Record<string, number>,
     );
 
-    for (const [type, count] of Object.entries(entityCounts)) {
-      console.log(`  ${type}: ${count}`);
+    for (const [kind, count] of Object.entries(entityCounts)) {
+      console.log(`  ${kind}: ${count}`);
     }
   }
 }
@@ -352,7 +352,7 @@ async function handleAssert(values: any): Promise<void> {
 
   // Assert against expected
   const assertionEngine = new AssertionEngine();
-  const assertionResult = assertionEngine.assert(conversionResult, tmdFilePath, tmdContent);
+  const assertionResult = await assertionEngine.assert(conversionResult, tmdFilePath, tmdContent);
 
   // Report results
   if (assertionResult.success) {
@@ -448,8 +448,8 @@ async function handleCheck(values: any): Promise<void> {
   }
 
   // Validate with TypedMind checker
-  const checker = new DSLChecker();
-  const validationResult = checker.check(conversionResult.tmdContent);
+  const typedMind = await TypedMind.create();
+  const validationResult = typedMind.check(conversionResult.tmdContent);
 
   if (validationResult.valid) {
     console.log('✓ TypeScript project architecture is valid');
@@ -458,49 +458,45 @@ async function handleCheck(values: any): Promise<void> {
       console.log(`\nValidated ${conversionResult.entities.length} entities:`);
       const entityCounts = conversionResult.entities.reduce(
         (counts, entity) => {
-          counts[entity.type] = (counts[entity.type] || 0) + 1;
+          counts[entity.kind] = (counts[entity.kind] || 0) + 1;
           return counts;
         },
         {} as Record<string, number>,
       );
 
-      for (const [type, count] of Object.entries(entityCounts)) {
-        console.log(`  ${type}: ${count}`);
+      for (const [kind, count] of Object.entries(entityCounts)) {
+        console.log(`  ${kind}: ${count}`);
       }
     }
 
     process.exit(0);
   } else {
-    console.error(`✗ Architecture validation failed with ${validationResult.errors.length} error(s):`);
+    const errorCount = validationResult.diagnostics.filter((diagnostic) => diagnostic.severity === 'error').length;
+    console.error(`✗ Architecture validation failed with ${errorCount} error(s):`);
 
-    // Map entity names to their source files
+    // Map entity names to their source files (Function carries no source
+    // path on the new AST — RFC-TM-3 §2.2 drops the legacy `container` field).
     const entityToFile = new Map<string, string>();
     for (const entity of conversionResult.entities) {
-      if ('path' in entity && entity.path) {
-        // File, ClassFile, Constants entities have path field
-        entityToFile.set(entity.name, entity.path);
-      } else if ('container' in entity && entity.container) {
-        // Function entities may have container field with source file
-        entityToFile.set(entity.name, entity.container);
+      // File, ClassFile, Constants entities have a `path` field.
+      const path = 'path' in entity ? entity.path : undefined;
+      if (typeof path === 'string' && path.length > 0) {
+        entityToFile.set(entity.name, path);
       }
     }
 
-    for (const error of validationResult.errors) {
-      const severity = error.severity === 'warning' ? 'WARNING' : 'ERROR';
+    for (const diagnostic of validationResult.diagnostics) {
+      const severity = diagnostic.severity === 'warning' ? 'WARNING' : 'ERROR';
 
       // Try to extract entity name from error message
-      const entityMatch = error.message.match(/entity '([^']+)'|'([^']+)'.*is not defined/);
+      const entityMatch = diagnostic.message.match(/entity '([^']+)'|'([^']+)'.*is not defined/);
       const entityName = entityMatch ? entityMatch[1] || entityMatch[2] : null;
       const sourceFile = entityName ? entityToFile.get(entityName) : null;
 
       if (sourceFile) {
-        console.error(`  ${severity} in ${sourceFile}: ${error.message}`);
+        console.error(`  ${severity} in ${sourceFile}: ${diagnostic.message}`);
       } else {
-        console.error(`  ${severity}: ${error.message}`);
-      }
-
-      if (error.suggestion) {
-        console.error(`    Suggestion: ${error.suggestion}`);
+        console.error(`  ${severity}: ${diagnostic.message}`);
       }
     }
 
