@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -15,38 +16,38 @@ describe('Scenario 45: Function Undefined Input/Output DTOs', () => {
     const checker = new DSLChecker();
     const result = checker.check(content);
     
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(7);
+    assert.equal(result.valid, false);
+    assert.equal((result.errors).length, 7);
     
     // Check specific errors
     const errors = result.errors;
     
     // Should find undefined UserInput
     const userInputError = errors.find(e => e.message.includes("UserInput"));
-    expect(userInputError).toBeDefined();
-    expect(userInputError?.message).toContain("Function input DTO 'UserInput' not found");
-    expect(userInputError?.severity).toBe('error');
-    expect(userInputError?.position.line).toBe(8); // Line where processUser function is defined
+    assert.notEqual(userInputError, undefined);
+    assert.ok((userInputError?.message).includes("Function input DTO 'UserInput' not found"));
+    assert.equal(userInputError?.severity, 'error');
+    assert.equal(userInputError?.position.line, 8); // Line where processUser function is defined
     
     // Should find undefined ValidationResult
     const validationResultError = errors.find(e => e.message.includes("ValidationResult"));
-    expect(validationResultError).toBeDefined();
-    expect(validationResultError?.message).toContain("Function output DTO 'ValidationResult' not found");
-    expect(validationResultError?.severity).toBe('error');
-    expect(validationResultError?.position.line).toBe(13); // Line where validateData function is defined
+    assert.notEqual(validationResultError, undefined);
+    assert.ok((validationResultError?.message).includes("Function output DTO 'ValidationResult' not found"));
+    assert.equal(validationResultError?.severity, 'error');
+    assert.equal(validationResultError?.position.line, 13); // Line where validateData function is defined
     
     // Should find undefined TransformInput
     const transformInputError = errors.find(e => e.message.includes("TransformInput"));
-    expect(transformInputError).toBeDefined();
-    expect(transformInputError?.message).toContain("Function input DTO 'TransformInput' not found");
-    expect(transformInputError?.severity).toBe('error');
-    expect(transformInputError?.position.line).toBe(17); // Line where transformResult function is defined
+    assert.notEqual(transformInputError, undefined);
+    assert.ok((transformInputError?.message).includes("Function input DTO 'TransformInput' not found"));
+    assert.equal(transformInputError?.severity, 'error');
+    assert.equal(transformInputError?.position.line, 17); // Line where transformResult function is defined
     
     // Should find undefined TransformOutput
     const transformOutputError = errors.find(e => e.message.includes("TransformOutput"));
-    expect(transformOutputError).toBeDefined();
-    expect(transformOutputError?.message).toContain("Function output DTO 'TransformOutput' not found");
-    expect(transformOutputError?.severity).toBe('error');
-    expect(transformOutputError?.position.line).toBe(17); // Line where transformResult function is defined
+    assert.notEqual(transformOutputError, undefined);
+    assert.ok((transformOutputError?.message).includes("Function output DTO 'TransformOutput' not found"));
+    assert.equal(transformOutputError?.severity, 'error');
+    assert.equal(transformOutputError?.position.line, 17); // Line where transformResult function is defined
   });
 });

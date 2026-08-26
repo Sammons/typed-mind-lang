@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -17,14 +18,14 @@ describe('scenario-22-nested-import', () => {
     const result = checker.check(content, filePath);
     
     // Should be invalid due to orphaned entities
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 3 orphaned entity errors
-    expect(result.errors).toHaveLength(3);
+    assert.equal((result.errors).length, 3);
     
     // Check for actual orphaned entity errors
-    expect(result.errors.some(err => err.message.includes("Orphaned entity 'main'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Orphaned entity 'User'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Orphaned entity 'query'"))).toBe(true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned entity 'main'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned entity 'User'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned entity 'query'")), true);
   });
 });

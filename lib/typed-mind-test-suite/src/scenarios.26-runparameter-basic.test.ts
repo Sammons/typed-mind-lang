@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,53 +17,53 @@ describe('scenario-26-runparameter-basic', () => {
     const content = readFileSync(filePath, 'utf-8');
     const result = checker.check(content, filePath);
     
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // Get parsed entities using parse method
     const parseResult = checker.parse(content, filePath);
     const entities = parseResult.entities;
     
     // Environment variables
-    expect(entities.has('DATABASE_URL')).toBe(true);
-    expect(entities.has('API_KEY')).toBe(true);
+    assert.equal(entities.has('DATABASE_URL'), true);
+    assert.equal(entities.has('API_KEY'), true);
     
     // IAM roles
-    expect(entities.has('LAMBDA_ROLE')).toBe(true);
+    assert.equal(entities.has('LAMBDA_ROLE'), true);
     
     // Runtime configuration
-    expect(entities.has('NODE_VERSION')).toBe(true);
+    assert.equal(entities.has('NODE_VERSION'), true);
     
     // Configuration parameters
-    expect(entities.has('MEMORY_SIZE')).toBe(true);
-    expect(entities.has('TIMEOUT')).toBe(true);
+    assert.equal(entities.has('MEMORY_SIZE'), true);
+    assert.equal(entities.has('TIMEOUT'), true);
     
     // Functions that consume parameters
-    expect(entities.has('handler')).toBe(true);
-    expect(entities.has('init')).toBe(true);
+    assert.equal(entities.has('handler'), true);
+    assert.equal(entities.has('init'), true);
     
     // Verify RunParameter types
     const databaseUrl = entities.get('DATABASE_URL') as any;
-    expect(databaseUrl?.type).toBe('RunParameter');
-    expect(databaseUrl?.paramType).toBe('env');
+    assert.equal(databaseUrl?.type, 'RunParameter');
+    assert.equal(databaseUrl?.paramType, 'env');
     
     const apiKey = entities.get('API_KEY') as any;
-    expect(apiKey?.type).toBe('RunParameter');
-    expect(apiKey?.paramType).toBe('env');
-    expect(apiKey?.defaultValue).toBe('dev-key-12345');
+    assert.equal(apiKey?.type, 'RunParameter');
+    assert.equal(apiKey?.paramType, 'env');
+    assert.equal(apiKey?.defaultValue, 'dev-key-12345');
     
     const lambdaRole = entities.get('LAMBDA_ROLE') as any;
-    expect(lambdaRole?.type).toBe('RunParameter');
-    expect(lambdaRole?.paramType).toBe('iam');
+    assert.equal(lambdaRole?.type, 'RunParameter');
+    assert.equal(lambdaRole?.paramType, 'iam');
     
     const nodeVersion = entities.get('NODE_VERSION') as any;
-    expect(nodeVersion?.type).toBe('RunParameter');
-    expect(nodeVersion?.paramType).toBe('runtime');
-    expect(nodeVersion?.defaultValue).toBe('20.x');
+    assert.equal(nodeVersion?.type, 'RunParameter');
+    assert.equal(nodeVersion?.paramType, 'runtime');
+    assert.equal(nodeVersion?.defaultValue, '20.x');
     
     const memorySize = entities.get('MEMORY_SIZE') as any;
-    expect(memorySize?.type).toBe('RunParameter');
-    expect(memorySize?.paramType).toBe('config');
-    expect(memorySize?.defaultValue).toBe('512');
+    assert.equal(memorySize?.type, 'RunParameter');
+    assert.equal(memorySize?.paramType, 'config');
+    assert.equal(memorySize?.defaultValue, '512');
   });
 });

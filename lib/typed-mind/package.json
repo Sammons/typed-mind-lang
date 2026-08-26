@@ -36,8 +36,8 @@
     "build": "tsc --build",
     "dev": "tsc --build --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
-    "test": "vitest --run",
-    "test:watch": "vitest --watch",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
@@ -46,8 +46,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.18.1",
-    "tsup": "^8.3.5",
-    "vitest": "^3.2.4"
+    "tsup": "^8.3.5"
   },
   "publishConfig": {
     "access": "public"

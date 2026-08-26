@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,38 +17,38 @@ describe('scenario-25-import-duplicate-names', () => {
     const content = readFileSync(filePath, 'utf-8');
     const result = checker.check(content, filePath);
     
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(4);
+    assert.equal(result.valid, false);
+    assert.equal((result.errors).length, 4);
     
     // Should detect orphaned initialize
     const initializeOrphanError = result.errors.find(err =>
       err.message === "Orphaned entity 'initialize'"
     );
-    expect(initializeOrphanError).toBeDefined();
-    expect(initializeOrphanError?.position.line).toBe(11);
-    expect(initializeOrphanError?.severity).toBe('error');
+    assert.notEqual(initializeOrphanError, undefined);
+    assert.equal(initializeOrphanError?.position.line, 11);
+    assert.equal(initializeOrphanError?.severity, 'error');
 
     // Should detect orphaned validateUser
     const validateUserOrphanError = result.errors.find(err =>
       err.message === "Orphaned entity 'validateUser'"
     );
-    expect(validateUserOrphanError).toBeDefined();
-    expect(validateUserOrphanError?.position.line).toBe(8);
+    assert.notEqual(validateUserOrphanError, undefined);
+    assert.equal(validateUserOrphanError?.position.line, 8);
     
     // Should detect AuthService exported by multiple files
     const multipleExportsError = result.errors.find(err => 
       err.message === "Entity 'AuthService' is exported by multiple files: AuthFile, AuthDuplicateFile"
     );
-    expect(multipleExportsError).toBeDefined();
-    expect(multipleExportsError?.severity).toBe('error');
-    expect(multipleExportsError?.suggestion).toBe('Each entity should be exported by exactly one file. Remove the duplicate exports.');
+    assert.notEqual(multipleExportsError, undefined);
+    assert.equal(multipleExportsError?.severity, 'error');
+    assert.equal(multipleExportsError?.suggestion, 'Each entity should be exported by exactly one file. Remove the duplicate exports.');
     
     // Should detect duplicate entity name from import
     const duplicateNameError = result.errors.find(err => 
       err.message === "Duplicate entity name 'AuthService' from import"
     );
-    expect(duplicateNameError).toBeDefined();
-    expect(duplicateNameError?.position.line).toBe(3);
-    expect(duplicateNameError?.suggestion).toBe('Use an alias to avoid naming conflicts');
+    assert.notEqual(duplicateNameError, undefined);
+    assert.equal(duplicateNameError?.position.line, 3);
+    assert.equal(duplicateNameError?.suggestion, 'Use an alias to avoid naming conflicts');
   });
 });

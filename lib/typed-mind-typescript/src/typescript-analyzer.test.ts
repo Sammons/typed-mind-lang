@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, before, after } from 'node:test';
+import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
@@ -6,7 +7,7 @@ import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
 const testProjectDir = '/tmp/typed-mind-ts-test';
 
 describe('TypeScriptAnalyzer', () => {
-  beforeAll(() => {
+  before(() => {
     // Create test project structure
     mkdirSync(testProjectDir, { recursive: true });
     mkdirSync(join(testProjectDir, 'src'), { recursive: true });
@@ -94,7 +95,7 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
     );
   });
 
-  afterAll(() => {
+  after(() => {
     rmSync(testProjectDir, { recursive: true, force: true });
   });
 
@@ -102,16 +103,16 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
     const analyzer = new TypeScriptAnalyzer(testProjectDir);
     const analysis = analyzer.analyze();
 
-    expect(analysis.modules).toHaveLength(3);
-    expect(analysis.entryPoints).toContain(join(testProjectDir, 'src', 'index.ts'));
+    assert.equal(analysis.modules.length, 3);
+    assert.ok(analysis.entryPoints.includes(join(testProjectDir, 'src', 'index.ts')));
 
     // Find the index module
     const indexModule = analysis.modules.find((m) => m.filePath.endsWith('index.ts'));
-    expect(indexModule).toBeDefined();
-    expect(indexModule?.functions).toHaveLength(1);
-    expect(indexModule?.functions[0].name).toBe('main');
-    expect(indexModule?.functions[0].isAsync).toBe(true);
-    expect(indexModule?.functions[0].returnType).toBe('Promise<void>');
+    assert.notEqual(indexModule, undefined);
+    assert.equal(indexModule?.functions.length, 1);
+    assert.equal(indexModule?.functions[0].name, 'main');
+    assert.equal(indexModule?.functions[0].isAsync, true);
+    assert.equal(indexModule?.functions[0].returnType, 'Promise<void>');
   });
 
   it('should parse class methods correctly', () => {
@@ -119,20 +120,20 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
     const analysis = analyzer.analyze();
 
     const userServiceModule = analysis.modules.find((m) => m.filePath.includes('user-service.ts'));
-    expect(userServiceModule).toBeDefined();
-    expect(userServiceModule?.classes).toHaveLength(1);
+    assert.notEqual(userServiceModule, undefined);
+    assert.equal(userServiceModule?.classes.length, 1);
 
     const userServiceClass = userServiceModule?.classes[0];
-    expect(userServiceClass?.name).toBe('UserService');
-    expect(userServiceClass?.methods).toHaveLength(2);
+    assert.equal(userServiceClass?.name, 'UserService');
+    assert.equal(userServiceClass?.methods.length, 2);
 
     const createUserMethod = userServiceClass?.methods.find((m) => m.name === 'createUser');
-    expect(createUserMethod).toBeDefined();
-    expect(createUserMethod?.isAsync).toBe(true);
-    expect(createUserMethod?.returnType).toBe('Promise<UserDTO>');
-    expect(createUserMethod?.parameters).toHaveLength(1);
-    expect(createUserMethod?.parameters[0].name).toBe('data');
-    expect(createUserMethod?.parameters[0].type).toBe('CreateUserDTO');
+    assert.notEqual(createUserMethod, undefined);
+    assert.equal(createUserMethod?.isAsync, true);
+    assert.equal(createUserMethod?.returnType, 'Promise<UserDTO>');
+    assert.equal(createUserMethod?.parameters.length, 1);
+    assert.equal(createUserMethod?.parameters[0].name, 'data');
+    assert.equal(createUserMethod?.parameters[0].type, 'CreateUserDTO');
   });
 
   it('should parse interfaces as DTOs', () => {
@@ -140,17 +141,17 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
     const analysis = analyzer.analyze();
 
     const typesModule = analysis.modules.find((m) => m.filePath.includes('user.ts'));
-    expect(typesModule).toBeDefined();
-    expect(typesModule?.interfaces).toHaveLength(2);
+    assert.notEqual(typesModule, undefined);
+    assert.equal(typesModule?.interfaces.length, 2);
 
     const userDTOInterface = typesModule?.interfaces.find((i) => i.name === 'UserDTO');
-    expect(userDTOInterface).toBeDefined();
-    expect(userDTOInterface?.properties).toHaveLength(4);
+    assert.notEqual(userDTOInterface, undefined);
+    assert.equal(userDTOInterface?.properties.length, 4);
 
     const nameProperty = userDTOInterface?.properties.find((p) => p.name === 'name');
-    expect(nameProperty).toBeDefined();
-    expect(nameProperty?.type).toBe('string');
-    expect(nameProperty?.isOptional).toBe(false);
+    assert.notEqual(nameProperty, undefined);
+    assert.equal(nameProperty?.type, 'string');
+    assert.equal(nameProperty?.isOptional, false);
   });
 
   it('should parse imports and exports', () => {
@@ -158,15 +159,15 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
     const analysis = analyzer.analyze();
 
     const indexModule = analysis.modules.find((m) => m.filePath.endsWith('index.ts'));
-    expect(indexModule?.imports).toHaveLength(2);
+    assert.equal(indexModule?.imports.length, 2);
 
     const userServiceImport = indexModule?.imports.find((i) => i.namedImports.includes('UserService'));
-    expect(userServiceImport).toBeDefined();
-    expect(userServiceImport?.specifier).toBe('./services/user-service');
+    assert.notEqual(userServiceImport, undefined);
+    assert.equal(userServiceImport?.specifier, './services/user-service');
 
-    expect(indexModule?.exports).toHaveLength(1);
-    expect(indexModule?.exports[0].name).toBe('main');
-    expect(indexModule?.exports[0].type).toBe('function');
+    assert.equal(indexModule?.exports.length, 1);
+    assert.equal(indexModule?.exports[0].name, 'main');
+    assert.equal(indexModule?.exports[0].type, 'function');
   });
 
   it('should handle type aliases', () => {
@@ -174,19 +175,19 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
     const analysis = analyzer.analyze();
 
     const typesModule = analysis.modules.find((m) => m.filePath.includes('user.ts'));
-    expect(typesModule?.types).toHaveLength(1);
+    assert.equal(typesModule?.types.length, 1);
 
     const userStatusType = typesModule?.types[0];
-    expect(userStatusType?.name).toBe('UserStatus');
-    expect(userStatusType?.type).toBe("'active' | 'inactive' | 'suspended'");
+    assert.equal(userStatusType?.name, 'UserStatus');
+    assert.equal(userStatusType?.type, "'active' | 'inactive' | 'suspended'");
   });
 
   it('should detect entry points correctly', () => {
     const analyzer = new TypeScriptAnalyzer(testProjectDir);
     const analysis = analyzer.analyze();
 
-    expect(analysis.entryPoints).toHaveLength(1);
-    expect(analysis.entryPoints[0]).toMatch(/index\.ts$/);
+    assert.equal(analysis.entryPoints.length, 1);
+    assert.match(analysis.entryPoints[0], /index\.ts$/);
   });
 
   it('should handle missing tsconfig gracefully', () => {
@@ -199,9 +200,9 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
       const analyzer = new TypeScriptAnalyzer(tempDir);
       const analysis = analyzer.analyze();
 
-      expect(analysis.modules).toHaveLength(1);
-      expect(analysis.modules[0].constants).toHaveLength(1);
-      expect(analysis.modules[0].constants[0].name).toBe('foo');
+      assert.equal(analysis.modules.length, 1);
+      assert.equal(analysis.modules[0].constants.length, 1);
+      assert.equal(analysis.modules[0].constants[0].name, 'foo');
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-66-bidirectional-containedby.tmd');
@@ -18,9 +23,9 @@ describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
       e.name === 'Header' && e.type === 'UIComponent'
     ) as any;
     
-    expect(header).toBeDefined();
-    expect(header.containedBy).toBeDefined();
-    expect(header.containedBy).toEqual(['App']);
+    assert.notEqual(header, undefined);
+    assert.notEqual(header.containedBy, undefined);
+    assert.deepEqual(header.containedBy, ['App']);
   });
 
   it('should handle nested containment hierarchy', () => {
@@ -37,9 +42,9 @@ describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
       e.name === 'Header' && e.type === 'UIComponent'
     ) as any;
     
-    expect(navItem1.containedBy).toEqual(['NavBar']);
-    expect(navBar.containedBy).toEqual(['Header']);
-    expect(header.containedBy).toEqual(['App']);
+    assert.deepEqual(navItem1.containedBy, ['NavBar']);
+    assert.deepEqual(navBar.containedBy, ['Header']);
+    assert.deepEqual(header.containedBy, ['App']);
   });
 
   it('should handle multiple children with same parent', () => {
@@ -56,9 +61,9 @@ describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
       e.name === 'Footer' && e.type === 'UIComponent'
     ) as any;
     
-    expect(header.containedBy).toEqual(['App']);
-    expect(mainContent.containedBy).toEqual(['App']);
-    expect(footer.containedBy).toEqual(['App']);
+    assert.deepEqual(header.containedBy, ['App']);
+    assert.deepEqual(mainContent.containedBy, ['App']);
+    assert.deepEqual(footer.containedBy, ['App']);
   });
 
   it('should handle root component without containedBy', () => {
@@ -69,9 +74,9 @@ describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
       e.name === 'App' && e.type === 'UIComponent'
     ) as any;
     
-    expect(app).toBeDefined();
-    expect(app.root).toBe(true);
-    expect(app.containedBy).toEqual([]);
+    assert.notEqual(app, undefined);
+    assert.equal(app.root, true);
+    assert.deepEqual(app.containedBy, []);
   });
 
   it('should handle orphan component without parent', () => {
@@ -82,8 +87,8 @@ describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
       e.name === 'OrphanComponent' && e.type === 'UIComponent'
     ) as any;
     
-    expect(orphan).toBeDefined();
-    expect(orphan.containedBy).toEqual([]);
+    assert.notEqual(orphan, undefined);
+    assert.deepEqual(orphan.containedBy, []);
   });
 
   it('should maintain consistency between contains and containedBy', () => {
@@ -100,10 +105,10 @@ describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
       e.name === 'NavItem2' && e.type === 'UIComponent'
     ) as any;
     
-    expect(navBar.contains).toContain('NavItem1');
-    expect(navBar.contains).toContain('NavItem2');
-    expect(navItem1.containedBy).toEqual(['NavBar']);
-    expect(navItem2.containedBy).toEqual(['NavBar']);
+    assert.ok((navBar.contains).includes('NavItem1'));
+    assert.ok((navBar.contains).includes('NavItem2'));
+    assert.deepEqual(navItem1.containedBy, ['NavBar']);
+    assert.deepEqual(navItem2.containedBy, ['NavBar']);
   });
 
   it('should handle complex nested structure', () => {
@@ -117,9 +122,9 @@ describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
       e.name === 'ContentArea' && e.type === 'UIComponent'
     ) as any;
     
-    expect(article.containedBy).toEqual(['ContentArea']);
-    expect(contentArea.containedBy).toEqual(['MainContent']);
-    expect(contentArea.contains).toContain('Article');
+    assert.deepEqual(article.containedBy, ['ContentArea']);
+    assert.deepEqual(contentArea.containedBy, ['MainContent']);
+    assert.ok((contentArea.contains).includes('Article'));
   });
 
   it('should handle component that contains but is not contained', () => {
@@ -133,9 +138,9 @@ describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
       e.name === 'CloseButton' && e.type === 'UIComponent'
     ) as any;
     
-    expect(floatingPanel.contains).toEqual(['CloseButton']);
-    expect(floatingPanel.containedBy).toEqual([]);
-    expect(closeButton.containedBy).toEqual(['FloatingPanel']);
+    assert.deepEqual(floatingPanel.contains, ['CloseButton']);
+    assert.deepEqual(floatingPanel.containedBy, []);
+    assert.deepEqual(closeButton.containedBy, ['FloatingPanel']);
   });
 
   it('should validate without errors when bidirectional relationships are correct', () => {
@@ -147,6 +152,6 @@ describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
       e.message.includes('containedBy')
     );
     
-    expect(containedByErrors).toEqual([]);
+    assert.deepEqual(containedByErrors, []);
   });
 });

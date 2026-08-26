@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -17,110 +18,110 @@ describe('scenario-34-cli-tool', () => {
     const parsed = checker.parse(content);
     
     // Should be invalid due to orphaned entities
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // Should have the main program
-    expect(parsed.entities.has('TaskMaster')).toBe(true);
+    assert.equal(parsed.entities.has('TaskMaster'), true);
     const app = parsed.entities.get('TaskMaster');
-    expect(app?.type).toBe('Program');
+    assert.equal(app?.type, 'Program');
     if (app?.type === 'Program') {
-      expect(app.entry).toBe('MainFile');
-      expect(app.version).toBe('1.5.0');
+      assert.equal(app.entry, 'MainFile');
+      assert.equal(app.version, '1.5.0');
     }
     
     // Should have core files
-    expect(parsed.entities.has('MainFile')).toBe(true);
-    expect(parsed.entities.has('CLIFile')).toBe(true);
-    expect(parsed.entities.has('CommandsFile')).toBe(true);
-    expect(parsed.entities.has('TaskRunnerFile')).toBe(true);
+    assert.equal(parsed.entities.has('MainFile'), true);
+    assert.equal(parsed.entities.has('CLIFile'), true);
+    assert.equal(parsed.entities.has('CommandsFile'), true);
+    assert.equal(parsed.entities.has('TaskRunnerFile'), true);
     
     // Should have task management files
-    expect(parsed.entities.has('TaskRegistryFile')).toBe(true);
-    expect(parsed.entities.has('TaskSchedulerFile')).toBe(true);
-    expect(parsed.entities.has('DependencyResolverFile')).toBe(true);
-    expect(parsed.entities.has('WorkerPoolFile')).toBe(true);
+    assert.equal(parsed.entities.has('TaskRegistryFile'), true);
+    assert.equal(parsed.entities.has('TaskSchedulerFile'), true);
+    assert.equal(parsed.entities.has('DependencyResolverFile'), true);
+    assert.equal(parsed.entities.has('WorkerPoolFile'), true);
     
     // Should have configuration files
-    expect(parsed.entities.has('ConfigLoaderFile')).toBe(true);
-    expect(parsed.entities.has('SchemaValidatorFile')).toBe(true);
+    assert.equal(parsed.entities.has('ConfigLoaderFile'), true);
+    assert.equal(parsed.entities.has('SchemaValidatorFile'), true);
     
     // Should have utility files
-    expect(parsed.entities.has('UtilsFile')).toBe(true);
-    expect(parsed.entities.has('Logger')).toBe(true);
-    expect(parsed.entities.has('FileUtils')).toBe(true);
-    expect(parsed.entities.has('ProcessUtils')).toBe(true);
+    assert.equal(parsed.entities.has('UtilsFile'), true);
+    assert.equal(parsed.entities.has('Logger'), true);
+    assert.equal(parsed.entities.has('FileUtils'), true);
+    assert.equal(parsed.entities.has('ProcessUtils'), true);
     
     // Should have environment variables
-    expect(parsed.entities.has('NODE_ENV')).toBe(true);
-    expect(parsed.entities.has('TASKMASTER_HOME')).toBe(true);
-    expect(parsed.entities.has('PARALLEL_JOBS')).toBe(true);
-    expect(parsed.entities.has('LOG_LEVEL')).toBe(true);
+    assert.equal(parsed.entities.has('NODE_ENV'), true);
+    assert.equal(parsed.entities.has('TASKMASTER_HOME'), true);
+    assert.equal(parsed.entities.has('PARALLEL_JOBS'), true);
+    assert.equal(parsed.entities.has('LOG_LEVEL'), true);
     
     // Check environment variable types
     const nodeEnv = parsed.entities.get('NODE_ENV');
-    expect(nodeEnv?.type).toBe('RunParameter');
+    assert.equal(nodeEnv?.type, 'RunParameter');
     if (nodeEnv?.type === 'RunParameter') {
-      expect(nodeEnv.paramType).toBe('env');
-      expect(nodeEnv.defaultValue).toBe('development');
+      assert.equal(nodeEnv.paramType, 'env');
+      assert.equal(nodeEnv.defaultValue, 'development');
     }
     
     const parallelJobs = parsed.entities.get('PARALLEL_JOBS');
-    expect(parallelJobs?.type).toBe('RunParameter');
+    assert.equal(parallelJobs?.type, 'RunParameter');
     if (parallelJobs?.type === 'RunParameter') {
-      expect(parallelJobs.paramType).toBe('env');
-      expect(parallelJobs.defaultValue).toBe('4');
+      assert.equal(parallelJobs.paramType, 'env');
+      assert.equal(parallelJobs.defaultValue, '4');
     }
     
     // Should have service classes
-    expect(parsed.entities.has('cli')).toBe(true);
-    expect(parsed.entities.has('taskRunner')).toBe(true);
-    expect(parsed.entities.has('taskRegistry')).toBe(true);
-    expect(parsed.entities.has('configLoader')).toBe(true);
+    assert.equal(parsed.entities.has('cli'), true);
+    assert.equal(parsed.entities.has('taskRunner'), true);
+    assert.equal(parsed.entities.has('taskRegistry'), true);
+    assert.equal(parsed.entities.has('configLoader'), true);
     
     // Should have task types
-    expect(parsed.entities.has('ShellTask')).toBe(true);
-    expect(parsed.entities.has('FileTask')).toBe(true);
-    expect(parsed.entities.has('HttpTask')).toBe(true);
-    expect(parsed.entities.has('DockerTask')).toBe(true);
+    assert.equal(parsed.entities.has('ShellTask'), true);
+    assert.equal(parsed.entities.has('FileTask'), true);
+    assert.equal(parsed.entities.has('HttpTask'), true);
+    assert.equal(parsed.entities.has('DockerTask'), true);
     
     // Should have key functions
-    expect(parsed.entities.has('main')).toBe(true);
-    expect(parsed.entities.has('runCommand')).toBe(true);
-    expect(parsed.entities.has('buildCommand')).toBe(true);
-    expect(parsed.entities.has('runTask')).toBe(true);
-    expect(parsed.entities.has('loadConfig')).toBe(true);
+    assert.equal(parsed.entities.has('main'), true);
+    assert.equal(parsed.entities.has('runCommand'), true);
+    assert.equal(parsed.entities.has('buildCommand'), true);
+    assert.equal(parsed.entities.has('runTask'), true);
+    assert.equal(parsed.entities.has('loadConfig'), true);
     
     // Should have DTOs
-    expect(parsed.entities.has('CLIArgs')).toBe(true);
-    expect(parsed.entities.has('RunOptions')).toBe(true);
-    expect(parsed.entities.has('TaskDefinition')).toBe(true);
-    expect(parsed.entities.has('TaskResult')).toBe(true);
-    expect(parsed.entities.has('Config')).toBe(true);
+    assert.equal(parsed.entities.has('CLIArgs'), true);
+    assert.equal(parsed.entities.has('RunOptions'), true);
+    assert.equal(parsed.entities.has('TaskDefinition'), true);
+    assert.equal(parsed.entities.has('TaskResult'), true);
+    assert.equal(parsed.entities.has('Config'), true);
     
     // Check that key functions consume environment variables
     const runCommandFunc = parsed.entities.get('runCommand');
-    expect(runCommandFunc?.type).toBe('Function');
+    assert.equal(runCommandFunc?.type, 'Function');
     if (runCommandFunc?.type === 'Function') {
-      expect(runCommandFunc.consumes).toContain('PARALLEL_JOBS');
-      expect(runCommandFunc.consumes).toContain('NODE_VERSION');
+      assert.ok((runCommandFunc.consumes).includes('PARALLEL_JOBS'));
+      assert.ok((runCommandFunc.consumes).includes('NODE_VERSION'));
     }
     
     const loadConfigFunc = parsed.entities.get('loadConfig');
-    expect(loadConfigFunc?.type).toBe('Function');
+    assert.equal(loadConfigFunc?.type, 'Function');
     if (loadConfigFunc?.type === 'Function') {
-      expect(loadConfigFunc.consumes).toContain('CONFIG_FILE');
-      expect(loadConfigFunc.consumes).toContain('TASKMASTER_HOME');
+      assert.ok((loadConfigFunc.consumes).includes('CONFIG_FILE'));
+      assert.ok((loadConfigFunc.consumes).includes('TASKMASTER_HOME'));
     }
     
     // Should have external dependencies
-    expect(parsed.dependencies.has('commander')).toBe(true);
-    expect(parsed.dependencies.has('chalk')).toBe(true);
-    expect(parsed.dependencies.has('ora')).toBe(true);
-    expect(parsed.dependencies.has('yaml')).toBe(true);
-    expect(parsed.dependencies.has('winston')).toBe(true);
+    assert.equal(parsed.dependencies.has('commander'), true);
+    assert.equal(parsed.dependencies.has('chalk'), true);
+    assert.equal(parsed.dependencies.has('ora'), true);
+    assert.equal(parsed.dependencies.has('yaml'), true);
+    assert.equal(parsed.dependencies.has('winston'), true);
     
     // Verify entity count is reasonable for a CLI tool
-    expect(parsed.entities.size).toBeGreaterThan(70);
+    assert.ok((parsed.entities.size) > (70));
   });
 });

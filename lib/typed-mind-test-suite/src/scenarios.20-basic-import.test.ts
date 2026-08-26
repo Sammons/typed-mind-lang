@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -17,13 +18,13 @@ describe('scenario-20-basic-import', () => {
     const result = checker.check(content, filePath);
     
     // Should be invalid due to orphaned entity
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 2 errors for orphaned entities
-    expect(result.errors).toHaveLength(2);
+    assert.equal((result.errors).length, 2);
 
     // Check for orphaned entities
-    expect(result.errors.some(err => err.message.includes("Orphaned entity 'startApp'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Orphaned entity 'validateUser'"))).toBe(true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned entity 'startApp'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned entity 'validateUser'")), true);
   });
 });

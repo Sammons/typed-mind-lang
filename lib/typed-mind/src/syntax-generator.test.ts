@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
 import { SyntaxGenerator, detectSyntaxFormat, toggleSyntaxFormat } from './syntax-generator.ts';
 import type { AnyEntity, ProgramEntity, FileEntity, FunctionEntity, DTOEntity, ClassFileEntity } from './types.ts';
 
@@ -20,8 +21,8 @@ startApp :: () => void
 `;
 
       const result = generator.detectFormat(content);
-      expect(result.format).toBe('shortform');
-      expect(result.confidence).toBeGreaterThan(0.7);
+      assert.equal(result.format, 'shortform');
+      assert.ok(result.confidence > 0.7);
     });
 
     it('should detect longform syntax', () => {
@@ -41,8 +42,8 @@ file main {
 `;
 
       const result = generator.detectFormat(content);
-      expect(result.format).toBe('longform');
-      expect(result.confidence).toBeGreaterThan(0.7);
+      assert.equal(result.format, 'longform');
+      assert.ok(result.confidence > 0.7);
     });
 
     it('should detect mixed format', () => {
@@ -58,13 +59,13 @@ startApp :: () => void
 `;
 
       const result = generator.detectFormat(content);
-      expect(result.format).toBe('mixed');
+      assert.equal(result.format, 'mixed');
     });
 
     it('should handle empty content', () => {
       const result = generator.detectFormat('');
-      expect(result.format).toBe('shortform'); // default
-      expect(result.confidence).toBe(0.5);
+      assert.equal(result.format, 'shortform'); // default
+      assert.equal(result.confidence, 0.5);
     });
 
     it('should ignore comments and empty lines', () => {
@@ -80,7 +81,7 @@ main @ src/index.ts:
 `;
 
       const result = generator.detectFormat(content);
-      expect(result.format).toBe('shortform');
+      assert.equal(result.format, 'shortform');
     });
   });
 
@@ -102,11 +103,11 @@ main @ src/index.ts:
       entities.set('TodoApp', program);
 
       const result = generator.toShortform(entities);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
-        expect(result.value).toContain('TodoApp -> main "Todo application" v1.0.0');
-        expect(result.value).toContain('-> [publicAPI]');
+        assert.ok(result.value.includes('TodoApp -> main "Todo application" v1.0.0'));
+        assert.ok(result.value.includes('-> [publicAPI]'));
       }
     });
 
@@ -127,13 +128,13 @@ main @ src/index.ts:
       entities.set('main', file);
 
       const result = generator.toShortform(entities);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
-        expect(result.value).toContain('main @ src/index.ts:');
-        expect(result.value).toContain('"Main entry file"');
-        expect(result.value).toContain('<- [UserService, Config]');
-        expect(result.value).toContain('-> [startApp]');
+        assert.ok(result.value.includes('main @ src/index.ts:'));
+        assert.ok(result.value.includes('"Main entry file"'));
+        assert.ok(result.value.includes('<- [UserService, Config]'));
+        assert.ok(result.value.includes('-> [startApp]'));
       }
     });
 
@@ -157,16 +158,16 @@ main @ src/index.ts:
       entities.set('createUser', func);
 
       const result = generator.toShortform(entities);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
-        expect(result.value).toContain('createUser :: (data: UserDTO) => Promise<User>');
-        expect(result.value).toContain('"Creates a new user"');
-        expect(result.value).toContain('<- UserDTO');
-        expect(result.value).toContain('-> User');
-        expect(result.value).toContain('~> [validateUser, Database.save]');
-        expect(result.value).toContain('~ [UserList]');
-        expect(result.value).toContain('$< [DATABASE_URL]');
+        assert.ok(result.value.includes('createUser :: (data: UserDTO) => Promise<User>'));
+        assert.ok(result.value.includes('"Creates a new user"'));
+        assert.ok(result.value.includes('<- UserDTO'));
+        assert.ok(result.value.includes('-> User'));
+        assert.ok(result.value.includes('~> [validateUser, Database.save]'));
+        assert.ok(result.value.includes('~ [UserList]'));
+        assert.ok(result.value.includes('$< [DATABASE_URL]'));
       }
     });
 
@@ -189,13 +190,13 @@ main @ src/index.ts:
       entities.set('UserDTO', dto);
 
       const result = generator.toShortform(entities);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
-        expect(result.value).toContain('UserDTO % "User data transfer object"');
-        expect(result.value).toContain('- name: string "User name"');
-        expect(result.value).toContain('- email?: string "Email address" (optional)');
-        expect(result.value).toContain('- age: number (optional)');
+        assert.ok(result.value.includes('UserDTO % "User data transfer object"'));
+        assert.ok(result.value.includes('- name: string "User name"'));
+        assert.ok(result.value.includes('- email?: string "Email address" (optional)'));
+        assert.ok(result.value.includes('- age: number (optional)'));
       }
     });
 
@@ -219,14 +220,14 @@ main @ src/index.ts:
       entities.set('UserService', classFile);
 
       const result = generator.toShortform(entities);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
-        expect(result.value).toContain('UserService #: src/services/user.ts <: BaseService, IUserService');
-        expect(result.value).toContain('"User service implementation"');
-        expect(result.value).toContain('<- [UserDTO, Database]');
-        expect(result.value).toContain('=> [create, find, update]');
-        expect(result.value).toContain('-> [userHelper]');
+        assert.ok(result.value.includes('UserService #: src/services/user.ts <: BaseService, IUserService'));
+        assert.ok(result.value.includes('"User service implementation"'));
+        assert.ok(result.value.includes('<- [UserDTO, Database]'));
+        assert.ok(result.value.includes('=> [create, find, update]'));
+        assert.ok(result.value.includes('-> [userHelper]'));
       }
     });
   });
@@ -248,15 +249,15 @@ main @ src/index.ts:
       entities.set('TodoApp', program);
 
       const result = generator.toLongform(entities);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
-        expect(result.value).toContain('program TodoApp {');
-        expect(result.value).toContain('type: Program');
-        expect(result.value).toContain('entry: main');
-        expect(result.value).toContain('purpose: "Todo application"');
-        expect(result.value).toContain('version: 1.0.0');
-        expect(result.value).toContain('}');
+        assert.ok(result.value.includes('program TodoApp {'));
+        assert.ok(result.value.includes('type: Program'));
+        assert.ok(result.value.includes('entry: main'));
+        assert.ok(result.value.includes('purpose: "Todo application"'));
+        assert.ok(result.value.includes('version: 1.0.0'));
+        assert.ok(result.value.includes('}'));
       }
     });
 
@@ -278,19 +279,19 @@ main @ src/index.ts:
       entities.set('UserDTO', dto);
 
       const result = generator.toLongform(entities);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
-        expect(result.value).toContain('dto UserDTO {');
-        expect(result.value).toContain('type: DTO');
-        expect(result.value).toContain('purpose: "User data"');
-        expect(result.value).toContain('fields: {');
-        expect(result.value).toContain('name: {');
-        expect(result.value).toContain('type: string');
-        expect(result.value).toContain('description: "User name"');
-        expect(result.value).toContain('profile: {');
-        expect(result.value).toContain('optional: true');
-        expect(result.value).toContain('}');
+        assert.ok(result.value.includes('dto UserDTO {'));
+        assert.ok(result.value.includes('type: DTO'));
+        assert.ok(result.value.includes('purpose: "User data"'));
+        assert.ok(result.value.includes('fields: {'));
+        assert.ok(result.value.includes('name: {'));
+        assert.ok(result.value.includes('type: string'));
+        assert.ok(result.value.includes('description: "User name"'));
+        assert.ok(result.value.includes('profile: {'));
+        assert.ok(result.value.includes('optional: true'));
+        assert.ok(result.value.includes('}'));
       }
     });
   });
@@ -306,7 +307,7 @@ main @ src/index.ts:
 `;
 
       const result = generator.toggleFormat(shortformContent);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       // Note: Since we're using a simplified implementation that doesn't fully parse,
       // we just verify it doesn't error for now
@@ -322,7 +323,7 @@ program TodoApp {
 `;
 
       const result = generator.toggleFormat(longformContent);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
     });
 
     it('should handle invalid syntax gracefully', () => {
@@ -332,7 +333,7 @@ RandomText 123 !!@#
 `;
 
       const result = generator.toggleFormat(invalidContent);
-      expect(result._tag).toBe('success'); // Should still succeed, just pass through
+      assert.equal(result._tag, 'success'); // Should still succeed, just pass through
     });
   });
 
@@ -351,11 +352,11 @@ RandomText 123 !!@#
       entities.set('Invalid', invalidEntity);
 
       const result = generator.toShortform(entities);
-      expect(result._tag).toBe('failure');
+      assert.equal(result._tag, 'failure');
 
       if (result._tag === 'failure') {
-        expect(result.error.message).toContain('Unknown entity type');
-        expect(result.error.entity).toBe('Invalid');
+        assert.ok(result.error.message.includes('Unknown entity type'));
+        assert.equal(result.error.entity, 'Invalid');
       }
     });
 
@@ -376,10 +377,10 @@ RandomText 123 !!@#
       const generator = new SyntaxGenerator({ preserveComments: true });
       const result = generator.toShortform(entities);
 
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
-        expect(result.value).toContain('# This is the main program');
+        assert.ok(result.value.includes('# This is the main program'));
       }
     });
 
@@ -401,7 +402,7 @@ RandomText 123 !!@#
       const generator = new SyntaxGenerator({ indentSize: 4 });
       const result = generator.toShortform(entities);
 
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
       // Note: Current implementation uses fixed 2-space indentation
       // This test documents the intended behavior
     });
@@ -412,10 +413,10 @@ RandomText 123 !!@#
       const entities = new Map<string, AnyEntity>();
 
       const result = generator.toShortform(entities);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
-        expect(result.value.trim()).toBe('');
+        assert.equal(result.value.trim(), '');
       }
     });
 
@@ -444,13 +445,13 @@ RandomText 123 !!@#
       entities.set('aaa', program);
 
       const result = generator.toShortform(entities);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
         // Program should come before Function due to type ordering
         const programIndex = result.value.indexOf('aaa -> main');
         const functionIndex = result.value.indexOf('zzz :: () => void');
-        expect(programIndex).toBeLessThan(functionIndex);
+        assert.ok(programIndex < functionIndex);
       }
     });
 
@@ -468,12 +469,12 @@ RandomText 123 !!@#
       entities.set('App', minimalProgram);
 
       const result = generator.toShortform(entities);
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
 
       if (result._tag === 'success') {
-        expect(result.value).toContain('App -> main');
-        expect(result.value).not.toContain('undefined');
-        expect(result.value).not.toContain('null');
+        assert.ok(result.value.includes('App -> main'));
+        assert.ok(!result.value.includes('undefined'));
+        assert.ok(!result.value.includes('null'));
       }
     });
   });
@@ -483,21 +484,21 @@ RandomText 123 !!@#
       const content = 'TodoApp -> main v1.0.0';
       const result = detectSyntaxFormat(content);
 
-      expect(result.format).toBe('shortform');
+      assert.equal(result.format, 'shortform');
     });
 
     it('should work with toggleSyntaxFormat convenience function', () => {
       const content = 'TodoApp -> main v1.0.0';
       const result = toggleSyntaxFormat(content);
 
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
     });
 
     it('should accept options in convenience function', () => {
       const content = 'TodoApp -> main v1.0.0';
       const result = toggleSyntaxFormat(content, { preserveComments: false });
 
-      expect(result._tag).toBe('success');
+      assert.equal(result._tag, 'success');
     });
   });
 });

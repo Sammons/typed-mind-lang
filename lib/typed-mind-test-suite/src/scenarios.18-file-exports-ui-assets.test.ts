@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,17 +17,17 @@ describe('scenario-18-file-exports-ui-assets', () => {
     const result = checker.check(content);
     
     // Should be invalid due to validation errors
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 12 validation errors (including orphaned entities)
-    expect(result.errors).toHaveLength(12);
+    assert.equal((result.errors).length, 12);
     
     // Check for orphaned file entities
     const orphanedFileErrors = result.errors.filter(err =>
       err.message.includes('Orphaned file') &&
       (err.message.includes('ComponentsFile') || err.message.includes('AssetsFile'))
     );
-    expect(orphanedFileErrors).toHaveLength(2);
+    assert.equal((orphanedFileErrors).length, 2);
     
     // Check for UIComponent containment errors
     const uiContainmentErrors = result.errors.filter(err => 
@@ -35,20 +36,20 @@ describe('scenario-18-file-exports-ui-assets', () => {
        err.message.includes('Input') || 
        err.message.includes('Modal'))
     );
-    expect(uiContainmentErrors).toHaveLength(3);
+    assert.equal((uiContainmentErrors).length, 3);
     
     // Verify specific error messages exist
-    expect(result.errors.some(err => err.message.includes("Orphaned file 'ComponentsFile'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("Orphaned file 'AssetsFile'"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("UIComponent 'Button' is not contained by any other UIComponent"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("UIComponent 'Input' is not contained by any other UIComponent"))).toBe(true);
-    expect(result.errors.some(err => err.message.includes("UIComponent 'Modal' is not contained by any other UIComponent"))).toBe(true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned file 'ComponentsFile'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("Orphaned file 'AssetsFile'")), true);
+    assert.equal(result.errors.some(err => err.message.includes("UIComponent 'Button' is not contained by any other UIComponent")), true);
+    assert.equal(result.errors.some(err => err.message.includes("UIComponent 'Input' is not contained by any other UIComponent")), true);
+    assert.equal(result.errors.some(err => err.message.includes("UIComponent 'Modal' is not contained by any other UIComponent")), true);
     
     // Verify that files can export UI components and assets (this scenario tests that capability)
     // The fact that we can parse the file without syntax errors demonstrates this works
-    expect(result.errors.every(err => 
+    assert.equal(result.errors.every(err => 
       !err.message.includes('cannot export') && 
       !err.message.includes('invalid export')
-    )).toBe(true);
+    ), true);
   });
 });

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,10 +17,10 @@ describe('scenario-14-uicomponent-validation', () => {
     const result = checker.check(content);
     
     // Should be invalid due to orphaned entities and missing containment
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 5 errors (including orphaned entity)
-    expect(result.errors).toHaveLength(5);
+    assert.equal((result.errors).length, 5);
     
     // Check for orphaned ComponentsFile error
     const orphanedComponentsFileError = result.errors.find(err =>
@@ -27,9 +28,9 @@ describe('scenario-14-uicomponent-validation', () => {
       err.position.line === 6 &&
       err.position.column === 1
     );
-    expect(orphanedComponentsFileError).toBeDefined();
-    expect(orphanedComponentsFileError?.severity).toBe('error');
-    expect(orphanedComponentsFileError?.suggestion).toBe('Remove this file or import its exports somewhere');
+    assert.notEqual(orphanedComponentsFileError, undefined);
+    assert.equal(orphanedComponentsFileError?.severity, 'error');
+    assert.equal(orphanedComponentsFileError?.suggestion, 'Remove this file or import its exports somewhere');
     
     // Check for orphaned UnexportedComponent error
     const orphanedUnexportedComponentError = result.errors.find(err => 
@@ -37,9 +38,9 @@ describe('scenario-14-uicomponent-validation', () => {
       err.position.line === 36 &&
       err.position.column === 1
     );
-    expect(orphanedUnexportedComponentError).toBeDefined();
-    expect(orphanedUnexportedComponentError?.severity).toBe('error');
-    expect(orphanedUnexportedComponentError?.suggestion).toBe('Remove or reference this entity');
+    assert.notEqual(orphanedUnexportedComponentError, undefined);
+    assert.equal(orphanedUnexportedComponentError?.severity, 'error');
+    assert.equal(orphanedUnexportedComponentError?.suggestion, 'Remove or reference this entity');
     
     // Check for App component not contained error
     const appNotContainedError = result.errors.find(err => 
@@ -47,9 +48,9 @@ describe('scenario-14-uicomponent-validation', () => {
       err.position.line === 10 &&
       err.position.column === 1
     );
-    expect(appNotContainedError).toBeDefined();
-    expect(appNotContainedError?.severity).toBe('error');
-    expect(appNotContainedError?.suggestion).toBe("Either add 'App' to another UIComponent's contains list, or mark it as a root component with &!");
+    assert.notEqual(appNotContainedError, undefined);
+    assert.equal(appNotContainedError?.severity, 'error');
+    assert.equal(appNotContainedError?.suggestion, "Either add 'App' to another UIComponent's contains list, or mark it as a root component with &!");
     
     // Check for UnexportedComponent not contained error
     const unexportedNotContainedError = result.errors.find(err => 
@@ -57,11 +58,11 @@ describe('scenario-14-uicomponent-validation', () => {
       err.position.line === 36 &&
       err.position.column === 1
     );
-    expect(unexportedNotContainedError).toBeDefined();
-    expect(unexportedNotContainedError?.severity).toBe('error');
-    expect(unexportedNotContainedError?.suggestion).toBe("Either add 'UnexportedComponent' to another UIComponent's contains list, or mark it as a root component with &!");
+    assert.notEqual(unexportedNotContainedError, undefined);
+    assert.equal(unexportedNotContainedError?.severity, 'error');
+    assert.equal(unexportedNotContainedError?.suggestion, "Either add 'UnexportedComponent' to another UIComponent's contains list, or mark it as a root component with &!");
     
     // All errors should be of severity 'error'
-    expect(result.errors.every(err => err.severity === 'error')).toBe(true);
+    assert.equal(result.errors.every(err => err.severity === 'error'), true);
   });
 });

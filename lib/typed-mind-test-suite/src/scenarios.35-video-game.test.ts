@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -17,129 +18,129 @@ describe('scenario-35-video-game', () => {
     const parsed = checker.parse(content);
     
     // Should be invalid due to orphaned entities
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // Should have the main program
-    expect(parsed.entities.has('DragonQuestRPG')).toBe(true);
+    assert.equal(parsed.entities.has('DragonQuestRPG'), true);
     const app = parsed.entities.get('DragonQuestRPG');
-    expect(app?.type).toBe('Program');
+    assert.equal(app?.type, 'Program');
     if (app?.type === 'Program') {
-      expect(app.entry).toBe('MainFile');
-      expect(app.version).toBe('1.0.0');
+      assert.equal(app.entry, 'MainFile');
+      assert.equal(app.version, '1.0.0');
     }
     
     // Should have core game system files
-    expect(parsed.entities.has('MainFile')).toBe(true);
-    expect(parsed.entities.has('SceneManagerFile')).toBe(true);
-    expect(parsed.entities.has('InputManagerFile')).toBe(true);
-    expect(parsed.entities.has('PlayerSystemFile')).toBe(true);
-    expect(parsed.entities.has('CombatSystemFile')).toBe(true);
-    expect(parsed.entities.has('AISystemFile')).toBe(true);
+    assert.equal(parsed.entities.has('MainFile'), true);
+    assert.equal(parsed.entities.has('SceneManagerFile'), true);
+    assert.equal(parsed.entities.has('InputManagerFile'), true);
+    assert.equal(parsed.entities.has('PlayerSystemFile'), true);
+    assert.equal(parsed.entities.has('CombatSystemFile'), true);
+    assert.equal(parsed.entities.has('AISystemFile'), true);
     
     // Should have world and gameplay systems
-    expect(parsed.entities.has('WorldManagerFile')).toBe(true);
-    expect(parsed.entities.has('QuestSystemFile')).toBe(true);
-    expect(parsed.entities.has('NPCSystemFile')).toBe(true);
-    expect(parsed.entities.has('InventorySystemFile')).toBe(true);
+    assert.equal(parsed.entities.has('WorldManagerFile'), true);
+    assert.equal(parsed.entities.has('QuestSystemFile'), true);
+    assert.equal(parsed.entities.has('NPCSystemFile'), true);
+    assert.equal(parsed.entities.has('InventorySystemFile'), true);
     
     // Should have networking
-    expect(parsed.entities.has('NetworkManagerFile')).toBe(true);
-    expect(parsed.entities.has('MultiplayerSyncFile')).toBe(true);
+    assert.equal(parsed.entities.has('NetworkManagerFile'), true);
+    assert.equal(parsed.entities.has('MultiplayerSyncFile'), true);
     
     // Should have UI systems
-    expect(parsed.entities.has('UIManagerFile')).toBe(true);
-    expect(parsed.entities.has('HUDFile')).toBe(true);
-    expect(parsed.entities.has('MenuSystemFile')).toBe(true);
+    assert.equal(parsed.entities.has('UIManagerFile'), true);
+    assert.equal(parsed.entities.has('HUDFile'), true);
+    assert.equal(parsed.entities.has('MenuSystemFile'), true);
     
     // Should have audio and graphics
-    expect(parsed.entities.has('AudioManagerFile')).toBe(true);
-    expect(parsed.entities.has('RenderingManagerFile')).toBe(true);
-    expect(parsed.entities.has('VFXManagerFile')).toBe(true);
+    assert.equal(parsed.entities.has('AudioManagerFile'), true);
+    assert.equal(parsed.entities.has('RenderingManagerFile'), true);
+    assert.equal(parsed.entities.has('VFXManagerFile'), true);
     
     // Should have save system
-    expect(parsed.entities.has('SaveSystemFile')).toBe(true);
-    expect(parsed.entities.has('ResourceManagerFile')).toBe(true);
+    assert.equal(parsed.entities.has('SaveSystemFile'), true);
+    assert.equal(parsed.entities.has('ResourceManagerFile'), true);
     
     // Should have UI components
-    expect(parsed.entities.has('MainMenu')).toBe(true);
-    expect(parsed.entities.has('HUD')).toBe(true);
-    expect(parsed.entities.has('PauseMenu')).toBe(true);
-    expect(parsed.entities.has('InventoryUI')).toBe(true);
-    expect(parsed.entities.has('QuestLog')).toBe(true);
+    assert.equal(parsed.entities.has('MainMenu'), true);
+    assert.equal(parsed.entities.has('HUD'), true);
+    assert.equal(parsed.entities.has('PauseMenu'), true);
+    assert.equal(parsed.entities.has('InventoryUI'), true);
+    assert.equal(parsed.entities.has('QuestLog'), true);
     
     // Should have environment variables
-    expect(parsed.entities.has('UNITY_VERSION')).toBe(true);
-    expect(parsed.entities.has('PHOTON_APP_ID')).toBe(true);
-    expect(parsed.entities.has('BUILD_TARGET')).toBe(true);
+    assert.equal(parsed.entities.has('UNITY_VERSION'), true);
+    assert.equal(parsed.entities.has('PHOTON_APP_ID'), true);
+    assert.equal(parsed.entities.has('BUILD_TARGET'), true);
     
     // Check environment variable types
     const unityVersion = parsed.entities.get('UNITY_VERSION');
-    expect(unityVersion?.type).toBe('RunParameter');
+    assert.equal(unityVersion?.type, 'RunParameter');
     if (unityVersion?.type === 'RunParameter') {
-      expect(unityVersion.paramType).toBe('env');
-      expect(unityVersion.required).toBe(true);
-      expect(unityVersion.defaultValue).toBe('2023.2.1f1');
+      assert.equal(unityVersion.paramType, 'env');
+      assert.equal(unityVersion.required, true);
+      assert.equal(unityVersion.defaultValue, '2023.2.1f1');
     }
     
     const photonAppId = parsed.entities.get('PHOTON_APP_ID');
-    expect(photonAppId?.type).toBe('RunParameter');
+    assert.equal(photonAppId?.type, 'RunParameter');
     if (photonAppId?.type === 'RunParameter') {
-      expect(photonAppId.paramType).toBe('env');
-      expect(photonAppId.required).toBe(true);
+      assert.equal(photonAppId.paramType, 'env');
+      assert.equal(photonAppId.required, true);
     }
     
     // Should have service classes
-    expect(parsed.entities.has('GameManager')).toBe(true);
-    expect(parsed.entities.has('SceneManager')).toBe(true);
-    expect(parsed.entities.has('PlayerController')).toBe(true);
-    expect(parsed.entities.has('CombatSystem')).toBe(true);
-    expect(parsed.entities.has('AIController')).toBe(true);
+    assert.equal(parsed.entities.has('GameManager'), true);
+    assert.equal(parsed.entities.has('SceneManager'), true);
+    assert.equal(parsed.entities.has('PlayerController'), true);
+    assert.equal(parsed.entities.has('CombatSystem'), true);
+    assert.equal(parsed.entities.has('AIController'), true);
     
     // Should have key functions
-    expect(parsed.entities.has('StartGame')).toBe(true);
-    expect(parsed.entities.has('PauseGame')).toBe(true);
-    expect(parsed.entities.has('LoadScene')).toBe(true);
-    expect(parsed.entities.has('Attack')).toBe(true);
-    expect(parsed.entities.has('UseSkill')).toBe(true);
-    expect(parsed.entities.has('SaveGame')).toBe(true);
+    assert.equal(parsed.entities.has('StartGame'), true);
+    assert.equal(parsed.entities.has('PauseGame'), true);
+    assert.equal(parsed.entities.has('LoadScene'), true);
+    assert.equal(parsed.entities.has('Attack'), true);
+    assert.equal(parsed.entities.has('UseSkill'), true);
+    assert.equal(parsed.entities.has('SaveGame'), true);
     
     // Should have DTOs
-    expect(parsed.entities.has('GameState')).toBe(true);
-    expect(parsed.entities.has('PlayerStats')).toBe(true);
-    expect(parsed.entities.has('Vector3')).toBe(true);
-    expect(parsed.entities.has('GameObject')).toBe(true);
-    expect(parsed.entities.has('Item')).toBe(true);
-    expect(parsed.entities.has('Quest')).toBe(true);
+    assert.equal(parsed.entities.has('GameState'), true);
+    assert.equal(parsed.entities.has('PlayerStats'), true);
+    assert.equal(parsed.entities.has('Vector3'), true);
+    assert.equal(parsed.entities.has('GameObject'), true);
+    assert.equal(parsed.entities.has('Item'), true);
+    assert.equal(parsed.entities.has('Quest'), true);
     
     // Check that key functions consume environment variables
     const connectFunc = parsed.entities.get('Connect');
-    expect(connectFunc?.type).toBe('Function');
+    assert.equal(connectFunc?.type, 'Function');
     if (connectFunc?.type === 'Function') {
-      expect(connectFunc.consumes).toContain('PHOTON_APP_ID');
+      assert.ok((connectFunc.consumes).includes('PHOTON_APP_ID'));
     }
     
     const initializeFunc = parsed.entities.get('Initialize');
-    expect(initializeFunc?.type).toBe('Function');
+    assert.equal(initializeFunc?.type, 'Function');
     if (initializeFunc?.type === 'Function') {
-      expect(initializeFunc.consumes).toContain('UNITY_VERSION');
-      expect(initializeFunc.consumes).toContain('BUILD_TARGET');
+      assert.ok((initializeFunc.consumes).includes('UNITY_VERSION'));
+      assert.ok((initializeFunc.consumes).includes('BUILD_TARGET'));
     }
     
     // Check game-specific functionality
     const useSkillFunc = parsed.entities.get('UseSkill');
-    expect(useSkillFunc?.type).toBe('Function');
+    assert.equal(useSkillFunc?.type, 'Function');
     if (useSkillFunc?.type === 'Function') {
-      expect(useSkillFunc.consumes).toContain('ENABLE_MODDING');
-      expect(useSkillFunc.affects).toContain('SkillBar');
-      expect(useSkillFunc.affects).toContain('ManaBar');
+      assert.ok((useSkillFunc.consumes).includes('ENABLE_MODDING'));
+      assert.ok((useSkillFunc.affects).includes('SkillBar'));
+      assert.ok((useSkillFunc.affects).includes('ManaBar'));
     }
     
     // Should have AI subclasses
-    expect(parsed.entities.has('EnemyAI')).toBe(true);
-    expect(parsed.entities.has('CompanionAI')).toBe(true);
+    assert.equal(parsed.entities.has('EnemyAI'), true);
+    assert.equal(parsed.entities.has('CompanionAI'), true);
     
     // Verify entity count is reasonable for a full game
-    expect(parsed.entities.size).toBeGreaterThan(90);
+    assert.ok((parsed.entities.size) > (90));
   });
 });

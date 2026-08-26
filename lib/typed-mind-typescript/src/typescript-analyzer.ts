@@ -2,6 +2,16 @@ import * as ts from 'typescript';
 import path from 'path';
 import fs from 'fs';
 import {
+  isFunction,
+  isClass,
+  isInterface,
+  isTypeAlias,
+  isVariableStatement,
+  isExportDeclaration,
+  isImportDeclaration,
+  createFilePath,
+} from './types.ts';
+import type {
   TypeScriptProjectAnalysis,
   ParsedModule,
   ParsedFunction,
@@ -14,24 +24,18 @@ import {
   ParsedMethod,
   ParsedProperty,
   ParsedParameter,
-  isFunction,
-  isClass,
-  isInterface,
-  isTypeAlias,
-  isVariableStatement,
-  isExportDeclaration,
-  isImportDeclaration,
-  createFilePath,
 } from './types.ts';
 
 export class TypeScriptAnalyzer {
   private program: ts.Program;
   private checker: ts.TypeChecker;
 
-  constructor(
-    private readonly projectPath: string,
-    private readonly configPath?: string,
-  ) {
+  private readonly projectPath: string;
+  private readonly configPath?: string;
+
+  constructor(projectPath: string, configPath?: string) {
+    this.projectPath = projectPath;
+    this.configPath = configPath;
     const configFilePath = this.resolveConfigPath();
     const { config, error } = this.loadTsConfig(configFilePath);
 

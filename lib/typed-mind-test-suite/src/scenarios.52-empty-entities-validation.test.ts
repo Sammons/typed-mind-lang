@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -32,7 +33,7 @@ describe('Scenario 52: Empty Entities Validation', () => {
        e.message.includes('calls') ||
        e.message.includes('contains'))
     );
-    expect(emptyListErrors).toHaveLength(0);
+    assert.equal((emptyListErrors).length, 0);
     
     // Might have warnings for empty descriptions
     const emptyDescWarnings = result.errors.filter(e => 
@@ -41,7 +42,7 @@ describe('Scenario 52: Empty Entities Validation', () => {
     );
     // These would be warnings, not errors
     emptyDescWarnings.forEach(w => {
-      expect(w.severity).toBe('warning');
+      assert.equal(w.severity, 'warning');
     });
     
     // File with no exports might get a warning
@@ -50,7 +51,7 @@ describe('Scenario 52: Empty Entities Validation', () => {
       e.message.includes('export')
     );
     if (noExportWarning) {
-      expect(noExportWarning.severity).toBe('warning');
+      assert.equal(noExportWarning.severity, 'warning');
     }
     
     // Empty MainFile exports might be questionable
@@ -65,6 +66,6 @@ describe('Scenario 52: Empty Entities Validation', () => {
       !e.message.includes('Orphaned') &&
       !e.message.includes('not exported')
     );
-    expect(criticalErrors.length).toBeLessThan(5);
+    assert.ok((criticalErrors.length) < (5));
   });
 });

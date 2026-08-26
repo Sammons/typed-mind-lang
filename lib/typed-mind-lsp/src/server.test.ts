@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
 import { TypedMindLanguageServer } from './server.ts';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
@@ -10,8 +11,8 @@ describe.skip('TypedMindLanguageServer', () => {
   });
 
   it('should create a server instance', () => {
-    expect(server).toBeDefined();
-    expect(server).toBeInstanceOf(TypedMindLanguageServer);
+    assert.notEqual(server, undefined);
+    assert.ok(server instanceof TypedMindLanguageServer);
   });
 
   it('should handle simple DSL content', () => {
@@ -24,12 +25,12 @@ AppEntry @ src/index.ts:
 `;
 
     const document = TextDocument.create('file:///test.tmd', 'typedmind', 1, content);
-    expect(document.getText()).toBe(content);
+    assert.equal(document.getText(), content);
   });
 
   it('should provide completions for entity types', () => {
     // Note: Full testing would require mocking the VS Code connection
     // This is a placeholder for more comprehensive tests
-    expect(true).toBe(true);
+    assert.ok(true);
   });
 });

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -21,39 +22,39 @@ describe('scenario-30-invalid-reference-types', () => {
     const parseResult = parser.parse(content);
     const validationResult = validator.validate(parseResult.entities);
     
-    expect(validationResult.valid).toBe(false);
-    expect(validationResult.errors).toHaveLength(3);
+    assert.equal(validationResult.valid, false);
+    assert.equal((validationResult.errors).length, 3);
     
     // Should have validation errors
-    expect(validationResult.errors.length).toBe(3);
-    expect(validationResult.errors.every(err => err.severity === 'error')).toBe(true);
+    assert.equal(validationResult.errors.length, 3);
+    assert.equal(validationResult.errors.every(err => err.severity === 'error'), true);
     
     // Verify entities are parsed correctly
     const entities = parseResult.entities;
-    expect(entities.has('MainFile')).toBe(true);
-    expect(entities.has('EntryFile')).toBe(true);
-    expect(entities.has('UserService')).toBe(true);
-    expect(entities.has('createUser')).toBe(true);
-    expect(entities.has('UserDTO')).toBe(true);
-    expect(entities.has('startApp')).toBe(true);
+    assert.equal(entities.has('MainFile'), true);
+    assert.equal(entities.has('EntryFile'), true);
+    assert.equal(entities.has('UserService'), true);
+    assert.equal(entities.has('createUser'), true);
+    assert.equal(entities.has('UserDTO'), true);
+    assert.equal(entities.has('startApp'), true);
     
     // Verify entity types
     const mainFile = entities.get('MainFile');
-    expect(mainFile?.type).toBe('File');
+    assert.equal(mainFile?.type, 'File');
     
     const entryFile = entities.get('EntryFile');
-    expect(entryFile?.type).toBe('File');
+    assert.equal(entryFile?.type, 'File');
     
     const userService = entities.get('UserService');
-    expect(userService?.type).toBe('File');
+    assert.equal(userService?.type, 'File');
     
     const createUser = entities.get('createUser');
-    expect(createUser?.type).toBe('Function');
+    assert.equal(createUser?.type, 'Function');
     
     const userDTO = entities.get('UserDTO');
-    expect(userDTO?.type).toBe('DTO');
+    assert.equal(userDTO?.type, 'DTO');
     
     const startApp = entities.get('startApp');
-    expect(startApp?.type).toBe('Function');
+    assert.equal(startApp?.type, 'Function');
   });
 });

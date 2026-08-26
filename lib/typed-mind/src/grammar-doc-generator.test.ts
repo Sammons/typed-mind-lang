@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { GrammarDocGenerator } from './grammar-doc-generator.ts';
 
 describe('GrammarDocGenerator', () => {
@@ -9,27 +10,27 @@ describe('GrammarDocGenerator', () => {
       const markdown = generator.generateMarkdown();
 
       // Check for main sections
-      expect(markdown).toContain('# TypedMind DSL Grammar Reference');
-      expect(markdown).toContain('## Table of Contents');
-      expect(markdown).toContain('## Entity Types');
-      expect(markdown).toContain('## Entity Patterns');
-      expect(markdown).toContain('## Continuation Patterns');
-      expect(markdown).toContain('## General Patterns');
-      expect(markdown).toContain('## Quick Reference Example');
+      assert.ok(markdown.includes('# TypedMind DSL Grammar Reference'));
+      assert.ok(markdown.includes('## Table of Contents'));
+      assert.ok(markdown.includes('## Entity Types'));
+      assert.ok(markdown.includes('## Entity Patterns'));
+      assert.ok(markdown.includes('## Continuation Patterns'));
+      assert.ok(markdown.includes('## General Patterns'));
+      assert.ok(markdown.includes('## Quick Reference Example'));
 
       // Check for entity types
-      expect(markdown).toContain('| Program |');
-      expect(markdown).toContain('| File |');
-      expect(markdown).toContain('| Function |');
-      expect(markdown).toContain('| Class |');
-      expect(markdown).toContain('| DTO |');
+      assert.ok(markdown.includes('| Program |'));
+      assert.ok(markdown.includes('| File |'));
+      assert.ok(markdown.includes('| Function |'));
+      assert.ok(markdown.includes('| Class |'));
+      assert.ok(markdown.includes('| DTO |'));
 
       // Check for pattern documentation in table format
-      expect(markdown).toContain('| Entity | Pattern | Example | Regex |');
+      assert.ok(markdown.includes('| Entity | Pattern | Example | Regex |'));
 
       // Check for example code
-      expect(markdown).toContain('TodoApp -> main');
-      expect(markdown).toContain('UserService #: src/services/user.ts');
+      assert.ok(markdown.includes('TodoApp -> main'));
+      assert.ok(markdown.includes('UserService #: src/services/user.ts'));
     });
   });
 
@@ -38,17 +39,17 @@ describe('GrammarDocGenerator', () => {
       const json = generator.generateJSON();
       const parsed = JSON.parse(json);
 
-      expect(parsed).toHaveProperty('entityTypes');
-      expect(parsed).toHaveProperty('patterns');
-      expect(parsed).toHaveProperty('descriptions');
+      assert.ok('entityTypes' in parsed);
+      assert.ok('patterns' in parsed);
+      assert.ok('descriptions' in parsed);
 
-      expect(parsed.entityTypes).toContain('Program');
-      expect(parsed.entityTypes).toContain('File');
-      expect(parsed.entityTypes).toContain('Function');
+      assert.ok(parsed.entityTypes.includes('Program'));
+      assert.ok(parsed.entityTypes.includes('File'));
+      assert.ok(parsed.entityTypes.includes('Function'));
 
-      expect(parsed.patterns).toHaveProperty('entity');
-      expect(parsed.patterns).toHaveProperty('continuation');
-      expect(parsed.patterns).toHaveProperty('general');
+      assert.ok('entity' in parsed.patterns);
+      assert.ok('continuation' in parsed.patterns);
+      assert.ok('general' in parsed.patterns);
     });
   });
 
@@ -57,20 +58,20 @@ describe('GrammarDocGenerator', () => {
       const ebnf = generator.generateEBNF();
 
       // Check for EBNF structure
-      expect(ebnf).toContain('(* TypedMind DSL Grammar in EBNF notation *)');
-      expect(ebnf).toContain('document =');
-      expect(ebnf).toContain('entity =');
+      assert.ok(ebnf.includes('(* TypedMind DSL Grammar in EBNF notation *)'));
+      assert.ok(ebnf.includes('document ='));
+      assert.ok(ebnf.includes('entity ='));
 
       // Check for entity definitions
-      expect(ebnf).toContain('program = identifier "->" identifier');
-      expect(ebnf).toContain('file = identifier "@" path');
-      expect(ebnf).toContain('function = identifier "::" signature');
-      expect(ebnf).toContain('class = identifier "<:"');
-      expect(ebnf).toContain('dto = identifier "%"');
+      assert.ok(ebnf.includes('program = identifier "->" identifier'));
+      assert.ok(ebnf.includes('file = identifier "@" path'));
+      assert.ok(ebnf.includes('function = identifier "::" signature'));
+      assert.ok(ebnf.includes('class = identifier "<:"'));
+      assert.ok(ebnf.includes('dto = identifier "%"'));
 
       // Check for common elements
-      expect(ebnf).toContain('identifier = letter (letter | digit | "_")*;');
-      expect(ebnf).toContain('string_literal =');
+      assert.ok(ebnf.includes('identifier = letter (letter | digit | "_")*;'));
+      assert.ok(ebnf.includes('string_literal ='));
     });
   });
 });

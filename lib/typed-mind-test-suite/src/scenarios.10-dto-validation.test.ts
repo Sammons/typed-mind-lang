@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,48 +17,48 @@ describe('scenario-10-dto-validation', () => {
     const result = checker.check(content);
     
     // Should be invalid due to validation errors
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 6 errors (2 orphaned + 4 validation)
-    expect(result.errors).toHaveLength(6);
+    assert.equal((result.errors).length, 6);
 
     // Check for orphaned entities
     const orphanedCreateUser = result.errors.find(err =>
       err.message === "Orphaned entity 'createUser'"
     );
-    expect(orphanedCreateUser).toBeDefined();
-    expect(orphanedCreateUser?.position.line).toBe(6);
+    assert.notEqual(orphanedCreateUser, undefined);
+    assert.equal(orphanedCreateUser?.position.line, 6);
 
     const orphanedUpdateUser = result.errors.find(err =>
       err.message === "Orphaned entity 'updateUser'"
     );
-    expect(orphanedUpdateUser).toBeDefined();
-    expect(orphanedUpdateUser?.position.line).toBe(10);
+    assert.notEqual(orphanedUpdateUser, undefined);
+    assert.equal(orphanedUpdateUser?.position.line, 10);
 
     // Check for validation errors
     const cannotUseInputError = result.errors.find(err =>
       err.message === "Cannot use 'input' to reference File 'UserFile'"
     );
-    expect(cannotUseInputError).toBeDefined();
-    expect(cannotUseInputError?.position.line).toBe(10);
-    expect(cannotUseInputError?.suggestion).toBe("'input' can only reference: DTO");
+    assert.notEqual(cannotUseInputError, undefined);
+    assert.equal(cannotUseInputError?.position.line, 10);
+    assert.equal(cannotUseInputError?.suggestion, "'input' can only reference: DTO");
 
     const nonExistentDTOError = result.errors.find(err =>
       err.message === "Function input DTO 'NonExistentDTO' not found"
     );
-    expect(nonExistentDTOError).toBeDefined();
-    expect(nonExistentDTOError?.position.line).toBe(6);
+    assert.notEqual(nonExistentDTOError, undefined);
+    assert.equal(nonExistentDTOError?.position.line, 6);
 
     const userFileNotDTOError = result.errors.find(err =>
       err.message === "Function input 'UserFile' is not a DTO (it's a File)"
     );
-    expect(userFileNotDTOError).toBeDefined();
-    expect(userFileNotDTOError?.position.line).toBe(10);
+    assert.notEqual(userFileNotDTOError, undefined);
+    assert.equal(userFileNotDTOError?.position.line, 10);
 
     const notADTOError = result.errors.find(err =>
       err.message === "Function output DTO 'NotADTO' not found"
     );
-    expect(notADTOError).toBeDefined();
-    expect(notADTOError?.position.line).toBe(10);
+    assert.notEqual(notADTOError, undefined);
+    assert.equal(notADTOError?.position.line, 10);
   });
 });

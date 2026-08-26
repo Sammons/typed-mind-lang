@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,16 +17,16 @@ describe('scenario-37-data-pipeline', () => {
     const result = checker.check(content);
     
     // Should be invalid due to orphaned entities
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // DSLChecker doesn't expose entities directly, but we can verify it processed the file successfully
     // by ensuring it contains the expected content structure
-    expect(content).toContain('AnalyticsPipeline');
-    expect(content).toContain('OrchestratorFile');
-    expect(content).toContain('runPipeline');
-    expect(content).toContain('KAFKA_BROKERS');
-    expect(content).toContain('PipelineConfig');
-    expect(content).toContain('SparkProcessor');
+    assert.ok((content).includes('AnalyticsPipeline'));
+    assert.ok((content).includes('OrchestratorFile'));
+    assert.ok((content).includes('runPipeline'));
+    assert.ok((content).includes('KAFKA_BROKERS'));
+    assert.ok((content).includes('PipelineConfig'));
+    assert.ok((content).includes('SparkProcessor'));
   });
 });

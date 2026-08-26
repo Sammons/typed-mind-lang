@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,20 +17,20 @@ describe('Scenario 50: Circular Function Calls', () => {
     const result = checker.check(content);
     
     // Should have errors for circular dependencies
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // Should detect orphaned entities instead of circular dependencies
     const orphanedErrors = result.errors.filter(e =>
       e.message.includes('Orphaned entity')
     );
-    expect(orphanedErrors.length).toBeGreaterThan(0);
+    assert.ok((orphanedErrors.length) > (0));
 
     // Check for orphaned file
     const orphanedFile = result.errors.find(e =>
       e.message.includes("Orphaned file 'SecondaryFile'")
     );
-    expect(orphanedFile).toBeDefined();
+    assert.notEqual(orphanedFile, undefined);
     
     // Deep chain without circular should NOT have errors
     const deepChainError = result.errors.find(e => 
@@ -39,7 +40,7 @@ describe('Scenario 50: Circular Function Calls', () => {
     );
     // Might have other errors but not circular
     if (deepChainError) {
-      expect(deepChainError.message).not.toContain('Circular');
+      assert.ok(!(deepChainError.message).includes('Circular'));
     }
   });
 });

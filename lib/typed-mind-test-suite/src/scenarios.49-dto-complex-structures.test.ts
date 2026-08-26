@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,31 +17,31 @@ describe('Scenario 49: DTO Complex Structures', () => {
     const result = checker.check(content);
     
     // All these complex DTO structures should be invalid
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // Verify entities were parsed correctly
     const parseResult = checker.parse(content);
     
     // Check empty DTO exists
-    expect(parseResult.entities.has('EmptyDTO')).toBe(true);
+    assert.equal(parseResult.entities.has('EmptyDTO'), true);
     
     // Check nested DTO exists and has fields
     const nestedDTO = parseResult.entities.get('NestedDTO');
-    expect(nestedDTO).toBeDefined();
-    expect(nestedDTO?.type).toBe('DTO');
+    assert.notEqual(nestedDTO, undefined);
+    assert.equal(nestedDTO?.type, 'DTO');
     
     // Check array field DTO
     const arrayDTO = parseResult.entities.get('ArrayFieldDTO');
-    expect(arrayDTO).toBeDefined();
+    assert.notEqual(arrayDTO, undefined);
     
     // Check self-referencing DTO
     const selfRefDTO = parseResult.entities.get('SelfReferencingDTO');
-    expect(selfRefDTO).toBeDefined();
+    assert.notEqual(selfRefDTO, undefined);
     
     // Check complex DTO with various field types
     const complexDTO = parseResult.entities.get('ComplexDTO');
-    expect(complexDTO).toBeDefined();
+    assert.notEqual(complexDTO, undefined);
   });
   
   it('should handle DTO field validation for Function fields', () => {
@@ -59,13 +60,13 @@ BadDTO % "DTO with function field"
     const checker = new DSLChecker();
     const result = checker.check(content);
     
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    assert.equal(result.valid, false);
+    assert.ok((result.errors.length) > (0));
     
     // Should have errors for Function fields
     const functionFieldErrors = result.errors.filter(e => 
       e.message.includes('Function type')
     );
-    expect(functionFieldErrors.length).toBeGreaterThan(0);
+    assert.ok((functionFieldErrors.length) > (0));
   });
 });

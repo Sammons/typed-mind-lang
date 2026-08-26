@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,45 +17,45 @@ describe('scenario-07-duplicate-paths', () => {
     const result = checker.check(content);
     
     // The DSL should be invalid due to duplicate paths
-    expect(result.valid).toBe(false);
+    assert.equal(result.valid, false);
     
     // Should have exactly 5 errors
-    expect(result.errors).toHaveLength(5);
+    assert.equal((result.errors).length, 5);
 
     // Check the duplicate path error details
     const duplicatePathError = result.errors.find(err =>
       err.message === "Path 'src/shared/utils.ts' already used by File 'FileOne'"
     );
-    expect(duplicatePathError).toBeDefined();
-    expect(duplicatePathError?.position.line).toBe(10);
-    expect(duplicatePathError?.position.column).toBe(1);
-    expect(duplicatePathError?.severity).toBe('error');
-    expect(duplicatePathError?.suggestion).toBe("Each File/ClassFile must have a unique path. Consider using ClassFile fusion with #:");
+    assert.notEqual(duplicatePathError, undefined);
+    assert.equal(duplicatePathError?.position.line, 10);
+    assert.equal(duplicatePathError?.position.column, 1);
+    assert.equal(duplicatePathError?.severity, 'error');
+    assert.equal(duplicatePathError?.suggestion, "Each File/ClassFile must have a unique path. Consider using ClassFile fusion with #:");
 
     // Check for orphaned file errors
     const orphanedFileOneError = result.errors.find(err =>
       err.message === "Orphaned file 'FileOne' - none of its exports are imported"
     );
-    expect(orphanedFileOneError).toBeDefined();
-    expect(orphanedFileOneError?.position.line).toBe(7);
+    assert.notEqual(orphanedFileOneError, undefined);
+    assert.equal(orphanedFileOneError?.position.line, 7);
 
     const orphanedFileTwoError = result.errors.find(err =>
       err.message === "Orphaned file 'FileTwo' - none of its exports are imported"
     );
-    expect(orphanedFileTwoError).toBeDefined();
-    expect(orphanedFileTwoError?.position.line).toBe(10);
+    assert.notEqual(orphanedFileTwoError, undefined);
+    assert.equal(orphanedFileTwoError?.position.line, 10);
 
     // Check for orphaned entity errors
     const orphanedHelperOneError = result.errors.find(err =>
       err.message === "Orphaned entity 'helperOne'"
     );
-    expect(orphanedHelperOneError).toBeDefined();
-    expect(orphanedHelperOneError?.position.line).toBe(13);
+    assert.notEqual(orphanedHelperOneError, undefined);
+    assert.equal(orphanedHelperOneError?.position.line, 13);
 
     const orphanedHelperTwoError = result.errors.find(err =>
       err.message === "Orphaned entity 'helperTwo'"
     );
-    expect(orphanedHelperTwoError).toBeDefined();
-    expect(orphanedHelperTwoError?.position.line).toBe(14);
+    assert.notEqual(orphanedHelperTwoError, undefined);
+    assert.equal(orphanedHelperTwoError?.position.line, 14);
   });
 });

@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { AssertionEngine } from './assertion-engine.ts';
 import type { ConversionResult } from './types.ts';
-import { FunctionEntity, DTOEntity } from '@sammons/typed-mind';
+import type { FunctionEntity, DTOEntity } from '@sammons/typed-mind';
 
 const createMockConversionResult = (): ConversionResult => ({
   success: true,
@@ -108,10 +109,10 @@ UserDTO %
 
     const result = engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
-    expect(result.success).toBe(true);
-    expect(result.deviations).toHaveLength(0);
-    expect(result.missingEntities).toHaveLength(0);
-    expect(result.extraEntities).toHaveLength(0);
+    assert.equal(result.success, true);
+    assert.equal(result.deviations.length, 0);
+    assert.equal(result.missingEntities.length, 0);
+    assert.equal(result.extraEntities.length, 0);
   });
 
   it('should detect missing entities', () => {
@@ -134,8 +135,8 @@ UserDTO %
 
     const result = engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
-    expect(result.success).toBe(false);
-    expect(result.missingEntities).toContain('AdminService');
+    assert.equal(result.success, false);
+    assert.ok(result.missingEntities.includes('AdminService'));
   });
 
   it('should detect extra entities', () => {
@@ -152,9 +153,9 @@ UserDTO %
 
     const result = engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
-    expect(result.success).toBe(false);
-    expect(result.extraEntities).toContain('UserService');
-    expect(result.extraEntities).toContain('createUser');
+    assert.equal(result.success, false);
+    assert.ok(result.extraEntities.includes('UserService'));
+    assert.ok(result.extraEntities.includes('createUser'));
   });
 
   it('should detect entity type mismatches', () => {
@@ -171,13 +172,13 @@ UserDTO %
 
     const result = engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
-    expect(result.success).toBe(false);
+    assert.equal(result.success, false);
 
     const typeDeviation = result.deviations.find((d) => d.entityName === 'UserService' && d.property === 'type');
-    expect(typeDeviation).toBeDefined();
-    expect(typeDeviation?.expected).toBe('Class');
-    expect(typeDeviation?.actual).toBe('ClassFile');
-    expect(typeDeviation?.severity).toBe('error');
+    assert.notEqual(typeDeviation, undefined);
+    assert.equal(typeDeviation?.expected, 'Class');
+    assert.equal(typeDeviation?.actual, 'ClassFile');
+    assert.equal(typeDeviation?.severity, 'error');
   });
 
   it('should detect method differences', () => {
@@ -194,12 +195,12 @@ UserDTO %
 
     const result = engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
-    expect(result.success).toBe(false);
+    assert.equal(result.success, false);
 
     const methodDeviation = result.deviations.find((d) => d.entityName === 'UserService' && d.property === 'methods.missing');
-    expect(methodDeviation).toBeDefined();
-    expect(methodDeviation?.expected).toContain('updateUser');
-    expect(methodDeviation?.expected).toContain('deleteUser');
+    assert.notEqual(methodDeviation, undefined);
+    assert.ok(methodDeviation?.expected.includes('updateUser'));
+    assert.ok(methodDeviation?.expected.includes('deleteUser'));
   });
 
   it('should detect DTO field differences', () => {
@@ -217,12 +218,12 @@ UserDTO %
 
     const result = engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
-    expect(result.success).toBe(false);
+    assert.equal(result.success, false);
 
     const missingFieldDeviation = result.deviations.find((d) => d.entityName === 'UserDTO' && d.property === 'field.createdAt');
-    expect(missingFieldDeviation).toBeDefined();
-    expect(missingFieldDeviation?.expected).toBe('field exists');
-    expect(missingFieldDeviation?.actual).toBe('field missing');
+    assert.notEqual(missingFieldDeviation, undefined);
+    assert.equal(missingFieldDeviation?.expected, 'field exists');
+    assert.equal(missingFieldDeviation?.actual, 'field missing');
   });
 
   it('should detect function signature mismatches', () => {
@@ -237,11 +238,11 @@ createUser :: createUser(data: UserCreateData) => User
 
     const result = engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
-    expect(result.success).toBe(false);
+    assert.equal(result.success, false);
 
     const signatureDeviation = result.deviations.find((d) => d.entityName === 'createUser' && d.property === 'signature');
-    expect(signatureDeviation).toBeDefined();
-    expect(signatureDeviation?.severity).toBe('error');
+    assert.notEqual(signatureDeviation, undefined);
+    assert.equal(signatureDeviation?.severity, 'error');
   });
 
   it('should handle invalid TMD syntax', () => {
@@ -256,12 +257,12 @@ createUser :: createUser(data: UserCreateData) => User
 
     const result = engine.assert(conversionResult, 'test.tmd', invalidTMD);
 
-    expect(result.success).toBe(false);
-    expect(result.deviations.length).toBeGreaterThan(0);
+    assert.equal(result.success, false);
+    assert.ok(result.deviations.length > 0);
 
     const syntaxDeviation = result.deviations.find((d) => d.entityName === '<parsing>' && d.property === 'syntax');
-    expect(syntaxDeviation).toBeDefined();
-    expect(syntaxDeviation?.severity).toBe('error');
+    assert.notEqual(syntaxDeviation, undefined);
+    assert.equal(syntaxDeviation?.severity, 'error');
   });
 
   it('should distinguish between errors and warnings', () => {
@@ -282,15 +283,15 @@ UserDTO %
 
     const result = engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
-    expect(result.success).toBe(true); // No errors, only warnings
+    assert.equal(result.success, true); // No errors, only warnings
 
     const warnings = result.deviations.filter((d) => d.severity === 'warning');
-    expect(warnings.length).toBeGreaterThan(0);
+    assert.ok(warnings.length > 0);
 
     const versionWarning = warnings.find((d) => d.entityName === 'IndexApp' && d.property === 'version');
-    expect(versionWarning).toBeDefined();
-    expect(versionWarning?.expected).toBe('2.0.0');
-    expect(versionWarning?.actual).toBe('1.0.0');
+    assert.notEqual(versionWarning, undefined);
+    assert.equal(versionWarning?.expected, '2.0.0');
+    assert.equal(versionWarning?.actual, '1.0.0');
   });
 
   it('should handle empty conversion results', () => {
@@ -310,7 +311,7 @@ UserService #: src/user.ts
 
     const result = engine.assert(emptyResult, 'test.tmd', expectedTMD);
 
-    expect(result.success).toBe(false);
-    expect(result.missingEntities).toContain('UserService');
+    assert.equal(result.success, false);
+    assert.ok(result.missingEntities.includes('UserService'));
   });
 });

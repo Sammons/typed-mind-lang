@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,9 +17,9 @@ describe('scenario-12-valid-complete', () => {
     const result = checker.check(content);
 
     // This is a valid complete program - all entities are properly connected
-    expect(result.valid).toBe(true);
+    assert.equal(result.valid, true);
 
     // Should have no errors in a valid program
-    expect(result.errors).toHaveLength(0);
+    assert.equal((result.errors).length, 0);
   });
 });

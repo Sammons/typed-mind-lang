@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('Scenario 60: Constants schema validation', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-60-constants-schema-validation.tmd');
@@ -18,22 +23,22 @@ describe('Scenario 60: Constants schema validation', () => {
     const appConfig = entities.find(e => 
       e.name === 'AppConfig' && e.type === 'Constants'
     );
-    expect(appConfig).toBeDefined();
-    expect(appConfig?.schema).toBe('AppConfigSchema');
-    expect(appConfig?.path).toBe('src/config/app.ts');
+    assert.notEqual(appConfig, undefined);
+    assert.equal(appConfig?.schema, 'AppConfigSchema');
+    assert.equal(appConfig?.path, 'src/config/app.ts');
     
     // Constants without schema
     const dbConfig = entities.find(e => 
       e.name === 'DatabaseConfig' && e.type === 'Constants'
     );
-    expect(dbConfig).toBeDefined();
-    expect(dbConfig?.schema).toBeUndefined();
+    assert.notEqual(dbConfig, undefined);
+    assert.equal(dbConfig?.schema, undefined);
     
     // Complex nested schema
     const apiConfig = entities.find(e => 
       e.name === 'ApiConfig' && e.type === 'Constants'
     );
-    expect(apiConfig?.schema).toBe('ApiConfigSchema');
+    assert.equal(apiConfig?.schema, 'ApiConfigSchema');
   });
 
   it('should validate schema references', () => {
@@ -43,14 +48,14 @@ describe('Scenario 60: Constants schema validation', () => {
     const errors = validationResult.errors.map(e => e.message);
     
     // BrokenConfig references non-existent schema
-    expect(errors.some(e =>
+    assert.equal(errors.some(e =>
       e.includes('BrokenConfig') && e.includes('NonExistentSchema')
-    )).toBe(false);
+    ), false);
     
     // InvalidSchema references undefined types
-    expect(errors.some(e =>
+    assert.equal(errors.some(e =>
       e.includes('UndefinedType') || e.includes('UnknownProcessor')
-    )).toBe(true); // Validator now validates DTO field type references
+    ), true); // Validator now validates DTO field type references
   });
 
   it('should handle circular schema references', () => {
@@ -65,12 +70,12 @@ describe('Scenario 60: Constants schema validation', () => {
       e.name === 'CircularSchemaB' && e.type === 'DTO'
     );
     
-    expect(circularA).toBeDefined();
-    expect(circularB).toBeDefined();
+    assert.notEqual(circularA, undefined);
+    assert.notEqual(circularB, undefined);
     
     // Check fields reference each other
-    expect(circularA?.fields?.some(f => f.type === 'CircularSchemaB')).toBe(true);
-    expect(circularB?.fields?.some(f => f.type === 'CircularSchemaA')).toBe(true);
+    assert.equal(circularA?.fields?.some(f => f.type === 'CircularSchemaB'), true);
+    assert.equal(circularB?.fields?.some(f => f.type === 'CircularSchemaA'), true);
     
     const validationResult = validator.validate(parseResult.entities, parseResult);
     const errors = validationResult.errors.map(e => e.message);
@@ -87,10 +92,10 @@ describe('Scenario 60: Constants schema validation', () => {
     const errors = validationResult.errors.map(e => e.message);
     
     // BadSchema has function fields
-    expect(errors.some(e => 
+    assert.equal(errors.some(e => 
       e.includes('BadSchema') && 
       (e.includes('Function') || e.includes('function type'))
-    )).toBe(true);
+    ), true);
   });
 
   it('should handle deeply nested schemas', () => {
@@ -111,15 +116,15 @@ describe('Scenario 60: Constants schema validation', () => {
       e.name === 'Level3Schema' && e.type === 'DTO'
     );
     
-    expect(nestedSchema).toBeDefined();
-    expect(level1).toBeDefined();
-    expect(level2).toBeDefined();
-    expect(level3).toBeDefined();
+    assert.notEqual(nestedSchema, undefined);
+    assert.notEqual(level1, undefined);
+    assert.notEqual(level2, undefined);
+    assert.notEqual(level3, undefined);
     
     // Check field references
-    expect(nestedSchema?.fields?.some(f => f.type === 'Level1Schema')).toBe(true);
-    expect(level1?.fields?.some(f => f.type === 'Level2Schema')).toBe(true);
-    expect(level2?.fields?.some(f => f.type === 'Level3Schema')).toBe(true);
+    assert.equal(nestedSchema?.fields?.some(f => f.type === 'Level1Schema'), true);
+    assert.equal(level1?.fields?.some(f => f.type === 'Level2Schema'), true);
+    assert.equal(level2?.fields?.some(f => f.type === 'Level3Schema'), true);
   });
 
   it('should reject constants with methods', () => {
@@ -132,7 +137,7 @@ describe('Scenario 60: Constants schema validation', () => {
     );
     
     // The parser might not parse methods for constants
-    expect(methodConfig?.methods).toBeUndefined();
+    assert.equal(methodConfig?.methods, undefined);
   });
 
   it('should allow multiple constants with same schema', () => {
@@ -144,8 +149,8 @@ describe('Scenario 60: Constants schema validation', () => {
       e.type === 'Constants' && e.schema === 'SharedSchema'
     );
     
-    expect(sharedConfigs.length).toBe(3);
-    expect(sharedConfigs.map(c => c.name).sort()).toEqual(['Config1', 'Config2', 'Config3']);
+    assert.equal(sharedConfigs.length, 3);
+    assert.deepEqual(sharedConfigs.map(c => c.name).sort(), ['Config1', 'Config2', 'Config3']);
     
     const validationResult = validator.validate(parseResult.entities, parseResult);
     const errors = validationResult.errors.map(e => e.message);
@@ -154,7 +159,7 @@ describe('Scenario 60: Constants schema validation', () => {
     const sharingErrors = errors.filter(e => 
       e.includes('SharedSchema') && e.includes('multiple')
     );
-    expect(sharingErrors.length).toBe(0);
+    assert.equal(sharingErrors.length, 0);
   });
 
   it('should detect orphaned schemas', () => {
@@ -164,9 +169,9 @@ describe('Scenario 60: Constants schema validation', () => {
     const errors = validationResult.errors.map(e => e.message);
     
     // OrphanedSchema is not used by any Constants
-    expect(errors.some(e =>
+    assert.equal(errors.some(e =>
       e.includes('OrphanedSchema') && e.includes('orphaned')
-    )).toBe(false);
+    ), false);
   });
 
   it('should validate constants consumption', () => {
@@ -177,19 +182,19 @@ describe('Scenario 60: Constants schema validation', () => {
     const useSecrets = entities.find(e => 
       e.name === 'useSecrets' && e.type === 'Function'
     );
-    expect(useSecrets?.consumes).toContain('SecretConfig');
+    assert.ok((useSecrets?.consumes).includes('SecretConfig'));
     
     // AppConfig consumed by multiple functions
     const initialize = entities.find(e => 
       e.name === 'initialize' && e.type === 'Function'
     );
-    expect(initialize?.consumes).toContain('AppConfig');
-    expect(initialize?.consumes).toContain('DatabaseConfig');
+    assert.ok((initialize?.consumes).includes('AppConfig'));
+    assert.ok((initialize?.consumes).includes('DatabaseConfig'));
     
     const getEnvironment = entities.find(e => 
       e.name === 'getEnvironment' && e.type === 'Function'
     );
-    expect(getEnvironment?.consumes).toContain('AppConfig');
+    assert.ok((getEnvironment?.consumes).includes('AppConfig'));
   });
 
   it('should validate constants imports', () => {
@@ -200,8 +205,8 @@ describe('Scenario 60: Constants schema validation', () => {
     const envFile = entities.find(e => 
       e.name === 'EnvironmentFile' && e.type === 'File'
     );
-    expect(envFile?.imports).toContain('AppConfig');
-    expect(envFile?.imports).toContain('DatabaseConfig');
+    assert.ok((envFile?.imports).includes('AppConfig'));
+    assert.ok((envFile?.imports).includes('DatabaseConfig'));
     
     const validationResult = validator.validate(parseResult.entities, parseResult);
     
@@ -210,6 +215,6 @@ describe('Scenario 60: Constants schema validation', () => {
       e.message.includes('Cannot import') &&
       (e.message.includes('AppConfig') || e.message.includes('DatabaseConfig'))
     );
-    expect(errors.length).toBe(0);
+    assert.equal(errors.length, 0);
   });
 });

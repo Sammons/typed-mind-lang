@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from '../../typed-mind/src/parser.ts';
 import { DSLValidator } from '../../typed-mind/src/validator.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('Scenario 56: Function signature edge cases', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-56-function-signature-edge-cases.tmd');
@@ -15,34 +20,34 @@ describe('Scenario 56: Function signature edge cases', () => {
 
     // Convert Map to array for filtering
     if (!parseResult || !parseResult.entities) {
-      expect.fail('parseResult or entities is undefined');
+      assert.fail('parseResult or entities is undefined');
       return;
     }
 
     const entitiesArray = Array.from(parseResult.entities.values());
 
     const functions = entitiesArray.filter(e => e.type === 'Function');
-    expect(functions.length).toBe(9); // func1-5, processRequest, log, noOp, complexFunc
+    assert.equal(functions.length, 9); // func1-5, processRequest, log, noOp, complexFunc
 
     // Check generic signature parsing
     const func1 = functions.find(f => f.name === 'func1');
-    expect(func1?.signature).toContain('<T extends Base>');
+    assert.ok((func1?.signature).includes('<T extends Base>'));
 
     // Check higher-order function
     const func4 = functions.find(f => f.name === 'func4');
-    expect(func4?.signature).toContain('=>');
-    expect(func4?.signature).toContain('(data: string)');
+    assert.ok((func4?.signature).includes('=>'));
+    assert.ok((func4?.signature).includes('(data: string)'));
 
     // Check that func5 exists (description parsing may vary)
     const func5 = functions.find(f => f.name === 'func5');
-    expect(func5).toBeDefined();
+    assert.notEqual(func5, undefined);
   });
 
   it('should validate function dependencies correctly', () => {
     const parseResult = parser.parse(content);
 
     if (!parseResult || !parseResult.entities) {
-      expect.fail('parseResult or entities is undefined');
+      assert.fail('parseResult or entities is undefined');
       return;
     }
 
@@ -56,20 +61,20 @@ describe('Scenario 56: Function signature edge cases', () => {
     const processRequest = entitiesArray.find(e =>
       e.type === 'Function' && e.name === 'processRequest'
     );
-    expect(processRequest?.input).toBe('Request');
+    assert.equal(processRequest?.input, 'Request');
 
     // Logger and Database are ClassFiles, not Functions, so they can't be called directly
     const callErrors = errors.filter(e =>
       e.message.includes("Cannot use 'calls' to reference ClassFile")
     );
-    expect(callErrors.length).toBeGreaterThan(0);
+    assert.ok((callErrors.length) > (0));
   });
 
   it('should handle functions with same names as class methods', () => {
     const parseResult = parser.parse(content);
 
     if (!parseResult || !parseResult.entities) {
-      expect.fail('parseResult or entities is undefined');
+      assert.fail('parseResult or entities is undefined');
       return;
     }
 
@@ -79,28 +84,28 @@ describe('Scenario 56: Function signature edge cases', () => {
     const logFunction = entitiesArray.find(e =>
       e.type === 'Function' && e.name === 'log'
     );
-    expect(logFunction).toBeDefined();
+    assert.notEqual(logFunction, undefined);
 
     const loggerClass = entitiesArray.find(e =>
       e.name === 'Logger' && e.type === 'ClassFile'
     );
-    expect(loggerClass?.methods).toContain('log');
+    assert.ok((loggerClass?.methods).includes('log'));
   });
 
   it('should parse empty and complex signatures', () => {
     const parseResult = parser.parse(content);
 
     if (!parseResult || !parseResult.entities) {
-      expect.fail('parseResult or entities is undefined');
+      assert.fail('parseResult or entities is undefined');
       return;
     }
 
     const entitiesArray = Array.from(parseResult.entities.values());
     const noOp = entitiesArray.find(e => e.name === 'noOp');
-    expect(noOp?.signature).toBe('() => void');
+    assert.equal(noOp?.signature, '() => void');
 
     const complexFunc = entitiesArray.find(e => e.name === 'complexFunc');
-    expect(complexFunc?.signature).toContain('('); // Multi-line function signatures get parsed as just the opening paren
+    assert.ok((complexFunc?.signature).includes('(')); // Multi-line function signatures get parsed as just the opening paren
     // Multi-line signatures may not be fully parsed, so just check it exists
   });
 });

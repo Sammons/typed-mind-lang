@@ -1,8 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { DSLParser } from './parser.ts';
 import { DSLValidator } from './validator.ts';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe('Documentation Examples', () => {
   const parser = new DSLParser();
@@ -15,7 +19,7 @@ describe('Documentation Examples', () => {
     // Extract all ```tmd code blocks
     const tmdBlocks = content.match(/```tmd\n([\s\S]*?)```/g) || [];
 
-    expect(tmdBlocks.length).toBeGreaterThan(0);
+    assert.ok(tmdBlocks.length > 0);
 
     tmdBlocks.forEach((block, index) => {
       // Remove the ```tmd and ``` markers
@@ -35,7 +39,7 @@ describe('Documentation Examples', () => {
         console.error(`\nExample ${index + 1} has parse errors:`);
         console.error('Code:\n', code);
         console.error('Parse Errors:', parseResult.errors);
-        expect(parseResult.errors.length).toBe(0);
+        assert.equal(parseResult.errors.length, 0);
         return;
       }
 
@@ -63,7 +67,7 @@ describe('Documentation Examples', () => {
           'Validation Errors:',
           validationResult.errors.map((e) => e.message),
         );
-        expect(validationResult.valid).toBe(true);
+        assert.equal(validationResult.valid, true);
       }
     });
   });
@@ -83,7 +87,7 @@ describe('Documentation Examples', () => {
         if (parseResult.errors && parseResult.errors.length > 0) {
           console.error('\nGenerated example has parse errors:');
           console.error('Parse Errors:', parseResult.errors);
-          expect(parseResult.errors.length).toBe(0);
+          assert.equal(parseResult.errors.length, 0);
           return;
         }
 
@@ -95,7 +99,7 @@ describe('Documentation Examples', () => {
             'Errors:',
             validationResult.errors.map((e) => e.message),
           );
-          expect(validationResult.valid).toBe(true);
+          assert.equal(validationResult.valid, true);
         }
       }
     } catch {

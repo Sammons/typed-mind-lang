@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { parseArgs } from 'util';
 
 // Options configuration matching the CLI
@@ -48,9 +49,9 @@ describe('CLI parseArgs utilities', () => {
       allowPositionals: true,
     });
 
-    expect(parsed.values.check).toBe('example.tmd');
-    expect(parsed.values.render).toBeUndefined();
-    expect(parsed.positionals).toEqual([]);
+    assert.equal(parsed.values.check, 'example.tmd');
+    assert.equal(parsed.values.render, undefined);
+    assert.deepEqual(parsed.positionals, []);
   });
 
   it('should parse --render flag with options', () => {
@@ -62,9 +63,9 @@ describe('CLI parseArgs utilities', () => {
       allowPositionals: true,
     });
 
-    expect(parsed.values.render).toBe('example.tmd');
-    expect(parsed.values.output).toBe('output.html');
-    expect(parsed.values.check).toBeUndefined();
+    assert.equal(parsed.values.render, 'example.tmd');
+    assert.equal(parsed.values.output, 'output.html');
+    assert.equal(parsed.values.check, undefined);
   });
 
   it('should handle --port option as number', () => {
@@ -76,11 +77,11 @@ describe('CLI parseArgs utilities', () => {
       allowPositionals: true,
     });
 
-    expect(parsed.values.port).toBe('8080');
+    assert.equal(parsed.values.port, '8080');
     // Test the port conversion logic used in the CLI
     const portNumber = parseInt(parsed.values.port || '3000', 10);
-    expect(portNumber).toBe(8080);
-    expect(typeof portNumber).toBe('number');
+    assert.equal(portNumber, 8080);
+    assert.equal(typeof portNumber, 'number');
   });
 
   it('should parse --no-browser flag correctly', () => {
@@ -92,8 +93,8 @@ describe('CLI parseArgs utilities', () => {
       allowPositionals: true,
     });
 
-    expect(parsed.values['no-browser']).toBe(true);
-    expect(parsed.values.render).toBe('example.tmd');
+    assert.equal(parsed.values['no-browser'], true);
+    assert.equal(parsed.values.render, 'example.tmd');
   });
 
   it('should parse short flags correctly', () => {
@@ -105,7 +106,7 @@ describe('CLI parseArgs utilities', () => {
       allowPositionals: true,
     });
 
-    expect(parsed.values.check).toBe('example.tmd');
+    assert.equal(parsed.values.check, 'example.tmd');
   });
 
   it('should handle help flag', () => {
@@ -117,7 +118,7 @@ describe('CLI parseArgs utilities', () => {
       allowPositionals: true,
     });
 
-    expect(parsed.values.help).toBe(true);
+    assert.equal(parsed.values.help, true);
   });
 
   it('should handle mixed options', () => {
@@ -129,10 +130,10 @@ describe('CLI parseArgs utilities', () => {
       allowPositionals: true,
     });
 
-    expect(parsed.values.render).toBe('example.tmd');
-    expect(parsed.values.port).toBe('9000');
-    expect(parsed.values['no-browser']).toBe(true);
-    expect(parsed.values['skip-orphan-check']).toBe(true);
+    assert.equal(parsed.values.render, 'example.tmd');
+    assert.equal(parsed.values.port, '9000');
+    assert.equal(parsed.values['no-browser'], true);
+    assert.equal(parsed.values['skip-orphan-check'], true);
   });
 
   it('should handle positional arguments', () => {
@@ -144,8 +145,8 @@ describe('CLI parseArgs utilities', () => {
       allowPositionals: true,
     });
 
-    expect(parsed.positionals).toEqual(['example.tmd']);
-    expect(parsed.values.check).toBeUndefined();
-    expect(parsed.values.render).toBeUndefined();
+    assert.deepEqual(parsed.positionals, ['example.tmd']);
+    assert.equal(parsed.values.check, undefined);
+    assert.equal(parsed.values.render, undefined);
   });
 });

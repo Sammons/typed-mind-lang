@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
 import type { TypeScriptProjectAnalysis, ParsedModule } from './types.ts';
 import { createFilePath } from './types.ts';
@@ -210,9 +211,9 @@ describe('TypeScriptToTypedMindConverter', () => {
 
     const result = converter.convert(analysis);
 
-    expect(result.success).toBe(true);
-    expect(result.errors).toHaveLength(0);
-    expect(result.entities.length).toBeGreaterThan(0);
+    assert.equal(result.success, true);
+    assert.equal(result.errors.length, 0);
+    assert.ok(result.entities.length > 0);
   });
 
   it('should use ClassFile fusion by default', () => {
@@ -222,15 +223,15 @@ describe('TypeScriptToTypedMindConverter', () => {
     const result = converter.convert(analysis);
 
     const userServiceEntity = result.entities.find((e) => e.name === 'UserService');
-    expect(userServiceEntity).toBeDefined();
-    expect(userServiceEntity?.type).toBe('ClassFile');
+    assert.notEqual(userServiceEntity, undefined);
+    assert.equal(userServiceEntity?.type, 'ClassFile');
 
     // Should have both class methods and file imports/exports
     const classFile = userServiceEntity as any;
-    expect(classFile.methods).toContain('createUser');
-    expect(classFile.methods).toContain('findUser');
-    expect(classFile.imports).toContain('UserDTO');
-    expect(classFile.imports).toContain('CreateUserDTO');
+    assert.ok(classFile.methods.includes('createUser'));
+    assert.ok(classFile.methods.includes('findUser'));
+    assert.ok(classFile.imports.includes('UserDTO'));
+    assert.ok(classFile.imports.includes('CreateUserDTO'));
   });
 
   it('should create separate entities when preferClassFile is false', () => {
@@ -242,10 +243,10 @@ describe('TypeScriptToTypedMindConverter', () => {
     const fileEntity = result.entities.find((e) => e.name === 'UserServiceFile');
     const classEntity = result.entities.find((e) => e.name === 'UserService');
 
-    expect(fileEntity).toBeDefined();
-    expect(fileEntity?.type).toBe('File');
-    expect(classEntity).toBeDefined();
-    expect(classEntity?.type).toBe('Class');
+    assert.notEqual(fileEntity, undefined);
+    assert.equal(fileEntity?.type, 'File');
+    assert.notEqual(classEntity, undefined);
+    assert.equal(classEntity?.type, 'Class');
   });
 
   it('should convert interfaces to DTOs', () => {
@@ -255,18 +256,18 @@ describe('TypeScriptToTypedMindConverter', () => {
     const result = converter.convert(analysis);
 
     const userDTO = result.entities.find((e) => e.name === 'UserDTO');
-    expect(userDTO).toBeDefined();
-    expect(userDTO?.type).toBe('DTO');
+    assert.notEqual(userDTO, undefined);
+    assert.equal(userDTO?.type, 'DTO');
 
     const dto = userDTO as any;
-    expect(dto.fields).toHaveLength(4);
+    assert.equal(dto.fields.length, 4);
 
     const idField = dto.fields.find((f: any) => f.name === 'id');
-    expect(idField.type).toBe('string');
-    expect(idField.optional).toBe(false);
+    assert.equal(idField.type, 'string');
+    assert.equal(idField.optional, false);
 
     const createdAtField = dto.fields.find((f: any) => f.name === 'createdAt');
-    expect(createdAtField.optional).toBe(true);
+    assert.equal(createdAtField.optional, true);
   });
 
   it('should generate programs by default', () => {
@@ -276,8 +277,8 @@ describe('TypeScriptToTypedMindConverter', () => {
     const result = converter.convert(analysis);
 
     const program = result.entities.find((e) => e.type === 'Program');
-    expect(program).toBeDefined();
-    expect(program?.name).toMatch(/App$/);
+    assert.notEqual(program, undefined);
+    assert.match(program?.name as string, /App$/);
   });
 
   it('should skip private members by default', () => {
@@ -301,7 +302,7 @@ describe('TypeScriptToTypedMindConverter', () => {
     const result = converter.convert(analysis);
 
     const userServiceEntity = result.entities.find((e) => e.name === 'UserService') as any;
-    expect(userServiceEntity.methods).not.toContain('privateHelper');
+    assert.ok(!userServiceEntity.methods.includes('privateHelper'));
   });
 
   it('should include private members when requested', () => {
@@ -325,7 +326,7 @@ describe('TypeScriptToTypedMindConverter', () => {
     const result = converter.convert(analysis);
 
     const userServiceEntity = result.entities.find((e) => e.name === 'UserService') as any;
-    expect(userServiceEntity.methods).toContain('privateHelper');
+    assert.ok(userServiceEntity.methods.includes('privateHelper'));
   });
 
   it('should generate valid TMD content', () => {
@@ -334,13 +335,13 @@ describe('TypeScriptToTypedMindConverter', () => {
 
     const result = converter.convert(analysis);
 
-    expect(result.tmdContent).toBeTruthy();
-    expect(result.tmdContent).toContain('# Programs');
-    expect(result.tmdContent).toContain('# ClassFiles');
-    expect(result.tmdContent).toContain('# DTOs');
-    expect(result.tmdContent).toContain('UserService #:');
-    expect(result.tmdContent).toContain('UserDTO %');
-    expect(result.tmdContent).toContain('=> [createUser, findUser]');
+    assert.ok(result.tmdContent);
+    assert.ok(result.tmdContent.includes('# Programs'));
+    assert.ok(result.tmdContent.includes('# ClassFiles'));
+    assert.ok(result.tmdContent.includes('# DTOs'));
+    assert.ok(result.tmdContent.includes('UserService #:'));
+    assert.ok(result.tmdContent.includes('UserDTO %'));
+    assert.ok(result.tmdContent.includes('=> [createUser, findUser]'));
   });
 
   it('should handle duplicate entity names', () => {
@@ -362,9 +363,9 @@ describe('TypeScriptToTypedMindConverter', () => {
     const converter = new TypeScriptToTypedMindConverter();
     const result = converter.convert(analysis);
 
-    expect(result.success).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0].message).toContain('Duplicate entity name');
+    assert.equal(result.success, false);
+    assert.ok(result.errors.length > 0);
+    assert.ok(result.errors[0].message.includes('Duplicate entity name'));
   });
 
   it('should handle entity naming edge cases', () => {
@@ -395,7 +396,7 @@ describe('TypeScriptToTypedMindConverter', () => {
     const result = converter.convert(analysis);
 
     // Should handle invalid names gracefully (convert to valid names or skip)
-    expect(result.success).toBe(true);
+    assert.equal(result.success, true);
   });
 
   it('should only convert exported interfaces and type aliases to DTOs', () => {
@@ -469,23 +470,23 @@ describe('TypeScriptToTypedMindConverter', () => {
     const converter = new TypeScriptToTypedMindConverter();
     const result = converter.convert(analysis);
 
-    expect(result.success).toBe(true);
-    expect(result.errors).toHaveLength(0);
+    assert.equal(result.success, true);
+    assert.equal(result.errors.length, 0);
 
     // Should create DTOs for exported interface and type
     const publicInterface = result.entities.find((e) => e.name === 'PublicInterface');
-    expect(publicInterface).toBeDefined();
-    expect(publicInterface?.type).toBe('DTO');
+    assert.notEqual(publicInterface, undefined);
+    assert.equal(publicInterface?.type, 'DTO');
 
     const publicType = result.entities.find((e) => e.name === 'PublicType');
-    expect(publicType).toBeDefined();
-    expect(publicType?.type).toBe('Constants'); // Type aliases become Constants
+    assert.notEqual(publicType, undefined);
+    assert.equal(publicType?.type, 'Constants'); // Type aliases become Constants
 
     // Should NOT create DTOs for non-exported interface and type
     const internalInterface = result.entities.find((e) => e.name === 'InternalInterface');
-    expect(internalInterface).toBeUndefined();
+    assert.equal(internalInterface, undefined);
 
     const internalType = result.entities.find((e) => e.name === 'InternalType');
-    expect(internalType).toBeUndefined();
+    assert.equal(internalType, undefined);
   });
 });

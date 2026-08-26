@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,8 +17,8 @@ describe('scenario-40-classfile-naming-conflict', () => {
     const result = checker.check(content);
     
     // Should be invalid due to naming conflicts and other validation errors
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(10);
+    assert.equal(result.valid, false);
+    assert.equal((result.errors).length, 10);
 
     const errorMessages = result.errors.map(err => err.message);
 
@@ -25,42 +26,42 @@ describe('scenario-40-classfile-naming-conflict', () => {
     const namingConflictErrors = result.errors.filter(err =>
       err.message.includes("Entity name 'UserController' is used by both a File and a Class")
     );
-    expect(namingConflictErrors).toHaveLength(2);
+    assert.equal((namingConflictErrors).length, 2);
 
     // Should suggest using ClassFile syntax
     const conflictError = namingConflictErrors[0];
-    expect(conflictError.suggestion).toContain("Replace with: UserController #:");
-    expect(conflictError.suggestion).toContain("src/controllers/user.ts <: BaseClass");
+    assert.ok((conflictError.suggestion).includes("Replace with: UserController #:"));
+    assert.ok((conflictError.suggestion).includes("src/controllers/user.ts <: BaseClass"));
 
     // Should detect orphaned entities
-    expect(errorMessages).toContain("Orphaned entity 'startApp'");
-    expect(errorMessages).toContain("Orphaned entity 'someFunction'");
-    expect(errorMessages).toContain("Orphaned entity 'BaseController'");
+    assert.ok((errorMessages).includes("Orphaned entity 'startApp'"));
+    assert.ok((errorMessages).includes("Orphaned entity 'someFunction'"));
+    assert.ok((errorMessages).includes("Orphaned entity 'BaseController'"));
 
     // Should detect orphaned file
-    expect(errorMessages).toContain("Orphaned file 'UserService' - none of its exports are imported");
+    assert.ok((errorMessages).includes("Orphaned file 'UserService' - none of its exports are imported"));
 
     // Should detect classes not exported by files
-    expect(errorMessages).toContain("Class 'UserController' is not exported by any file");
-    expect(errorMessages).toContain("Class 'BaseController' is not exported by any file");
+    assert.ok((errorMessages).includes("Class 'UserController' is not exported by any file"));
+    assert.ok((errorMessages).includes("Class 'BaseController' is not exported by any file"));
 
     // Should detect function not exported by any file
-    expect(errorMessages).toContain("Function 'someFunction' is not exported by any file and is not a class method");
+    assert.ok((errorMessages).includes("Function 'someFunction' is not exported by any file and is not a class method"));
 
     // Should detect method not found on class
-    expect(errorMessages).toContain("Method 'someMethod' not found on class 'UserController'");
+    assert.ok((errorMessages).includes("Method 'someMethod' not found on class 'UserController'"));
     
     // Verify specific error positions for naming conflicts
     const firstConflictError = result.errors.find(err => 
       err.message.includes("Entity name 'UserController' is used by both a File and a Class") && 
       err.position.line === 13
     );
-    expect(firstConflictError).toBeDefined();
+    assert.notEqual(firstConflictError, undefined);
     
     const secondConflictError = result.errors.find(err => 
       err.message.includes("Entity name 'UserController' is used by both a File and a Class") && 
       err.position.line === 18
     );
-    expect(secondConflictError).toBeDefined();
+    assert.notEqual(secondConflictError, undefined);
   });
 });

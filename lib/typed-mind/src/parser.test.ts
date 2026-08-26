@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { DSLParser } from './parser.ts';
 
 describe('DSLParser', () => {
@@ -9,13 +10,13 @@ describe('DSLParser', () => {
     const parseResult = parser.parse(input);
     const entities = parseResult.entities;
 
-    expect(entities.size).toBe(1);
+    assert.equal(entities.size, 1);
     const program = entities.get('TodoApp');
-    expect(program).toBeDefined();
-    expect(program?.type).toBe('Program');
+    assert.notEqual(program, undefined);
+    assert.equal(program?.type, 'Program');
     if (program?.type === 'Program') {
-      expect(program.entry).toBe('AppEntry');
-      expect(program.version).toBe('2.0');
+      assert.equal(program.entry, 'AppEntry');
+      assert.equal(program.version, '2.0');
     }
   });
 
@@ -28,14 +29,14 @@ AppEntry @ src/index.ts:
     const parseResult = parser.parse(input);
     const entities = parseResult.entities;
 
-    expect(entities.size).toBe(1);
+    assert.equal(entities.size, 1);
     const file = entities.get('AppEntry');
-    expect(file).toBeDefined();
-    expect(file?.type).toBe('File');
+    assert.notEqual(file, undefined);
+    assert.equal(file?.type, 'File');
     if (file?.type === 'File') {
-      expect(file.path).toBe('src/index.ts');
-      expect(file.imports).toEqual(['ExpressSetup', 'Routes', 'Database']);
-      expect(file.exports).toEqual(['startServer']);
+      assert.equal(file.path, 'src/index.ts');
+      assert.deepEqual(file.imports, ['ExpressSetup', 'Routes', 'Database']);
+      assert.deepEqual(file.exports, ['startServer']);
     }
   });
 
@@ -48,14 +49,14 @@ createUser :: (data: UserInput) => Promise<User>
     const parseResult = parser.parse(input);
     const entities = parseResult.entities;
 
-    expect(entities.size).toBe(1);
+    assert.equal(entities.size, 1);
     const func = entities.get('createUser');
-    expect(func).toBeDefined();
-    expect(func?.type).toBe('Function');
+    assert.notEqual(func, undefined);
+    assert.equal(func?.type, 'Function');
     if (func?.type === 'Function') {
-      expect(func.signature).toBe('(data: UserInput) => Promise<User>');
-      expect(func.description).toBe('Creates a new user in the database');
-      expect(func.calls).toEqual(['validateInput', 'Database.insert']);
+      assert.equal(func.signature, '(data: UserInput) => Promise<User>');
+      assert.equal(func.description, 'Creates a new user in the database');
+      assert.deepEqual(func.calls, ['validateInput', 'Database.insert']);
     }
   });
 
@@ -67,14 +68,14 @@ TodoController <: BaseController, IController
     const parseResult = parser.parse(input);
     const entities = parseResult.entities;
 
-    expect(entities.size).toBe(1);
+    assert.equal(entities.size, 1);
     const cls = entities.get('TodoController');
-    expect(cls).toBeDefined();
-    expect(cls?.type).toBe('Class');
+    assert.notEqual(cls, undefined);
+    assert.equal(cls?.type, 'Class');
     if (cls?.type === 'Class') {
-      expect(cls.extends).toBe('BaseController');
-      expect(cls.implements).toEqual(['IController']);
-      expect(cls.methods).toEqual(['create', 'read', 'update', 'delete']);
+      assert.equal(cls.extends, 'BaseController');
+      assert.deepEqual(cls.implements, ['IController']);
+      assert.deepEqual(cls.methods, ['create', 'read', 'update', 'delete']);
     }
   });
 
@@ -83,13 +84,13 @@ TodoController <: BaseController, IController
     const parseResult = parser.parse(input);
     const entities = parseResult.entities;
 
-    expect(entities.size).toBe(1);
+    assert.equal(entities.size, 1);
     const constants = entities.get('Config');
-    expect(constants).toBeDefined();
-    expect(constants?.type).toBe('Constants');
+    assert.notEqual(constants, undefined);
+    assert.equal(constants?.type, 'Constants');
     if (constants?.type === 'Constants') {
-      expect(constants.path).toBe('src/config.ts');
-      expect(constants.schema).toBe('EnvSchema');
+      assert.equal(constants.path, 'src/config.ts');
+      assert.equal(constants.schema, 'EnvSchema');
     }
   });
 
@@ -106,9 +107,9 @@ UserService @ src/services/user.ts:
     const parseResult = parser.parse(input);
     const entities = parseResult.entities;
 
-    expect(entities.size).toBe(2);
-    expect(entities.has('TodoApp')).toBe(true);
-    expect(entities.has('UserService')).toBe(true);
+    assert.equal(entities.size, 2);
+    assert.equal(entities.has('TodoApp'), true);
+    assert.equal(entities.has('UserService'), true);
   });
 
   it('should parse complete example', () => {
@@ -135,12 +136,12 @@ Config ! src/config.ts : EnvSchema
     const parseResult = parser.parse(input);
     const entities = parseResult.entities;
 
-    expect(entities.size).toBe(6);
-    expect(entities.has('TodoApp')).toBe(true);
-    expect(entities.has('AppEntry')).toBe(true);
-    expect(entities.has('Routes')).toBe(true);
-    expect(entities.has('TodoController')).toBe(true);
-    expect(entities.has('create')).toBe(true);
-    expect(entities.has('Config')).toBe(true);
+    assert.equal(entities.size, 6);
+    assert.equal(entities.has('TodoApp'), true);
+    assert.equal(entities.has('AppEntry'), true);
+    assert.equal(entities.has('Routes'), true);
+    assert.equal(entities.has('TodoController'), true);
+    assert.equal(entities.has('create'), true);
+    assert.equal(entities.has('Config'), true);
   });
 });
