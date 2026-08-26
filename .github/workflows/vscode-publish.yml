@@ -99,6 +99,22 @@ jobs:
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
+      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
+      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml). Mirrors
+      # .gitea/workflows/deploy-static-site.yml's mise setup shape. The
+      # extension currently depends on the published @sammons/typed-mind
+      # (not the workspace build), so this step is a no-op today; it makes
+      # the pipeline structurally ready for TM-5 Q2/Q3's bundle-lsp wiring,
+      # which will build @sammons/typed-mind-lsp (and transitively
+      # @sammons/typed-mind) from the local workspace instead.
+      - name: Install mise
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install toolchain
+        run: mise install
+
       - name: Build TypedMind packages
         run: |
           # Build only the extension and its dependencies
