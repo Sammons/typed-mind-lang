@@ -12,7 +12,7 @@ import {
   ConversionError,
   ConversionWarning,
   createEntityName,
-} from './types';
+} from './types.ts';
 import {
   AnyEntity,
   ProgramEntity,

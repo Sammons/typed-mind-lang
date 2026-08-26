@@ -1,5 +1,5 @@
 import { DSLChecker, AnyEntity, ProgramGraph } from '@sammons/typed-mind';
-import { AssertionResult, Deviation, ConversionResult } from './types';
+import { AssertionResult, Deviation, ConversionResult } from './types.ts';
 
 export class AssertionEngine {
   private readonly checker = new DSLChecker();

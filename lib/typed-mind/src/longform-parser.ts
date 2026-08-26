@@ -12,7 +12,7 @@ import type {
   RunParameterEntity,
   DependencyEntity,
   Position,
-} from './types';
+} from './types.ts';
 
 interface LongformBlock {
   type: string;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { GrammarValidator } from './grammar-validator';
-import type { AnyEntity, ProgramEntity, FileEntity, DTOEntity } from './types';
+import { GrammarValidator } from './grammar-validator.ts';
+import type { AnyEntity, ProgramEntity, FileEntity, DTOEntity } from './types.ts';
 
 describe('GrammarValidator', () => {
   const validator = new GrammarValidator();

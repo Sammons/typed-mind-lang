@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { DSLParser } from '../../typed-mind/src/parser';
-import { DSLValidator } from '../../typed-mind/src/validator';
+import { DSLParser } from '../../typed-mind/src/parser.ts';
+import { DSLValidator } from '../../typed-mind/src/validator.ts';
 
 describe('Scenario 59: Program with ClassFile as entry point', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-59-program-classfile-entrypoint.tmd');

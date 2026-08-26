@@ -11,9 +11,9 @@ import type {
   UIComponentEntity,
   RunParameterEntity,
   DependencyEntity,
-} from './types';
-import { ENTITY_PATTERNS, GENERAL_PATTERNS } from './parser-patterns';
-import type { Result } from './result';
+} from './types.ts';
+import { ENTITY_PATTERNS, GENERAL_PATTERNS } from './parser-patterns.ts';
+import type { Result } from './result.ts';
 
 /**
  * Syntax format types

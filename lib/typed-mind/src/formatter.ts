@@ -1,4 +1,4 @@
-import type { ValidationError } from './types';
+import type { ValidationError } from './types.ts';
 
 export class ErrorFormatter {
   format(error: ValidationError, lines: string[]): string {

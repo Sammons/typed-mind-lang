@@ -1,5 +1,5 @@
-export { TypeScriptAnalyzer } from './typescript-analyzer';
-export { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter';
-export { AssertionEngine } from './assertion-engine';
+export { TypeScriptAnalyzer } from './typescript-analyzer.ts';
+export { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
+export { AssertionEngine } from './assertion-engine.ts';
 
-export * from './types';
+export * from './types.ts';

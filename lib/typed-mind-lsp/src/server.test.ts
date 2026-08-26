@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TypedMindLanguageServer } from './server';
+import { TypedMindLanguageServer } from './server.ts';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
 describe.skip('TypedMindLanguageServer', () => {

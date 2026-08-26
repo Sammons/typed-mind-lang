@@ -1,11 +1,11 @@
-import { DSLParser } from './parser';
-import { DSLValidator } from './validator';
-import { ErrorFormatter } from './formatter';
-import { ImportResolver } from './import-resolver';
-import { SyntaxGenerator, type SyntaxGenerationError } from './syntax-generator';
-import type { ValidationResult, ProgramGraph, AnyEntity, ValidationError } from './types';
-import type { Result } from './result';
-import type { FilePath } from './branded-types';
+import { DSLParser } from './parser.ts';
+import { DSLValidator } from './validator.ts';
+import { ErrorFormatter } from './formatter.ts';
+import { ImportResolver } from './import-resolver.ts';
+import { SyntaxGenerator, type SyntaxGenerationError } from './syntax-generator.ts';
+import type { ValidationResult, ProgramGraph, AnyEntity, ValidationError } from './types.ts';
+import type { Result } from './result.ts';
+import type { FilePath } from './branded-types.ts';
 import { dirname } from 'path';
 
 // Export all types explicitly for better TypeScript experience
@@ -40,29 +40,29 @@ export type {
   // Import/Graph types
   ImportStatement,
   ProgramGraph,
-} from './types';
+} from './types.ts';
 
 // Export branded types
-export * from './branded-types';
+export * from './branded-types.ts';
 
 // Export Result types
-export * from './result';
+export * from './result.ts';
 
 // Export error types
-export * from './error-types';
+export * from './error-types.ts';
 
 // Export EntityMap
-export * from './entity-map';
+export * from './entity-map.ts';
 
 // Export EntityBuilder
-export * from './entity-builder';
-export { DSLParser, type ParseResult, type ParseError } from './parser';
-export { DSLValidator } from './validator';
-export { ErrorFormatter } from './formatter';
-export { LongformParser } from './longform-parser';
-export { GrammarValidator, type GrammarValidationResult, type GrammarValidationError } from './grammar-validator';
-export { ENTITY_PATTERNS, CONTINUATION_PATTERNS, GENERAL_PATTERNS, PATTERN_DESCRIPTIONS } from './parser-patterns';
-export { GrammarDocGenerator } from './grammar-doc-generator';
+export * from './entity-builder.ts';
+export { DSLParser, type ParseResult, type ParseError } from './parser.ts';
+export { DSLValidator } from './validator.ts';
+export { ErrorFormatter } from './formatter.ts';
+export { LongformParser } from './longform-parser.ts';
+export { GrammarValidator, type GrammarValidationResult, type GrammarValidationError } from './grammar-validator.ts';
+export { ENTITY_PATTERNS, CONTINUATION_PATTERNS, GENERAL_PATTERNS, PATTERN_DESCRIPTIONS } from './parser-patterns.ts';
+export { GrammarDocGenerator } from './grammar-doc-generator.ts';
 export {
   SyntaxGenerator,
   toggleSyntaxFormat,
@@ -71,7 +71,7 @@ export {
   type SyntaxGeneratorOptions,
   type SyntaxGenerationError,
   type FormatDetectionResult,
-} from './syntax-generator';
+} from './syntax-generator.ts';
 
 // Enhanced DSLChecker with better type safety
 export interface DSLCheckerOptions {

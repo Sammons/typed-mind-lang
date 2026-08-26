@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { DSLParser } from './parser';
-import { DSLValidator } from './validator';
+import { DSLParser } from './parser.ts';
+import { DSLValidator } from './validator.ts';
 
 describe('Documentation Examples', () => {
   const parser = new DSLParser();

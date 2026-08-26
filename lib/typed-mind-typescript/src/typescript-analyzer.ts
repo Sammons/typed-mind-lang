@@ -22,7 +22,7 @@ import {
   isExportDeclaration,
   isImportDeclaration,
   createFilePath,
-} from './types';
+} from './types.ts';
 
 export class TypeScriptAnalyzer {
   private program: ts.Program;

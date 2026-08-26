@@ -4,10 +4,10 @@
  */
 
 // Export original renderer for backward compatibility
-export { EnhancedTypedMindRenderer as TypedMindRenderer } from './enhanced-index';
+export { EnhancedTypedMindRenderer as TypedMindRenderer } from './enhanced-index.ts';
 
 // Export advanced renderer as the main export
-export { AdvancedTypedMindRenderer } from './advanced-renderer';
+export { AdvancedTypedMindRenderer } from './advanced-renderer.ts';
 
 // Export all advanced system components for granular usage
 export {
@@ -16,14 +16,14 @@ export {
   LevelOfDetailManager,
   type ViewportInfo,
   type SpatialItem,
-} from './performance/spatial-index';
+} from './performance/spatial-index.ts';
 
 export {
   ValidationErrorProcessor,
   ErrorVisualizationRenderer,
   type EnhancedValidationError,
   type ErrorSeverity,
-} from './validation/error-visualization';
+} from './validation/error-visualization.ts';
 
 export {
   PluginManager,
@@ -36,7 +36,7 @@ export {
   type ThemePlugin,
   type ExportPlugin,
   type PluginContext,
-} from './plugins/plugin-system';
+} from './plugins/plugin-system.ts';
 
 export {
   GraphMetricsAnalyzer,
@@ -45,7 +45,7 @@ export {
   type Metric,
   type Recommendation,
   type Risk,
-} from './metrics/graph-metrics';
+} from './metrics/graph-metrics.ts';
 
 export {
   PatternRecognitionEngine,
@@ -53,7 +53,7 @@ export {
   type PatternVisualization,
   type PatternMatcher,
   type PatternRecommendation,
-} from './patterns/pattern-recognition';
+} from './patterns/pattern-recognition.ts';
 
 export {
   ArchitectureDiffAnalyzer,
@@ -62,7 +62,7 @@ export {
   type DiffOptions,
   type DiffChangeType,
   type DiffSummary,
-} from './diff/diff-visualization';
+} from './diff/diff-visualization.ts';
 
 export {
   CodeGenerationEngine,
@@ -71,10 +71,10 @@ export {
   type CodePreview,
   type TargetLanguage,
   type TargetFramework,
-} from './codegen/code-generation';
+} from './codegen/code-generation.ts';
 
 // Re-export enhanced renderer options for convenience
-export type { EnhancedRendererOptions } from './enhanced-index';
+export type { EnhancedRendererOptions } from './enhanced-index.ts';
 
 // Type-only exports for advanced configuration
 export type AdvancedRendererOptions = {
@@ -115,4 +115,4 @@ export type AdvancedRendererOptions = {
 };
 
 // Default export is the advanced renderer
-export { AdvancedTypedMindRenderer as default } from './advanced-renderer';
+export { AdvancedTypedMindRenderer as default } from './advanced-renderer.ts';

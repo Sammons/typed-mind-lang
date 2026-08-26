@@ -16,13 +16,13 @@ import {
   LevelOfDetailManager,
   type ViewportInfo,
   type SpatialItem,
-} from './performance/spatial-index';
-import { ValidationErrorProcessor, ErrorVisualizationRenderer, type EnhancedValidationError } from './validation/error-visualization';
-import { PluginManager, type Plugin, type PluginContext } from './plugins/plugin-system';
-import { GraphMetricsAnalyzer, type HealthScore, type MetricCategory } from './metrics/graph-metrics';
-import { PatternRecognitionEngine, type ArchitecturalPattern, type PatternVisualization } from './patterns/pattern-recognition';
-import { ArchitectureDiffAnalyzer, type ArchitectureDiff, type DiffOptions } from './diff/diff-visualization';
-import { CodeGenerationEngine, type CodeGenConfig, type CodePreview } from './codegen/code-generation';
+} from './performance/spatial-index.ts';
+import { ValidationErrorProcessor, ErrorVisualizationRenderer, type EnhancedValidationError } from './validation/error-visualization.ts';
+import { PluginManager, type Plugin, type PluginContext } from './plugins/plugin-system.ts';
+import { GraphMetricsAnalyzer, type HealthScore, type MetricCategory } from './metrics/graph-metrics.ts';
+import { PatternRecognitionEngine, type ArchitecturalPattern, type PatternVisualization } from './patterns/pattern-recognition.ts';
+import { ArchitectureDiffAnalyzer, type ArchitectureDiff, type DiffOptions } from './diff/diff-visualization.ts';
+import { CodeGenerationEngine, type CodeGenConfig, type CodePreview } from './codegen/code-generation.ts';
 
 /**
  * Advanced renderer configuration

@@ -1,2 +1,2 @@
-export { TypedMindLanguageServer } from './server';
-export { startServer } from './start-server';
+export { TypedMindLanguageServer } from './server.ts';
+export { startServer } from './start-server.ts';
