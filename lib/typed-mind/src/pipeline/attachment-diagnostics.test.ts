@@ -38,6 +38,27 @@ describe('semantics/orphan-continuation', () => {
     );
   });
 
+  it('keeps the entity open across a continuation-shaped ERROR line (indented `<- []`), so later continuations still attach', () => {
+    // Legacy: `  <- []` matches the continuation probe (leading indent + `<-`)
+    // but no continuation regex, so it is a silent no-op that leaves the
+    // entity open — the following exports line attaches (parser.ts:97). The
+    // walker probes the SOURCE lines of the ERROR region for this; probing
+    // errorNode.text loses the first line's indent and wrongly closed the
+    // entity (Q5 shadow-substrate finding on the corpus's empty-list lines).
+    const outcome = parser.parse('PagesFile @ src/pages/index.ts:\n  <- []\n  -> [HomePage, CartPage]\n');
+    const file = outcome.entities.at(0);
+    assert.deepEqual(
+      {
+        exports: file !== undefined && 'exports' in file ? file.exports : undefined,
+        diagnostics: outcome.diagnostics.map((diagnostic) => ({ code: diagnostic.code, line: diagnostic.span.start.line })),
+      },
+      {
+        exports: ['HomePage', 'CartPage'],
+        diagnostics: [{ code: 'syntax/error', line: 2 }],
+      },
+    );
+  });
+
   it('flags a continuation after a longform block (the block closes the open entity, parser.ts:91)', () => {
     const outcome = parser.parse('function createUser {\n  signature: "() => void"\n}\n  ~> [helper]\n');
     assert.deepEqual(

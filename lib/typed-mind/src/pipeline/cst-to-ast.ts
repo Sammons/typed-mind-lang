@@ -218,8 +218,20 @@ export class CstToAstWalker {
   #handleErrorRegion(errorNode: SyntaxNode): void {
     // The syntax/error diagnostic itself comes from collectSyntaxDiagnostics
     // (one walk over the whole tree); this handler only replicates the legacy
-    // line-loop state transition described in the module header.
-    const meaningfulLines = errorNode.text.split('\n').filter((line) => line.trim().length > 0 && !line.trim().startsWith('#'));
+    // line-loop state transition described in the module header. The probe
+    // runs against the SOURCE lines the region covers, not errorNode.text:
+    // the legacy pattern is anchored on leading indentation (`^\s+`), and a
+    // tree-sitter ERROR node's text starts at the first token, dropping the
+    // first line's indent — probing node text misreads an indented `<- []`
+    // as non-continuation-shaped and wrongly closes the open entity (found by
+    // the Q5 shadow substrate on the corpus's empty-list lines).
+    const startLineIndex = errorNode.startPosition.row;
+    const endLineIndex = errorNode.endPosition.column === 0 ? errorNode.endPosition.row - 1 : errorNode.endPosition.row;
+    const coveredLines: string[] = [];
+    for (let lineIndex = startLineIndex; lineIndex <= endLineIndex && lineIndex < this.#sourceLines.length; lineIndex++) {
+      coveredLines.push(this.#sourceLines[lineIndex] ?? '');
+    }
+    const meaningfulLines = coveredLines.filter((line) => line.trim().length > 0 && !line.trim().startsWith('#'));
     const allContinuationShaped = meaningfulLines.every((line) => LEGACY_CONTINUATION_PATTERN.test(line));
     if (!allContinuationShaped) {
       this.#closeOpenEntity();
