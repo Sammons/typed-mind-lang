@@ -1,0 +1,827 @@
+============================================================
+E1: Program with entry, purpose, and version
+============================================================
+
+TodoApp -> AppEntry "Main application" v1.0.0
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name)
+    (string)
+    (version)))
+
+============================================================
+E1: Program bare (entry only)
+============================================================
+
+TodoApp -> AppEntry
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name)))
+
+============================================================
+E2: File declaration
+============================================================
+
+UserService @ src/services/user.ts:
+
+---
+
+(source_file
+  (file_declaration
+    (entity_name)
+    (path)))
+
+============================================================
+E3: Function declaration with signature to EOL
+============================================================
+
+createUser :: (data: UserInput) => Promise<User>
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature)))
+
+============================================================
+E4: Class with inheritance list
+============================================================
+
+UserController <: BaseController, IController
+
+---
+
+(source_file
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)
+      (entity_name))))
+
+============================================================
+E4 CORRECTED: bare Class with EMPTY inheritance list (scenario-34-cli-tool.tmd:127 `cli <:`)
+============================================================
+
+cli <:
+
+---
+
+(source_file
+  (class_declaration
+    (entity_name)))
+
+============================================================
+E5: ClassFile with inheritance
+============================================================
+
+UserController #: src/controllers/user.ts <: BaseController
+
+---
+
+(source_file
+  (classfile_declaration
+    (entity_name)
+    (path)
+    (inherit_list
+      (entity_name))))
+
+============================================================
+E5: ClassFile without inheritance
+============================================================
+
+UserController #: src/controllers/user.ts
+
+---
+
+(source_file
+  (classfile_declaration
+    (entity_name)
+    (path)))
+
+============================================================
+E6: Constants with schema
+============================================================
+
+Config ! src/config.ts : ConfigSchema
+
+---
+
+(source_file
+  (constants_declaration
+    (entity_name)
+    (path)
+    (entity_name)))
+
+============================================================
+E6: Constants without schema
+============================================================
+
+Config ! src/config.ts
+
+---
+
+(source_file
+  (constants_declaration
+    (entity_name)
+    (path)))
+
+============================================================
+E7: DTO with purpose
+============================================================
+
+UserDTO % "User data transfer object"
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+E7: DTO without purpose
+============================================================
+
+UserDTO %
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name)))
+
+============================================================
+E8: Asset
+============================================================
+
+Logo ~ "Company logo SVG"
+
+---
+
+(source_file
+  (asset_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+E9: UIComponent (plain)
+============================================================
+
+LoginForm & "User login form"
+
+---
+
+(source_file
+  (uicomponent_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+E9: UIComponent (root, &!)
+============================================================
+
+RootApp &! "Root application component"
+
+---
+
+(source_file
+  (uicomponent_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+E10 CORRECTED: RunParameter with (required) marker
+============================================================
+
+DATABASE_URL $env "PostgreSQL connection string" (required)
+
+---
+
+(source_file
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string)
+    (param_marker)))
+
+============================================================
+E10 CORRECTED: RunParameter with (optional) marker — 19x in corpus, e.g. scenario-34-cli-tool.tmd:99
+============================================================
+
+NODE_ENV $env "Node environment" (optional)
+
+---
+
+(source_file
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string)
+    (param_marker)))
+
+============================================================
+E10: RunParameter without marker
+============================================================
+
+FEATURE_FLAGS $config "Feature toggle configuration"
+
+---
+
+(source_file
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string)))
+
+============================================================
+E11 CORRECTED: Dependency with v-prefixed version (scenario-38-dependency-validation.tmd:9 `axios ^ "..." v3.1.0`)
+============================================================
+
+axios ^ "HTTP client library" v3.1.0
+
+---
+
+(source_file
+  (dependency_declaration
+    (entity_name)
+    (string)
+    (version)))
+
+============================================================
+E11 CORRECTED: Dependency with bare (v-less) version (scenario-62-dependency-consumption.tmd:90 `exact-version ^ "..." 6.0.0`)
+============================================================
+
+exact-version ^ "Exact version" 6.0.0
+
+---
+
+(source_file
+  (dependency_declaration
+    (dependency_name)
+    (string)
+    (version)))
+
+============================================================
+E11: Dependency without version
+============================================================
+
+lodash ^ "Utility functions"
+
+---
+
+(source_file
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+E11: Dependency with leading-dash name class
+============================================================
+
+-pkg ^ "leading dash dependency name"
+
+---
+
+(source_file
+  (dependency_declaration
+    (dependency_name)
+    (string)))
+
+============================================================
+E11: Dependency with scoped package name
+============================================================
+
+@types/node ^ "Node.js type definitions" v18.0.0
+
+---
+
+(source_file
+  (dependency_declaration
+    (dependency_name)
+    (string)
+    (version)))
+
+============================================================
+C1: <- [A,B] imports
+============================================================
+
+MainFile @ src/main.ts:
+  <- [AuthService, Logger]
+
+---
+
+(source_file
+  (file_declaration
+    (entity_name)
+    (path))
+  (import_list
+    (name_list
+      (entity_name)
+      (entity_name))))
+
+============================================================
+C2: -> [A,B] exports
+============================================================
+
+MainFile @ src/main.ts:
+  -> [startApp, stopApp]
+
+---
+
+(source_file
+  (file_declaration
+    (entity_name)
+    (path))
+  (export_list
+    (name_list
+      (entity_name)
+      (entity_name))))
+
+============================================================
+C3: ~> [A,B] calls (dotted names allowed as plain entity_name is NOT enough — dotted form is a signature-position concept; here bare names)
+============================================================
+
+startApp :: () => void
+  ~> [validateInput, initServer]
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature))
+  (calls_list
+    (name_list
+      (entity_name)
+      (entity_name))))
+
+============================================================
+C4: <- Name bare input
+============================================================
+
+createUser :: (data: UserCreateDTO) => Promise<User>
+  <- UserCreateDTO
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature))
+  (input_name
+    (entity_name)))
+
+============================================================
+C5: -> Name bare output
+============================================================
+
+createUser :: (data: UserCreateDTO) => Promise<User>
+  -> UserDTO
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature))
+  (output_name
+    (entity_name)))
+
+============================================================
+C6: => [A,B] methods
+============================================================
+
+cli <:
+  => [parse, run, showVersion]
+
+---
+
+(source_file
+  (class_declaration
+    (entity_name))
+  (methods_list
+    (name_list
+      (entity_name)
+      (entity_name)
+      (entity_name))))
+
+============================================================
+C7: ~ [A,B] affects (function touches UI components)
+============================================================
+
+refreshList :: () => void
+  ~ [TodoList, TodoItem]
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature))
+  (affects_list
+    (name_list
+      (entity_name)
+      (entity_name))))
+
+============================================================
+C8: > [A,B] contains (UIComponent children)
+============================================================
+
+SystemDashboard &! "Main system dashboard"
+  > [UserManagementPanel, SecurityPanel]
+
+---
+
+(source_file
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (contains_list
+    (name_list
+      (entity_name)
+      (entity_name))))
+
+============================================================
+C9: < [A,B] containedBy
+============================================================
+
+UserManagementPanel & "User management interface"
+  < [SystemDashboard]
+
+---
+
+(source_file
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (contained_by_list
+    (name_list
+      (entity_name))))
+
+============================================================
+C10: >> Name containsProgram
+============================================================
+
+IndexHTML ~ "Interactive UI HTML file"
+  >> UIProgram
+
+---
+
+(source_file
+  (asset_declaration
+    (entity_name)
+    (string))
+  (contains_program
+    (entity_name)))
+
+============================================================
+C11: - name: type "desc" (optional) DTO field — full form
+============================================================
+
+UserDTO %
+  - email: string "User email address" (optional)
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type)
+    (string)
+    (optional_marker)))
+
+============================================================
+C11: - name?: type DTO field, ? shorthand form
+============================================================
+
+UserDTO %
+  - lastLoginAt?: Date "Last login timestamp"
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type)
+    (string)))
+
+============================================================
+C12: # text comment inside an entity body (indented)
+============================================================
+
+_PrivateAuthService #: src/internal/auth.ts
+  => [_generateToken, _validateInternalAuth]
+  # Note: Methods can have underscore prefixes too
+
+---
+
+(source_file
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (methods_list
+    (name_list
+      (entity_name)
+      (entity_name)))
+  (entity_comment
+    (comment)))
+
+============================================================
+C13: "text" description line
+============================================================
+
+initializeSystem :: () => Promise<void>
+  "System initialization with complex naming patterns"
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature))
+  (description_line
+    (string)))
+
+============================================================
+C14: = "value" RunParameter default
+============================================================
+
+PORT $env "Server port"
+  = "3000"
+
+---
+
+(source_file
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (default_value
+    (string)))
+
+============================================================
+C15: $< [A,B] consumes
+============================================================
+
+versionConsumer :: () => void
+  $< [DATABASE_URL, API_KEY]
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature))
+  (consumes_list
+    (name_list
+      (entity_name)
+      (entity_name))))
+
+============================================================
+D1: full-line comment at column 0
+============================================================
+
+# Entity Naming Edge Cases Example
+NoDesc %
+
+---
+
+(source_file
+  (comment_line
+    (comment))
+  (dto_declaration
+    (entity_name)))
+
+============================================================
+D2: inline comment on a Program declaration (scenario-38-dependency-validation.tmd:6 `WebApp -> MainFile v1.0.0 # Test dependency entity type`)
+============================================================
+
+WebApp -> MainFile v1.0.0 # Test dependency entity type
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name)
+    (version)
+    (inline_comment)))
+
+============================================================
+D2 SCOPING: inline comment on a continuation line (Asset containsProgram, scenario-47-function-mixed-dependencies.tmd:41 `>> MixedDepsApp  # Asset contains the program`)
+============================================================
+
+MixedAsset ~ "asset"
+  >> MixedDepsApp  # Asset contains the program
+
+---
+
+(source_file
+  (asset_declaration
+    (entity_name)
+    (string))
+  (contains_program
+    (entity_name)
+    (inline_comment)))
+
+============================================================
+D2 SCOPING: import lines do NOT admit an inline comment (parser.ts:667-678 never strips it) — a trailing '#' cannot attach to import_statement (no optional(inline_comment) in its production), so it always lands as a separate node on the next line
+============================================================
+
+@import "./shared/auth.tmd"
+# not stripped into the import; this is a separate full-line comment
+
+---
+
+(source_file
+  (import_statement
+    (import_head))
+  (comment_line
+    (comment)))
+
+============================================================
+D2 marker/comment adjacency: inline comment after a DTO field carrying (optional)
+============================================================
+
+UserDTO %
+  - bio?: string "User biography" (optional)  # trailing note on an optional field
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type)
+    (string)
+    (optional_marker)
+    (inline_comment)))
+
+============================================================
+D3: @import "path" (no alias)
+============================================================
+
+@import "./imports/shared/auth-module.tmd"
+
+---
+
+(source_file
+  (import_statement
+    (import_head)))
+
+============================================================
+D3: @import "path" as Alias
+============================================================
+
+@import "./imports/ui/components.tmd" as UI
+
+---
+
+(source_file
+  (import_statement
+    (import_head)
+    (entity_name)))
+
+============================================================
+D3: bare import "path" as Alias (no @ prefix)
+============================================================
+
+import "./shared/auth.tmd" as Auth
+
+---
+
+(source_file
+  (import_statement
+    (import_head)
+    (entity_name)))
+
+============================================================
+D4: blank line between two declarations is not an ERROR
+============================================================
+
+FirstDTO %
+
+SecondDTO %
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_declaration
+    (entity_name)))
+
+============================================================
+S-GRAMMAR-4b arm 1 (WIDENS): leading-underscore ClassFile parses (today's CLASS_FILE regex forbids leading '_')
+============================================================
+
+_ValidationService #: src/internal/validation.ts
+
+---
+
+(source_file
+  (classfile_declaration
+    (entity_name)
+    (path)))
+
+============================================================
+S-GRAMMAR-4b arm 2 (NARROWS): leading-digit entity name yields ERROR (scenario-54-entity-name-boundaries.tmd:40 `123Name @ ...`)
+============================================================
+
+123Name @ src/x.ts:
+
+---
+
+(source_file
+  (ERROR
+    (dependency_name)
+    (UNEXPECTED 's')))
+
+============================================================
+scenario-34: bare inheritance in a real multi-line class body
+============================================================
+
+taskRunner <:
+  => [run, runTask, runTasks, stopAll]
+
+---
+
+(source_file
+  (class_declaration
+    (entity_name))
+  (methods_list
+    (name_list
+      (entity_name)
+      (entity_name)
+      (entity_name)
+      (entity_name))))
+
+============================================================
+scenario-62: unprefixed (v-less) dependency version, multiple forms in sequence
+============================================================
+
+exact-version ^ "Exact version" 6.0.0
+range-version ^ "Range version" ^4.0.0
+
+---
+
+(source_file
+  (dependency_declaration
+    (dependency_name)
+    (string)
+    (version))
+  (dependency_declaration
+    (dependency_name)
+    (string)
+    (ERROR
+      (UNEXPECTED '4'))))
+
+============================================================
+scenario-38: unprefixed dependency version alongside v-prefixed sibling
+============================================================
+
+lodash ^ "Utility functions"
+express ^ "Web framework" v4.18.2
+
+---
+
+(source_file
+  (dependency_declaration
+    (entity_name)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)
+    (version)))
+
+============================================================
+RunParameter (optional) immediately followed by its default-value continuation
+============================================================
+
+CACHE_DIR $config "Cache directory" (optional)
+  = ".taskmaster-cache"
+
+---
+
+(source_file
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string)
+    (param_marker))
+  (default_value
+    (string)))

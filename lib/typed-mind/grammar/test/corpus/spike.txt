@@ -140,7 +140,7 @@ NoDesc %
     (entity_name)))
 
 ============================================================
-S-GRAMMAR-4a: <= line yields ERROR between intact valid neighbors
+S-GRAMMAR-4a: <= line yields ERROR between intact valid neighbors (Q1: C9 changes ERROR shape, neighbors still intact)
 ============================================================
 
 Good1 % "ok"
@@ -153,9 +153,11 @@ Good2 % "ok"
   (dto_declaration
     (entity_name)
     (string))
-  (ERROR
-    (UNEXPECTED '=')
-    (UNEXPECTED 'B'))
+  (contained_by_list
+    (ERROR)
+    (name_list
+      (entity_name)
+      (entity_name)))
   (dto_declaration
     (entity_name)
     (string)))
