@@ -49,16 +49,16 @@ pnpm test
 
 ```bash
 # Check a DSL file for errors
-node lib/typed-mind-cli/dist/cli.cjs --check examples/example.tmd
+node lib/typed-mind-cli/dist/cli.js --check examples/example.tmd
 
 # Render a DSL file interactively
-node lib/typed-mind-cli/dist/cli.cjs --render examples/example.tmd
+node lib/typed-mind-cli/dist/cli.js --render examples/example.tmd
 
 # Generate static HTML output
-node lib/typed-mind-cli/dist/cli.cjs --render examples/example.tmd --output output.html
+node lib/typed-mind-cli/dist/cli.js --render examples/example.tmd --output output.html
 
 # Custom port and disable auto-browser
-node lib/typed-mind-cli/dist/cli.cjs --render examples/dto-example.tmd --port 8080 --no-browser
+node lib/typed-mind-cli/dist/cli.js --render examples/dto-example.tmd --port 8080 --no-browser
 ```
 
 ## Examples

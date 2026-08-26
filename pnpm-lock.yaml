@@ -38,9 +38,6 @@ importers:
       '@types/node':
         specifier: ^22.18.1
         version: 22.18.1
-      tsup:
-        specifier: ^8.3.5
-        version: 8.5.0(postcss@8.5.6)(supports-color@10.2.2)(tsx@4.20.5)(typescript@5.9.2)
 
   lib/typed-mind-cli:
     dependencies:
@@ -60,9 +57,6 @@ importers:
       publint:
         specifier: ^0.3.24
         version: 0.3.24
-      tsup:
-        specifier: ^8.3.5
-        version: 8.5.0(postcss@8.5.6)(supports-color@10.2.2)(tsx@4.20.5)(typescript@5.9.2)
 
   lib/typed-mind-lsp:
     dependencies:
@@ -98,9 +92,6 @@ importers:
       '@types/node':
         specifier: ^22.18.1
         version: 22.18.1
-      tsup:
-        specifier: ^8.3.5
-        version: 8.5.0(postcss@8.5.6)(supports-color@10.2.2)(tsx@4.20.5)(typescript@5.9.2)
 
   lib/typed-mind-static-website:
     devDependencies:
@@ -139,9 +130,6 @@ importers:
       '@types/node':
         specifier: ^22.18.1
         version: 22.18.1
-      tsup:
-        specifier: ^8.3.5
-        version: 8.5.0(postcss@8.5.6)(supports-color@10.2.2)(tsx@4.20.5)(typescript@5.9.2)
       typescript-eslint:
         specifier: ^8.42.0
         version: 8.42.0(eslint@9.35.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.9.2)

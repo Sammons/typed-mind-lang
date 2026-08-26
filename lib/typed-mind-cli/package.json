@@ -25,12 +25,11 @@
   "bugs": {
     "url": "https://github.com/Sammons/typed-mind-lang/issues"
   },
-  "main": "dist/index.cjs",
+  "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "module": "dist/index.mjs",
   "bin": {
-    "typed-mind": "./dist/cli.cjs",
-    "tmd": "./dist/cli.cjs"
+    "typed-mind": "./dist/cli.js",
+    "tmd": "./dist/cli.js"
   },
   "files": [
     "dist",
@@ -41,8 +40,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "require": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -52,9 +50,9 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsc --build && chmod +x dist/cli.js",
     "dev": "tsc --build --watch",
-    "clean": "rm -rf dist *.tsbuildinfo *.tgz .tsup",
+    "clean": "rm -rf dist *.tsbuildinfo *.tgz",
     "test": "node --test 'src/**/*.test.ts'",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "lint": "eslint src",
@@ -62,7 +60,7 @@
     "typecheck": "tsc --noEmit",
     "prepare": "pnpm run build",
     "prepack": "pnpm run lint && pnpm run typecheck",
-    "build:check": "pnpm run build && node dist/cli.cjs --help",
+    "build:check": "pnpm run build && node dist/cli.js --help",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run lint && pnpm run typecheck && pnpm test",
     "validate:package": "pnpm exec publint && pnpm exec attw --pack .",
     "release:dry": "pnpm run build && pnpm run validate:package && pnpm publish --dry-run --no-git-checks"
@@ -74,8 +72,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@types/node": "^22.18.1",
-    "publint": "^0.3.24",
-    "tsup": "^8.3.5"
+    "publint": "^0.3.24"
   },
   "publishConfig": {
     "access": "public"

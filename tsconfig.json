@@ -28,6 +28,7 @@
     { "path": "./lib/typed-mind-renderer" },
     { "path": "./lib/typed-mind-cli" },
     { "path": "./lib/typed-mind-lsp" },
+    { "path": "./lib/typed-mind-typescript" },
     { "path": "./lib/typed-mind-vscode-extension" }
   ]
 }

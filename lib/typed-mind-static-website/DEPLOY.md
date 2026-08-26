@@ -42,6 +42,6 @@ WARNING: `--branch=main` targets the production deployment. Omitting it on a non
 
 ## Troubleshooting
 
-- **Snippet validation fails with every snippet red**: the site build shells out to `lib/typed-mind-cli/dist/cli.cjs`. Build the CLI first (step 2 above).
+- **Snippet validation fails with every snippet red**: the site build shells out to `lib/typed-mind-cli/dist/cli.js`. Build the CLI first (step 2 above).
 - **Deploy lands in preview instead of production**: pass `--branch=main` explicitly (see warning above).
 - **401 from wrangler**: the token is scoped to Pages only; regenerate from claude-home secrets if rotated.

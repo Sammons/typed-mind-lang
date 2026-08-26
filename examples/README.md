@@ -45,13 +45,13 @@ Use these examples as templates for your own architecture specifications:
 
 ```bash
 # Validate an example
-node lib/typed-mind-cli/dist/cli.cjs --check examples/example.tmd
+node lib/typed-mind-cli/dist/cli.js --check examples/example.tmd
 
 # Generate interactive visualization
-node lib/typed-mind-cli/dist/cli.cjs --render examples/example.tmd
+node lib/typed-mind-cli/dist/cli.js --render examples/example.tmd
 
 # Generate static HTML output
-node lib/typed-mind-cli/dist/cli.cjs --render examples/example.tmd --output my-architecture.html
+node lib/typed-mind-cli/dist/cli.js --render examples/example.tmd --output my-architecture.html
 ```
 
 ## VS Code Extension
