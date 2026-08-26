@@ -188,6 +188,7 @@ describe('import check (validator.ts:369-406)', () => {
       name: 'Wild',
       span: wildSpan,
       raw: 'Wild @ src/wild.ts:',
+      sourceForm: 'shortform',
       path: 'src/wild.ts',
       imports: ['zz*'],
       exports: [],

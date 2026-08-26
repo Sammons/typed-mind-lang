@@ -76,6 +76,7 @@ describe('CST→AST walk/attach layer', () => {
         projected: [
           {
             kind: 'Program',
+            sourceForm: 'shortform',
             name: 'TodoApp',
             comment: 'main program',
             entry: 'AppEntry',
@@ -85,6 +86,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'File',
+            sourceForm: 'shortform',
             name: 'UserService',
             comment: undefined,
             path: 'src/services/user.ts',
@@ -94,6 +96,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'Function',
+            sourceForm: 'shortform',
             name: 'createUser',
             comment: undefined,
             signature: '(data: UserDTO) => UserDTO',
@@ -107,6 +110,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'Class',
+            sourceForm: 'shortform',
             name: 'BaseController',
             comment: undefined,
             implements: ['IController'],
@@ -116,6 +120,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'ClassFile',
+            sourceForm: 'shortform',
             name: 'UserController',
             comment: undefined,
             path: 'src/controllers/user.ts',
@@ -128,6 +133,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'Constants',
+            sourceForm: 'shortform',
             name: 'AppConfig',
             comment: undefined,
             path: 'src/config.ts',
@@ -136,6 +142,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'Asset',
+            sourceForm: 'shortform',
             name: 'Logo',
             comment: undefined,
             description: 'Company logo',
@@ -143,6 +150,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'UIComponent',
+            sourceForm: 'shortform',
             name: 'UserList',
             comment: undefined,
             purpose: 'List of users',
@@ -153,6 +161,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'UIComponent',
+            sourceForm: 'shortform',
             name: 'RootApp',
             comment: undefined,
             purpose: 'Root',
@@ -163,6 +172,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'RunParameter',
+            sourceForm: 'shortform',
             name: 'DB_URL',
             comment: undefined,
             paramType: 'env',
@@ -172,6 +182,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'Dependency',
+            sourceForm: 'shortform',
             name: 'axios',
             comment: undefined,
             purpose: 'HTTP client',

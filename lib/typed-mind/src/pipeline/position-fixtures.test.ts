@@ -63,10 +63,19 @@ describe('3-site position fixture (continuation, block property, DTO field)', ()
 });
 
 describe('column-1 tripwire (I-6)', () => {
-  it('no production module under src/pipeline, src/ast, or src/checker constructs a constant-column position', () => {
+  it('no production module under src/pipeline, src/ast, src/checker, or src/emitter constructs a constant-column position', () => {
     // src/checker added per RFC-TM-4 Q1 (rfc-tm-4-diamond.md I-6: "tripwire
-    // extended to src/checker/").
-    const productionDirs = [testDir, join(testDir, '..', 'ast'), join(testDir, '..', 'ast', 'gen'), join(testDir, '..', 'checker')];
+    // extended to src/checker/"); src/emitter added per RFC-TM-4 Q2 (I-6
+    // span fixture for emitter diagnostics — the emitter emits no
+    // diagnostics today, so this dir is currently vacuously clean, but the
+    // tripwire covers it from its first commit per the same discipline).
+    const productionDirs = [
+      testDir,
+      join(testDir, '..', 'ast'),
+      join(testDir, '..', 'ast', 'gen'),
+      join(testDir, '..', 'checker'),
+      join(testDir, '..', 'emitter'),
+    ];
     const offenders: string[] = [];
     // A literal `column: <digits>` is the legacy hardcoding this mission kills
     // (parser.ts:188 `column: 1`); computed columns (`.column + 1`) never

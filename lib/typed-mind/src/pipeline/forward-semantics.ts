@@ -107,6 +107,7 @@ const distributeOne = (fn: FunctionNode, byName: ReadonlyMap<string, EntityNode>
     name: fn.name,
     span: fn.span,
     raw: fn.raw,
+    sourceForm: fn.sourceForm,
     ...(fn.comment !== undefined ? { comment: fn.comment } : {}),
     signature: fn.signature,
     calls,
