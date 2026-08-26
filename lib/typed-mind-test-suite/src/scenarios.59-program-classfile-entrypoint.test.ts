@@ -88,37 +88,20 @@ describe('Scenario 59: Program with ClassFile as entry point', () => {
 
     // The ClassFile should have serverInstance in its exports
     assert.ok(exports?.includes('serverInstance'));
-  });
 
-  // STOP-AND-REPORT (S-TEST-1, out of Q4 scope — no lib/typed-mind source
-  // changes here): ClassFileNode's constructor (ast/class-file-node.ts:36)
-  // unconditionally appends the entity's own name to `.exports` when not
-  // already present: `args.exports.includes(args.name) ? args.exports :
-  // [...args.exports, args.name]`. Legacy's auto-export (parser.ts:287) only
-  // fires for the bare `#:` sigil form with NO explicit export continuation;
-  // when an explicit `-> [...]` continuation exists (as ApplicationServer has
-  // here: `-> [serverInstance]`), legacy does NOT also force-add the
-  // self-name — confirmed directly against DSLParser, which returns
-  // exports: ['serverInstance'] only. This is a genuine, unlisted delta with
-  // no A1-A11 amendment-table row (not a corpus-scenario verdict mover, so
-  // outside the shadow-verdict harness's coverage — it diffs diagnostic
-  // messages, not raw entity field shapes). Affects at least: scenario-34,
-  // scenario-58, scenario-59 (this file), and
-  // lib/typed-mind-static-website/snippets/getting-started-longform.tmd.
-  // Skipped rather than forced green; fixing requires a lib/typed-mind
-  // source change to ClassFileNode's construction (RFC owner's call: is the
-  // legacy asymmetry the intended contract, or was legacy under-exporting?).
-  it.skip('should NOT auto-export ApplicationServer a second time when an explicit -> [...] export continuation already exists', async () => {
-    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
-    const outcome = parser.parse(content);
-    const entities = outcome.entities;
-    const appServer = entities.find((e) => e.name === 'ApplicationServer' && e instanceof ClassFileNode);
-    const exports = (appServer as ClassFileNode)?.exports;
-
-    // The ClassFile implicitly exports itself only via the bare `#:` form;
-    // ApplicationServer has an explicit `-> [serverInstance]` continuation,
-    // so legacy does not also force-add the self-name.
-    assert.ok(!exports?.includes('ApplicationServer'));
+    // RFC-TM-4 §4 A12 (authorized 2026-08-26, claude-home #1356): ClassFile
+    // auto-self-export applies unconditionally in the new AST
+    // (class-file-node.ts:36) — legacy seeds `exports: [name]` at
+    // construction (parser.ts:287,693) but a declared `-> [...]`
+    // continuation OVERWRITES that seed (parser.ts:487-491), so legacy
+    // reports exports without the self-name once an explicit continuation
+    // exists. RFC-TM-3 §2.2 cited only the seed, not the overwrite; the new
+    // node implements the citation as written, so the self-name now
+    // survives alongside a declared continuation. Attested census: this
+    // file (ApplicationServer ×1) is one of the 6 records / 3 files A12
+    // covers (scenario-34 ×4, scenario-58 ×1, scenario-59 ×1). Zero verdict
+    // movement in check() (existence/exporter-count checks are unaffected).
+    assert.ok(exports?.includes('ApplicationServer'));
   });
 
   it('should detect missing dependencies', async () => {

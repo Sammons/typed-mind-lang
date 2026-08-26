@@ -14,18 +14,24 @@ import { WASM_PATH } from './wasm-path.ts';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// STOP-AND-REPORT (S-TEST-1, scenario-58, not in an AUTHORIZED[A#] delta row):
-// `DataFile` is declared with File syntax (`@ src/data.ts:`, line 28) plus an
-// illegal-on-File `=> [processData]` methods continuation (line 30). Legacy
-// tolerated the illegal continuation and kept DataFile as `type: 'File'`
-// (methods stayed unset). The new grammar instead folds the methods
-// continuation into the entity, producing `kind: 'ClassFile'` for DataFile.
-// This is a File->ClassFile kind change with no corresponding AUTHORIZED row
-// for this scenario. It does not flip any assertion below to failing (the
-// `instanceof FileNode` narrow below now finds no match, so the `?.methods`
-// optional-chain still reads `undefined`), but it is a silent precision loss:
-// the test no longer confirms DataFile stayed a File — flagged for lead
-// review, no lib/typed-mind source change made here (out of Q4 scope).
+// RFC-TM-4 §4 A4 (rfc-tm-4-diamond.md: "scenario-58 lookahead ClassFile
+// carries exports/imports first-class"): `DataFile` is declared with File
+// syntax (`@ src/data.ts:`, line 28) plus an illegal-on-File
+// `=> [processData]` methods continuation (line 30) and its own `-> [...]`/
+// `<- [...]` continuations. Legacy's regex parser mangled this into
+// `type: 'Class'` (verified directly against DSLParser) — a Class-typed
+// object that still carries the File-only `path` field and drops `imports`/
+// `exports` entirely (Class has neither in the legacy type), which is why
+// legacy separately reports "Class 'DataFile' is not exported by any file"
+// (AUTHORIZED[A4], shadow-verdict-harness.mjs) — a leftover from the
+// mis-typed Class. The new grammar's lookahead conversion instead resolves
+// the whole declaration into a single coherent `ClassFile` node carrying
+// path/methods/imports/exports first-class (attested by probing
+// TypedMindParser directly: DataFile parses as ClassFile with
+// path: 'src/data.ts', methods: ['processData'],
+// imports: ['Database'], exports: ['DataClass', 'DataFile']) — exactly the
+// "fusion assertions gain the recovered fields" outcome A4 describes. This
+// is the row's mechanism, not a new unauthorized cause.
 
 describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-58-classfile-vs-class-file.tmd');
@@ -64,12 +70,11 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
     assert.notEqual(processUserError, undefined);
 
     // Mistake 7: Classes not exported by any file
-    // STOP-AND-REPORT (S-TEST-1, scenario-58, AUTHORIZED[A4]): legacy emitted
-    // "Class 'DataClass' is not exported by any file" (L34); the new surface
-    // does not emit this finding for DataClass. AUTHORIZED[A4] documents this
-    // exact legacy-only message as an accepted delta. Assertion below is kept
-    // at the legacy-matching expectation is not possible without forcing a
-    // false pass, so this checks the delta explicitly instead.
+    // RFC-TM-4 §4 A4: legacy emitted "Class 'DataClass' is not exported by
+    // any file" (L34) as a cascade off DataFile's mis-typing as a Class (see
+    // file-level A4 comment above); the new surface does not emit this
+    // finding for DataClass since DataFile correctly resolves to ClassFile.
+    // Authorized delta — asserted explicitly rather than left implicit.
     const orphanedClassError = errors.find((e) => e.message.includes("Class 'DataClass' is not exported by any file"));
     assert.equal(orphanedClassError, undefined);
   });
@@ -86,6 +91,12 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
     assert.ok(userService?.methods.includes('createUser'));
     assert.ok(userService?.imports.includes('UserRepository'));
     assert.ok(userService?.exports.includes('userHelper'));
+    // RFC-TM-4 §4 A12 (authorized 2026-08-26, claude-home #1356): UserService
+    // declares `-> [userHelper]` without its own name; the new ClassFileNode
+    // unconditionally appends the self-name on top of the declared list
+    // (legacy's seed-then-overwrite left it out once a continuation existed).
+    // Attested: this file's UserService is one of A12's 6 records / 3 files.
+    assert.ok(userService?.exports.includes('UserService'));
 
     // EmptyService with no methods (valid)
     const emptyService = entitiesArray.find((e): e is ClassFileNode => e instanceof ClassFileNode && e.name === 'EmptyService');
@@ -122,12 +133,21 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
     const outcome = parser.parse(content);
     const entitiesArray = outcome.entities;
 
-    // Files can't have methods (=> syntax)
-    // See file-level STOP-AND-REPORT above: DataFile now parses as ClassFile,
-    // so this `instanceof FileNode` narrow finds no match and `?.methods`
-    // reads undefined via optional chaining — the assertion still passes.
-    const dataFile = entitiesArray.find((e): e is FileNode => e instanceof FileNode && e.name === 'DataFile');
-    assert.equal(dataFile?.methods, undefined);
+    // Files can't have methods (=> syntax): RFC-TM-4 §4 A4. The new grammar's
+    // lookahead conversion resolves DataFile's File-declaration-plus-methods-
+    // continuation into a single ClassFile node (see file-level A4 comment
+    // above), carrying path/methods/imports/exports first-class rather than
+    // legacy's mis-typed Class with a stray File-only path field.
+    assert.equal(
+      entitiesArray.find((e) => e.name === 'DataFile' && e instanceof FileNode),
+      undefined,
+    );
+    const dataFile = entitiesArray.find((e): e is ClassFileNode => e instanceof ClassFileNode && e.name === 'DataFile');
+    assert.notEqual(dataFile, undefined);
+    assert.equal(dataFile?.path, 'src/data.ts');
+    assert.deepEqual(dataFile?.methods, ['processData']);
+    assert.deepEqual(dataFile?.imports, ['Database']);
+    assert.deepEqual(dataFile?.exports, ['DataClass', 'DataFile']);
 
     // Classes can't have paths (@ syntax)
     const dataClass = entitiesArray.find((e): e is ClassNode => e instanceof ClassNode && e.name === 'DataClass');
