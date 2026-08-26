@@ -101,6 +101,14 @@ The extension works with any VS Code theme.
 - **View errors**: Problems panel shows all validation errors
 - **Quick fixes**: Hover over errors and click the lightbulb for fixes
 
+## Build
+
+This package builds with `tsup` (esbuild), unlike the other `typed-mind-lang` packages,
+which build with `tsc --build`. `vsce package --no-dependencies` ships the extension
+with no `node_modules`, so the extension host artifact must be a self-contained bundle
+with its dependencies inlined — that is the one job `tsc --build` cannot do, and the
+reason this package retains `tsup`.
+
 ## Development
 
 - `pnpm dev` - Watch mode

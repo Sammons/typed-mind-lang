@@ -45,8 +45,7 @@
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },
   "devDependencies": {
-    "@types/node": "^22.18.1",
-    "tsup": "^8.3.5"
+    "@types/node": "^22.18.1"
   },
   "publishConfig": {
     "access": "public"

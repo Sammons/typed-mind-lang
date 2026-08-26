@@ -34,8 +34,8 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "build": "tsup src/cli.ts src/index.ts --format cjs --dts --clean && chmod +x dist/cli.js",
-    "dev": "tsup src/cli.ts src/index.ts --format cjs --dts --watch",
+    "build": "tsc --build && chmod +x dist/cli.js",
+    "dev": "tsc --build --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
     "test": "node --test",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
@@ -50,7 +50,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.18.1",
-    "tsup": "^8.3.5",
     "typescript-eslint": "^8.42.0"
   },
   "publishConfig": {
