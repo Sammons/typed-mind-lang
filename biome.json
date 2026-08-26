@@ -14,6 +14,7 @@
       "!lib/typed-mind-static-website/dist",
       "!**/*.vsix",
       "!pnpm-lock.yaml",
+      "!lib/typed-mind/grammar/src",
       "!lib/typed-mind-vscode-extension/lsp-bundled",
       "!lib/typed-mind-static-website/assets",
       "!**/*.html"

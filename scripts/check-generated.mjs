@@ -1,14 +1,126 @@
 #!/usr/bin/env node
-// RFC-TM-1 (rfc-tm-1-diamond.md) leaf L4.
+// RFC-TM-2 Q0 (rfc-tm-2-diamond.md §3) — the real body of the RFC-TM-1 L4 seat
+// (seat contract: check-generated.mjs must regenerate-and-diff the tree-sitter
+// artifacts AND run the `tree-sitter test` grammar corpus inside `pnpm run ci`).
 //
-// Seat contract (inherited obligation on TM-2): TM-2's replacement body performs the
-// regenerate-and-diff logic for parser.c / grammar.json / node-types.json (the tree-sitter
-// generated artifacts under lib/typed-mind/grammar/) AND invokes the `tree-sitter test` grammar
-// corpus — this is where S-CI-1's "grammar tests run inside `pnpm run ci`" clause executes.
-// TM-3 extends the body to the <Kind>Base skeletons.
+// Steps (doc §3 "check:generated replacement body"):
+//   1. tree-sitter generate in lib/typed-mind/grammar/ (regenerates src/).
+//   2. git diff --exit-code -- lib/typed-mind/grammar/src  (S-ARTIFACT-1 diff gate).
+//   3. tree-sitter test — the S-TEST-3 corpus (runs via --wasm so the gate
+//      exercises the shipping artifact and needs no host C compiler).
+//   4. tree-sitter build --wasm to a temp path, discarded after the exit-code
+//      check — pre-merge proof the REAL grammar compiles to wasm (F-4 gap).
+//   5. Assert no tracked *.wasm under lib/typed-mind/grammar/ (S-ARTIFACT-2).
 //
-// The gate's SEAT in `validate` is TM-1's deliverable; its teeth arrive with the artifacts they
-// guard. Until TM-2 lands, this script is an explicit no-op.
+// TM-3 extension point: this body grows the <Kind>Base skeleton regenerate-and-diff
+// here (after step 2) when RFC-TM-3 lands.
+//
+// Toolchain resolution mirrors scripts/check-toolchain.mjs: binaries come from
+// their `mise where`-resolved paths so this script's own ambient node loads
+// grammar.js, and TREE_SITTER_WASI_SDK_PATH pins the wasm builds to the
+// mise-provisioned SDK — the CLI's unverified auto-downloader must never fire
+// (check:toolchain asserts its fallback cache dir stays empty).
 
-console.log('[check:generated] no generated artifacts yet (gate armed; populated by RFC-TM-2)');
-process.exit(0);
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const GRAMMAR_DIR = join(REPO_ROOT, 'lib', 'typed-mind', 'grammar');
+const GRAMMAR_SRC_PATHSPEC = 'lib/typed-mind/grammar/src';
+
+class GeneratedCheckError extends Error {}
+
+const run = (command, args, options = {}) => {
+  return execFileSync(command, args, { encoding: 'utf8', cwd: REPO_ROOT, ...options });
+};
+
+const resolveTreeSitterBin = () => {
+  const installDir = run('mise', ['where', 'tree-sitter']).trim();
+  if (!installDir) {
+    throw new GeneratedCheckError('mise where tree-sitter returned empty output');
+  }
+  const binPath = join(installDir, 'tree-sitter');
+  if (!existsSync(binPath)) {
+    throw new GeneratedCheckError(`tree-sitter binary not found at ${binPath}`);
+  }
+  return binPath;
+};
+
+const resolveWasiSdkPath = () => {
+  const wasiSdkPath = run('mise', ['where', 'http:wasi-sdk']).trim();
+  if (!wasiSdkPath) {
+    throw new GeneratedCheckError('mise where http:wasi-sdk returned empty output');
+  }
+  return wasiSdkPath;
+};
+
+const main = () => {
+  if (!existsSync(join(GRAMMAR_DIR, 'grammar.js'))) {
+    throw new GeneratedCheckError(`grammar.js not found at ${GRAMMAR_DIR} — the RFC-TM-2 grammar directory is the frozen path`);
+  }
+  const treeSitterBin = resolveTreeSitterBin();
+  const wasmEnv = { ...process.env, TREE_SITTER_WASI_SDK_PATH: resolveWasiSdkPath() };
+
+  // Step 1: regenerate src/ from grammar.js.
+  run(treeSitterBin, ['generate', 'grammar.js'], { cwd: GRAMMAR_DIR });
+  console.log('[check:generated] step 1: tree-sitter generate OK');
+
+  // Step 2: committed artifacts must match what grammar.js generates.
+  try {
+    run('git', ['diff', '--exit-code', '--', GRAMMAR_SRC_PATHSPEC]);
+  } catch {
+    throw new GeneratedCheckError(
+      `${GRAMMAR_SRC_PATHSPEC} drifted from grammar.js — run \`tree-sitter generate\` in ${GRAMMAR_DIR} and commit the regenerated artifacts`,
+    );
+  }
+  console.log('[check:generated] step 2: generated artifacts match committed src/ (diff gate OK)');
+
+  // Step 3: the S-TEST-3 grammar corpus. --rebuild defeats the CLI's stale
+  // build cache (keyed by language name, not grammar content).
+  run(treeSitterBin, ['test', '--wasm', '--rebuild'], { cwd: GRAMMAR_DIR, env: wasmEnv, stdio: ['pipe', 'inherit', 'inherit'] });
+  console.log('[check:generated] step 3: tree-sitter test OK');
+
+  // Step 4: the REAL grammar must compile to wasm; output is discarded.
+  const scratchDir = mkdtempSync(join(tmpdir(), 'tm-grammar-wasm-'));
+  try {
+    const wasmPath = join(scratchDir, 'typed_mind.wasm');
+    run(treeSitterBin, ['build', '--wasm', '.', '--output', wasmPath], { cwd: GRAMMAR_DIR, env: wasmEnv });
+    if (!existsSync(wasmPath) || statSync(wasmPath).size === 0) {
+      throw new GeneratedCheckError('tree-sitter build --wasm exited 0 but produced no nonempty wasm');
+    }
+    console.log(`[check:generated] step 4: real-grammar wasm build OK (${statSync(wasmPath).size} bytes, discarded)`);
+  } finally {
+    rmSync(scratchDir, { recursive: true, force: true });
+  }
+
+  // Step 5: grammar.wasm is never committed.
+  const trackedWasm = run('git', ['ls-files', 'lib/typed-mind/grammar/**/*.wasm', 'lib/typed-mind/grammar/*.wasm']).trim();
+  if (trackedWasm !== '') {
+    throw new GeneratedCheckError(`tracked wasm artifacts found under lib/typed-mind/grammar/ (never commit these):\n${trackedWasm}`);
+  }
+  console.log('[check:generated] step 5: no tracked *.wasm under the grammar dir (OK)');
+
+  console.log('[check:generated] PASS');
+};
+
+try {
+  main();
+} catch (error) {
+  if (error instanceof GeneratedCheckError) {
+    console.error(`[check:generated] FAIL: ${error.message}`);
+  } else if (error instanceof Error) {
+    console.error(`[check:generated] FAIL: ${error.message}`);
+    if (error.stdout) {
+      console.error(error.stdout.toString());
+    }
+    if (error.stderr) {
+      console.error(error.stderr.toString());
+    }
+  } else {
+    console.error('[check:generated] FAIL: unknown error', error);
+  }
+  process.exit(1);
+}

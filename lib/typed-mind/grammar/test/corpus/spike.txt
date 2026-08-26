@@ -1,0 +1,894 @@
+============================================================
+S-GRAMMAR-3: top-level leading-dash Dependency vs indented DTO field
+============================================================
+
+-pkg ^ "the dash dep"
+  - field: string
+
+---
+
+(source_file
+  (dependency_declaration
+    (dependency_name)
+    (string))
+  (dto_field
+    (field_name)
+    (field_type)))
+
+============================================================
+S-GRAMMAR-3: one-space indent is still a continuation line
+============================================================
+
+ - field: string
+
+---
+
+(source_file
+  (dto_field
+    (field_name)
+    (field_type)))
+
+============================================================
+S-GRAMMAR-1a: DTO field with function type and (optional) marker
+============================================================
+
+  - cb: (x: number) => void (optional)
+
+---
+
+(source_file
+  (dto_field
+    (field_name)
+    (field_type)
+    (optional_marker)))
+
+============================================================
+S-GRAMMAR-1a: DTO field with function type, description, and marker as distinct nodes
+============================================================
+
+  - cb: (x: number) => void "desc" (optional)
+
+---
+
+(source_file
+  (dto_field
+    (field_name)
+    (field_type)
+    (string)
+    (optional_marker)))
+
+============================================================
+S-GRAMMAR-1a adversarial: genuine trailing paren group is type, not marker
+============================================================
+
+  - cb: fn (custom)
+
+---
+
+(source_file
+  (dto_field
+    (field_name)
+    (field_type)))
+
+============================================================
+S-GRAMMAR-1a adversarial: simple type with marker, no false negative
+============================================================
+
+  - x: string (optional)
+
+---
+
+(source_file
+  (dto_field
+    (field_name)
+    (field_type)
+    (optional_marker)))
+
+============================================================
+S-GRAMMAR-1b: padded trailing # splits off as inline comment, signature clean
+============================================================
+
+handler :: (x) => y  # trailing note
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature)
+    (inline_comment)))
+
+============================================================
+S-GRAMMAR-1b: un-padded # inside signature text survives, no comment node
+============================================================
+
+fn :: Map<string,#Tag> => void
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature)))
+
+============================================================
+S-GRAMMAR-1b: # inside a string stays in the string
+============================================================
+
+stripe ^ "Handles a # discount code"
+
+---
+
+(source_file
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+S-GRAMMAR-1b: full-line comment at column 0
+============================================================
+
+# a full-line comment
+NoDesc %
+
+---
+
+(source_file
+  (comment_line
+    (comment))
+  (dto_declaration
+    (entity_name)))
+
+============================================================
+S-GRAMMAR-4a: <= line yields ERROR between intact valid neighbors
+============================================================
+
+Good1 % "ok"
+  <= [A, B]
+Good2 % "ok"
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name)
+    (string))
+  (ERROR
+    (UNEXPECTED '=')
+    (UNEXPECTED 'B'))
+  (dto_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'program' is a valid entity name for every sigil
+============================================================
+
+program -> Main
+program @ src/k.ts:
+program :: (x) => y
+program <: Base
+program #: src/k.ts
+program ! src/config.ts
+program % "d"
+program ~ "d"
+program & "d"
+program &! "d"
+program $env "d"
+program ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'file' is a valid entity name for every sigil
+============================================================
+
+file -> Main
+file @ src/k.ts:
+file :: (x) => y
+file <: Base
+file #: src/k.ts
+file ! src/config.ts
+file % "d"
+file ~ "d"
+file & "d"
+file &! "d"
+file $env "d"
+file ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'function' is a valid entity name for every sigil
+============================================================
+
+function -> Main
+function @ src/k.ts:
+function :: (x) => y
+function <: Base
+function #: src/k.ts
+function ! src/config.ts
+function % "d"
+function ~ "d"
+function & "d"
+function &! "d"
+function $env "d"
+function ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'class' is a valid entity name for every sigil
+============================================================
+
+class -> Main
+class @ src/k.ts:
+class :: (x) => y
+class <: Base
+class #: src/k.ts
+class ! src/config.ts
+class % "d"
+class ~ "d"
+class & "d"
+class &! "d"
+class $env "d"
+class ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'dto' is a valid entity name for every sigil
+============================================================
+
+dto -> Main
+dto @ src/k.ts:
+dto :: (x) => y
+dto <: Base
+dto #: src/k.ts
+dto ! src/config.ts
+dto % "d"
+dto ~ "d"
+dto & "d"
+dto &! "d"
+dto $env "d"
+dto ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'component' is a valid entity name for every sigil
+============================================================
+
+component -> Main
+component @ src/k.ts:
+component :: (x) => y
+component <: Base
+component #: src/k.ts
+component ! src/config.ts
+component % "d"
+component ~ "d"
+component & "d"
+component &! "d"
+component $env "d"
+component ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'asset' is a valid entity name for every sigil
+============================================================
+
+asset -> Main
+asset @ src/k.ts:
+asset :: (x) => y
+asset <: Base
+asset #: src/k.ts
+asset ! src/config.ts
+asset % "d"
+asset ~ "d"
+asset & "d"
+asset &! "d"
+asset $env "d"
+asset ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'constants' is a valid entity name for every sigil
+============================================================
+
+constants -> Main
+constants @ src/k.ts:
+constants :: (x) => y
+constants <: Base
+constants #: src/k.ts
+constants ! src/config.ts
+constants % "d"
+constants ~ "d"
+constants & "d"
+constants &! "d"
+constants $env "d"
+constants ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'parameter' is a valid entity name for every sigil
+============================================================
+
+parameter -> Main
+parameter @ src/k.ts:
+parameter :: (x) => y
+parameter <: Base
+parameter #: src/k.ts
+parameter ! src/config.ts
+parameter % "d"
+parameter ~ "d"
+parameter & "d"
+parameter &! "d"
+parameter $env "d"
+parameter ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'dependency' is a valid entity name for every sigil
+============================================================
+
+dependency -> Main
+dependency @ src/k.ts:
+dependency :: (x) => y
+dependency <: Base
+dependency #: src/k.ts
+dependency ! src/config.ts
+dependency % "d"
+dependency ~ "d"
+dependency & "d"
+dependency &! "d"
+dependency $env "d"
+dependency ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'classfile' is a valid entity name for every sigil
+============================================================
+
+classfile -> Main
+classfile @ src/k.ts:
+classfile :: (x) => y
+classfile <: Base
+classfile #: src/k.ts
+classfile ! src/config.ts
+classfile % "d"
+classfile ~ "d"
+classfile & "d"
+classfile &! "d"
+classfile $env "d"
+classfile ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword-by-sigil matrix: 'import' is a valid entity name for every sigil
+============================================================
+
+import -> Main
+import @ src/k.ts:
+import :: (x) => y
+import <: Base
+import #: src/k.ts
+import ! src/config.ts
+import % "d"
+import ~ "d"
+import & "d"
+import &! "d"
+import $env "d"
+import ^ "d"
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name))
+  (file_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (class_declaration
+    (entity_name)
+    (inherit_list
+      (entity_name)))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (constants_declaration
+    (entity_name)
+    (path))
+  (dto_declaration
+    (entity_name)
+    (string))
+  (asset_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (uicomponent_declaration
+    (entity_name)
+    (string))
+  (runparameter_declaration
+    (entity_name)
+    (param_type)
+    (string))
+  (dependency_declaration
+    (entity_name)
+    (string)))
+
+============================================================
+keyword strategy (a): block headers parse while the same keyword works in sigil position
+============================================================
+
+class TodoApp {
+  path: src/app.ts
+}
+classfile SvcFile {
+  path: src/svc.ts
+}
+class :: (x) => y
+
+---
+
+(source_file
+  (longform_block
+    (block_header)
+    (block_line_text))
+  (longform_block
+    (block_header)
+    (block_line_text))
+  (function_declaration
+    (entity_name)
+    (signature)))
