@@ -1,9 +1,11 @@
 // RFC-TM-3 §3.1 (rfc-tm-3-diamond.md) — the async tree-sitter parser factory.
-// Q1 delivers creation + wasm resolution + the wrapped CST root; the CST→AST
-// walk/attach layer (ParseOutcome) builds on this in Q3.
+// Q1 delivered creation + wasm resolution + the wrapped CST root (parseCst);
+// Q3 adds the CST→AST walk/attach layer: parse(source) returns ParseOutcome.
 
 import { Language, Parser } from 'web-tree-sitter';
 import { CstSourceFile } from '../ast/gen/cst-nodes.ts';
+import { walkCstToAst } from './cst-to-ast.ts';
+import type { ParseOutcome } from './parse-outcome.ts';
 
 export interface TypedMindParserOptions {
   readonly wasmPath?: string;
@@ -61,14 +63,21 @@ export class TypedMindParser {
     return new TypedMindParser(parser);
   }
 
-  parse(source: string) {
+  // The CST-level entry: the wrapped tree root, no semantic interpretation.
+  parseCst(source: string): CstSourceFile {
     const tree = this.#parser.parse(source);
     if (tree === null) {
       // Invariant violation: web-tree-sitter returns null only when no language
       // is set or a progress callback cancels the parse; neither path exists
       // through this class.
-      throw new Error('TypedMindParser.parse(): tree-sitter returned no tree');
+      throw new Error('TypedMindParser.parseCst(): tree-sitter returned no tree');
     }
     return new CstSourceFile(tree.rootNode);
+  }
+
+  // §3.1: the pipeline entry. Always tolerant — parse problems land in
+  // ParseOutcome.diagnostics, never as throws (§3.3).
+  parse(source: string): ParseOutcome {
+    return walkCstToAst(this.parseCst(source), source).outcome;
   }
 }

@@ -1,0 +1,4 @@
+# RFC-TM-3 Q3 manifest-class fixture: multiline-bracket-list (PR #18 manifest).
+Main @ src/main.ts:
+  -> [helperA,
+      helperB]
