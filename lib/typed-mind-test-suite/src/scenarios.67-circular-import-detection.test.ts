@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLParser } from '../../typed-mind/src/parser.ts';
-import { DSLValidator } from '../../typed-mind/src/validator.ts';
+import { AstValidator } from '../../typed-mind/src/checker/ast-validator.ts';
+import { computeLinks } from '../../typed-mind/src/pipeline/link-index.ts';
+import { TypedMindParser } from '../../typed-mind/src/pipeline/typed-mind-parser.ts';
+import { WASM_PATH } from './wasm-path.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,28 +14,30 @@ const __dirname = dirname(__filename);
 describe('Scenario 67: Circular import detection', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-67-circular-import-detection.tmd');
   const content = readFileSync(scenarioPath, 'utf-8');
-  const parser = new DSLParser();
-  const validator = new DSLValidator();
 
-  it('should detect direct circular imports between two files', () => {
-    const parseResult = parser.parse(content);
-    const validationResult = validator.validate(parseResult.entities, parseResult);
+  it('should detect direct circular imports between two files', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
+    const validation = new AstValidator().validate(outcome, links);
 
     // Should have errors about ModuleA <-> ModuleB circular import
-    const circularErrors = validationResult.errors.filter(
+    const circularErrors = validation.findings.filter(
       (e) => e.message.toLowerCase().includes('circular') && (e.message.includes('ModuleA') || e.message.includes('ModuleB')),
     );
 
     assert.ok(circularErrors.length > 0);
-    assert.equal(validationResult.valid, false);
+    assert.equal(validation.valid, false);
   });
 
-  it('should detect indirect circular imports through chain', () => {
-    const parseResult = parser.parse(content);
-    const validationResult = validator.validate(parseResult.entities, parseResult);
+  it('should detect indirect circular imports through chain', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
+    const validation = new AstValidator().validate(outcome, links);
 
     // Should detect ServiceA -> ServiceB -> ServiceC -> ServiceA cycle
-    const circularErrors = validationResult.errors.filter(
+    const circularErrors = validation.findings.filter(
       (e) =>
         e.message.toLowerCase().includes('circular') &&
         (e.message.includes('ServiceA') || e.message.includes('ServiceB') || e.message.includes('ServiceC')),
@@ -42,24 +46,28 @@ describe('Scenario 67: Circular import detection', () => {
     assert.ok(circularErrors.length > 0);
   });
 
-  it('should detect self-imports as circular', () => {
-    const parseResult = parser.parse(content);
-    const validationResult = validator.validate(parseResult.entities, parseResult);
+  it('should detect self-imports as circular', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
+    const validation = new AstValidator().validate(outcome, links);
 
     // Should detect SelfImporter importing itself
-    const selfImportErrors = validationResult.errors.filter(
+    const selfImportErrors = validation.findings.filter(
       (e) => e.message.toLowerCase().includes('circular') && e.message.includes('SelfImporter'),
     );
 
     assert.ok(selfImportErrors.length > 0);
   });
 
-  it('should not flag valid non-circular imports', () => {
-    const parseResult = parser.parse(content);
-    const validationResult = validator.validate(parseResult.entities, parseResult);
+  it('should not flag valid non-circular imports', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
+    const validation = new AstValidator().validate(outcome, links);
 
     // ValidModule, HelperA, HelperB should not have circular import errors
-    const validModuleErrors = validationResult.errors.filter(
+    const validModuleErrors = validation.findings.filter(
       (e) =>
         e.message.toLowerCase().includes('circular') &&
         (e.message.includes('ValidModule') || e.message.includes('HelperA') || e.message.includes('HelperB')),
@@ -68,12 +76,14 @@ describe('Scenario 67: Circular import detection', () => {
     assert.equal(validModuleErrors.length, 0);
   });
 
-  it('should report specific files involved in circular dependency', () => {
-    const parseResult = parser.parse(content);
-    const validationResult = validator.validate(parseResult.entities, parseResult);
+  it('should report specific files involved in circular dependency', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
+    const validation = new AstValidator().validate(outcome, links);
 
     // Error messages should be informative
-    const circularErrors = validationResult.errors.filter((e) => e.message.toLowerCase().includes('circular'));
+    const circularErrors = validation.findings.filter((e) => e.message.toLowerCase().includes('circular'));
 
     // Should mention the specific files involved
     const hasSpecificFileInfo = circularErrors.some(
@@ -86,33 +96,38 @@ describe('Scenario 67: Circular import detection', () => {
     assert.equal(hasSpecificFileInfo, true);
   });
 
-  it('should mark validation as invalid when circular imports exist', () => {
-    const parseResult = parser.parse(content);
-    const validationResult = validator.validate(parseResult.entities, parseResult);
+  it('should mark validation as invalid when circular imports exist', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
+    const validation = new AstValidator().validate(outcome, links);
 
-    assert.equal(validationResult.valid, false);
+    assert.equal(validation.valid, false);
 
-    const circularErrors = validationResult.errors.filter((e) => e.message.toLowerCase().includes('circular'));
+    const circularErrors = validation.findings.filter((e) => e.message.toLowerCase().includes('circular'));
 
     assert.ok(circularErrors.length > 0);
   });
 
-  it('should handle circular imports in Files not ClassFiles', () => {
-    const parseResult = parser.parse(content);
+  it('should handle circular imports in Files not ClassFiles', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
 
     // All test entities should be Files, not ClassFiles
-    const moduleA = Array.from(parseResult.entities.values()).find((e) => e.name === 'ModuleA');
-    const moduleB = Array.from(parseResult.entities.values()).find((e) => e.name === 'ModuleB');
+    const moduleA = outcome.entities.find((e) => e.name === 'ModuleA');
+    const moduleB = outcome.entities.find((e) => e.name === 'ModuleB');
 
-    assert.equal(moduleA?.type, 'File');
-    assert.equal(moduleB?.type, 'File');
+    assert.equal(moduleA?.kind, 'File');
+    assert.equal(moduleB?.kind, 'File');
   });
 
-  it('should provide severity level for circular import errors', () => {
-    const parseResult = parser.parse(content);
-    const validationResult = validator.validate(parseResult.entities, parseResult);
+  it('should provide severity level for circular import errors', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
+    const validation = new AstValidator().validate(outcome, links);
 
-    const circularErrors = validationResult.errors.filter((e) => e.message.toLowerCase().includes('circular'));
+    const circularErrors = validation.findings.filter((e) => e.message.toLowerCase().includes('circular'));
 
     // Circular imports should be errors, not warnings
     circularErrors.forEach((error) => {

@@ -3,59 +3,80 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
+import { RunParameterNode } from '../../typed-mind/src/ast/run-parameter-node.ts';
+import { TypedMindParser } from '../../typed-mind/src/pipeline/typed-mind-parser.ts';
+import { WASM_PATH } from './wasm-path.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-27-runparameter-orphaned', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-27-runparameter-orphaned.tmd';
 
-  it('should detect orphaned RunParameters', () => {
+  it('should detect orphaned RunParameters', async () => {
+    const typedMind = await TypedMind.create();
     const filePath = join(__dirname, '..', 'scenarios', scenarioFile);
     const content = readFileSync(filePath, 'utf-8');
-    const result = checker.check(content, filePath);
+    const result = typedMind.check(content, filePath);
 
     assert.equal(result.valid, false);
-    assert.equal(result.errors.length, 3);
+    assert.equal(result.diagnostics.length, 3);
 
     // Should detect orphaned UNUSED_PARAM
-    const unusedParamError = result.errors.find((err) => err.message === "Orphaned entity 'UNUSED_PARAM'");
-    assert.notEqual(unusedParamError, undefined);
-    assert.equal(unusedParamError?.position.line, 12);
-    assert.equal(unusedParamError?.severity, 'error');
-    assert.equal(unusedParamError?.suggestion, 'Remove or reference this entity');
+    const unusedParamDiagnostic = result.diagnostics.find((diagnostic) => diagnostic.message === "Orphaned entity 'UNUSED_PARAM'");
+    assert.notEqual(unusedParamDiagnostic, undefined);
+    assert.equal(unusedParamDiagnostic?.span.start.line, 12);
+    assert.equal(unusedParamDiagnostic?.severity, 'error');
 
     // Should detect orphaned SECRET_KEY
-    const secretKeyError = result.errors.find((err) => err.message === "Orphaned entity 'SECRET_KEY'");
-    assert.notEqual(secretKeyError, undefined);
-    assert.equal(secretKeyError?.position.line, 13);
-    assert.equal(secretKeyError?.severity, 'error');
-    assert.equal(secretKeyError?.suggestion, 'Remove or reference this entity');
+    const secretKeyDiagnostic = result.diagnostics.find((diagnostic) => diagnostic.message === "Orphaned entity 'SECRET_KEY'");
+    assert.notEqual(secretKeyDiagnostic, undefined);
+    assert.equal(secretKeyDiagnostic?.span.start.line, 13);
+    assert.equal(secretKeyDiagnostic?.severity, 'error');
 
     // Should detect orphaned processData function
-    const processDataError = result.errors.find((err) => err.message === "Orphaned entity 'processData'");
-    assert.notEqual(processDataError, undefined);
-    assert.equal(processDataError?.position.line, 16);
-    assert.equal(processDataError?.severity, 'error');
-    assert.equal(processDataError?.suggestion, 'Remove or reference this entity');
+    const processDataDiagnostic = result.diagnostics.find((diagnostic) => diagnostic.message === "Orphaned entity 'processData'");
+    assert.notEqual(processDataDiagnostic, undefined);
+    assert.equal(processDataDiagnostic?.span.start.line, 16);
+    assert.equal(processDataDiagnostic?.severity, 'error');
 
-    // Get parsed entities using parse method
-    const parseResult = checker.parse(content, filePath);
+    // Get parsed entities using the source-graph parser directly, so the
+    // concrete AST node classes used for narrowing below come from the same
+    // module instance as the entities themselves — `@sammons/typed-mind`'s
+    // TypedMind facade resolves through the compiled `dist/` build, a
+    // distinct module graph from `src/ast/*-node.ts`.
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const parseResult = parser.parse(content);
     const entities = parseResult.entities;
-    assert.equal(entities.has('UNUSED_PARAM'), true);
-    assert.equal(entities.has('SECRET_KEY'), true);
-    assert.equal(entities.has('API_KEY'), true);
-    assert.equal(entities.has('DATABASE_URL'), true);
+    assert.equal(
+      entities.some((entity) => entity.name === 'UNUSED_PARAM'),
+      true,
+    );
+    assert.equal(
+      entities.some((entity) => entity.name === 'SECRET_KEY'),
+      true,
+    );
+    assert.equal(
+      entities.some((entity) => entity.name === 'API_KEY'),
+      true,
+    );
+    assert.equal(
+      entities.some((entity) => entity.name === 'DATABASE_URL'),
+      true,
+    );
 
     // Verify types
-    const unusedParam = entities.get('UNUSED_PARAM') as any;
-    assert.equal(unusedParam?.type, 'RunParameter');
+    const unusedParam = entities.find((entity) => entity.name === 'UNUSED_PARAM' && entity instanceof RunParameterNode) as
+      | RunParameterNode
+      | undefined;
+    assert.equal(unusedParam?.kind, 'RunParameter');
     assert.equal(unusedParam?.paramType, 'env');
 
-    const secretKey = entities.get('SECRET_KEY') as any;
-    assert.equal(secretKey?.type, 'RunParameter');
+    const secretKey = entities.find((entity) => entity.name === 'SECRET_KEY' && entity instanceof RunParameterNode) as
+      | RunParameterNode
+      | undefined;
+    assert.equal(secretKey?.kind, 'RunParameter');
     assert.equal(secretKey?.paramType, 'config');
     assert.equal(secretKey?.defaultValue, 'secret123');
   });

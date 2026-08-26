@@ -3,44 +3,45 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-41-classfile-method-calls', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-41-classfile-method-calls.tmd';
 
-  it('should validate method calls on ClassFile entities', () => {
+  it('should validate method calls on ClassFile entities', async () => {
+    const typedMind = await TypedMind.create();
     const content = readFileSync(join(__dirname, '..', 'scenarios', scenarioFile), 'utf-8');
-    const result = checker.check(content);
+    const result = typedMind.check(content);
 
     // Should be invalid due to issues with method calls and entity resolution (based on actual error output)
     assert.equal(result.valid, false);
-    assert.equal(result.errors.length, 8);
+    assert.equal(result.diagnostics.length, 8);
 
-    const errorMessages = result.errors.map((err) => err.message);
+    const diagnosticMessages = result.diagnostics.map((diagnostic) => diagnostic.message);
 
     // Should detect that calls cannot reference ClassFile entities
-    assert.equal(errorMessages.filter((msg) => msg.includes("Cannot use 'calls' to reference ClassFile 'UserController'")).length, 3);
+    assert.equal(diagnosticMessages.filter((msg) => msg.includes("Cannot use 'calls' to reference ClassFile 'UserController'")).length, 3);
 
     // Should detect orphaned entity
-    assert.ok(errorMessages.includes("Orphaned entity 'testInvalidCall'"));
+    assert.ok(diagnosticMessages.includes("Orphaned entity 'testInvalidCall'"));
 
     // Should detect function not exported by any file
-    assert.ok(errorMessages.includes("Function 'testInvalidCall' is not exported by any file and is not a class method"));
+    assert.ok(diagnosticMessages.includes("Function 'testInvalidCall' is not exported by any file and is not a class method"));
 
     // Should detect method not found on classfile
-    assert.ok(errorMessages.includes("Method 'nonExistentMethod' not found on classfile 'UserController'"));
+    assert.ok(diagnosticMessages.includes("Method 'nonExistentMethod' not found on classfile 'UserController'"));
 
     // Verify specific error positions for method call validation
-    const orphanedError = result.errors.find((err) => err.message.includes("Orphaned entity 'testInvalidCall'"));
-    assert.equal(orphanedError?.position.line, 25);
+    const orphanedError = result.diagnostics.find((diagnostic) => diagnostic.message.includes("Orphaned entity 'testInvalidCall'"));
+    assert.equal(orphanedError?.span.start.line, 25);
 
-    const methodNotFoundError = result.errors.find((err) => err.message.includes("Method 'nonExistentMethod' not found on classfile"));
-    assert.equal(methodNotFoundError?.position.line, 25);
-    assert.equal(methodNotFoundError?.suggestion, 'Available methods: createUser, getUser, updateUser, deleteUser');
+    const methodNotFoundError = result.diagnostics.find((diagnostic) =>
+      diagnostic.message.includes("Method 'nonExistentMethod' not found on classfile"),
+    );
+    assert.equal(methodNotFoundError?.span.start.line, 25);
 
     // Verify the file contains expected ClassFile syntax with proper methods
     assert.ok(content.includes('UserController #: src/controllers/user.ts <: BaseController'));

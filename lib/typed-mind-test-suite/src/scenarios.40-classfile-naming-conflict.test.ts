@@ -3,63 +3,60 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-40-classfile-naming-conflict', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-40-classfile-naming-conflict.tmd';
 
-  it('should detect naming conflicts between File and Class entities', () => {
+  it('should detect naming conflicts between File and Class entities', async () => {
+    const typedMind = await TypedMind.create();
     const content = readFileSync(join(__dirname, '..', 'scenarios', scenarioFile), 'utf-8');
-    const result = checker.check(content);
+    const result = typedMind.check(content);
 
-    // Should be invalid due to naming conflicts and other validation errors
+    // Should be invalid due to naming conflicts and other validation diagnostics
     assert.equal(result.valid, false);
-    assert.equal(result.errors.length, 10);
+    assert.equal(result.diagnostics.length, 10);
 
-    const errorMessages = result.errors.map((err) => err.message);
+    const diagnosticMessages = result.diagnostics.map((diagnostic) => diagnostic.message);
 
     // Should detect naming conflicts between File and Class entities
-    const namingConflictErrors = result.errors.filter((err) =>
-      err.message.includes("Entity name 'UserController' is used by both a File and a Class"),
+    const namingConflictDiagnostics = result.diagnostics.filter((diagnostic) =>
+      diagnostic.message.includes("Entity name 'UserController' is used by both a File and a Class"),
     );
-    assert.equal(namingConflictErrors.length, 2);
-
-    // Should suggest using ClassFile syntax
-    const conflictError = namingConflictErrors[0];
-    assert.ok(conflictError.suggestion.includes('Replace with: UserController #:'));
-    assert.ok(conflictError.suggestion.includes('src/controllers/user.ts <: BaseClass'));
+    assert.equal(namingConflictDiagnostics.length, 2);
 
     // Should detect orphaned entities
-    assert.ok(errorMessages.includes("Orphaned entity 'startApp'"));
-    assert.ok(errorMessages.includes("Orphaned entity 'someFunction'"));
-    assert.ok(errorMessages.includes("Orphaned entity 'BaseController'"));
+    assert.ok(diagnosticMessages.includes("Orphaned entity 'startApp'"));
+    assert.ok(diagnosticMessages.includes("Orphaned entity 'someFunction'"));
+    assert.ok(diagnosticMessages.includes("Orphaned entity 'BaseController'"));
 
     // Should detect orphaned file
-    assert.ok(errorMessages.includes("Orphaned file 'UserService' - none of its exports are imported"));
+    assert.ok(diagnosticMessages.includes("Orphaned file 'UserService' - none of its exports are imported"));
 
     // Should detect classes not exported by files
-    assert.ok(errorMessages.includes("Class 'UserController' is not exported by any file"));
-    assert.ok(errorMessages.includes("Class 'BaseController' is not exported by any file"));
+    assert.ok(diagnosticMessages.includes("Class 'UserController' is not exported by any file"));
+    assert.ok(diagnosticMessages.includes("Class 'BaseController' is not exported by any file"));
 
     // Should detect function not exported by any file
-    assert.ok(errorMessages.includes("Function 'someFunction' is not exported by any file and is not a class method"));
+    assert.ok(diagnosticMessages.includes("Function 'someFunction' is not exported by any file and is not a class method"));
 
     // Should detect method not found on class
-    assert.ok(errorMessages.includes("Method 'someMethod' not found on class 'UserController'"));
+    assert.ok(diagnosticMessages.includes("Method 'someMethod' not found on class 'UserController'"));
 
-    // Verify specific error positions for naming conflicts
-    const firstConflictError = result.errors.find(
-      (err) => err.message.includes("Entity name 'UserController' is used by both a File and a Class") && err.position.line === 13,
+    // Verify specific diagnostic positions for naming conflicts
+    const firstConflictDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message.includes("Entity name 'UserController' is used by both a File and a Class") && diagnostic.span.start.line === 13,
     );
-    assert.notEqual(firstConflictError, undefined);
+    assert.notEqual(firstConflictDiagnostic, undefined);
 
-    const secondConflictError = result.errors.find(
-      (err) => err.message.includes("Entity name 'UserController' is used by both a File and a Class") && err.position.line === 18,
+    const secondConflictDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message.includes("Entity name 'UserController' is used by both a File and a Class") && diagnostic.span.start.line === 18,
     );
-    assert.notEqual(secondConflictError, undefined);
+    assert.notEqual(secondConflictDiagnostic, undefined);
   });
 });

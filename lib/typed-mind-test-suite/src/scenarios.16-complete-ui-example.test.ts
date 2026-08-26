@@ -3,62 +3,72 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-16-complete-ui-example', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-16-complete-ui-example.tmd';
 
-  it('should validate 16 complete ui example', () => {
+  it('should validate 16 complete ui example', async () => {
+    const typedMind = await TypedMind.create();
     const content = readFileSync(join(__dirname, '..', 'scenarios', scenarioFile), 'utf-8');
-    const result = checker.check(content);
+    const result = typedMind.check(content);
 
     // Should be invalid due to validation errors
     assert.equal(result.valid, false);
 
-    // Should have exactly 16 validation errors (including orphaned entities)
-    assert.equal(result.errors.length, 16);
+    // RFC-TM-4 §4 A2: `-> []` (line 5) is a PR #18 manifest empty-list class,
+    // now diagnosed as syntax/error instead of silently dropped — one new
+    // diagnostic on top of the legacy 16.
+    assert.equal(result.diagnostics.length, 17);
+    const emptyListErrors = result.diagnostics.filter((diagnostic) => diagnostic.message === 'unparsable text: `-> []`');
+    assert.equal(emptyListErrors.length, 1);
 
     // Check for orphaned file entities
-    const orphanedFileErrors = result.errors.filter(
-      (err) => err.message.includes('Orphaned file') && (err.message.includes('ComponentsFile') || err.message.includes('AssetsFile')),
+    const orphanedFileErrors = result.diagnostics.filter(
+      (diagnostic) =>
+        diagnostic.message.includes('Orphaned file') &&
+        (diagnostic.message.includes('ComponentsFile') || diagnostic.message.includes('AssetsFile')),
     );
     assert.equal(orphanedFileErrors.length, 2);
 
     // Check for method not found error on UserModel
-    const methodNotFoundErrors = result.errors.filter((err) => err.message.includes("Method 'find' not found on class 'UserModel'"));
+    const methodNotFoundErrors = result.diagnostics.filter((diagnostic) =>
+      diagnostic.message.includes("Method 'find' not found on class 'UserModel'"),
+    );
     assert.equal(methodNotFoundErrors.length, 1);
 
     // Check for UIComponent containment errors
-    const uiContainmentErrors = result.errors.filter(
-      (err) =>
-        err.message.includes('is not contained by any other UIComponent') &&
-        (err.message.includes('App') || err.message.includes('LoginFormView')),
+    const uiContainmentErrors = result.diagnostics.filter(
+      (diagnostic) =>
+        diagnostic.message.includes('is not contained by any other UIComponent') &&
+        (diagnostic.message.includes('App') || diagnostic.message.includes('LoginFormView')),
     );
     assert.equal(uiContainmentErrors.length, 2);
 
     // Verify specific error messages exist
     assert.equal(
-      result.errors.some((err) => err.message.includes("Orphaned file 'ComponentsFile'")),
+      result.diagnostics.some((diagnostic) => diagnostic.message.includes("Orphaned file 'ComponentsFile'")),
       true,
     );
     assert.equal(
-      result.errors.some((err) => err.message.includes("Orphaned file 'AssetsFile'")),
+      result.diagnostics.some((diagnostic) => diagnostic.message.includes("Orphaned file 'AssetsFile'")),
       true,
     );
     assert.equal(
-      result.errors.some((err) => err.message.includes("Method 'find' not found on class 'UserModel'")),
+      result.diagnostics.some((diagnostic) => diagnostic.message.includes("Method 'find' not found on class 'UserModel'")),
       true,
     );
     assert.equal(
-      result.errors.some((err) => err.message.includes("UIComponent 'App' is not contained by any other UIComponent")),
+      result.diagnostics.some((diagnostic) => diagnostic.message.includes("UIComponent 'App' is not contained by any other UIComponent")),
       true,
     );
     assert.equal(
-      result.errors.some((err) => err.message.includes("UIComponent 'LoginFormView' is not contained by any other UIComponent")),
+      result.diagnostics.some((diagnostic) =>
+        diagnostic.message.includes("UIComponent 'LoginFormView' is not contained by any other UIComponent"),
+      ),
       true,
     );
   });

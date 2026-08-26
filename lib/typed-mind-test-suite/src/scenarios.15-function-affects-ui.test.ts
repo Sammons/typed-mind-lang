@@ -3,128 +3,114 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-15-function-affects-ui', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-15-function-affects-ui.tmd';
 
-  it('should validate function affects UI relationships', () => {
+  it('should validate function affects UI relationships', async () => {
+    const typedMind = await TypedMind.create();
     const content = readFileSync(join(__dirname, '..', 'scenarios', scenarioFile), 'utf-8');
-    const result = checker.check(content);
+    const result = typedMind.check(content);
 
     // Should be invalid due to multiple validation errors
     assert.equal(result.valid, false);
 
     // Should have exactly 11 errors (including orphaned entities)
-    assert.equal(result.errors.length, 11);
+    assert.equal(result.diagnostics.length, 11);
 
     // Check for invalid 'calls' to UIComponent error
-    const invalidCallsError = result.errors.find(
-      (err) =>
-        err.message === "Cannot use 'calls' to reference UIComponent 'TodoList'" && err.position.line === 14 && err.position.column === 1,
+    const invalidCallsDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message === "Cannot use 'calls' to reference UIComponent 'TodoList'" &&
+        diagnostic.span.start.line === 14 &&
+        diagnostic.span.start.column === 1,
     );
-    assert.notEqual(invalidCallsError, undefined);
-    assert.equal(invalidCallsError?.severity, 'error');
-    assert.equal(invalidCallsError?.suggestion, "'calls' can only reference: Function, Class");
+    assert.notEqual(invalidCallsDiagnostic, undefined);
+    assert.equal(invalidCallsDiagnostic?.severity, 'error');
 
     // Check for invalid 'affects' to Function error
-    const invalidAffectsError = result.errors.find(
-      (err) =>
-        err.message === "Cannot use 'affects' to reference Function 'updateTodoList'" &&
-        err.position.line === 26 &&
-        err.position.column === 1,
+    const invalidAffectsDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message === "Cannot use 'affects' to reference Function 'updateTodoList'" &&
+        diagnostic.span.start.line === 26 &&
+        diagnostic.span.start.column === 1,
     );
-    assert.notEqual(invalidAffectsError, undefined);
-    assert.equal(invalidAffectsError?.severity, 'error');
-    assert.equal(invalidAffectsError?.suggestion, "'affects' can only reference: UIComponent");
+    assert.notEqual(invalidAffectsDiagnostic, undefined);
+    assert.equal(invalidAffectsDiagnostic?.severity, 'error');
 
     // Check for orphaned refreshUI entity error
-    const orphanedRefreshUIError = result.errors.find(
-      (err) => err.message === "Orphaned entity 'refreshUI'" && err.position.line === 22 && err.position.column === 1,
+    const orphanedRefreshUIDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message === "Orphaned entity 'refreshUI'" && diagnostic.span.start.line === 22 && diagnostic.span.start.column === 1,
     );
-    assert.notEqual(orphanedRefreshUIError, undefined);
-    assert.equal(orphanedRefreshUIError?.severity, 'error');
-    assert.equal(orphanedRefreshUIError?.suggestion, 'Remove or reference this entity');
+    assert.notEqual(orphanedRefreshUIDiagnostic, undefined);
+    assert.equal(orphanedRefreshUIDiagnostic?.severity, 'error');
 
     // Check for orphaned invalidAffect entity error
-    const orphanedInvalidAffectError = result.errors.find(
-      (err) => err.message === "Orphaned entity 'invalidAffect'" && err.position.line === 26 && err.position.column === 1,
+    const orphanedInvalidAffectDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message === "Orphaned entity 'invalidAffect'" && diagnostic.span.start.line === 26 && diagnostic.span.start.column === 1,
     );
-    assert.notEqual(orphanedInvalidAffectError, undefined);
-    assert.equal(orphanedInvalidAffectError?.severity, 'error');
-    assert.equal(orphanedInvalidAffectError?.suggestion, 'Remove or reference this entity');
+    assert.notEqual(orphanedInvalidAffectDiagnostic, undefined);
+    assert.equal(orphanedInvalidAffectDiagnostic?.severity, 'error');
 
     // Check for refreshUI not exported error
-    const refreshUINotExportedError = result.errors.find(
-      (err) =>
-        err.message === "Function 'refreshUI' is not exported by any file and is not a class method" &&
-        err.position.line === 22 &&
-        err.position.column === 1,
+    const refreshUINotExportedDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message === "Function 'refreshUI' is not exported by any file and is not a class method" &&
+        diagnostic.span.start.line === 22 &&
+        diagnostic.span.start.column === 1,
     );
-    assert.notEqual(refreshUINotExportedError, undefined);
-    assert.equal(refreshUINotExportedError?.severity, 'error');
-    assert.equal(
-      refreshUINotExportedError?.suggestion,
-      "Either add 'refreshUI' to the exports of a file entity or define it as a method of a class",
-    );
+    assert.notEqual(refreshUINotExportedDiagnostic, undefined);
+    assert.equal(refreshUINotExportedDiagnostic?.severity, 'error');
 
     // Check for invalidAffect not exported error
-    const invalidAffectNotExportedError = result.errors.find(
-      (err) =>
-        err.message === "Function 'invalidAffect' is not exported by any file and is not a class method" &&
-        err.position.line === 26 &&
-        err.position.column === 1,
+    const invalidAffectNotExportedDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message === "Function 'invalidAffect' is not exported by any file and is not a class method" &&
+        diagnostic.span.start.line === 26 &&
+        diagnostic.span.start.column === 1,
     );
-    assert.notEqual(invalidAffectNotExportedError, undefined);
-    assert.equal(invalidAffectNotExportedError?.severity, 'error');
-    assert.equal(
-      invalidAffectNotExportedError?.suggestion,
-      "Either add 'invalidAffect' to the exports of a file entity or define it as a method of a class",
-    );
+    assert.notEqual(invalidAffectNotExportedDiagnostic, undefined);
+    assert.equal(invalidAffectNotExportedDiagnostic?.severity, 'error');
 
     // Check for refreshUI affects unknown component error
-    const refreshUIUnknownComponentError = result.errors.find(
-      (err) =>
-        err.message === "Function 'refreshUI' affects unknown component 'NonExistentComponent'" &&
-        err.position.line === 22 &&
-        err.position.column === 1,
+    const refreshUIUnknownComponentDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message === "Function 'refreshUI' affects unknown component 'NonExistentComponent'" &&
+        diagnostic.span.start.line === 22 &&
+        diagnostic.span.start.column === 1,
     );
-    assert.notEqual(refreshUIUnknownComponentError, undefined);
-    assert.equal(refreshUIUnknownComponentError?.severity, 'error');
-    assert.equal(refreshUIUnknownComponentError?.suggestion, "Define 'NonExistentComponent' as a UIComponent");
+    assert.notEqual(refreshUIUnknownComponentDiagnostic, undefined);
+    assert.equal(refreshUIUnknownComponentDiagnostic?.severity, 'error');
 
     // Check for invalidAffect cannot affect Function error
-    const invalidAffectCannotAffectError = result.errors.find(
-      (err) =>
-        err.message === "Function 'invalidAffect' cannot affect 'updateTodoList' (it's a Function)" &&
-        err.position.line === 26 &&
-        err.position.column === 1,
+    const invalidAffectCannotAffectDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message === "Function 'invalidAffect' cannot affect 'updateTodoList' (it's a Function)" &&
+        diagnostic.span.start.line === 26 &&
+        diagnostic.span.start.column === 1,
     );
-    assert.notEqual(invalidAffectCannotAffectError, undefined);
-    assert.equal(invalidAffectCannotAffectError?.severity, 'error');
-    assert.equal(invalidAffectCannotAffectError?.suggestion, 'Functions can only affect UIComponents');
+    assert.notEqual(invalidAffectCannotAffectDiagnostic, undefined);
+    assert.equal(invalidAffectCannotAffectDiagnostic?.severity, 'error');
 
     // Check for TodoList not contained error
-    const todoListNotContainedError = result.errors.find(
-      (err) =>
-        err.message === "UIComponent 'TodoList' is not contained by any other UIComponent" &&
-        err.position.line === 7 &&
-        err.position.column === 1,
+    const todoListNotContainedDiagnostic = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message === "UIComponent 'TodoList' is not contained by any other UIComponent" &&
+        diagnostic.span.start.line === 7 &&
+        diagnostic.span.start.column === 1,
     );
-    assert.notEqual(todoListNotContainedError, undefined);
-    assert.equal(todoListNotContainedError?.severity, 'error');
-    assert.equal(
-      todoListNotContainedError?.suggestion,
-      "Either add 'TodoList' to another UIComponent's contains list, or mark it as a root component with &!",
-    );
+    assert.notEqual(todoListNotContainedDiagnostic, undefined);
+    assert.equal(todoListNotContainedDiagnostic?.severity, 'error');
 
-    // All errors should be of severity 'error'
+    // All diagnostics should be of severity 'error'
     assert.equal(
-      result.errors.every((err) => err.severity === 'error'),
+      result.diagnostics.every((diagnostic) => diagnostic.severity === 'error'),
       true,
     );
   });

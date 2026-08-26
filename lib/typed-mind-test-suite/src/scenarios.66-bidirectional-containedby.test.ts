@@ -3,122 +3,136 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLParser } from '../../typed-mind/src/parser.ts';
-import { DSLValidator } from '../../typed-mind/src/validator.ts';
+import { UiComponentNode } from '../../typed-mind/src/ast/ui-component-node.ts';
+import { AstValidator } from '../../typed-mind/src/checker/ast-validator.ts';
+import { computeLinks } from '../../typed-mind/src/pipeline/link-index.ts';
+import { TypedMindParser } from '../../typed-mind/src/pipeline/typed-mind-parser.ts';
+import { WASM_PATH } from './wasm-path.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Note (S-TEST-1, scenario-66): legacy exposed `UIComponent.containedBy` as a
+// per-entity array of parent names. `UiComponentNode` carries only
+// `declaredContainedBy` (the author's `< [...]` claim) on the new surface —
+// the derived reverse relationship now lives on `LinkIndex.containedBy(name)`,
+// which returns `readonly string[]` (plain names, no verb/kind dimension —
+// same as scenarios 64/65, no precision loss versus legacy). All assertions
+// below use `links.containedBy(name)` in place of `entity.containedBy`.
+
 describe('Scenario 66: Bidirectional containedBy for UIComponents', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-66-bidirectional-containedby.tmd');
   const content = readFileSync(scenarioPath, 'utf-8');
-  const parser = new DSLParser();
-  const validator = new DSLValidator();
 
-  it('should automatically populate UIComponent.containedBy when parent contains it', () => {
-    const parseResult = parser.parse(content);
+  it('should automatically populate UIComponent.containedBy when parent contains it', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
 
     // Check Header.containedBy
-    const header = Array.from(parseResult.entities.values()).find((e) => e.name === 'Header' && e.type === 'UIComponent') as any;
+    const header = outcome.entities.find((e): e is UiComponentNode => e instanceof UiComponentNode && e.name === 'Header');
 
     assert.notEqual(header, undefined);
-    assert.notEqual(header.containedBy, undefined);
-    assert.deepEqual(header.containedBy, ['App']);
+    const headerContainedBy = links.containedBy('Header');
+    assert.notEqual(headerContainedBy, undefined);
+    assert.deepEqual(headerContainedBy, ['App']);
   });
 
-  it('should handle nested containment hierarchy', () => {
-    const parseResult = parser.parse(content);
+  it('should handle nested containment hierarchy', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
 
     // Check multi-level nesting: App > Header > NavBar > NavItem1
-    const navItem1 = Array.from(parseResult.entities.values()).find((e) => e.name === 'NavItem1' && e.type === 'UIComponent') as any;
-    const navBar = Array.from(parseResult.entities.values()).find((e) => e.name === 'NavBar' && e.type === 'UIComponent') as any;
-    const header = Array.from(parseResult.entities.values()).find((e) => e.name === 'Header' && e.type === 'UIComponent') as any;
-
-    assert.deepEqual(navItem1.containedBy, ['NavBar']);
-    assert.deepEqual(navBar.containedBy, ['Header']);
-    assert.deepEqual(header.containedBy, ['App']);
+    assert.deepEqual(links.containedBy('NavItem1'), ['NavBar']);
+    assert.deepEqual(links.containedBy('NavBar'), ['Header']);
+    assert.deepEqual(links.containedBy('Header'), ['App']);
   });
 
-  it('should handle multiple children with same parent', () => {
-    const parseResult = parser.parse(content);
+  it('should handle multiple children with same parent', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
 
     // App contains Header, MainContent, Footer
-    const header = Array.from(parseResult.entities.values()).find((e) => e.name === 'Header' && e.type === 'UIComponent') as any;
-    const mainContent = Array.from(parseResult.entities.values()).find((e) => e.name === 'MainContent' && e.type === 'UIComponent') as any;
-    const footer = Array.from(parseResult.entities.values()).find((e) => e.name === 'Footer' && e.type === 'UIComponent') as any;
-
-    assert.deepEqual(header.containedBy, ['App']);
-    assert.deepEqual(mainContent.containedBy, ['App']);
-    assert.deepEqual(footer.containedBy, ['App']);
+    assert.deepEqual(links.containedBy('Header'), ['App']);
+    assert.deepEqual(links.containedBy('MainContent'), ['App']);
+    assert.deepEqual(links.containedBy('Footer'), ['App']);
   });
 
-  it('should handle root component without containedBy', () => {
-    const parseResult = parser.parse(content);
+  it('should handle root component without containedBy', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
 
     // App is root, should not have containedBy
-    const app = Array.from(parseResult.entities.values()).find((e) => e.name === 'App' && e.type === 'UIComponent') as any;
+    const app = outcome.entities.find((e): e is UiComponentNode => e instanceof UiComponentNode && e.name === 'App');
 
     assert.notEqual(app, undefined);
-    assert.equal(app.root, true);
-    assert.deepEqual(app.containedBy, []);
+    assert.equal(app?.root, true);
+    assert.deepEqual(links.containedBy('App'), []);
   });
 
-  it('should handle orphan component without parent', () => {
-    const parseResult = parser.parse(content);
+  it('should handle orphan component without parent', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
 
     // OrphanComponent has no parent
-    const orphan = Array.from(parseResult.entities.values()).find((e) => e.name === 'OrphanComponent' && e.type === 'UIComponent') as any;
+    const orphan = outcome.entities.find((e): e is UiComponentNode => e instanceof UiComponentNode && e.name === 'OrphanComponent');
 
     assert.notEqual(orphan, undefined);
-    assert.deepEqual(orphan.containedBy, []);
+    assert.deepEqual(links.containedBy('OrphanComponent'), []);
   });
 
-  it('should maintain consistency between contains and containedBy', () => {
-    const parseResult = parser.parse(content);
+  it('should maintain consistency between contains and containedBy', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
 
     // Check bidirectional relationship
-    const navBar = Array.from(parseResult.entities.values()).find((e) => e.name === 'NavBar' && e.type === 'UIComponent') as any;
-    const navItem1 = Array.from(parseResult.entities.values()).find((e) => e.name === 'NavItem1' && e.type === 'UIComponent') as any;
-    const navItem2 = Array.from(parseResult.entities.values()).find((e) => e.name === 'NavItem2' && e.type === 'UIComponent') as any;
+    const navBar = outcome.entities.find((e): e is UiComponentNode => e instanceof UiComponentNode && e.name === 'NavBar');
 
-    assert.ok(navBar.contains.includes('NavItem1'));
-    assert.ok(navBar.contains.includes('NavItem2'));
-    assert.deepEqual(navItem1.containedBy, ['NavBar']);
-    assert.deepEqual(navItem2.containedBy, ['NavBar']);
+    assert.ok(navBar?.contains?.includes('NavItem1'));
+    assert.ok(navBar?.contains?.includes('NavItem2'));
+    assert.deepEqual(links.containedBy('NavItem1'), ['NavBar']);
+    assert.deepEqual(links.containedBy('NavItem2'), ['NavBar']);
   });
 
-  it('should handle complex nested structure', () => {
-    const parseResult = parser.parse(content);
+  it('should handle complex nested structure', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
 
     // MainContent > ContentArea > Article
-    const article = Array.from(parseResult.entities.values()).find((e) => e.name === 'Article' && e.type === 'UIComponent') as any;
-    const contentArea = Array.from(parseResult.entities.values()).find((e) => e.name === 'ContentArea' && e.type === 'UIComponent') as any;
+    const contentArea = outcome.entities.find((e): e is UiComponentNode => e instanceof UiComponentNode && e.name === 'ContentArea');
 
-    assert.deepEqual(article.containedBy, ['ContentArea']);
-    assert.deepEqual(contentArea.containedBy, ['MainContent']);
-    assert.ok(contentArea.contains.includes('Article'));
+    assert.deepEqual(links.containedBy('Article'), ['ContentArea']);
+    assert.deepEqual(links.containedBy('ContentArea'), ['MainContent']);
+    assert.ok(contentArea?.contains?.includes('Article'));
   });
 
-  it('should handle component that contains but is not contained', () => {
-    const parseResult = parser.parse(content);
+  it('should handle component that contains but is not contained', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
 
     // FloatingPanel contains CloseButton but is not contained by anything
-    const floatingPanel = Array.from(parseResult.entities.values()).find(
-      (e) => e.name === 'FloatingPanel' && e.type === 'UIComponent',
-    ) as any;
-    const closeButton = Array.from(parseResult.entities.values()).find((e) => e.name === 'CloseButton' && e.type === 'UIComponent') as any;
+    const floatingPanel = outcome.entities.find((e): e is UiComponentNode => e instanceof UiComponentNode && e.name === 'FloatingPanel');
 
-    assert.deepEqual(floatingPanel.contains, ['CloseButton']);
-    assert.deepEqual(floatingPanel.containedBy, []);
-    assert.deepEqual(closeButton.containedBy, ['FloatingPanel']);
+    assert.deepEqual(floatingPanel?.contains, ['CloseButton']);
+    assert.deepEqual(links.containedBy('FloatingPanel'), []);
+    assert.deepEqual(links.containedBy('CloseButton'), ['FloatingPanel']);
   });
 
-  it('should validate without errors when bidirectional relationships are correct', () => {
-    const parseResult = parser.parse(content);
-    const validationResult = validator.validate(parseResult.entities, parseResult);
+  it('should validate without errors when bidirectional relationships are correct', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
+    const validation = new AstValidator().validate(outcome, links);
 
     // Should not have any validation errors about missing containedBy
-    const containedByErrors = validationResult.errors.filter((e) => e.message.includes('containedBy'));
+    const containedByErrors = validation.findings.filter((e) => e.message.includes('containedBy'));
 
     assert.deepEqual(containedByErrors, []);
   });

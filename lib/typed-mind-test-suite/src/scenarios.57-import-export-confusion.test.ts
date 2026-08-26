@@ -3,8 +3,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLParser } from '../../typed-mind/src/parser.ts';
-import { DSLValidator } from '../../typed-mind/src/validator.ts';
+import { ClassFileNode } from '../../typed-mind/src/ast/class-file-node.ts';
+import { ClassNode } from '../../typed-mind/src/ast/class-node.ts';
+import { FileNode } from '../../typed-mind/src/ast/file-node.ts';
+import { AstValidator } from '../../typed-mind/src/checker/ast-validator.ts';
+import { computeLinks } from '../../typed-mind/src/pipeline/link-index.ts';
+import { TypedMindParser } from '../../typed-mind/src/pipeline/typed-mind-parser.ts';
+import { WASM_PATH } from './wasm-path.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,15 +17,15 @@ const __dirname = dirname(__filename);
 describe('Scenario 57: Import and export confusion', () => {
   const scenarioPath = join(__dirname, '../scenarios/scenario-57-import-export-confusion.tmd');
   const content = readFileSync(scenarioPath, 'utf-8');
-  const parser = new DSLParser();
-  const validator = new DSLValidator();
 
-  it('should detect import/export mistakes', () => {
-    const parseResult = parser.parse(content);
-    const validationResult = validator.validate(parseResult.entities);
+  it('should detect import/export mistakes', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const links = computeLinks(outcome.entities);
+    const validation = new AstValidator().validate(outcome, links);
 
-    assert.equal(validationResult.valid, false);
-    const errors = validationResult.errors.map((e) => e.message);
+    assert.equal(validation.valid, false);
+    const errors = validation.findings.map((e) => e.message);
 
     // There should be validation errors from import/export mistakes
 
@@ -43,13 +48,8 @@ describe('Scenario 57: Import and export confusion', () => {
     );
 
     // Mistake 4: Class with imports (parser should reject this)
-    if (!parseResult?.entities) {
-      assert.fail('parseResult or entities is undefined');
-      return;
-    }
-
-    const entitiesArray = Array.from(parseResult.entities.values());
-    const baseClass = entitiesArray.find((e) => e.name === 'BaseClass' && e.type === 'Class');
+    const entitiesArray = outcome.entities;
+    const baseClass = entitiesArray.find((e): e is ClassNode => e instanceof ClassNode && e.name === 'BaseClass');
     // Classes can have imports in the current implementation
     assert.notEqual(baseClass, undefined);
 
@@ -76,44 +76,34 @@ describe('Scenario 57: Import and export confusion', () => {
     );
   });
 
-  it('should accept valid import/export patterns', () => {
-    const parseResult = parser.parse(content);
-
-    if (!parseResult?.entities) {
-      assert.fail('parseResult or entities is undefined');
-      return;
-    }
-
-    const entitiesArray = Array.from(parseResult.entities.values());
+  it('should accept valid import/export patterns', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const entitiesArray = outcome.entities;
 
     // Check ProperModule has correct imports/exports
-    const properModule = entitiesArray.find((e) => e.name === 'ProperModule' && e.type === 'File');
-    assert.ok((properModule?.imports).includes('Config'));
-    assert.ok((properModule?.imports).includes('getConfig'));
-    assert.ok((properModule?.exports).includes('properFunc'));
-    assert.ok((properModule?.exports).includes('ProperClass'));
+    const properModule = entitiesArray.find((e): e is FileNode => e instanceof FileNode && e.name === 'ProperModule');
+    assert.ok(properModule?.imports.includes('Config'));
+    assert.ok(properModule?.imports.includes('getConfig'));
+    assert.ok(properModule?.exports.includes('properFunc'));
+    assert.ok(properModule?.exports.includes('ProperClass'));
 
     // IsolatedFile with no imports/exports is valid
-    const isolatedFile = entitiesArray.find((e) => e.name === 'IsolatedFile');
+    const isolatedFile = entitiesArray.find((e): e is FileNode => e instanceof FileNode && e.name === 'IsolatedFile');
     assert.notEqual(isolatedFile, undefined);
-    assert.equal(isolatedFile?.imports?.length || 0, 0);
-    assert.equal(isolatedFile?.exports?.length || 0, 0);
+    assert.equal(isolatedFile?.imports.length || 0, 0);
+    assert.equal(isolatedFile?.exports.length || 0, 0);
   });
 
-  it('should properly handle ClassFile imports', () => {
-    const parseResult = parser.parse(content);
-
-    if (!parseResult?.entities) {
-      assert.fail('parseResult or entities is undefined');
-      return;
-    }
-
-    const entitiesArray = Array.from(parseResult.entities.values());
+  it('should properly handle ClassFile imports', async () => {
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const outcome = parser.parse(content);
+    const entitiesArray = outcome.entities;
 
     // UserService as ClassFile can have imports
-    const userService = entitiesArray.find((e) => e.name === 'UserService' && e.type === 'ClassFile');
+    const userService = entitiesArray.find((e): e is ClassFileNode => e instanceof ClassFileNode && e.name === 'UserService');
     assert.notEqual(userService, undefined);
     // Even though it tries to import itself, the parser should capture it
-    assert.ok((userService?.imports).includes('UserService'));
+    assert.ok(userService?.imports.includes('UserService'));
   });
 });

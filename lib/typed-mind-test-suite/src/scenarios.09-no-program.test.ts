@@ -3,47 +3,46 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-09-no-program', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-09-no-program.tmd';
 
-  it('should validate 09 no program', () => {
+  it('should validate 09 no program', async () => {
+    const typedMind = await TypedMind.create();
     const content = readFileSync(join(__dirname, '..', 'scenarios', scenarioFile), 'utf-8');
-    const result = checker.check(content);
+    const result = typedMind.check(content);
 
     // Should be invalid due to missing program entry point
     assert.equal(result.valid, false);
 
     // Should have exactly 3 errors (1 no program + 1 orphaned file + 1 orphaned entity)
-    assert.equal(result.errors.length, 3);
+    assert.equal(result.diagnostics.length, 3);
 
     // Should have an orphaned file error for MainFile
-    const orphanedFileError = result.errors.find((err) => err.message === "Orphaned file 'MainFile' - none of its exports are imported");
-    assert.notEqual(orphanedFileError, undefined);
-    assert.equal(orphanedFileError?.position.line, 3);
-    assert.equal(orphanedFileError?.position.column, 1);
-    assert.equal(orphanedFileError?.severity, 'error');
-    assert.equal(orphanedFileError?.suggestion, 'Remove this file or import its exports somewhere');
+    const orphanedFileDiagnostic = result.diagnostics.find(
+      (diagnostic) => diagnostic.message === "Orphaned file 'MainFile' - none of its exports are imported",
+    );
+    assert.notEqual(orphanedFileDiagnostic, undefined);
+    assert.equal(orphanedFileDiagnostic?.span.start.line, 3);
+    assert.equal(orphanedFileDiagnostic?.span.start.column, 1);
+    assert.equal(orphanedFileDiagnostic?.severity, 'error');
 
     // Should have an orphaned entity error for doSomething
-    const orphanedEntityError = result.errors.find((err) => err.message === "Orphaned entity 'doSomething'");
-    assert.notEqual(orphanedEntityError, undefined);
-    assert.equal(orphanedEntityError?.position.line, 6);
-    assert.equal(orphanedEntityError?.position.column, 1);
-    assert.equal(orphanedEntityError?.severity, 'error');
-    assert.equal(orphanedEntityError?.suggestion, 'Remove or reference this entity');
+    const orphanedEntityDiagnostic = result.diagnostics.find((diagnostic) => diagnostic.message === "Orphaned entity 'doSomething'");
+    assert.notEqual(orphanedEntityDiagnostic, undefined);
+    assert.equal(orphanedEntityDiagnostic?.span.start.line, 6);
+    assert.equal(orphanedEntityDiagnostic?.span.start.column, 1);
+    assert.equal(orphanedEntityDiagnostic?.severity, 'error');
 
     // Should have a no program entry point error
-    const noProgramError = result.errors.find((err) => err.message === 'No program entry point defined');
-    assert.notEqual(noProgramError, undefined);
-    assert.equal(noProgramError?.position.line, 1);
-    assert.equal(noProgramError?.position.column, 1);
-    assert.equal(noProgramError?.severity, 'error');
-    assert.equal(noProgramError?.suggestion, 'Add a Program entity: AppName -> EntryFile');
+    const noProgramDiagnostic = result.diagnostics.find((diagnostic) => diagnostic.message === 'No program entry point defined');
+    assert.notEqual(noProgramDiagnostic, undefined);
+    assert.equal(noProgramDiagnostic?.span.start.line, 1);
+    assert.equal(noProgramDiagnostic?.span.start.column, 1);
+    assert.equal(noProgramDiagnostic?.severity, 'error');
   });
 });
