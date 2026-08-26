@@ -3,10 +3,10 @@ IndexApp -> IndexFile v1.0.0
   -> [main]
 
 # Files
-IndexFile @ ../../../../../../../../../project/src/index.ts:
+IndexFile @ project/src/index.ts:
   <- [UserService]
   -> [main]
-UserServiceFile @ ../../../../../../../../../project/src/services/user-service.ts:
+UserServiceFile @ project/src/services/user-service.ts:
   <- [UserDTO, CreateUserDTO]
   -> [UserService]
 

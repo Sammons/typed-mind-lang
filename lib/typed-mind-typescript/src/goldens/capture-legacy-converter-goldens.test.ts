@@ -15,7 +15,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import type { ParsedModule, TypeScriptProjectAnalysis } from '../types.ts';
 import { createFilePath } from '../types.ts';
@@ -247,6 +247,29 @@ const assertMatchesGolden = (path: string, value: string): void => {
 };
 
 describe('RFC-TM-6 Q1 — legacy converter emitter TMD goldens', () => {
+  // getRelativePath (typescript-to-typedmind-converter.ts:1490-1492) emits
+  // File/ClassFile paths via `path.relative(process.cwd(), filePath)` — the
+  // legacy emitter's own pre-existing behavior, unchanged by this Quantum.
+  // Left at the machine's real cwd, the emitted `../../..` depth varies with
+  // wherever this repo happens to be checked out (a worktree nested under
+  // `.claude/worktrees/<slug>/` versus a shallow CI checkout), which would
+  // make the checked-in golden fail on every OTHER checkout even though
+  // nothing regressed. Pinning cwd to `/` for the duration of each test
+  // makes `path.relative` deterministic across machines: the mock fixtures'
+  // absolute paths all live under `/project/...`, so `path.relative('/',
+  // '/project/src/index.ts')` always yields `project/src/index.ts` with no
+  // machine-dependent `../` prefix.
+  let originalCwd: string;
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    process.chdir('/');
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+  });
+
   it('captures generateTMDContent output for the default (preferClassFile: true) fixture', () => {
     const converter = new TypeScriptToTypedMindConverter({ preferClassFile: true });
     const result = converter.convert(createBaseAnalysis());

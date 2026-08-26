@@ -1,10 +1,10 @@
 # Files
-IndexFile @ ../../../../../../../../../project/src/index.ts:
+IndexFile @ project/src/index.ts:
   <- [UserService]
   -> [main]
 
 # ClassFiles (Services/Controllers)
-UserService #: ../../../../../../../../../project/src/services/user-service.ts <: BaseService, IUserService
+UserService #: project/src/services/user-service.ts <: BaseService, IUserService
   <- [UserDTO, CreateUserDTO]
   => [createUser, findUser]
 
