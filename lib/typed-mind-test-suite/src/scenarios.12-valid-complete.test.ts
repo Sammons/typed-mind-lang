@@ -3,23 +3,28 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-12-valid-complete', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-12-valid-complete.tmd';
 
-  it('should validate complete program as valid', () => {
+  it('should validate complete program as valid', async () => {
+    const typedMind = await TypedMind.create();
     const content = readFileSync(join(__dirname, '..', 'scenarios', scenarioFile), 'utf-8');
-    const result = checker.check(content);
+    const result = typedMind.check(content);
 
-    // This is a valid complete program - all entities are properly connected
-    assert.equal(result.valid, true);
+    // RFC-TM-4 §4 A2: the empty exports list `-> []` (L5, on AppFile) is now
+    // diagnosed as a syntax/error ("unparsable text") instead of parsing
+    // silently, so this previously-clean scenario now carries exactly 1 finding.
+    assert.equal(result.valid, false); // was true
+    assert.equal(result.diagnostics.length, 1); // was 0
 
-    // Should have no errors in a valid program
-    assert.equal(result.errors.length, 0);
+    const diagnostic = result.diagnostics[0];
+    assert.equal(diagnostic?.message, 'unparsable text: `-> []`');
+    assert.equal(diagnostic?.span.start.line, 5);
+    assert.equal(diagnostic?.severity, 'error');
   });
 });

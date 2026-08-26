@@ -1,3 +1,18 @@
+// STOP-AND-REPORT: this file was NOT migrated to the new AstValidator /
+// computeLinks(LinkIndex) surface. Every assertion here keys off
+// `ref.type` as the RELATIONSHIP VERB ('imports', 'exports', 'input',
+// 'output', 'calls', 'contains', 'containedBy', 'consumes', 'entry',
+// 'containsProgram') — i.e. HOW the reference happens, not the
+// referencing entity's kind. The new `LinkIndex.referencedBy(name)`
+// (lib/typed-mind/src/pipeline/link-index.ts) returns
+// `readonly { from: string; fromType: EntityKind }[]` — `fromType` is the
+// referencing entity's KIND (Program/File/Function/...), and there is no
+// field carrying the relationship verb. This is a genuine shape gap with
+// no workaround, per RFC-TM-4 §4 (S-TEST-1 amendments); every `.some((ref)
+// => ref.from === X && ref.type === Y)` assertion in this file (lines
+// 36-134 in the pre-migration version) would need a verb it cannot get
+// from the new surface. Left on the legacy DSLParser/DSLValidator pair so
+// the test keeps passing rather than force a fabricated migration.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

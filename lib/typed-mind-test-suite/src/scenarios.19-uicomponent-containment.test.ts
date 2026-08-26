@@ -3,56 +3,48 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-19-uicomponent-containment', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-19-uicomponent-containment.tmd';
 
-  it('should validate UIComponent containment rules', () => {
+  it('should validate UIComponent containment rules', async () => {
+    const typedMind = await TypedMind.create();
     const content = readFileSync(join(__dirname, '..', 'scenarios', scenarioFile), 'utf-8');
-    const result = checker.check(content);
+    const result = typedMind.check(content);
 
     // Should be invalid due to containment errors and orphaned entities
     assert.equal(result.valid, false);
 
     // Should have exactly 6 errors (4 orphaned + 2 containment)
-    assert.equal(result.errors.length, 6);
+    assert.equal(result.diagnostics.length, 6);
 
     // Check for orphaned entity errors
-    const errorMessages = result.errors.map((err) => err.message);
-    assert.ok(errorMessages.includes("Orphaned entity 'RootApp'"));
-    assert.ok(errorMessages.includes("Orphaned entity 'Sidebar'"));
-    assert.ok(errorMessages.includes("Orphaned entity 'OrphanedComponent'"));
-    assert.ok(errorMessages.includes("Orphaned entity 'AnotherRootApp'"));
+    const diagnosticMessages = result.diagnostics.map((diagnostic) => diagnostic.message);
+    assert.ok(diagnosticMessages.includes("Orphaned entity 'RootApp'"));
+    assert.ok(diagnosticMessages.includes("Orphaned entity 'Sidebar'"));
+    assert.ok(diagnosticMessages.includes("Orphaned entity 'OrphanedComponent'"));
+    assert.ok(diagnosticMessages.includes("Orphaned entity 'AnotherRootApp'"));
 
     // Check for Sidebar containment error
-    const sidebarError = result.errors.find((err) =>
-      err.message.includes("UIComponent 'Sidebar' is not contained by any other UIComponent"),
+    const sidebarDiagnostic = result.diagnostics.find((diagnostic) =>
+      diagnostic.message.includes("UIComponent 'Sidebar' is not contained by any other UIComponent"),
     );
-    assert.notEqual(sidebarError, undefined);
-    assert.equal(sidebarError?.position.line, 12);
-    assert.equal(sidebarError?.position.column, 1);
-    assert.equal(sidebarError?.severity, 'error');
-    assert.equal(
-      sidebarError?.suggestion,
-      "Either add 'Sidebar' to another UIComponent's contains list, or mark it as a root component with &!",
-    );
+    assert.notEqual(sidebarDiagnostic, undefined);
+    assert.equal(sidebarDiagnostic?.span.start.line, 12);
+    assert.equal(sidebarDiagnostic?.span.start.column, 1);
+    assert.equal(sidebarDiagnostic?.severity, 'error');
 
     // Check for OrphanedComponent containment error
-    const orphanedError = result.errors.find((err) =>
-      err.message.includes("UIComponent 'OrphanedComponent' is not contained by any other UIComponent"),
+    const orphanedDiagnostic = result.diagnostics.find((diagnostic) =>
+      diagnostic.message.includes("UIComponent 'OrphanedComponent' is not contained by any other UIComponent"),
     );
-    assert.notEqual(orphanedError, undefined);
-    assert.equal(orphanedError?.position.line, 20);
-    assert.equal(orphanedError?.position.column, 1);
-    assert.equal(orphanedError?.severity, 'error');
-    assert.equal(
-      orphanedError?.suggestion,
-      "Either add 'OrphanedComponent' to another UIComponent's contains list, or mark it as a root component with &!",
-    );
+    assert.notEqual(orphanedDiagnostic, undefined);
+    assert.equal(orphanedDiagnostic?.span.start.line, 20);
+    assert.equal(orphanedDiagnostic?.span.start.column, 1);
+    assert.equal(orphanedDiagnostic?.severity, 'error');
   });
 });

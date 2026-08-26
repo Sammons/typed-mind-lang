@@ -3,24 +3,24 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-37-data-pipeline', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-37-data-pipeline.tmd';
 
-  it('should validate data pipeline ETL architecture', () => {
+  it('should validate data pipeline ETL architecture', async () => {
+    const typedMind = await TypedMind.create();
     const content = readFileSync(join(__dirname, '..', 'scenarios', scenarioFile), 'utf-8');
-    const result = checker.check(content);
+    const result = typedMind.check(content);
 
     // Should be invalid due to orphaned entities
     assert.equal(result.valid, false);
-    assert.ok(result.errors.length > 0);
+    assert.ok(result.diagnostics.length > 0);
 
-    // DSLChecker doesn't expose entities directly, but we can verify it processed the file successfully
+    // TypedMind doesn't expose entities directly here, but we can verify it processed the file successfully
     // by ensuring it contains the expected content structure
     assert.ok(content.includes('AnalyticsPipeline'));
     assert.ok(content.includes('OrchestratorFile'));

@@ -3,53 +3,76 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
+import { RunParameterNode } from '../../typed-mind/src/ast/run-parameter-node.ts';
+import { TypedMindParser } from '../../typed-mind/src/pipeline/typed-mind-parser.ts';
+import { WASM_PATH } from './wasm-path.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-28-runparameter-invalid-consumes', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-28-runparameter-invalid-consumes.tmd';
 
-  it('should detect invalid RunParameter consumption', () => {
+  it('should detect invalid RunParameter consumption', async () => {
+    const typedMind = await TypedMind.create();
     const filePath = join(__dirname, '..', 'scenarios', scenarioFile);
     const content = readFileSync(filePath, 'utf-8');
-    const result = checker.check(content, filePath);
+    const result = typedMind.check(content, filePath);
 
     assert.equal(result.valid, false);
-    assert.equal(result.errors.length, 3);
+    assert.equal(result.diagnostics.length, 3);
 
     // Check for orphaned entities
-    const orphanedBadFunction = result.errors.find((err) => err.message === "Orphaned entity 'badFunction'");
+    const orphanedBadFunction = result.diagnostics.find((diagnostic) => diagnostic.message === "Orphaned entity 'badFunction'");
     assert.notEqual(orphanedBadFunction, undefined);
 
-    const orphanedAnotherBadFunction = result.errors.find((err) => err.message === "Orphaned entity 'anotherBadFunction'");
+    const orphanedAnotherBadFunction = result.diagnostics.find(
+      (diagnostic) => diagnostic.message === "Orphaned entity 'anotherBadFunction'",
+    );
     assert.notEqual(orphanedAnotherBadFunction, undefined);
 
     // Should detect consuming unknown parameter
-    const unknownParamError = result.errors.find(
-      (err) => err.message === "Function 'badFunction' consumes unknown entity 'NON_EXISTENT_PARAM'",
+    const unknownParamDiagnostic = result.diagnostics.find(
+      (diagnostic) => diagnostic.message === "Function 'badFunction' consumes unknown entity 'NON_EXISTENT_PARAM'",
     );
-    assert.notEqual(unknownParamError, undefined);
-    assert.equal(unknownParamError?.position.line, 12);
-    assert.equal(unknownParamError?.severity, 'error');
-    assert.equal(unknownParamError?.suggestion, "Define 'NON_EXISTENT_PARAM' as one of: RunParameter, Asset, Dependency, Constants");
+    assert.notEqual(unknownParamDiagnostic, undefined);
+    assert.equal(unknownParamDiagnostic?.span.start.line, 12);
+    assert.equal(unknownParamDiagnostic?.severity, 'error');
 
-    // Get parsed entities using parse method
-    const parseResult = checker.parse(content, filePath);
+    // Get parsed entities using the source-graph parser directly, so the
+    // concrete AST node classes used for narrowing below come from the same
+    // module instance as the entities themselves — `@sammons/typed-mind`'s
+    // TypedMind facade resolves through the compiled `dist/` build, a
+    // distinct module graph from `src/ast/*-node.ts`.
+    const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
+    const parseResult = parser.parse(content);
     const entities = parseResult.entities;
-    assert.equal(entities.has('DATABASE_URL'), true);
-    assert.equal(entities.has('APP_CONFIG'), true);
-    assert.equal(entities.has('badFunction'), true);
-    assert.equal(entities.has('anotherBadFunction'), true);
+    assert.equal(
+      entities.some((entity) => entity.name === 'DATABASE_URL'),
+      true,
+    );
+    assert.equal(
+      entities.some((entity) => entity.name === 'APP_CONFIG'),
+      true,
+    );
+    assert.equal(
+      entities.some((entity) => entity.name === 'badFunction'),
+      true,
+    );
+    assert.equal(
+      entities.some((entity) => entity.name === 'anotherBadFunction'),
+      true,
+    );
 
     // Verify types
-    const databaseUrl = entities.get('DATABASE_URL') as any;
-    assert.equal(databaseUrl?.type, 'RunParameter');
+    const databaseUrl = entities.find((entity) => entity.name === 'DATABASE_URL' && entity instanceof RunParameterNode) as
+      | RunParameterNode
+      | undefined;
+    assert.equal(databaseUrl?.kind, 'RunParameter');
     assert.equal(databaseUrl?.paramType, 'env');
 
-    const appConfig = entities.get('APP_CONFIG');
-    assert.equal(appConfig?.type, 'Constants');
+    const appConfig = entities.find((entity) => entity.name === 'APP_CONFIG');
+    assert.equal(appConfig?.kind, 'Constants');
   });
 });

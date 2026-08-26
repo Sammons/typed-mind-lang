@@ -3,34 +3,33 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('scenario-03-circular-dependency', () => {
-  const checker = new DSLChecker();
   const scenarioFile = 'scenario-03-circular-dependency.tmd';
 
-  it('should detect circular dependency between functions', () => {
+  it('should detect circular dependency between functions', async () => {
+    const typedMind = await TypedMind.create();
     const content = readFileSync(join(__dirname, '..', 'scenarios', scenarioFile), 'utf-8');
-    const result = checker.check(content);
+    const result = typedMind.check(content);
 
     // The result should be invalid due to circular dependency
     assert.equal(result.valid, false);
 
     // Should have exactly 1 error
-    assert.equal(result.errors.length, 1);
+    assert.equal(result.diagnostics.length, 1);
 
-    const error = result.errors[0];
+    const diagnostic = result.diagnostics[0];
 
-    // Check error properties
-    assert.equal(error.position.line, 3);
-    assert.equal(error.position.column, 1);
-    assert.equal(error.severity, 'error');
-    assert.notEqual(error.suggestion, undefined);
+    // Check diagnostic properties
+    assert.equal(diagnostic.span.start.line, 3);
+    assert.equal(diagnostic.span.start.column, 1);
+    assert.equal(diagnostic.severity, 'error');
 
-    // Check that the error message describes the circular dependency
-    assert.equal(error.message, 'Circular import detected: ServiceA -> ServiceB -> ServiceC -> ServiceA');
+    // Check that the diagnostic message describes the circular dependency
+    assert.equal(diagnostic.message, 'Circular import detected: ServiceA -> ServiceB -> ServiceC -> ServiceA');
   });
 });

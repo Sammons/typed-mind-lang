@@ -3,53 +3,64 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('Scenario 53: ClassFile Inheritance Edge Cases', () => {
-  it('should detect circular and invalid inheritance patterns', () => {
+  it('should detect circular and invalid inheritance patterns', async () => {
     const scenarioPath = join(__dirname, '../scenarios/scenario-53-classfile-inheritance-edge-cases.tmd');
     const content = readFileSync(scenarioPath, 'utf-8');
 
-    const checker = new DSLChecker();
-    const result = checker.check(content);
+    const typedMind = await TypedMind.create();
+    const result = typedMind.check(content);
 
     // Should have errors for invalid inheritance
     assert.equal(result.valid, false);
-    assert.ok(result.errors.length > 0);
+    // RFC-TM-4 §4 A2: line 9's trailing `,` is now diagnosed as a syntax
+    // error, adding one diagnostic on top of the legacy set. This test only
+    // asserts presence via `> 0` / `.find()`, so the extra diagnostic does
+    // not change any assertion outcome.
+    assert.ok(result.diagnostics.length > 0);
 
     // Should find orphaned entities instead of circular inheritance
-    const orphanedErrors = result.errors.filter((e) => e.message.includes('Orphaned entity'));
+    const orphanedErrors = result.diagnostics.filter((diagnostic) => diagnostic.message.includes('Orphaned entity'));
     assert.ok(orphanedErrors.length > 0);
 
     // Should find ClassFile reference errors
-    const callsErrors = result.errors.filter((e) => e.message.includes("Cannot use 'calls' to reference ClassFile"));
+    const callsErrors = result.diagnostics.filter((diagnostic) => diagnostic.message.includes("Cannot use 'calls' to reference ClassFile"));
     assert.ok(callsErrors.length > 0);
 
     // Inheriting from non-existent class
-    const nonExistentBaseError = result.errors.find(
-      (e) => e.message.includes('NonExistentBase') && (e.message.includes('not found') || e.message.includes('does not exist')),
+    const nonExistentBaseError = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message.includes('NonExistentBase') &&
+        (diagnostic.message.includes('not found') || diagnostic.message.includes('does not exist')),
     );
     assert.notEqual(nonExistentBaseError, undefined); // Missing base class should be detected
 
     // Self-inheriting class should error
-    const selfInheritingError = result.errors.find(
-      (e) => e.message.includes('SelfInheriting') && (e.message.includes('itself') || e.message.includes('circular')),
+    const selfInheritingError = result.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.message.includes('SelfInheriting') && (diagnostic.message.includes('itself') || diagnostic.message.includes('circular')),
     );
     assert.notEqual(selfInheritingError, undefined); // Self-inheritance should be detected
 
     // Valid inheritance should not error
-    const validChildError = result.errors.find((e) => e.message.includes('ValidChild') && e.message.includes('inheritance'));
+    const validChildError = result.diagnostics.find(
+      (diagnostic) => diagnostic.message.includes('ValidChild') && diagnostic.message.includes('inheritance'),
+    );
     assert.equal(validChildError, undefined);
 
     // Deep inheritance chain should be valid
-    const deepInheritanceError = result.errors.find(
-      (e) =>
-        (e.message.includes('RootClass') || e.message.includes('MiddleClass') || e.message.includes('DeepChild')) &&
-        e.message.includes('inheritance') &&
-        !e.message.includes('Orphaned'),
+    const deepInheritanceError = result.diagnostics.find(
+      (diagnostic) =>
+        (diagnostic.message.includes('RootClass') ||
+          diagnostic.message.includes('MiddleClass') ||
+          diagnostic.message.includes('DeepChild')) &&
+        diagnostic.message.includes('inheritance') &&
+        !diagnostic.message.includes('Orphaned'),
     );
     assert.equal(deepInheritanceError, undefined);
   });
