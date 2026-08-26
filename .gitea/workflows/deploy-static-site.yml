@@ -41,7 +41,7 @@ jobs:
           mise exec -- corepack prepare pnpm@11 --activate
 
       - name: Install dependencies
-        run: mise exec -- pnpm install --ignore-scripts
+        run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build packages
         run: |
