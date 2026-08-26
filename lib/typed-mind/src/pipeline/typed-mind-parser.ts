@@ -11,6 +11,16 @@ import type { ParseOutcome } from './parse-outcome.ts';
 export interface TypedMindParserOptions {
   readonly wasmPath?: string;
   readonly wasmBytes?: Uint8Array;
+  // RFC-TM-5 §2 (rfc-tm-5-diamond.md) — the primary mechanism for locating
+  // web-tree-sitter's own emscripten runtime wasm (distinct from
+  // grammar.wasm, the language). The glue's findWasmBinary() calls
+  // Module["locateFile"]("web-tree-sitter.wasm") when a locateFile hook is
+  // present (web-tree-sitter@0.26.13, web-tree-sitter.js:1707-1712), falling
+  // back to a same-directory URL resolution otherwise — that fallback breaks
+  // once the glue is bundled into a different directory layout (a bundled
+  // cli.js is not adjacent to node_modules/web-tree-sitter/). When set, this
+  // path is handed to web-tree-sitter's own Parser.init({ locateFile }) below.
+  readonly runtimeWasmPath?: string;
 }
 
 // Default wasm resolution is __dirname-relative in the compiled CommonJS
@@ -56,7 +66,17 @@ export class TypedMindParser {
   }
 
   static async create(options: TypedMindParserOptions = {}) {
-    await Parser.init();
+    // RFC-TM-5 §2 — when runtimeWasmPath is supplied, wire it through
+    // Parser.init's locateFile hook so web-tree-sitter's own
+    // findWasmBinary() resolves its runtime wasm from an explicit path
+    // instead of a same-directory URL guess. Zero-arg Parser.init() (today's
+    // behavior) is preserved when the option is absent.
+    if (options.runtimeWasmPath === undefined) {
+      await Parser.init();
+    } else {
+      const runtimeWasmPath = options.runtimeWasmPath;
+      await Parser.init({ locateFile: () => runtimeWasmPath });
+    }
     const wasmSource = options.wasmBytes ?? options.wasmPath ?? resolveDefaultWasmPath();
     const language = await Language.load(wasmSource);
     const parser = new Parser();

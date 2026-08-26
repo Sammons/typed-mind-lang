@@ -30,6 +30,7 @@ import { toLspDiagnostics } from './lsp-diagnostics.ts';
 import { provideReferencesForName } from './references.ts';
 import { provideSemanticTokensForDocument, SEMANTIC_TOKEN_LEGEND, SEMANTIC_TOKEN_MODIFIERS } from './semantic-tokens.ts';
 import { handleToggleFormat, type ToggleFormatParams, type ToggleFormatResult } from './toggle-format.ts';
+import { resolveWasmPaths } from './wasm-resolution.ts';
 
 export class TypedMindLanguageServer {
   private readonly connection = createConnection(ProposedFeatures.all);
@@ -53,7 +54,12 @@ export class TypedMindLanguageServer {
   // start-server.ts for the ordering that makes this the only construction
   // path.
   static async create(): Promise<TypedMindLanguageServer> {
-    const typedMind = await TypedMind.create();
+    // RFC-TM-5 §2 — ordered candidate resolution for both wasm artifacts:
+    // bundle-adjacent first (the dist-bundled/ layout tsup.bundled.config.ts
+    // populates), then the core package's own layouts. Either field may
+    // resolve to undefined, in which case TypedMind.create() falls through to
+    // its own default resolution unchanged (dev layout parity).
+    const typedMind = await TypedMind.create(resolveWasmPaths());
     return new TypedMindLanguageServer(typedMind);
   }
 
