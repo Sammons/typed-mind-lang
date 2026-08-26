@@ -1,0 +1,8 @@
+# RFC-TM-3 Q2-authored duplicate-preservation fixture (executed in Q3, doc
+# FAQ Q2): the same name declared by a longform function block AND a shortform
+# function declaration. Longform duplicates are silently overwritten today
+# with no diagnostic at all; ParseOutcome.entities must contain BOTH.
+function createUser {
+  signature: "(data: UserDTO) => UserDTO"
+}
+createUser :: (data: UserDTO) => UserDTO
