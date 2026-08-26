@@ -172,7 +172,7 @@ Steps, in order, all in one PR:
    mismatch blocks the bump — this is a live independent check, not trust-on-first-use.
 5. Bump `web-tree-sitter`'s exact pin in `package.json`.
 6. Regenerate the generated artifacts: `parser.c`, `grammar.json`, `node-types.json`, and the
-   `S-AST-2` `<Kind>Base` skeletons.
+   `S-AST-2` `src/ast/gen/` wrappers (`node lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs`).
 7. Run the wasm load smoke test: `pnpm run check:toolchain` must pass, proving the regenerated
    grammar builds and loads under the newly-pinned toolchain.
 

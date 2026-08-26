@@ -19,5 +19,5 @@ macos-arm64 = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download
 # https://api.github.com/repos/WebAssembly/wasi-sdk/releases/tags/wasi-sdk-<major> | python3 -c
 # "...assets[].digest..." ) — a mismatch blocks the bump, this is not TOFU; (5) bump
 # web-tree-sitter's exact pin in package.json; (6) regenerate parser.c/grammar.json/node-types.json
-# and the S-AST-2 Base skeletons; (7) pass the wasm load smoke test (pnpm run check:toolchain).
+# and the S-AST-2 src/ast/gen/ wrappers; (7) pass the wasm load smoke test (pnpm run check:toolchain).
 # See README "Development" for the full narrative. RFC-TM-1 (rfc-tm-1-diamond.md).
