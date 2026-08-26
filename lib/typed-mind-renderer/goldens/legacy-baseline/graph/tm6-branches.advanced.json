@@ -1,0 +1,182 @@
+{
+  "entities": [
+    {
+      "name": "BranchApp",
+      "type": "Program",
+      "entry": "AppEntry",
+      "version": "1.0.0",
+      "position": {
+        "line": 1,
+        "column": 1
+      },
+      "raw": "BranchApp -> AppEntry v1.0.0"
+    },
+    {
+      "name": "AppEntry",
+      "type": "File",
+      "path": "src/entry.ts",
+      "imports": ["helperFn", "BaseSvc", "Serializable", "ChildSvc", "RootPanel", "SidePanel"],
+      "exports": ["BaseSvc", "Serializable", "ChildSvc", "helperFn"],
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "raw": "AppEntry @ src/entry.ts:"
+    },
+    {
+      "name": "BaseSvc",
+      "type": "Class",
+      "implements": [],
+      "methods": ["baseRun"],
+      "imports": [],
+      "position": {
+        "line": 5,
+        "column": 1
+      },
+      "raw": "BaseSvc <:"
+    },
+    {
+      "name": "Serializable",
+      "type": "Class",
+      "implements": [],
+      "methods": ["toJson"],
+      "imports": [],
+      "position": {
+        "line": 7,
+        "column": 1
+      },
+      "raw": "Serializable <:"
+    },
+    {
+      "name": "ChildSvc",
+      "type": "Class",
+      "extends": "BaseSvc",
+      "implements": ["Serializable"],
+      "methods": ["childRun"],
+      "imports": [],
+      "position": {
+        "line": 9,
+        "column": 1
+      },
+      "raw": "ChildSvc <: BaseSvc, Serializable"
+    },
+    {
+      "name": "helperFn",
+      "type": "Function",
+      "signature": "(input: InputDto) => OutputDto",
+      "calls": [],
+      "position": {
+        "line": 11,
+        "column": 1
+      },
+      "raw": "helperFn :: (input: InputDto) => OutputDto",
+      "input": "InputDto",
+      "output": "OutputDto",
+      "consumes": ["APP_MODE"]
+    },
+    {
+      "name": "InputDto",
+      "type": "DTO",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 15,
+        "column": 1
+      },
+      "raw": "InputDto %"
+    },
+    {
+      "name": "OutputDto",
+      "type": "DTO",
+      "fields": [
+        {
+          "name": "ok",
+          "type": "boolean",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 17,
+        "column": 1
+      },
+      "raw": "OutputDto %"
+    },
+    {
+      "name": "APP_MODE",
+      "type": "Constants",
+      "path": "src/config.ts",
+      "position": {
+        "line": 19,
+        "column": 1
+      },
+      "raw": "APP_MODE ! src/config.ts"
+    },
+    {
+      "name": "RootPanel",
+      "type": "UIComponent",
+      "purpose": "Root panel",
+      "root": true,
+      "contains": ["OrphanPanel", "SidePanel"],
+      "containedBy": [],
+      "affectedBy": [],
+      "position": {
+        "line": 20,
+        "column": 1
+      },
+      "raw": "RootPanel &! \"Root panel\""
+    },
+    {
+      "name": "SidePanel",
+      "type": "UIComponent",
+      "purpose": "Side panel, declares no contains",
+      "contains": [],
+      "containedBy": ["RootPanel"],
+      "affectedBy": [],
+      "position": {
+        "line": 22,
+        "column": 1
+      },
+      "raw": "SidePanel & \"Side panel, declares no contains\""
+    },
+    {
+      "name": "OrphanPanel",
+      "type": "UIComponent",
+      "purpose": "Mismatch child",
+      "contains": [],
+      "containedBy": ["SidePanel", "RootPanel"],
+      "affectedBy": [],
+      "position": {
+        "line": 23,
+        "column": 1
+      },
+      "raw": "OrphanPanel & \"Mismatch child\""
+    }
+  ],
+  "links": [],
+  "errors": [],
+  "metadata": {
+    "healthScore": {
+      "overall": 92,
+      "categories": {
+        "Complexity": 100,
+        "Coupling": 97.90178571428572,
+        "Structure": 98.5,
+        "Testability": 80,
+        "Maintainability": 70,
+        "Performance": 84.83333333333333
+      },
+      "trends": {},
+      "recommendations": [],
+      "risks": []
+    },
+    "patterns": [],
+    "performance": {
+      "graph-load-time": "<normalized: non-deterministic wall-clock timing>"
+    }
+  }
+}

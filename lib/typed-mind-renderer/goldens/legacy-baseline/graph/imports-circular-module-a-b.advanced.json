@@ -1,0 +1,138 @@
+{
+  "entities": [
+    {
+      "name": "FileA",
+      "type": "File",
+      "path": "src/module-a.ts",
+      "imports": ["ServiceB"],
+      "exports": ["ServiceA"],
+      "position": {
+        "line": 4,
+        "column": 1
+      },
+      "raw": "FileA @ src/module-a.ts:"
+    },
+    {
+      "name": "ServiceA",
+      "type": "Class",
+      "implements": [],
+      "methods": ["methodA"],
+      "imports": [],
+      "position": {
+        "line": 8,
+        "column": 1
+      },
+      "raw": "ServiceA <:"
+    },
+    {
+      "name": "methodA",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["ServiceB.methodB"],
+      "position": {
+        "line": 11,
+        "column": 1
+      },
+      "raw": "methodA :: () => void"
+    }
+  ],
+  "links": [],
+  "errors": [
+    {
+      "position": {
+        "line": 4,
+        "column": 1
+      },
+      "message": "Orphaned file 'FileA' - none of its exports are imported",
+      "severity": "error",
+      "suggestion": "Remove this file or import its exports somewhere"
+    },
+    {
+      "position": {
+        "line": 8,
+        "column": 1
+      },
+      "message": "Orphaned entity 'ServiceA'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 4,
+        "column": 1
+      },
+      "message": "Import 'ServiceB' not found",
+      "severity": "error",
+      "suggestion": "Did you mean 'ServiceA'?"
+    },
+    {
+      "position": {
+        "line": 1,
+        "column": 1
+      },
+      "message": "No program entry point defined",
+      "severity": "error",
+      "suggestion": "Add a Program entity: AppName -> EntryFile"
+    },
+    {
+      "position": {
+        "line": 11,
+        "column": 1
+      },
+      "message": "Call to 'ServiceB.methodB' references unknown entity 'ServiceB'",
+      "severity": "error"
+    },
+    {
+      "position": {
+        "line": 4,
+        "column": 1
+      },
+      "message": "Entity 'FileA' conflicts with imported entity",
+      "severity": "error"
+    },
+    {
+      "position": {
+        "line": 8,
+        "column": 1
+      },
+      "message": "Entity 'ServiceA' conflicts with imported entity",
+      "severity": "error"
+    },
+    {
+      "position": {
+        "line": 11,
+        "column": 1
+      },
+      "message": "Entity 'methodA' conflicts with imported entity",
+      "severity": "error"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Circular import detected: /Users/sammons/Desktop/typed-mind-lang/.claude/worktrees/tm6-q1/lib/typed-mind-test-suite/scenarios/imports/circular/module-b.tmd -> /Users/sammons/Desktop/typed-mind-lang/.claude/worktrees/tm6-q1/lib/typed-mind-test-suite/scenarios/imports/circular/module-a.tmd -> /Users/sammons/Desktop/typed-mind-lang/.claude/worktrees/tm6-q1/lib/typed-mind-test-suite/scenarios/imports/circular/module-b.tmd",
+      "severity": "error"
+    }
+  ],
+  "metadata": {
+    "healthScore": {
+      "overall": 91,
+      "categories": {
+        "Complexity": 100,
+        "Coupling": 100,
+        "Structure": 95.5,
+        "Testability": 80,
+        "Maintainability": 61.666666666666664,
+        "Performance": 84.83333333333333
+      },
+      "trends": {},
+      "recommendations": [],
+      "risks": []
+    },
+    "patterns": [],
+    "performance": {
+      "graph-load-time": "<normalized: non-deterministic wall-clock timing>"
+    }
+  }
+}

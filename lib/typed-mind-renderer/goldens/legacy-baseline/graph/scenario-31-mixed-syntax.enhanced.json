@@ -1,0 +1,447 @@
+{
+  "entities": [
+    {
+      "name": "TodoApp",
+      "type": "Program",
+      "entry": "AppEntry",
+      "version": "1.0.0",
+      "position": {
+        "line": 4,
+        "column": 1
+      },
+      "raw": "TodoApp -> AppEntry v1.0.0"
+    },
+    {
+      "name": "APIServer",
+      "type": "Program",
+      "entry": "ApiMain",
+      "version": "2.0.0",
+      "position": {
+        "line": 7,
+        "column": 1
+      },
+      "raw": "program APIServer {\n  entry: ApiMain\n  version: \"2.0.0\"\n}"
+    },
+    {
+      "name": "AppEntry",
+      "type": "File",
+      "path": "src/app.ts",
+      "imports": ["Express"],
+      "exports": ["startApp"],
+      "position": {
+        "line": 13,
+        "column": 1
+      },
+      "raw": "AppEntry @ src/app.ts:"
+    },
+    {
+      "name": "ApiMain",
+      "type": "File",
+      "path": "src/api.ts",
+      "imports": ["Fastify", "Database"],
+      "exports": ["startApi"],
+      "position": {
+        "line": 18,
+        "column": 1
+      },
+      "raw": "file ApiMain {\n  path: \"src/api.ts\"\n  imports: [Fastify, Database]\n  exports: [startApi]\n}"
+    },
+    {
+      "name": "createTodo",
+      "type": "Function",
+      "signature": "(data: TodoDTO) => Todo",
+      "calls": ["validate", "save"],
+      "position": {
+        "line": 25,
+        "column": 1
+      },
+      "raw": "createTodo :: (data: TodoDTO) => Todo"
+    },
+    {
+      "name": "deleteTodo",
+      "type": "Function",
+      "signature": "(id: string) => void",
+      "calls": ["Database.delete"],
+      "affects": [],
+      "consumes": [],
+      "position": {
+        "line": 28,
+        "column": 1
+      },
+      "raw": "function deleteTodo {\n  signature: \"(id: string) => void\"\n  calls: [Database.delete]\n}"
+    },
+    {
+      "name": "TodoDTO",
+      "type": "DTO",
+      "purpose": "Todo input data",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "done",
+          "type": "boolean",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 34,
+        "column": 1
+      },
+      "raw": "TodoDTO % \"Todo input data\""
+    },
+    {
+      "name": "UserDTO",
+      "type": "DTO",
+      "purpose": "User data",
+      "fields": [
+        {
+          "name": "name",
+          "type": "any",
+          "optional": false
+        },
+        {
+          "name": "email",
+          "type": "any",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 38,
+        "column": 1
+      },
+      "raw": "dto UserDTO {\n  description: \"User data\"\n  fields: {\n}",
+      "comment": "User data"
+    },
+    {
+      "name": "Button",
+      "type": "UIComponent",
+      "purpose": "Reusable button",
+      "contains": [],
+      "containedBy": ["UserProfile"],
+      "affectedBy": [],
+      "position": {
+        "line": 47,
+        "column": 1
+      },
+      "raw": "Button & \"Reusable button\""
+    },
+    {
+      "name": "UserProfile",
+      "type": "UIComponent",
+      "purpose": "User profile display",
+      "root": false,
+      "contains": ["Button"],
+      "containedBy": [],
+      "affectedBy": ["updateProfile"],
+      "position": {
+        "line": 49,
+        "column": 1
+      },
+      "raw": "component UserProfile {\n  description: \"User profile display\"\n  contains: [Button]\n  affectedBy: [updateProfile]\n}",
+      "comment": "User profile display"
+    },
+    {
+      "name": "DATABASE_URL",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "Database connection",
+      "consumedBy": ["updateProfile"],
+      "position": {
+        "line": 56,
+        "column": 1
+      },
+      "raw": "DATABASE_URL $env \"Database connection\""
+    },
+    {
+      "name": "API_KEY",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "API key",
+      "defaultValue": "dev-key",
+      "required": false,
+      "consumedBy": ["updateProfile"],
+      "position": {
+        "line": 58,
+        "column": 1
+      },
+      "raw": "parameter API_KEY {\n  type: \"env\"\n  description: \"API key\"\n  default: \"dev-key\"\n}",
+      "comment": "API key"
+    },
+    {
+      "name": "updateProfile",
+      "type": "Function",
+      "signature": "(data: UserDTO) => void",
+      "calls": [],
+      "affects": ["UserProfile"],
+      "consumes": ["DATABASE_URL", "API_KEY"],
+      "position": {
+        "line": 65,
+        "column": 1
+      },
+      "raw": "function updateProfile {\n  signature: \"(data: UserDTO) => void\"\n  consumes: [DATABASE_URL, API_KEY]\n  affects: [UserProfile]\n}"
+    },
+    {
+      "name": "Express",
+      "type": "Constants",
+      "path": "src/express.ts",
+      "position": {
+        "line": 72,
+        "column": 1
+      },
+      "raw": "Express ! src/express.ts"
+    },
+    {
+      "name": "Fastify",
+      "type": "Constants",
+      "path": "src/fastify.ts",
+      "position": {
+        "line": 73,
+        "column": 1
+      },
+      "raw": "Fastify ! src/fastify.ts"
+    },
+    {
+      "name": "Database",
+      "type": "Class",
+      "implements": [],
+      "methods": ["delete"],
+      "imports": [],
+      "position": {
+        "line": 74,
+        "column": 1
+      },
+      "raw": "Database <:"
+    },
+    {
+      "name": "validate",
+      "type": "Function",
+      "signature": "(data: any) => boolean",
+      "calls": [],
+      "position": {
+        "line": 77,
+        "column": 1
+      },
+      "raw": "validate :: (data: any) => boolean"
+    },
+    {
+      "name": "save",
+      "type": "Function",
+      "signature": "(data: any) => void",
+      "calls": [],
+      "position": {
+        "line": 78,
+        "column": 1
+      },
+      "raw": "save :: (data: any) => void"
+    },
+    {
+      "name": "startApp",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 80,
+        "column": 1
+      },
+      "raw": "startApp :: () => void"
+    },
+    {
+      "name": "startApi",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 81,
+        "column": 1
+      },
+      "raw": "startApi :: () => void"
+    }
+  ],
+  "links": [
+    {
+      "source": "TodoApp",
+      "target": "AppEntry",
+      "type": "entry"
+    },
+    {
+      "source": "APIServer",
+      "target": "ApiMain",
+      "type": "entry"
+    },
+    {
+      "source": "AppEntry",
+      "target": "Express",
+      "type": "import"
+    },
+    {
+      "source": "AppEntry",
+      "target": "startApp",
+      "type": "export"
+    },
+    {
+      "source": "ApiMain",
+      "target": "Fastify",
+      "type": "import"
+    },
+    {
+      "source": "ApiMain",
+      "target": "Database",
+      "type": "import"
+    },
+    {
+      "source": "ApiMain",
+      "target": "startApi",
+      "type": "export"
+    },
+    {
+      "source": "createTodo",
+      "target": "validate",
+      "type": "call"
+    },
+    {
+      "source": "createTodo",
+      "target": "save",
+      "type": "call"
+    }
+  ],
+  "errors": [
+    {
+      "position": {
+        "line": 25,
+        "column": 1
+      },
+      "message": "Orphaned entity 'createTodo'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 28,
+        "column": 1
+      },
+      "message": "Orphaned entity 'deleteTodo'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 34,
+        "column": 1
+      },
+      "message": "Orphaned entity 'TodoDTO'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 38,
+        "column": 1
+      },
+      "message": "Orphaned entity 'UserDTO'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 49,
+        "column": 1
+      },
+      "message": "Orphaned entity 'UserProfile'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 65,
+        "column": 1
+      },
+      "message": "Orphaned entity 'updateProfile'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 80,
+        "column": 1
+      },
+      "message": "Orphaned entity 'startApp'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 81,
+        "column": 1
+      },
+      "message": "Orphaned entity 'startApi'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 25,
+        "column": 1
+      },
+      "message": "Function 'createTodo' is not exported by any file and is not a class method",
+      "severity": "error",
+      "suggestion": "Either add 'createTodo' to the exports of a file entity or define it as a method of a class"
+    },
+    {
+      "position": {
+        "line": 28,
+        "column": 1
+      },
+      "message": "Function 'deleteTodo' is not exported by any file and is not a class method",
+      "severity": "error",
+      "suggestion": "Either add 'deleteTodo' to the exports of a file entity or define it as a method of a class"
+    },
+    {
+      "position": {
+        "line": 65,
+        "column": 1
+      },
+      "message": "Function 'updateProfile' is not exported by any file and is not a class method",
+      "severity": "error",
+      "suggestion": "Either add 'updateProfile' to the exports of a file entity or define it as a method of a class"
+    },
+    {
+      "position": {
+        "line": 74,
+        "column": 1
+      },
+      "message": "Class 'Database' is not exported by any file",
+      "severity": "error",
+      "suggestion": "Add 'Database' to the exports of a file entity or convert to ClassFile with #: operator"
+    },
+    {
+      "position": {
+        "line": 77,
+        "column": 1
+      },
+      "message": "Function 'validate' is not exported by any file and is not a class method",
+      "severity": "error",
+      "suggestion": "Either add 'validate' to the exports of a file entity or define it as a method of a class"
+    },
+    {
+      "position": {
+        "line": 78,
+        "column": 1
+      },
+      "message": "Function 'save' is not exported by any file and is not a class method",
+      "severity": "error",
+      "suggestion": "Either add 'save' to the exports of a file entity or define it as a method of a class"
+    },
+    {
+      "position": {
+        "line": 49,
+        "column": 1
+      },
+      "message": "UIComponent 'UserProfile' is not contained by any other UIComponent",
+      "severity": "error",
+      "suggestion": "Either add 'UserProfile' to another UIComponent's contains list, or mark it as a root component with &!"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "AppEntry": ["helperFn", "BaseSvc", "Serializable", "ChildSvc", "RootPanel", "SidePanel"],
+  "ChildSvc": ["BaseSvc", "Serializable"],
+  "helperFn": ["InputDto", "OutputDto", "APP_MODE"],
+  "BaseSvc": [],
+  "Serializable": [],
+  "RootPanel": [],
+  "SidePanel": [],
+  "OrphanPanel": []
+}

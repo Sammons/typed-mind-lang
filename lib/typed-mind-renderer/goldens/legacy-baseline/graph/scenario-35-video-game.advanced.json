@@ -1,0 +1,3145 @@
+{
+  "entities": [
+    {
+      "name": "DragonQuestRPG",
+      "type": "Program",
+      "entry": "MainFile",
+      "version": "1.0.0",
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "raw": "DragonQuestRPG -> MainFile v1.0.0 # 3D Action RPG with multiplayer support",
+      "comment": "3D Action RPG with multiplayer support"
+    },
+    {
+      "name": "MainFile",
+      "type": "File",
+      "path": "Assets/Scripts/Core/GameManager.cs",
+      "imports": [
+        "SceneManagerFile",
+        "InputManagerFile",
+        "SaveSystemFile",
+        "NetworkManagerFile",
+        "PlayerSystemFile",
+        "CombatSystemFile",
+        "AISystemFile",
+        "InventorySystemFile",
+        "WorldManagerFile",
+        "QuestSystemFile",
+        "NPCSystemFile",
+        "MultiplayerSyncFile",
+        "UIManagerFile",
+        "HUDFile",
+        "MenuSystemFile",
+        "AudioManagerFile",
+        "RenderingManagerFile",
+        "VFXManagerFile",
+        "ResourceManagerFile"
+      ],
+      "exports": ["GameManager", "GameState"],
+      "position": {
+        "line": 5,
+        "column": 1
+      },
+      "raw": "MainFile @ Assets/Scripts/Core/GameManager.cs:"
+    },
+    {
+      "name": "SceneManagerFile",
+      "type": "File",
+      "path": "Assets/Scripts/Core/SceneManager.cs",
+      "imports": ["LoadingScreen", "SceneTransition"],
+      "exports": ["SceneManager", "LoadScene", "UnloadScene", "LoadSceneAsync", "GetActiveScene"],
+      "position": {
+        "line": 9,
+        "column": 1
+      },
+      "raw": "SceneManagerFile @ Assets/Scripts/Core/SceneManager.cs:"
+    },
+    {
+      "name": "InputManagerFile",
+      "type": "File",
+      "path": "Assets/Scripts/Core/InputManager.cs",
+      "imports": ["InputActions", "ControllerSupport"],
+      "exports": ["InputManager", "GetInput", "RegisterAction", "GetAxis", "GetButton", "RemapControl"],
+      "position": {
+        "line": 13,
+        "column": 1
+      },
+      "raw": "InputManagerFile @ Assets/Scripts/Core/InputManager.cs:"
+    },
+    {
+      "name": "PlayerSystemFile",
+      "type": "File",
+      "path": "Assets/Scripts/Player/PlayerController.cs",
+      "imports": ["CharacterMovement", "CombatSystemFile", "InventorySystemFile", "SkillSystem"],
+      "exports": ["PlayerController", "PlayerStats", "Move", "Jump", "Interact"],
+      "position": {
+        "line": 18,
+        "column": 1
+      },
+      "raw": "PlayerSystemFile @ Assets/Scripts/Player/PlayerController.cs:"
+    },
+    {
+      "name": "CombatSystemFile",
+      "type": "File",
+      "path": "Assets/Scripts/Combat/CombatSystem.cs",
+      "imports": ["DamageCalculator", "StatusEffects", "ComboSystem"],
+      "exports": ["CombatSystem", "Attack", "Defend", "UseSkill", "DealDamage", "TakeDamage", "ApplyStatus", "RemoveStatus"],
+      "position": {
+        "line": 22,
+        "column": 1
+      },
+      "raw": "CombatSystemFile @ Assets/Scripts/Combat/CombatSystem.cs:"
+    },
+    {
+      "name": "AISystemFile",
+      "type": "File",
+      "path": "Assets/Scripts/AI/AIController.cs",
+      "imports": ["BehaviorTree", "Pathfinding", "SensorSystem"],
+      "exports": ["AIController", "EnemyAI", "CompanionAI", "UpdateBehavior", "SetTarget", "Patrol", "Chase"],
+      "position": {
+        "line": 26,
+        "column": 1
+      },
+      "raw": "AISystemFile @ Assets/Scripts/AI/AIController.cs:"
+    },
+    {
+      "name": "InventorySystemFile",
+      "type": "File",
+      "path": "Assets/Scripts/Inventory/InventorySystem.cs",
+      "imports": ["ItemDatabase", "EquipmentManager"],
+      "exports": ["InventorySystem", "AddItem", "RemoveItem", "UseItem", "EquipItem", "UnequipItem"],
+      "position": {
+        "line": 30,
+        "column": 1
+      },
+      "raw": "InventorySystemFile @ Assets/Scripts/Inventory/InventorySystem.cs:"
+    },
+    {
+      "name": "WorldManagerFile",
+      "type": "File",
+      "path": "Assets/Scripts/World/WorldManager.cs",
+      "imports": ["TerrainGenerator", "WeatherSystem", "DayNightCycle"],
+      "exports": ["WorldManager", "GenerateWorld", "GenerateTerrain", "SetWeather", "UpdateTime", "SpawnEntities"],
+      "position": {
+        "line": 35,
+        "column": 1
+      },
+      "raw": "WorldManagerFile @ Assets/Scripts/World/WorldManager.cs:"
+    },
+    {
+      "name": "QuestSystemFile",
+      "type": "File",
+      "path": "Assets/Scripts/Quests/QuestManager.cs",
+      "imports": ["QuestDatabase", "DialogueSystem"],
+      "exports": ["QuestManager", "StartQuest", "CompleteQuest", "UpdateObjective", "GetActiveQuests"],
+      "position": {
+        "line": 39,
+        "column": 1
+      },
+      "raw": "QuestSystemFile @ Assets/Scripts/Quests/QuestManager.cs:"
+    },
+    {
+      "name": "NPCSystemFile",
+      "type": "File",
+      "path": "Assets/Scripts/NPCs/NPCManager.cs",
+      "imports": ["NPCDatabase", "DialogueSystem", "ShopSystem"],
+      "exports": ["NPCManager", "SpawnNPC", "InteractWithNPC"],
+      "position": {
+        "line": 43,
+        "column": 1
+      },
+      "raw": "NPCSystemFile @ Assets/Scripts/NPCs/NPCManager.cs:"
+    },
+    {
+      "name": "NetworkManagerFile",
+      "type": "File",
+      "path": "Assets/Scripts/Network/NetworkManager.cs",
+      "imports": ["PhotonNetwork", "MatchmakingService", "MultiplayerSyncFile"],
+      "exports": ["NetworkManager", "ConnectToServer", "CreateRoom", "JoinRoom", "Connect", "Disconnect", "SendData"],
+      "position": {
+        "line": 48,
+        "column": 1
+      },
+      "raw": "NetworkManagerFile @ Assets/Scripts/Network/NetworkManager.cs:"
+    },
+    {
+      "name": "MultiplayerSyncFile",
+      "type": "File",
+      "path": "Assets/Scripts/Network/MultiplayerSync.cs",
+      "imports": ["PlayerSync", "WorldSync"],
+      "exports": ["MultiplayerSync", "SyncPosition", "SyncState"],
+      "position": {
+        "line": 52,
+        "column": 1
+      },
+      "raw": "MultiplayerSyncFile @ Assets/Scripts/Network/MultiplayerSync.cs:"
+    },
+    {
+      "name": "UIManagerFile",
+      "type": "File",
+      "path": "Assets/Scripts/UI/UIManager.cs",
+      "imports": ["MainMenu", "HUD", "PauseMenu", "InventoryUI", "QuestLog", "HUDFile", "MenuSystemFile"],
+      "exports": ["UIManager", "ShowUI", "HideUI", "UpdateUI", "RegisterPanel"],
+      "position": {
+        "line": 57,
+        "column": 1
+      },
+      "raw": "UIManagerFile @ Assets/Scripts/UI/UIManager.cs:"
+    },
+    {
+      "name": "HUDFile",
+      "type": "File",
+      "path": "Assets/Scripts/UI/HUD.cs",
+      "imports": ["HealthBar", "ManaBar", "Minimap", "QuestTracker"],
+      "exports": ["HUD", "UpdateHealth", "UpdateMana"],
+      "position": {
+        "line": 61,
+        "column": 1
+      },
+      "raw": "HUDFile @ Assets/Scripts/UI/HUD.cs:"
+    },
+    {
+      "name": "MenuSystemFile",
+      "type": "File",
+      "path": "Assets/Scripts/UI/MenuSystem.cs",
+      "imports": ["SettingsMenu", "SaveLoadMenu", "CharacterCreation"],
+      "exports": ["MenuSystem", "OpenMenu", "CloseMenu"],
+      "position": {
+        "line": 65,
+        "column": 1
+      },
+      "raw": "MenuSystemFile @ Assets/Scripts/UI/MenuSystem.cs:"
+    },
+    {
+      "name": "AudioManagerFile",
+      "type": "File",
+      "path": "Assets/Scripts/Audio/AudioManager.cs",
+      "imports": ["MusicPlayer", "SFXPlayer", "VoicePlayer"],
+      "exports": ["AudioManager", "PlayMusic", "PlaySFX", "PlayVoice", "StopMusic", "SetVolume"],
+      "position": {
+        "line": 70,
+        "column": 1
+      },
+      "raw": "AudioManagerFile @ Assets/Scripts/Audio/AudioManager.cs:"
+    },
+    {
+      "name": "RenderingManagerFile",
+      "type": "File",
+      "path": "Assets/Scripts/Rendering/RenderingManager.cs",
+      "imports": ["PostProcessing", "LODSystem", "OcclusionCulling"],
+      "exports": ["RenderingManager", "SetQuality", "UpdateSettings"],
+      "position": {
+        "line": 75,
+        "column": 1
+      },
+      "raw": "RenderingManagerFile @ Assets/Scripts/Rendering/RenderingManager.cs:"
+    },
+    {
+      "name": "VFXManagerFile",
+      "type": "File",
+      "path": "Assets/Scripts/VFX/VFXManager.cs",
+      "imports": ["ParticleSystem", "ShaderEffects"],
+      "exports": ["VFXManager", "PlayEffect", "StopEffect"],
+      "position": {
+        "line": 79,
+        "column": 1
+      },
+      "raw": "VFXManagerFile @ Assets/Scripts/VFX/VFXManager.cs:"
+    },
+    {
+      "name": "SaveSystemFile",
+      "type": "File",
+      "path": "Assets/Scripts/SaveLoad/SaveSystem.cs",
+      "imports": ["SaveData", "CloudSave"],
+      "exports": ["SaveSystem", "SaveGame", "LoadGame", "DeleteSave", "QuickSave", "AutoSave"],
+      "position": {
+        "line": 84,
+        "column": 1
+      },
+      "raw": "SaveSystemFile @ Assets/Scripts/SaveLoad/SaveSystem.cs:"
+    },
+    {
+      "name": "ResourceManagerFile",
+      "type": "File",
+      "path": "Assets/Scripts/Resources/ResourceManager.cs",
+      "imports": ["AssetBundles", "AddressableAssets"],
+      "exports": ["ResourceManager", "LoadAsset", "UnloadAsset", "PreloadAssets", "ClearCache"],
+      "position": {
+        "line": 89,
+        "column": 1
+      },
+      "raw": "ResourceManagerFile @ Assets/Scripts/Resources/ResourceManager.cs:"
+    },
+    {
+      "name": "UNITY_VERSION",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "Unity engine version",
+      "required": true,
+      "consumedBy": ["Initialize"],
+      "position": {
+        "line": 94,
+        "column": 1
+      },
+      "raw": "UNITY_VERSION $env \"Unity engine version\" (required)",
+      "defaultValue": "2023.2.1f1"
+    },
+    {
+      "name": "PHOTON_APP_ID",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "Photon networking app ID",
+      "required": true,
+      "consumedBy": ["Connect", "InitializeNetwork"],
+      "position": {
+        "line": 96,
+        "column": 1
+      },
+      "raw": "PHOTON_APP_ID $env \"Photon networking app ID\" (required)"
+    },
+    {
+      "name": "STEAM_APP_ID",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "Steam app ID",
+      "consumedBy": ["CloudSync"],
+      "position": {
+        "line": 97,
+        "column": 1
+      },
+      "raw": "STEAM_APP_ID $env \"Steam app ID\" (optional)"
+    },
+    {
+      "name": "ANALYTICS_KEY",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "Game analytics key",
+      "consumedBy": ["CompleteQuest"],
+      "position": {
+        "line": 98,
+        "column": 1
+      },
+      "raw": "ANALYTICS_KEY $env \"Game analytics key\" (optional)"
+    },
+    {
+      "name": "BUILD_TARGET",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "Platform build target",
+      "consumedBy": ["Initialize"],
+      "position": {
+        "line": 99,
+        "column": 1
+      },
+      "raw": "BUILD_TARGET $env \"Platform build target\"",
+      "defaultValue": "PC"
+    },
+    {
+      "name": "GRAPHICS_API",
+      "type": "RunParameter",
+      "paramType": "runtime",
+      "description": "Graphics API",
+      "consumedBy": ["InitializeGraphics"],
+      "position": {
+        "line": 103,
+        "column": 1
+      },
+      "raw": "GRAPHICS_API $runtime \"Graphics API\"",
+      "defaultValue": "DirectX12"
+    },
+    {
+      "name": "TARGET_FPS",
+      "type": "RunParameter",
+      "paramType": "runtime",
+      "description": "Target frame rate",
+      "consumedBy": ["InitializeGraphics"],
+      "position": {
+        "line": 105,
+        "column": 1
+      },
+      "raw": "TARGET_FPS $runtime \"Target frame rate\"",
+      "defaultValue": "60"
+    },
+    {
+      "name": "PHYSICS_TIMESTEP",
+      "type": "RunParameter",
+      "paramType": "runtime",
+      "description": "Fixed physics timestep",
+      "consumedBy": ["InitializePhysics"],
+      "position": {
+        "line": 107,
+        "column": 1
+      },
+      "raw": "PHYSICS_TIMESTEP $runtime \"Fixed physics timestep\"",
+      "defaultValue": "0.02"
+    },
+    {
+      "name": "BUILD_TYPE",
+      "type": "RunParameter",
+      "paramType": "config",
+      "description": "Build configuration",
+      "consumedBy": ["SaveGame"],
+      "position": {
+        "line": 111,
+        "column": 1
+      },
+      "raw": "BUILD_TYPE $config \"Build configuration\"",
+      "defaultValue": "Release"
+    },
+    {
+      "name": "ENABLE_MULTIPLAYER",
+      "type": "RunParameter",
+      "paramType": "config",
+      "description": "Enable multiplayer features",
+      "consumedBy": ["InitializeNetwork"],
+      "position": {
+        "line": 113,
+        "column": 1
+      },
+      "raw": "ENABLE_MULTIPLAYER $config \"Enable multiplayer features\"",
+      "defaultValue": "true"
+    },
+    {
+      "name": "ENABLE_MODDING",
+      "type": "RunParameter",
+      "paramType": "config",
+      "description": "Enable mod support",
+      "consumedBy": ["UseSkill"],
+      "position": {
+        "line": 115,
+        "column": 1
+      },
+      "raw": "ENABLE_MODDING $config \"Enable mod support\"",
+      "defaultValue": "false"
+    },
+    {
+      "name": "MAX_PLAYERS",
+      "type": "RunParameter",
+      "paramType": "config",
+      "description": "Maximum players per session",
+      "consumedBy": ["InitializeNetwork"],
+      "position": {
+        "line": 117,
+        "column": 1
+      },
+      "raw": "MAX_PLAYERS $config \"Maximum players per session\"",
+      "defaultValue": "4"
+    },
+    {
+      "name": "MainMenu",
+      "type": "UIComponent",
+      "purpose": "Main menu screen",
+      "root": true,
+      "contains": ["PlayButton", "SettingsButton", "QuitButton"],
+      "containedBy": [],
+      "affectedBy": ["StartGame", "EndGame", "Connect", "CreateRoom", "JoinRoom", "ShowUI", "HideUI", "LoadGame"],
+      "position": {
+        "line": 121,
+        "column": 1
+      },
+      "raw": "MainMenu &! \"Main menu screen\""
+    },
+    {
+      "name": "HUD",
+      "type": "UIComponent",
+      "purpose": "In-game heads-up display",
+      "root": true,
+      "contains": ["HealthBar", "ManaBar", "Minimap", "QuestTracker", "SkillBar"],
+      "containedBy": [],
+      "affectedBy": ["PauseGame", "ShowUI", "HideUI", "UpdateUI"],
+      "position": {
+        "line": 125,
+        "column": 1
+      },
+      "raw": "HUD &! \"In-game heads-up display\""
+    },
+    {
+      "name": "PauseMenu",
+      "type": "UIComponent",
+      "purpose": "Pause game menu",
+      "root": true,
+      "contains": ["ResumeButton", "SaveButton", "SettingsButton", "QuitButton"],
+      "containedBy": [],
+      "affectedBy": ["PauseGame", "ShowUI", "HideUI", "SaveGame"],
+      "position": {
+        "line": 129,
+        "column": 1
+      },
+      "raw": "PauseMenu &! \"Pause game menu\""
+    },
+    {
+      "name": "InventoryUI",
+      "type": "UIComponent",
+      "purpose": "Inventory management screen",
+      "root": true,
+      "contains": ["ItemGrid", "EquipmentSlots", "StatsPanel"],
+      "containedBy": [],
+      "affectedBy": ["AddItem", "RemoveItem", "ShowUI", "HideUI"],
+      "position": {
+        "line": 133,
+        "column": 1
+      },
+      "raw": "InventoryUI &! \"Inventory management screen\""
+    },
+    {
+      "name": "QuestLog",
+      "type": "UIComponent",
+      "purpose": "Quest journal interface",
+      "root": true,
+      "contains": ["QuestList", "QuestDetails", "MapMarkers"],
+      "containedBy": [],
+      "affectedBy": ["StartQuest", "CompleteQuest", "ShowUI", "HideUI"],
+      "position": {
+        "line": 137,
+        "column": 1
+      },
+      "raw": "QuestLog &! \"Quest journal interface\""
+    },
+    {
+      "name": "CharacterCreation",
+      "type": "UIComponent",
+      "purpose": "Character creation screen",
+      "root": true,
+      "contains": ["ClassSelection", "AppearanceCustomizer", "StatsAllocator"],
+      "containedBy": [],
+      "affectedBy": ["OpenMenu", "CloseMenu"],
+      "position": {
+        "line": 141,
+        "column": 1
+      },
+      "raw": "CharacterCreation &! \"Character creation screen\""
+    },
+    {
+      "name": "SettingsMenu",
+      "type": "UIComponent",
+      "purpose": "Game settings interface",
+      "root": true,
+      "contains": ["GraphicsSettings", "AudioSettings", "ControlSettings"],
+      "containedBy": [],
+      "affectedBy": ["OpenMenu", "CloseMenu"],
+      "position": {
+        "line": 144,
+        "column": 1
+      },
+      "raw": "SettingsMenu &! \"Game settings interface\""
+    },
+    {
+      "name": "SaveLoadMenu",
+      "type": "UIComponent",
+      "purpose": "Save/Load game interface",
+      "root": true,
+      "contains": ["SaveSlotList", "LoadButton", "DeleteButton"],
+      "containedBy": [],
+      "affectedBy": ["OpenMenu", "CloseMenu"],
+      "position": {
+        "line": 147,
+        "column": 1
+      },
+      "raw": "SaveLoadMenu &! \"Save/Load game interface\""
+    },
+    {
+      "name": "HealthBar",
+      "type": "UIComponent",
+      "purpose": "Player health display",
+      "contains": [],
+      "containedBy": ["HUD"],
+      "affectedBy": ["DealDamage", "TakeDamage", "UpdateHealth"],
+      "position": {
+        "line": 152,
+        "column": 1
+      },
+      "raw": "HealthBar & \"Player health display\""
+    },
+    {
+      "name": "ManaBar",
+      "type": "UIComponent",
+      "purpose": "Player mana display",
+      "contains": [],
+      "containedBy": ["HUD"],
+      "affectedBy": ["UseSkill", "UpdateMana"],
+      "position": {
+        "line": 156,
+        "column": 1
+      },
+      "raw": "ManaBar & \"Player mana display\""
+    },
+    {
+      "name": "Minimap",
+      "type": "UIComponent",
+      "purpose": "World minimap",
+      "contains": [],
+      "containedBy": ["HUD"],
+      "affectedBy": ["StartQuest"],
+      "position": {
+        "line": 160,
+        "column": 1
+      },
+      "raw": "Minimap & \"World minimap\""
+    },
+    {
+      "name": "QuestTracker",
+      "type": "UIComponent",
+      "purpose": "Active quest tracker",
+      "contains": [],
+      "containedBy": ["HUD"],
+      "affectedBy": ["StartQuest", "UpdateObjective", "CompleteQuest"],
+      "position": {
+        "line": 164,
+        "column": 1
+      },
+      "raw": "QuestTracker & \"Active quest tracker\""
+    },
+    {
+      "name": "SkillBar",
+      "type": "UIComponent",
+      "purpose": "Skill hotbar",
+      "contains": [],
+      "containedBy": ["HUD"],
+      "affectedBy": ["Attack", "UseSkill"],
+      "position": {
+        "line": 168,
+        "column": 1
+      },
+      "raw": "SkillBar & \"Skill hotbar\""
+    },
+    {
+      "name": "PlayButton",
+      "type": "UIComponent",
+      "purpose": "Start game button",
+      "contains": [],
+      "containedBy": ["MainMenu"],
+      "affectedBy": ["StartGame"],
+      "position": {
+        "line": 173,
+        "column": 1
+      },
+      "raw": "PlayButton & \"Start game button\""
+    },
+    {
+      "name": "SettingsButton",
+      "type": "UIComponent",
+      "purpose": "Open settings button",
+      "contains": [],
+      "containedBy": ["MainMenu", "PauseMenu"],
+      "affectedBy": [],
+      "position": {
+        "line": 177,
+        "column": 1
+      },
+      "raw": "SettingsButton & \"Open settings button\""
+    },
+    {
+      "name": "QuitButton",
+      "type": "UIComponent",
+      "purpose": "Quit game button",
+      "contains": [],
+      "containedBy": ["MainMenu", "PauseMenu"],
+      "affectedBy": [],
+      "position": {
+        "line": 180,
+        "column": 1
+      },
+      "raw": "QuitButton & \"Quit game button\""
+    },
+    {
+      "name": "ResumeButton",
+      "type": "UIComponent",
+      "purpose": "Resume game button",
+      "contains": [],
+      "containedBy": ["PauseMenu"],
+      "affectedBy": [],
+      "position": {
+        "line": 183,
+        "column": 1
+      },
+      "raw": "ResumeButton & \"Resume game button\""
+    },
+    {
+      "name": "SaveButton",
+      "type": "UIComponent",
+      "purpose": "Save game button",
+      "contains": [],
+      "containedBy": ["PauseMenu"],
+      "affectedBy": ["SaveGame"],
+      "position": {
+        "line": 186,
+        "column": 1
+      },
+      "raw": "SaveButton & \"Save game button\""
+    },
+    {
+      "name": "ItemGrid",
+      "type": "UIComponent",
+      "purpose": "Inventory item grid",
+      "contains": [],
+      "containedBy": ["InventoryUI"],
+      "affectedBy": ["AddItem", "RemoveItem"],
+      "position": {
+        "line": 191,
+        "column": 1
+      },
+      "raw": "ItemGrid & \"Inventory item grid\""
+    },
+    {
+      "name": "EquipmentSlots",
+      "type": "UIComponent",
+      "purpose": "Character equipment slots",
+      "contains": [],
+      "containedBy": ["InventoryUI"],
+      "affectedBy": ["EquipItem", "UnequipItem"],
+      "position": {
+        "line": 195,
+        "column": 1
+      },
+      "raw": "EquipmentSlots & \"Character equipment slots\""
+    },
+    {
+      "name": "StatsPanel",
+      "type": "UIComponent",
+      "purpose": "Character stats display",
+      "contains": [],
+      "containedBy": ["InventoryUI"],
+      "affectedBy": ["EquipItem", "UnequipItem"],
+      "position": {
+        "line": 199,
+        "column": 1
+      },
+      "raw": "StatsPanel & \"Character stats display\""
+    },
+    {
+      "name": "QuestList",
+      "type": "UIComponent",
+      "purpose": "List of quests",
+      "contains": [],
+      "containedBy": ["QuestLog"],
+      "affectedBy": [],
+      "position": {
+        "line": 204,
+        "column": 1
+      },
+      "raw": "QuestList & \"List of quests\""
+    },
+    {
+      "name": "QuestDetails",
+      "type": "UIComponent",
+      "purpose": "Quest description and objectives",
+      "contains": [],
+      "containedBy": ["QuestLog"],
+      "affectedBy": [],
+      "position": {
+        "line": 207,
+        "column": 1
+      },
+      "raw": "QuestDetails & \"Quest description and objectives\""
+    },
+    {
+      "name": "MapMarkers",
+      "type": "UIComponent",
+      "purpose": "Quest map markers",
+      "contains": [],
+      "containedBy": ["QuestLog"],
+      "affectedBy": [],
+      "position": {
+        "line": 210,
+        "column": 1
+      },
+      "raw": "MapMarkers & \"Quest map markers\""
+    },
+    {
+      "name": "ClassSelection",
+      "type": "UIComponent",
+      "purpose": "Character class selector",
+      "contains": [],
+      "containedBy": ["CharacterCreation"],
+      "affectedBy": [],
+      "position": {
+        "line": 214,
+        "column": 1
+      },
+      "raw": "ClassSelection & \"Character class selector\""
+    },
+    {
+      "name": "AppearanceCustomizer",
+      "type": "UIComponent",
+      "purpose": "Character appearance editor",
+      "contains": [],
+      "containedBy": ["CharacterCreation"],
+      "affectedBy": [],
+      "position": {
+        "line": 217,
+        "column": 1
+      },
+      "raw": "AppearanceCustomizer & \"Character appearance editor\""
+    },
+    {
+      "name": "StatsAllocator",
+      "type": "UIComponent",
+      "purpose": "Initial stats allocation",
+      "contains": [],
+      "containedBy": ["CharacterCreation"],
+      "affectedBy": [],
+      "position": {
+        "line": 220,
+        "column": 1
+      },
+      "raw": "StatsAllocator & \"Initial stats allocation\""
+    },
+    {
+      "name": "GraphicsSettings",
+      "type": "UIComponent",
+      "purpose": "Graphics quality settings",
+      "contains": [],
+      "containedBy": ["SettingsMenu"],
+      "affectedBy": [],
+      "position": {
+        "line": 224,
+        "column": 1
+      },
+      "raw": "GraphicsSettings & \"Graphics quality settings\""
+    },
+    {
+      "name": "AudioSettings",
+      "type": "UIComponent",
+      "purpose": "Audio volume settings",
+      "contains": [],
+      "containedBy": ["SettingsMenu"],
+      "affectedBy": [],
+      "position": {
+        "line": 227,
+        "column": 1
+      },
+      "raw": "AudioSettings & \"Audio volume settings\""
+    },
+    {
+      "name": "ControlSettings",
+      "type": "UIComponent",
+      "purpose": "Input control mapping",
+      "contains": [],
+      "containedBy": ["SettingsMenu"],
+      "affectedBy": [],
+      "position": {
+        "line": 230,
+        "column": 1
+      },
+      "raw": "ControlSettings & \"Input control mapping\""
+    },
+    {
+      "name": "SaveSlotList",
+      "type": "UIComponent",
+      "purpose": "List of save slots",
+      "contains": [],
+      "containedBy": ["SaveLoadMenu"],
+      "affectedBy": ["SaveGame"],
+      "position": {
+        "line": 234,
+        "column": 1
+      },
+      "raw": "SaveSlotList & \"List of save slots\""
+    },
+    {
+      "name": "LoadButton",
+      "type": "UIComponent",
+      "purpose": "Load save button",
+      "contains": [],
+      "containedBy": ["SaveLoadMenu"],
+      "affectedBy": ["LoadGame"],
+      "position": {
+        "line": 237,
+        "column": 1
+      },
+      "raw": "LoadButton & \"Load save button\""
+    },
+    {
+      "name": "DeleteButton",
+      "type": "UIComponent",
+      "purpose": "Delete save button",
+      "contains": [],
+      "containedBy": ["SaveLoadMenu"],
+      "affectedBy": ["DeleteSave"],
+      "position": {
+        "line": 241,
+        "column": 1
+      },
+      "raw": "DeleteButton & \"Delete save button\""
+    },
+    {
+      "name": "LoadingScreen",
+      "type": "Asset",
+      "description": "Loading screen backgrounds",
+      "position": {
+        "line": 246,
+        "column": 1
+      },
+      "raw": "LoadingScreen ~ \"Loading screen backgrounds\""
+    },
+    {
+      "name": "SceneTransition",
+      "type": "Asset",
+      "description": "Scene transition effects",
+      "position": {
+        "line": 247,
+        "column": 1
+      },
+      "raw": "SceneTransition ~ \"Scene transition effects\""
+    },
+    {
+      "name": "InputActions",
+      "type": "Asset",
+      "description": "Input action maps",
+      "position": {
+        "line": 248,
+        "column": 1
+      },
+      "raw": "InputActions ~ \"Input action maps\""
+    },
+    {
+      "name": "ControllerSupport",
+      "type": "Asset",
+      "description": "Controller button prompts",
+      "position": {
+        "line": 249,
+        "column": 1
+      },
+      "raw": "ControllerSupport ~ \"Controller button prompts\""
+    },
+    {
+      "name": "ItemDatabase",
+      "type": "Asset",
+      "description": "Item definition database",
+      "position": {
+        "line": 250,
+        "column": 1
+      },
+      "raw": "ItemDatabase ~ \"Item definition database\""
+    },
+    {
+      "name": "QuestDatabase",
+      "type": "Asset",
+      "description": "Quest data storage",
+      "position": {
+        "line": 251,
+        "column": 1
+      },
+      "raw": "QuestDatabase ~ \"Quest data storage\""
+    },
+    {
+      "name": "NPCDatabase",
+      "type": "Asset",
+      "description": "NPC character data",
+      "position": {
+        "line": 252,
+        "column": 1
+      },
+      "raw": "NPCDatabase ~ \"NPC character data\""
+    },
+    {
+      "name": "SaveData",
+      "type": "Asset",
+      "description": "Save game data structure",
+      "position": {
+        "line": 253,
+        "column": 1
+      },
+      "raw": "SaveData ~ \"Save game data structure\""
+    },
+    {
+      "name": "AssetBundles",
+      "type": "Asset",
+      "description": "Downloadable content bundles",
+      "position": {
+        "line": 254,
+        "column": 1
+      },
+      "raw": "AssetBundles ~ \"Downloadable content bundles\""
+    },
+    {
+      "name": "AddressableAssets",
+      "type": "Asset",
+      "description": "Addressable asset catalog",
+      "position": {
+        "line": 255,
+        "column": 1
+      },
+      "raw": "AddressableAssets ~ \"Addressable asset catalog\""
+    },
+    {
+      "name": "CharacterMovement",
+      "type": "Asset",
+      "description": "Character movement system",
+      "position": {
+        "line": 256,
+        "column": 1
+      },
+      "raw": "CharacterMovement ~ \"Character movement system\""
+    },
+    {
+      "name": "SkillSystem",
+      "type": "Asset",
+      "description": "Character skill system",
+      "position": {
+        "line": 257,
+        "column": 1
+      },
+      "raw": "SkillSystem ~ \"Character skill system\""
+    },
+    {
+      "name": "DamageCalculator",
+      "type": "Asset",
+      "description": "Damage calculation logic",
+      "position": {
+        "line": 258,
+        "column": 1
+      },
+      "raw": "DamageCalculator ~ \"Damage calculation logic\""
+    },
+    {
+      "name": "StatusEffects",
+      "type": "Asset",
+      "description": "Status effect definitions",
+      "position": {
+        "line": 259,
+        "column": 1
+      },
+      "raw": "StatusEffects ~ \"Status effect definitions\""
+    },
+    {
+      "name": "ComboSystem",
+      "type": "Asset",
+      "description": "Combat combo system",
+      "position": {
+        "line": 260,
+        "column": 1
+      },
+      "raw": "ComboSystem ~ \"Combat combo system\""
+    },
+    {
+      "name": "BehaviorTree",
+      "type": "Asset",
+      "description": "AI behavior trees",
+      "position": {
+        "line": 261,
+        "column": 1
+      },
+      "raw": "BehaviorTree ~ \"AI behavior trees\""
+    },
+    {
+      "name": "Pathfinding",
+      "type": "Asset",
+      "description": "Pathfinding algorithms",
+      "position": {
+        "line": 262,
+        "column": 1
+      },
+      "raw": "Pathfinding ~ \"Pathfinding algorithms\""
+    },
+    {
+      "name": "SensorSystem",
+      "type": "Asset",
+      "description": "AI sensory system",
+      "position": {
+        "line": 263,
+        "column": 1
+      },
+      "raw": "SensorSystem ~ \"AI sensory system\""
+    },
+    {
+      "name": "EquipmentManager",
+      "type": "Asset",
+      "description": "Equipment management",
+      "position": {
+        "line": 264,
+        "column": 1
+      },
+      "raw": "EquipmentManager ~ \"Equipment management\""
+    },
+    {
+      "name": "TerrainGenerator",
+      "type": "Asset",
+      "description": "Procedural terrain generation",
+      "position": {
+        "line": 265,
+        "column": 1
+      },
+      "raw": "TerrainGenerator ~ \"Procedural terrain generation\""
+    },
+    {
+      "name": "WeatherSystem",
+      "type": "Asset",
+      "description": "Dynamic weather",
+      "position": {
+        "line": 266,
+        "column": 1
+      },
+      "raw": "WeatherSystem ~ \"Dynamic weather\""
+    },
+    {
+      "name": "DayNightCycle",
+      "type": "Asset",
+      "description": "Day/night cycle",
+      "position": {
+        "line": 267,
+        "column": 1
+      },
+      "raw": "DayNightCycle ~ \"Day/night cycle\""
+    },
+    {
+      "name": "DialogueSystem",
+      "type": "Asset",
+      "description": "Dialogue trees",
+      "position": {
+        "line": 268,
+        "column": 1
+      },
+      "raw": "DialogueSystem ~ \"Dialogue trees\""
+    },
+    {
+      "name": "ShopSystem",
+      "type": "Asset",
+      "description": "Shop interface",
+      "position": {
+        "line": 269,
+        "column": 1
+      },
+      "raw": "ShopSystem ~ \"Shop interface\""
+    },
+    {
+      "name": "PhotonNetwork",
+      "type": "Asset",
+      "description": "Photon networking wrapper",
+      "position": {
+        "line": 270,
+        "column": 1
+      },
+      "raw": "PhotonNetwork ~ \"Photon networking wrapper\""
+    },
+    {
+      "name": "MatchmakingService",
+      "type": "Asset",
+      "description": "Matchmaking logic",
+      "position": {
+        "line": 271,
+        "column": 1
+      },
+      "raw": "MatchmakingService ~ \"Matchmaking logic\""
+    },
+    {
+      "name": "PlayerSync",
+      "type": "Asset",
+      "description": "Player synchronization",
+      "position": {
+        "line": 272,
+        "column": 1
+      },
+      "raw": "PlayerSync ~ \"Player synchronization\""
+    },
+    {
+      "name": "WorldSync",
+      "type": "Asset",
+      "description": "World state sync",
+      "position": {
+        "line": 273,
+        "column": 1
+      },
+      "raw": "WorldSync ~ \"World state sync\""
+    },
+    {
+      "name": "MusicPlayer",
+      "type": "Asset",
+      "description": "Background music player",
+      "position": {
+        "line": 274,
+        "column": 1
+      },
+      "raw": "MusicPlayer ~ \"Background music player\""
+    },
+    {
+      "name": "SFXPlayer",
+      "type": "Asset",
+      "description": "Sound effects player",
+      "position": {
+        "line": 275,
+        "column": 1
+      },
+      "raw": "SFXPlayer ~ \"Sound effects player\""
+    },
+    {
+      "name": "VoicePlayer",
+      "type": "Asset",
+      "description": "Voice line player",
+      "position": {
+        "line": 276,
+        "column": 1
+      },
+      "raw": "VoicePlayer ~ \"Voice line player\""
+    },
+    {
+      "name": "PostProcessing",
+      "type": "Asset",
+      "description": "Post processing effects",
+      "position": {
+        "line": 277,
+        "column": 1
+      },
+      "raw": "PostProcessing ~ \"Post processing effects\""
+    },
+    {
+      "name": "LODSystem",
+      "type": "Asset",
+      "description": "Level of detail system",
+      "position": {
+        "line": 278,
+        "column": 1
+      },
+      "raw": "LODSystem ~ \"Level of detail system\""
+    },
+    {
+      "name": "OcclusionCulling",
+      "type": "Asset",
+      "description": "Occlusion culling",
+      "position": {
+        "line": 279,
+        "column": 1
+      },
+      "raw": "OcclusionCulling ~ \"Occlusion culling\""
+    },
+    {
+      "name": "ParticleSystem",
+      "type": "Asset",
+      "description": "Particle effects",
+      "position": {
+        "line": 280,
+        "column": 1
+      },
+      "raw": "ParticleSystem ~ \"Particle effects\""
+    },
+    {
+      "name": "ShaderEffects",
+      "type": "Asset",
+      "description": "Shader effects",
+      "position": {
+        "line": 281,
+        "column": 1
+      },
+      "raw": "ShaderEffects ~ \"Shader effects\""
+    },
+    {
+      "name": "CloudSave",
+      "type": "Asset",
+      "description": "Cloud save integration",
+      "position": {
+        "line": 282,
+        "column": 1
+      },
+      "raw": "CloudSave ~ \"Cloud save integration\""
+    },
+    {
+      "name": "GameManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["StartGame", "PauseGame", "EndGame", "ChangeState", "Initialize"],
+      "imports": [],
+      "position": {
+        "line": 285,
+        "column": 1
+      },
+      "raw": "GameManager <:"
+    },
+    {
+      "name": "SceneManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["LoadScene", "UnloadScene", "LoadSceneAsync", "GetActiveScene"],
+      "imports": [],
+      "position": {
+        "line": 288,
+        "column": 1
+      },
+      "raw": "SceneManager <:"
+    },
+    {
+      "name": "InputManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["GetAxis", "GetButton", "RegisterAction", "RemapControl", "GetInput"],
+      "imports": [],
+      "position": {
+        "line": 291,
+        "column": 1
+      },
+      "raw": "InputManager <:"
+    },
+    {
+      "name": "PlayerController",
+      "type": "Class",
+      "implements": [],
+      "methods": ["Move", "Jump", "Interact"],
+      "imports": [],
+      "position": {
+        "line": 294,
+        "column": 1
+      },
+      "raw": "PlayerController <:"
+    },
+    {
+      "name": "CombatSystem",
+      "type": "Class",
+      "implements": [],
+      "methods": ["DealDamage", "TakeDamage", "ApplyStatus", "RemoveStatus", "UseSkill", "Attack", "Defend"],
+      "imports": [],
+      "position": {
+        "line": 297,
+        "column": 1
+      },
+      "raw": "CombatSystem <:"
+    },
+    {
+      "name": "AIController",
+      "type": "Class",
+      "implements": [],
+      "methods": ["UpdateBehavior", "SetTarget", "Patrol", "Chase", "Attack"],
+      "imports": [],
+      "position": {
+        "line": 300,
+        "column": 1
+      },
+      "raw": "AIController <:"
+    },
+    {
+      "name": "InventorySystem",
+      "type": "Class",
+      "implements": [],
+      "methods": ["AddItem", "RemoveItem", "UseItem", "EquipItem", "UnequipItem"],
+      "imports": [],
+      "position": {
+        "line": 303,
+        "column": 1
+      },
+      "raw": "InventorySystem <:"
+    },
+    {
+      "name": "WorldManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["GenerateTerrain", "SetWeather", "UpdateTime", "SpawnEntities", "GenerateWorld", "InitializePhysics"],
+      "imports": [],
+      "position": {
+        "line": 306,
+        "column": 1
+      },
+      "raw": "WorldManager <:"
+    },
+    {
+      "name": "QuestManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["StartQuest", "UpdateObjective", "CompleteQuest", "GetActiveQuests"],
+      "imports": [],
+      "position": {
+        "line": 309,
+        "column": 1
+      },
+      "raw": "QuestManager <:"
+    },
+    {
+      "name": "NPCManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["SpawnNPC", "InteractWithNPC"],
+      "imports": [],
+      "position": {
+        "line": 312,
+        "column": 1
+      },
+      "raw": "NPCManager <:"
+    },
+    {
+      "name": "NetworkManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["Connect", "Disconnect", "CreateRoom", "JoinRoom", "SendData", "ConnectToServer", "InitializeNetwork"],
+      "imports": [],
+      "position": {
+        "line": 315,
+        "column": 1
+      },
+      "raw": "NetworkManager <:"
+    },
+    {
+      "name": "UIManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["ShowUI", "HideUI", "UpdateUI", "RegisterPanel"],
+      "imports": [],
+      "position": {
+        "line": 318,
+        "column": 1
+      },
+      "raw": "UIManager <:"
+    },
+    {
+      "name": "AudioManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["PlayMusic", "PlaySFX", "StopMusic", "SetVolume", "PlayVoice"],
+      "imports": [],
+      "position": {
+        "line": 321,
+        "column": 1
+      },
+      "raw": "AudioManager <:"
+    },
+    {
+      "name": "SaveSystem",
+      "type": "Class",
+      "implements": [],
+      "methods": ["SaveGame", "LoadGame", "QuickSave", "AutoSave", "DeleteSave", "CloudSync"],
+      "imports": [],
+      "position": {
+        "line": 324,
+        "column": 1
+      },
+      "raw": "SaveSystem <:"
+    },
+    {
+      "name": "ResourceManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["LoadAsset", "UnloadAsset", "PreloadAssets", "ClearCache"],
+      "imports": [],
+      "position": {
+        "line": 327,
+        "column": 1
+      },
+      "raw": "ResourceManager <:"
+    },
+    {
+      "name": "RenderingManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["SetQuality", "UpdateSettings", "InitializeGraphics"],
+      "imports": [],
+      "position": {
+        "line": 330,
+        "column": 1
+      },
+      "raw": "RenderingManager <:"
+    },
+    {
+      "name": "VFXManager",
+      "type": "Class",
+      "implements": [],
+      "methods": ["PlayEffect", "StopEffect"],
+      "imports": [],
+      "position": {
+        "line": 333,
+        "column": 1
+      },
+      "raw": "VFXManager <:"
+    },
+    {
+      "name": "MenuSystem",
+      "type": "Class",
+      "implements": [],
+      "methods": ["OpenMenu", "CloseMenu"],
+      "imports": [],
+      "position": {
+        "line": 336,
+        "column": 1
+      },
+      "raw": "MenuSystem <:"
+    },
+    {
+      "name": "MultiplayerSync",
+      "type": "Class",
+      "implements": [],
+      "methods": ["SyncPosition", "SyncState"],
+      "imports": [],
+      "position": {
+        "line": 339,
+        "column": 1
+      },
+      "raw": "MultiplayerSync <:"
+    },
+    {
+      "name": "StartGame",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["SceneManager.LoadScene", "AudioManager.PlayMusic"],
+      "position": {
+        "line": 343,
+        "column": 1
+      },
+      "raw": "StartGame :: () => void",
+      "affects": ["MainMenu", "PlayButton"]
+    },
+    {
+      "name": "PauseGame",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 347,
+        "column": 1
+      },
+      "raw": "PauseGame :: () => void",
+      "affects": ["HUD", "PauseMenu"]
+    },
+    {
+      "name": "EndGame",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["GameManager.ChangeState"],
+      "position": {
+        "line": 350,
+        "column": 1
+      },
+      "raw": "EndGame :: () => void",
+      "affects": ["MainMenu"]
+    },
+    {
+      "name": "ChangeState",
+      "type": "Function",
+      "signature": "(newState: GameState) => void",
+      "calls": [],
+      "position": {
+        "line": 354,
+        "column": 1
+      },
+      "raw": "ChangeState :: (newState: GameState) => void",
+      "input": "GameState"
+    },
+    {
+      "name": "LoadScene",
+      "type": "Function",
+      "signature": "(sceneName: string) => void",
+      "calls": ["ResourceManager.LoadAsset"],
+      "position": {
+        "line": 357,
+        "column": 1
+      },
+      "raw": "LoadScene :: (sceneName: string) => void"
+    },
+    {
+      "name": "UnloadScene",
+      "type": "Function",
+      "signature": "(sceneName: string) => void",
+      "calls": ["ResourceManager.UnloadAsset"],
+      "position": {
+        "line": 360,
+        "column": 1
+      },
+      "raw": "UnloadScene :: (sceneName: string) => void"
+    },
+    {
+      "name": "LoadSceneAsync",
+      "type": "Function",
+      "signature": "(sceneName: string) => void",
+      "calls": ["ResourceManager.LoadAsset"],
+      "position": {
+        "line": 363,
+        "column": 1
+      },
+      "raw": "LoadSceneAsync :: (sceneName: string) => void"
+    },
+    {
+      "name": "GetActiveScene",
+      "type": "Function",
+      "signature": "() => string",
+      "calls": [],
+      "position": {
+        "line": 366,
+        "column": 1
+      },
+      "raw": "GetActiveScene :: () => string"
+    },
+    {
+      "name": "GetAxis",
+      "type": "Function",
+      "signature": "(axisName: string) => float",
+      "calls": [],
+      "position": {
+        "line": 368,
+        "column": 1
+      },
+      "raw": "GetAxis :: (axisName: string) => float"
+    },
+    {
+      "name": "GetButton",
+      "type": "Function",
+      "signature": "(buttonName: string) => boolean",
+      "calls": [],
+      "position": {
+        "line": 370,
+        "column": 1
+      },
+      "raw": "GetButton :: (buttonName: string) => boolean"
+    },
+    {
+      "name": "GetInput",
+      "type": "Function",
+      "signature": "() => InputData",
+      "calls": [],
+      "position": {
+        "line": 372,
+        "column": 1
+      },
+      "raw": "GetInput :: () => InputData",
+      "output": "InputData"
+    },
+    {
+      "name": "RegisterAction",
+      "type": "Function",
+      "signature": "(action: string, callback: function) => void",
+      "calls": [],
+      "position": {
+        "line": 375,
+        "column": 1
+      },
+      "raw": "RegisterAction :: (action: string, callback: function) => void"
+    },
+    {
+      "name": "RemapControl",
+      "type": "Function",
+      "signature": "(action: string, newKey: string) => void",
+      "calls": [],
+      "position": {
+        "line": 377,
+        "column": 1
+      },
+      "raw": "RemapControl :: (action: string, newKey: string) => void"
+    },
+    {
+      "name": "Move",
+      "type": "Function",
+      "signature": "(direction: Vector3) => void",
+      "calls": [],
+      "position": {
+        "line": 379,
+        "column": 1
+      },
+      "raw": "Move :: (direction: Vector3) => void",
+      "input": "Vector3"
+    },
+    {
+      "name": "Jump",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 382,
+        "column": 1
+      },
+      "raw": "Jump :: () => void"
+    },
+    {
+      "name": "Attack",
+      "type": "Function",
+      "signature": "(target: GameObject) => void",
+      "calls": ["CombatSystem.DealDamage"],
+      "position": {
+        "line": 384,
+        "column": 1
+      },
+      "raw": "Attack :: (target: GameObject) => void",
+      "input": "GameObject",
+      "affects": ["SkillBar"]
+    },
+    {
+      "name": "UseItem",
+      "type": "Function",
+      "signature": "(itemId: string) => void",
+      "calls": ["InventorySystem.UseItem"],
+      "position": {
+        "line": 389,
+        "column": 1
+      },
+      "raw": "UseItem :: (itemId: string) => void"
+    },
+    {
+      "name": "Interact",
+      "type": "Function",
+      "signature": "(target: GameObject) => void",
+      "calls": ["NPCManager.InteractWithNPC", "InventorySystem.AddItem"],
+      "position": {
+        "line": 392,
+        "column": 1
+      },
+      "raw": "Interact :: (target: GameObject) => void",
+      "input": "GameObject"
+    },
+    {
+      "name": "Defend",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["CombatSystem.ApplyStatus"],
+      "position": {
+        "line": 396,
+        "column": 1
+      },
+      "raw": "Defend :: () => void"
+    },
+    {
+      "name": "UseSkill",
+      "type": "Function",
+      "signature": "(skillId: string) => void",
+      "calls": ["CombatSystem.ApplyStatus"],
+      "position": {
+        "line": 399,
+        "column": 1
+      },
+      "raw": "UseSkill :: (skillId: string) => void",
+      "affects": ["SkillBar", "ManaBar"],
+      "consumes": ["ENABLE_MODDING"]
+    },
+    {
+      "name": "DealDamage",
+      "type": "Function",
+      "signature": "(target: GameObject, amount: float) => void",
+      "calls": [],
+      "position": {
+        "line": 404,
+        "column": 1
+      },
+      "raw": "DealDamage :: (target: GameObject, amount: float) => void",
+      "input": "GameObject",
+      "affects": ["HealthBar"]
+    },
+    {
+      "name": "TakeDamage",
+      "type": "Function",
+      "signature": "(amount: float) => void",
+      "calls": [],
+      "position": {
+        "line": 408,
+        "column": 1
+      },
+      "raw": "TakeDamage :: (amount: float) => void",
+      "affects": ["HealthBar"]
+    },
+    {
+      "name": "ApplyStatus",
+      "type": "Function",
+      "signature": "(status: StatusEffect) => void",
+      "calls": [],
+      "position": {
+        "line": 411,
+        "column": 1
+      },
+      "raw": "ApplyStatus :: (status: StatusEffect) => void",
+      "input": "StatusEffect"
+    },
+    {
+      "name": "RemoveStatus",
+      "type": "Function",
+      "signature": "(statusId: string) => void",
+      "calls": [],
+      "position": {
+        "line": 414,
+        "column": 1
+      },
+      "raw": "RemoveStatus :: (statusId: string) => void"
+    },
+    {
+      "name": "UpdateBehavior",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["AIController.SetTarget"],
+      "position": {
+        "line": 416,
+        "column": 1
+      },
+      "raw": "UpdateBehavior :: () => void"
+    },
+    {
+      "name": "SetTarget",
+      "type": "Function",
+      "signature": "(target: GameObject) => void",
+      "calls": [],
+      "position": {
+        "line": 419,
+        "column": 1
+      },
+      "raw": "SetTarget :: (target: GameObject) => void",
+      "input": "GameObject"
+    },
+    {
+      "name": "Patrol",
+      "type": "Function",
+      "signature": "(waypoints: Vector3[]) => void",
+      "calls": [],
+      "position": {
+        "line": 422,
+        "column": 1
+      },
+      "raw": "Patrol :: (waypoints: Vector3[]) => void",
+      "input": "Vector3Array"
+    },
+    {
+      "name": "Chase",
+      "type": "Function",
+      "signature": "(target: GameObject) => void",
+      "calls": ["AIController.SetTarget"],
+      "position": {
+        "line": 425,
+        "column": 1
+      },
+      "raw": "Chase :: (target: GameObject) => void",
+      "input": "GameObject"
+    },
+    {
+      "name": "AddItem",
+      "type": "Function",
+      "signature": "(item: Item) => void",
+      "calls": [],
+      "position": {
+        "line": 429,
+        "column": 1
+      },
+      "raw": "AddItem :: (item: Item) => void",
+      "input": "Item",
+      "affects": ["InventoryUI", "ItemGrid"]
+    },
+    {
+      "name": "RemoveItem",
+      "type": "Function",
+      "signature": "(itemId: string) => void",
+      "calls": [],
+      "position": {
+        "line": 433,
+        "column": 1
+      },
+      "raw": "RemoveItem :: (itemId: string) => void",
+      "affects": ["InventoryUI", "ItemGrid"]
+    },
+    {
+      "name": "EquipItem",
+      "type": "Function",
+      "signature": "(item: Equipment) => void",
+      "calls": [],
+      "position": {
+        "line": 436,
+        "column": 1
+      },
+      "raw": "EquipItem :: (item: Equipment) => void",
+      "input": "Equipment",
+      "affects": ["EquipmentSlots", "StatsPanel"]
+    },
+    {
+      "name": "UnequipItem",
+      "type": "Function",
+      "signature": "(slot: string) => void",
+      "calls": [],
+      "position": {
+        "line": 440,
+        "column": 1
+      },
+      "raw": "UnequipItem :: (slot: string) => void",
+      "affects": ["EquipmentSlots", "StatsPanel"]
+    },
+    {
+      "name": "GenerateTerrain",
+      "type": "Function",
+      "signature": "(seed: int) => void",
+      "calls": ["ResourceManager.LoadAsset"],
+      "position": {
+        "line": 443,
+        "column": 1
+      },
+      "raw": "GenerateTerrain :: (seed: int) => void"
+    },
+    {
+      "name": "GenerateWorld",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["WorldManager.GenerateTerrain", "WorldManager.SpawnEntities"],
+      "position": {
+        "line": 446,
+        "column": 1
+      },
+      "raw": "GenerateWorld :: () => void"
+    },
+    {
+      "name": "SetWeather",
+      "type": "Function",
+      "signature": "(weather: string) => void",
+      "calls": [],
+      "position": {
+        "line": 449,
+        "column": 1
+      },
+      "raw": "SetWeather :: (weather: string) => void"
+    },
+    {
+      "name": "UpdateTime",
+      "type": "Function",
+      "signature": "(deltaTime: float) => void",
+      "calls": [],
+      "position": {
+        "line": 451,
+        "column": 1
+      },
+      "raw": "UpdateTime :: (deltaTime: float) => void"
+    },
+    {
+      "name": "SpawnEntities",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["NPCManager.SpawnNPC"],
+      "position": {
+        "line": 453,
+        "column": 1
+      },
+      "raw": "SpawnEntities :: () => void"
+    },
+    {
+      "name": "StartQuest",
+      "type": "Function",
+      "signature": "(questId: string) => void",
+      "calls": ["QuestManager.StartQuest"],
+      "position": {
+        "line": 456,
+        "column": 1
+      },
+      "raw": "StartQuest :: (questId: string) => void",
+      "affects": ["QuestLog", "QuestTracker", "Minimap"]
+    },
+    {
+      "name": "UpdateObjective",
+      "type": "Function",
+      "signature": "(questId: string, objective: QuestObjective) => void",
+      "calls": [],
+      "position": {
+        "line": 460,
+        "column": 1
+      },
+      "raw": "UpdateObjective :: (questId: string, objective: QuestObjective) => void",
+      "input": "QuestObjective",
+      "affects": ["QuestTracker"]
+    },
+    {
+      "name": "CompleteQuest",
+      "type": "Function",
+      "signature": "(questId: string) => QuestReward[]",
+      "calls": ["QuestManager.CompleteQuest"],
+      "position": {
+        "line": 464,
+        "column": 1
+      },
+      "raw": "CompleteQuest :: (questId: string) => QuestReward[]",
+      "affects": ["QuestLog", "QuestTracker"],
+      "output": "QuestReward",
+      "consumes": ["ANALYTICS_KEY"]
+    },
+    {
+      "name": "GetActiveQuests",
+      "type": "Function",
+      "signature": "() => Quest[]",
+      "calls": [],
+      "position": {
+        "line": 470,
+        "column": 1
+      },
+      "raw": "GetActiveQuests :: () => Quest[]",
+      "output": "Quest"
+    },
+    {
+      "name": "SpawnNPC",
+      "type": "Function",
+      "signature": "(npcId: string, position: Vector3) => GameObject",
+      "calls": [],
+      "position": {
+        "line": 473,
+        "column": 1
+      },
+      "raw": "SpawnNPC :: (npcId: string, position: Vector3) => GameObject",
+      "input": "Vector3",
+      "output": "GameObject"
+    },
+    {
+      "name": "InteractWithNPC",
+      "type": "Function",
+      "signature": "(npcId: string) => void",
+      "calls": [],
+      "position": {
+        "line": 477,
+        "column": 1
+      },
+      "raw": "InteractWithNPC :: (npcId: string) => void"
+    },
+    {
+      "name": "Connect",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["NetworkManager.Connect"],
+      "position": {
+        "line": 479,
+        "column": 1
+      },
+      "raw": "Connect :: () => void",
+      "affects": ["MainMenu"],
+      "consumes": ["PHOTON_APP_ID"]
+    },
+    {
+      "name": "ConnectToServer",
+      "type": "Function",
+      "signature": "(serverAddress: string) => void",
+      "calls": ["NetworkManager.Connect"],
+      "position": {
+        "line": 484,
+        "column": 1
+      },
+      "raw": "ConnectToServer :: (serverAddress: string) => void"
+    },
+    {
+      "name": "Disconnect",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["NetworkManager.Disconnect"],
+      "position": {
+        "line": 487,
+        "column": 1
+      },
+      "raw": "Disconnect :: () => void"
+    },
+    {
+      "name": "CreateRoom",
+      "type": "Function",
+      "signature": "(roomName: string) => void",
+      "calls": ["NetworkManager.CreateRoom"],
+      "position": {
+        "line": 490,
+        "column": 1
+      },
+      "raw": "CreateRoom :: (roomName: string) => void",
+      "affects": ["MainMenu"]
+    },
+    {
+      "name": "JoinRoom",
+      "type": "Function",
+      "signature": "(roomCode: string) => void",
+      "calls": ["NetworkManager.JoinRoom"],
+      "position": {
+        "line": 494,
+        "column": 1
+      },
+      "raw": "JoinRoom :: (roomCode: string) => void",
+      "affects": ["MainMenu"]
+    },
+    {
+      "name": "SendData",
+      "type": "Function",
+      "signature": "(data: object) => void",
+      "calls": [],
+      "position": {
+        "line": 498,
+        "column": 1
+      },
+      "raw": "SendData :: (data: object) => void"
+    },
+    {
+      "name": "SyncPosition",
+      "type": "Function",
+      "signature": "(position: Vector3) => void",
+      "calls": [],
+      "position": {
+        "line": 500,
+        "column": 1
+      },
+      "raw": "SyncPosition :: (position: Vector3) => void",
+      "input": "Vector3"
+    },
+    {
+      "name": "SyncState",
+      "type": "Function",
+      "signature": "(state: object) => void",
+      "calls": [],
+      "position": {
+        "line": 503,
+        "column": 1
+      },
+      "raw": "SyncState :: (state: object) => void"
+    },
+    {
+      "name": "ShowUI",
+      "type": "Function",
+      "signature": "(panelName: string) => void",
+      "calls": [],
+      "position": {
+        "line": 505,
+        "column": 1
+      },
+      "raw": "ShowUI :: (panelName: string) => void",
+      "affects": ["MainMenu", "HUD", "PauseMenu", "InventoryUI", "QuestLog"]
+    },
+    {
+      "name": "HideUI",
+      "type": "Function",
+      "signature": "(panelName: string) => void",
+      "calls": [],
+      "position": {
+        "line": 508,
+        "column": 1
+      },
+      "raw": "HideUI :: (panelName: string) => void",
+      "affects": ["MainMenu", "HUD", "PauseMenu", "InventoryUI", "QuestLog"]
+    },
+    {
+      "name": "UpdateUI",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 511,
+        "column": 1
+      },
+      "raw": "UpdateUI :: () => void",
+      "affects": ["HUD"]
+    },
+    {
+      "name": "RegisterPanel",
+      "type": "Function",
+      "signature": "(panelName: string, panel: object) => void",
+      "calls": [],
+      "position": {
+        "line": 514,
+        "column": 1
+      },
+      "raw": "RegisterPanel :: (panelName: string, panel: object) => void"
+    },
+    {
+      "name": "UpdateHealth",
+      "type": "Function",
+      "signature": "(health: float) => void",
+      "calls": [],
+      "position": {
+        "line": 516,
+        "column": 1
+      },
+      "raw": "UpdateHealth :: (health: float) => void",
+      "affects": ["HealthBar"]
+    },
+    {
+      "name": "UpdateMana",
+      "type": "Function",
+      "signature": "(mana: float) => void",
+      "calls": [],
+      "position": {
+        "line": 519,
+        "column": 1
+      },
+      "raw": "UpdateMana :: (mana: float) => void",
+      "affects": ["ManaBar"]
+    },
+    {
+      "name": "OpenMenu",
+      "type": "Function",
+      "signature": "(menuName: string) => void",
+      "calls": [],
+      "position": {
+        "line": 522,
+        "column": 1
+      },
+      "raw": "OpenMenu :: (menuName: string) => void",
+      "affects": ["SettingsMenu", "SaveLoadMenu", "CharacterCreation"]
+    },
+    {
+      "name": "CloseMenu",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 525,
+        "column": 1
+      },
+      "raw": "CloseMenu :: () => void",
+      "affects": ["SettingsMenu", "SaveLoadMenu", "CharacterCreation"]
+    },
+    {
+      "name": "PlayMusic",
+      "type": "Function",
+      "signature": "(trackName: string) => void",
+      "calls": [],
+      "position": {
+        "line": 528,
+        "column": 1
+      },
+      "raw": "PlayMusic :: (trackName: string) => void"
+    },
+    {
+      "name": "PlaySFX",
+      "type": "Function",
+      "signature": "(soundName: string) => void",
+      "calls": [],
+      "position": {
+        "line": 530,
+        "column": 1
+      },
+      "raw": "PlaySFX :: (soundName: string) => void"
+    },
+    {
+      "name": "PlayVoice",
+      "type": "Function",
+      "signature": "(voiceLine: string) => void",
+      "calls": [],
+      "position": {
+        "line": 532,
+        "column": 1
+      },
+      "raw": "PlayVoice :: (voiceLine: string) => void"
+    },
+    {
+      "name": "StopMusic",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 534,
+        "column": 1
+      },
+      "raw": "StopMusic :: () => void"
+    },
+    {
+      "name": "SetVolume",
+      "type": "Function",
+      "signature": "(channel: string, volume: float) => void",
+      "calls": [],
+      "position": {
+        "line": 536,
+        "column": 1
+      },
+      "raw": "SetVolume :: (channel: string, volume: float) => void"
+    },
+    {
+      "name": "SaveGame",
+      "type": "Function",
+      "signature": "(slot: int) => void",
+      "calls": ["SaveSystem.SaveGame"],
+      "position": {
+        "line": 538,
+        "column": 1
+      },
+      "raw": "SaveGame :: (slot: int) => void",
+      "affects": ["SaveButton", "PauseMenu", "SaveSlotList"],
+      "consumes": ["BUILD_TYPE"]
+    },
+    {
+      "name": "LoadGame",
+      "type": "Function",
+      "signature": "(slot: int) => void",
+      "calls": ["SaveSystem.LoadGame", "SceneManager.LoadScene"],
+      "position": {
+        "line": 543,
+        "column": 1
+      },
+      "raw": "LoadGame :: (slot: int) => void",
+      "affects": ["MainMenu", "LoadButton"]
+    },
+    {
+      "name": "DeleteSave",
+      "type": "Function",
+      "signature": "(slot: int) => void",
+      "calls": ["SaveSystem.DeleteSave"],
+      "position": {
+        "line": 547,
+        "column": 1
+      },
+      "raw": "DeleteSave :: (slot: int) => void",
+      "affects": ["DeleteButton"]
+    },
+    {
+      "name": "QuickSave",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["SaveSystem.SaveGame"],
+      "position": {
+        "line": 551,
+        "column": 1
+      },
+      "raw": "QuickSave :: () => void"
+    },
+    {
+      "name": "AutoSave",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["SaveSystem.SaveGame"],
+      "position": {
+        "line": 554,
+        "column": 1
+      },
+      "raw": "AutoSave :: () => void"
+    },
+    {
+      "name": "LoadAsset",
+      "type": "Function",
+      "signature": "(assetPath: string) => object",
+      "calls": ["ResourceManager.PreloadAssets"],
+      "position": {
+        "line": 557,
+        "column": 1
+      },
+      "raw": "LoadAsset :: (assetPath: string) => object"
+    },
+    {
+      "name": "UnloadAsset",
+      "type": "Function",
+      "signature": "(assetPath: string) => void",
+      "calls": ["ResourceManager.ClearCache"],
+      "position": {
+        "line": 560,
+        "column": 1
+      },
+      "raw": "UnloadAsset :: (assetPath: string) => void"
+    },
+    {
+      "name": "PreloadAssets",
+      "type": "Function",
+      "signature": "(assetPaths: string[]) => void",
+      "calls": [],
+      "position": {
+        "line": 563,
+        "column": 1
+      },
+      "raw": "PreloadAssets :: (assetPaths: string[]) => void"
+    },
+    {
+      "name": "ClearCache",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 565,
+        "column": 1
+      },
+      "raw": "ClearCache :: () => void"
+    },
+    {
+      "name": "SetQuality",
+      "type": "Function",
+      "signature": "(level: string) => void",
+      "calls": ["RenderingManager.UpdateSettings"],
+      "position": {
+        "line": 567,
+        "column": 1
+      },
+      "raw": "SetQuality :: (level: string) => void"
+    },
+    {
+      "name": "UpdateSettings",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 570,
+        "column": 1
+      },
+      "raw": "UpdateSettings :: () => void"
+    },
+    {
+      "name": "PlayEffect",
+      "type": "Function",
+      "signature": "(effectName: string, position: Vector3) => void",
+      "calls": [],
+      "position": {
+        "line": 572,
+        "column": 1
+      },
+      "raw": "PlayEffect :: (effectName: string, position: Vector3) => void",
+      "input": "Vector3"
+    },
+    {
+      "name": "StopEffect",
+      "type": "Function",
+      "signature": "(effectId: string) => void",
+      "calls": [],
+      "position": {
+        "line": 575,
+        "column": 1
+      },
+      "raw": "StopEffect :: (effectId: string) => void"
+    },
+    {
+      "name": "Initialize",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [
+        "GameManager.Initialize",
+        "WorldManager.InitializePhysics",
+        "RenderingManager.InitializeGraphics",
+        "NetworkManager.InitializeNetwork"
+      ],
+      "position": {
+        "line": 578,
+        "column": 1
+      },
+      "raw": "Initialize :: () => void",
+      "consumes": ["UNITY_VERSION", "BUILD_TARGET"]
+    },
+    {
+      "name": "InitializePhysics",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 582,
+        "column": 1
+      },
+      "raw": "InitializePhysics :: () => void",
+      "consumes": ["PHYSICS_TIMESTEP"]
+    },
+    {
+      "name": "InitializeGraphics",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 585,
+        "column": 1
+      },
+      "raw": "InitializeGraphics :: () => void",
+      "consumes": ["GRAPHICS_API", "TARGET_FPS"]
+    },
+    {
+      "name": "InitializeNetwork",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 588,
+        "column": 1
+      },
+      "raw": "InitializeNetwork :: () => void",
+      "consumes": ["PHOTON_APP_ID", "MAX_PLAYERS", "ENABLE_MULTIPLAYER"]
+    },
+    {
+      "name": "CloudSync",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 591,
+        "column": 1
+      },
+      "raw": "CloudSync :: () => void",
+      "consumes": ["STEAM_APP_ID"]
+    },
+    {
+      "name": "EnemyAI",
+      "type": "Class",
+      "extends": "AIController",
+      "implements": [],
+      "methods": ["AttackPlayer", "FleeWhenLowHealth"],
+      "imports": [],
+      "position": {
+        "line": 595,
+        "column": 1
+      },
+      "raw": "EnemyAI <: AIController"
+    },
+    {
+      "name": "CompanionAI",
+      "type": "Class",
+      "extends": "AIController",
+      "implements": [],
+      "methods": ["FollowPlayer", "AssistInCombat"],
+      "imports": [],
+      "position": {
+        "line": 598,
+        "column": 1
+      },
+      "raw": "CompanionAI <: AIController"
+    },
+    {
+      "name": "AttackPlayer",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["AIController.Chase", "CombatSystem.Attack"],
+      "position": {
+        "line": 601,
+        "column": 1
+      },
+      "raw": "AttackPlayer :: () => void"
+    },
+    {
+      "name": "FleeWhenLowHealth",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["AIController.Patrol"],
+      "position": {
+        "line": 604,
+        "column": 1
+      },
+      "raw": "FleeWhenLowHealth :: () => void"
+    },
+    {
+      "name": "FollowPlayer",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["AIController.SetTarget"],
+      "position": {
+        "line": 607,
+        "column": 1
+      },
+      "raw": "FollowPlayer :: () => void"
+    },
+    {
+      "name": "AssistInCombat",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["AIController.Attack"],
+      "position": {
+        "line": 610,
+        "column": 1
+      },
+      "raw": "AssistInCombat :: () => void"
+    },
+    {
+      "name": "GameState",
+      "type": "DTO",
+      "purpose": "Current game state",
+      "fields": [
+        {
+          "name": "currentScene",
+          "type": "string",
+          "description": "Active scene name",
+          "optional": false
+        },
+        {
+          "name": "isPaused",
+          "type": "boolean",
+          "description": "Pause state",
+          "optional": false
+        },
+        {
+          "name": "gameTime",
+          "type": "float",
+          "description": "In-game time",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 614,
+        "column": 1
+      },
+      "raw": "GameState % \"Current game state\""
+    },
+    {
+      "name": "PlayerStats",
+      "type": "DTO",
+      "purpose": "Player character stats",
+      "fields": [
+        {
+          "name": "health",
+          "type": "int",
+          "description": "Current health",
+          "optional": false
+        },
+        {
+          "name": "maxHealth",
+          "type": "int",
+          "description": "Maximum health",
+          "optional": false
+        },
+        {
+          "name": "mana",
+          "type": "int",
+          "description": "Current mana",
+          "optional": false
+        },
+        {
+          "name": "maxMana",
+          "type": "int",
+          "description": "Maximum mana",
+          "optional": false
+        },
+        {
+          "name": "level",
+          "type": "int",
+          "description": "Character level",
+          "optional": false
+        },
+        {
+          "name": "experience",
+          "type": "int",
+          "description": "Current XP",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 619,
+        "column": 1
+      },
+      "raw": "PlayerStats % \"Player character stats\""
+    },
+    {
+      "name": "Vector3",
+      "type": "DTO",
+      "purpose": "3D position/direction",
+      "fields": [
+        {
+          "name": "x",
+          "type": "float",
+          "description": "X coordinate",
+          "optional": false
+        },
+        {
+          "name": "y",
+          "type": "float",
+          "description": "Y coordinate",
+          "optional": false
+        },
+        {
+          "name": "z",
+          "type": "float",
+          "description": "Z coordinate",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 627,
+        "column": 1
+      },
+      "raw": "Vector3 % \"3D position/direction\""
+    },
+    {
+      "name": "Vector3Array",
+      "type": "DTO",
+      "purpose": "Array of 3D positions",
+      "fields": [
+        {
+          "name": "positions",
+          "type": "Vector3[]",
+          "description": "Array of positions",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 632,
+        "column": 1
+      },
+      "raw": "Vector3Array % \"Array of 3D positions\""
+    },
+    {
+      "name": "GameObject",
+      "type": "DTO",
+      "purpose": "Unity game object reference",
+      "fields": [
+        {
+          "name": "instanceId",
+          "type": "int",
+          "description": "Object instance ID",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Object name",
+          "optional": false
+        },
+        {
+          "name": "tag",
+          "type": "string",
+          "description": "Object tag",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 635,
+        "column": 1
+      },
+      "raw": "GameObject % \"Unity game object reference\""
+    },
+    {
+      "name": "Item",
+      "type": "DTO",
+      "purpose": "Inventory item data",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Item ID",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Item name",
+          "optional": false
+        },
+        {
+          "name": "icon",
+          "type": "string",
+          "description": "Icon path",
+          "optional": false
+        },
+        {
+          "name": "stackSize",
+          "type": "int",
+          "description": "Stack size",
+          "optional": false
+        },
+        {
+          "name": "rarity",
+          "type": "string",
+          "description": "Item rarity",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 640,
+        "column": 1
+      },
+      "raw": "Item % \"Inventory item data\""
+    },
+    {
+      "name": "Equipment",
+      "type": "DTO",
+      "purpose": "Equippable item data",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Equipment ID",
+          "optional": false
+        },
+        {
+          "name": "slot",
+          "type": "string",
+          "description": "Equipment slot",
+          "optional": false
+        },
+        {
+          "name": "stats",
+          "type": "object",
+          "description": "Stat modifiers",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 647,
+        "column": 1
+      },
+      "raw": "Equipment % \"Equippable item data\""
+    },
+    {
+      "name": "Quest",
+      "type": "DTO",
+      "purpose": "Quest data",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Quest ID",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Quest name",
+          "optional": false
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Quest description",
+          "optional": false
+        },
+        {
+          "name": "objectives",
+          "type": "QuestObjective[]",
+          "description": "Quest objectives",
+          "optional": false
+        },
+        {
+          "name": "rewards",
+          "type": "QuestReward[]",
+          "description": "Quest rewards",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 652,
+        "column": 1
+      },
+      "raw": "Quest % \"Quest data\""
+    },
+    {
+      "name": "QuestObjective",
+      "type": "DTO",
+      "purpose": "Quest objective",
+      "fields": [
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Objective text",
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Objective type",
+          "optional": false
+        },
+        {
+          "name": "target",
+          "type": "string",
+          "description": "Target ID",
+          "optional": false
+        },
+        {
+          "name": "count",
+          "type": "int",
+          "description": "Required count",
+          "optional": false
+        },
+        {
+          "name": "completed",
+          "type": "boolean",
+          "description": "Completion status",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 659,
+        "column": 1
+      },
+      "raw": "QuestObjective % \"Quest objective\""
+    },
+    {
+      "name": "QuestReward",
+      "type": "DTO",
+      "purpose": "Quest reward",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Reward type",
+          "optional": false
+        },
+        {
+          "name": "itemId",
+          "type": "string",
+          "description": "Item ID",
+          "optional": true
+        },
+        {
+          "name": "amount",
+          "type": "int",
+          "description": "Reward amount",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 666,
+        "column": 1
+      },
+      "raw": "QuestReward % \"Quest reward\""
+    },
+    {
+      "name": "StatusEffect",
+      "type": "DTO",
+      "purpose": "Status effect data",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Effect ID",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Effect name",
+          "optional": false
+        },
+        {
+          "name": "duration",
+          "type": "float",
+          "description": "Effect duration",
+          "optional": false
+        },
+        {
+          "name": "stackable",
+          "type": "boolean",
+          "description": "Can stack",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 671,
+        "column": 1
+      },
+      "raw": "StatusEffect % \"Status effect data\""
+    },
+    {
+      "name": "InputData",
+      "type": "DTO",
+      "purpose": "Player input state",
+      "fields": [
+        {
+          "name": "horizontal",
+          "type": "float",
+          "description": "Horizontal input",
+          "optional": false
+        },
+        {
+          "name": "vertical",
+          "type": "float",
+          "description": "Vertical input",
+          "optional": false
+        },
+        {
+          "name": "buttons",
+          "type": "object",
+          "description": "Button states",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 677,
+        "column": 1
+      },
+      "raw": "InputData % \"Player input state\""
+    }
+  ],
+  "links": [],
+  "errors": [
+    {
+      "position": {
+        "line": 285,
+        "column": 1
+      },
+      "message": "Orphaned entity 'GameManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 288,
+        "column": 1
+      },
+      "message": "Orphaned entity 'SceneManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 291,
+        "column": 1
+      },
+      "message": "Orphaned entity 'InputManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 294,
+        "column": 1
+      },
+      "message": "Orphaned entity 'PlayerController'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 297,
+        "column": 1
+      },
+      "message": "Orphaned entity 'CombatSystem'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 300,
+        "column": 1
+      },
+      "message": "Orphaned entity 'AIController'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 303,
+        "column": 1
+      },
+      "message": "Orphaned entity 'InventorySystem'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 306,
+        "column": 1
+      },
+      "message": "Orphaned entity 'WorldManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 309,
+        "column": 1
+      },
+      "message": "Orphaned entity 'QuestManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 312,
+        "column": 1
+      },
+      "message": "Orphaned entity 'NPCManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 315,
+        "column": 1
+      },
+      "message": "Orphaned entity 'NetworkManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 318,
+        "column": 1
+      },
+      "message": "Orphaned entity 'UIManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 321,
+        "column": 1
+      },
+      "message": "Orphaned entity 'AudioManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 324,
+        "column": 1
+      },
+      "message": "Orphaned entity 'SaveSystem'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 327,
+        "column": 1
+      },
+      "message": "Orphaned entity 'ResourceManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 330,
+        "column": 1
+      },
+      "message": "Orphaned entity 'RenderingManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 333,
+        "column": 1
+      },
+      "message": "Orphaned entity 'VFXManager'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 336,
+        "column": 1
+      },
+      "message": "Orphaned entity 'MenuSystem'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 339,
+        "column": 1
+      },
+      "message": "Orphaned entity 'MultiplayerSync'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 516,
+        "column": 1
+      },
+      "message": "Orphaned entity 'UpdateHealth'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 519,
+        "column": 1
+      },
+      "message": "Orphaned entity 'UpdateMana'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 595,
+        "column": 1
+      },
+      "message": "Orphaned entity 'EnemyAI'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 598,
+        "column": 1
+      },
+      "message": "Orphaned entity 'CompanionAI'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 619,
+        "column": 1
+      },
+      "message": "Orphaned entity 'PlayerStats'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    }
+  ],
+  "metadata": {
+    "healthScore": {
+      "overall": 79,
+      "categories": {
+        "Complexity": 56.675,
+        "Coupling": 100,
+        "Structure": 75,
+        "Testability": 80,
+        "Maintainability": 73.52852852852853,
+        "Performance": 84.83333333333333
+      },
+      "trends": {},
+      "recommendations": [],
+      "risks": []
+    },
+    "patterns": [],
+    "performance": {
+      "graph-load-time": "<normalized: non-deterministic wall-clock timing>"
+    }
+  }
+}

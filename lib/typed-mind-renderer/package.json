@@ -80,7 +80,9 @@
     "copy-static": "mkdir -p dist && cp -r src/static dist/",
     "dev": "tsc --build --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
-    "test": "echo 'no tests in renderer package'",
+    "test": "node --test",
+    "test:watch": "node --test --watch 'src/**/*.test.ts'",
+    "check:golden-deltas": "node scripts/check-golden-deltas.mjs",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },

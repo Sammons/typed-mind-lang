@@ -1,0 +1,3218 @@
+{
+  "entities": [
+    {
+      "name": "TaskMaster",
+      "type": "Program",
+      "entry": "MainFile",
+      "version": "1.5.0",
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "raw": "TaskMaster -> MainFile v1.5.0 # Modern task runner and build tool",
+      "comment": "Modern task runner and build tool"
+    },
+    {
+      "name": "commander",
+      "type": "Dependency",
+      "purpose": "CLI framework",
+      "version": "12.1.0",
+      "importedBy": [],
+      "position": {
+        "line": 5,
+        "column": 1
+      },
+      "raw": "commander ^ \"CLI framework\" v12.1.0"
+    },
+    {
+      "name": "chalk",
+      "type": "Dependency",
+      "purpose": "Terminal styling",
+      "version": "5.3.0",
+      "importedBy": [],
+      "position": {
+        "line": 6,
+        "column": 1
+      },
+      "raw": "chalk ^ \"Terminal styling\" v5.3.0"
+    },
+    {
+      "name": "ora",
+      "type": "Dependency",
+      "purpose": "Spinner for async operations",
+      "version": "8.0.1",
+      "importedBy": [],
+      "position": {
+        "line": 7,
+        "column": 1
+      },
+      "raw": "ora ^ \"Spinner for async operations\" v8.0.1"
+    },
+    {
+      "name": "yaml",
+      "type": "Dependency",
+      "purpose": "YAML parser",
+      "version": "2.3.4",
+      "importedBy": [],
+      "position": {
+        "line": 8,
+        "column": 1
+      },
+      "raw": "yaml ^ \"YAML parser\" v2.3.4"
+    },
+    {
+      "name": "json5",
+      "type": "Dependency",
+      "purpose": "JSON5 parser",
+      "version": "2.2.3",
+      "importedBy": [],
+      "position": {
+        "line": 9,
+        "column": 1
+      },
+      "raw": "json5 ^ \"JSON5 parser\" v2.2.3"
+    },
+    {
+      "name": "cosmiconfig",
+      "type": "Dependency",
+      "purpose": "Config file loader",
+      "version": "9.0.0",
+      "importedBy": [],
+      "position": {
+        "line": 10,
+        "column": 1
+      },
+      "raw": "cosmiconfig ^ \"Config file loader\" v9.0.0"
+    },
+    {
+      "name": "ajv",
+      "type": "Dependency",
+      "purpose": "JSON schema validator",
+      "version": "8.12.0",
+      "importedBy": [],
+      "position": {
+        "line": 11,
+        "column": 1
+      },
+      "raw": "ajv ^ \"JSON schema validator\" v8.12.0"
+    },
+    {
+      "name": "winston",
+      "type": "Dependency",
+      "purpose": "Logging library",
+      "version": "3.11.0",
+      "importedBy": [],
+      "position": {
+        "line": 12,
+        "column": 1
+      },
+      "raw": "winston ^ \"Logging library\" v3.11.0"
+    },
+    {
+      "name": "glob",
+      "type": "Dependency",
+      "purpose": "File pattern matching",
+      "version": "10.3.10",
+      "importedBy": [],
+      "position": {
+        "line": 13,
+        "column": 1
+      },
+      "raw": "glob ^ \"File pattern matching\" v10.3.10"
+    },
+    {
+      "name": "fs-extra",
+      "type": "Dependency",
+      "purpose": "File system operations",
+      "version": "11.2.0",
+      "importedBy": [],
+      "position": {
+        "line": 14,
+        "column": 1
+      },
+      "raw": "fs-extra ^ \"File system operations\" v11.2.0"
+    },
+    {
+      "name": "execa",
+      "type": "Dependency",
+      "purpose": "Process execution",
+      "version": "8.0.1",
+      "importedBy": [],
+      "position": {
+        "line": 15,
+        "column": 1
+      },
+      "raw": "execa ^ \"Process execution\" v8.0.1"
+    },
+    {
+      "name": "cross-spawn",
+      "type": "Dependency",
+      "purpose": "Cross-platform spawn",
+      "version": "7.0.3",
+      "importedBy": [],
+      "position": {
+        "line": 16,
+        "column": 1
+      },
+      "raw": "cross-spawn ^ \"Cross-platform spawn\" v7.0.3"
+    },
+    {
+      "name": "chokidar",
+      "type": "Dependency",
+      "purpose": "File watcher",
+      "version": "3.6.0",
+      "importedBy": [],
+      "position": {
+        "line": 17,
+        "column": 1
+      },
+      "raw": "chokidar ^ \"File watcher\" v3.6.0"
+    },
+    {
+      "name": "MainFile",
+      "type": "File",
+      "path": "src/index.ts",
+      "imports": ["CLIFile", "TaskRunnerFile", "ConfigLoaderFile", "TasksFile", "PluginsFile", "UtilsFile", "ConstantsFile", "DTOsFile"],
+      "exports": ["main"],
+      "position": {
+        "line": 20,
+        "column": 1
+      },
+      "raw": "MainFile @ src/index.ts:"
+    },
+    {
+      "name": "CLIFile",
+      "type": "File",
+      "path": "src/cli/index.ts",
+      "imports": ["CommandsFile"],
+      "exports": ["cli", "parseArgs", "displayHelp"],
+      "position": {
+        "line": 25,
+        "column": 1
+      },
+      "raw": "CLIFile @ src/cli/index.ts:"
+    },
+    {
+      "name": "CommandsFile",
+      "type": "File",
+      "path": "src/cli/commands.ts",
+      "imports": ["TaskRunnerFile", "Logger", "FileUtils"],
+      "exports": ["registerCommands", "runCommand", "buildCommand", "watchCommand", "testCommand", "deployCommand"],
+      "position": {
+        "line": 29,
+        "column": 1
+      },
+      "raw": "CommandsFile @ src/cli/commands.ts:"
+    },
+    {
+      "name": "TaskRunnerFile",
+      "type": "File",
+      "path": "src/core/task-runner.ts",
+      "imports": ["TaskRegistryFile", "TaskSchedulerFile", "DependencyResolverFile", "WorkerPoolFile"],
+      "exports": ["taskRunner", "runTask", "runParallel", "runSequential"],
+      "position": {
+        "line": 34,
+        "column": 1
+      },
+      "raw": "TaskRunnerFile @ src/core/task-runner.ts:"
+    },
+    {
+      "name": "TaskRegistryFile",
+      "type": "File",
+      "path": "src/core/task-registry.ts",
+      "imports": ["SchemaValidatorFile"],
+      "exports": ["taskRegistry", "registerTask", "getTask", "listTasks"],
+      "position": {
+        "line": 38,
+        "column": 1
+      },
+      "raw": "TaskRegistryFile @ src/core/task-registry.ts:"
+    },
+    {
+      "name": "DependencyResolverFile",
+      "type": "File",
+      "path": "src/core/dependency-resolver.ts",
+      "imports": [],
+      "exports": ["dependencyResolver", "resolveDependencies", "detectCycles"],
+      "position": {
+        "line": 42,
+        "column": 1
+      },
+      "raw": "DependencyResolverFile @ src/core/dependency-resolver.ts:"
+    },
+    {
+      "name": "TaskSchedulerFile",
+      "type": "File",
+      "path": "src/core/task-scheduler.ts",
+      "imports": ["WorkerPoolFile"],
+      "exports": ["taskScheduler", "scheduleTask", "cancelTask"],
+      "position": {
+        "line": 45,
+        "column": 1
+      },
+      "raw": "TaskSchedulerFile @ src/core/task-scheduler.ts:"
+    },
+    {
+      "name": "TasksFile",
+      "type": "File",
+      "path": "src/tasks/index.ts",
+      "imports": ["ProcessUtils", "FileUtils", "taskDefinitions"],
+      "exports": ["ShellTask", "FileTask", "HttpTask", "DockerTask", "K8sTask"],
+      "position": {
+        "line": 50,
+        "column": 1
+      },
+      "raw": "TasksFile @ src/tasks/index.ts:"
+    },
+    {
+      "name": "PluginsFile",
+      "type": "File",
+      "path": "src/plugins/index.ts",
+      "imports": ["PluginAPI", "FileUtils"],
+      "exports": ["loadPlugins", "registerPlugin"],
+      "position": {
+        "line": 55,
+        "column": 1
+      },
+      "raw": "PluginsFile @ src/plugins/index.ts:"
+    },
+    {
+      "name": "PluginAPI",
+      "type": "ClassFile",
+      "path": "src/plugins/api.ts",
+      "implements": [],
+      "methods": ["registerTask", "registerCommand", "emit", "on"],
+      "imports": ["TaskRegistryFile"],
+      "exports": ["createContext", "exposeAPI"],
+      "position": {
+        "line": 59,
+        "column": 1
+      },
+      "raw": "PluginAPI #: src/plugins/api.ts # Plugin API class and file",
+      "comment": "Plugin API class and file"
+    },
+    {
+      "name": "ConfigLoaderFile",
+      "type": "File",
+      "path": "src/config/config-loader.ts",
+      "imports": ["SchemaValidatorFile", "FileUtils"],
+      "exports": ["configLoader", "loadConfig", "validateConfig"],
+      "position": {
+        "line": 65,
+        "column": 1
+      },
+      "raw": "ConfigLoaderFile @ src/config/config-loader.ts:"
+    },
+    {
+      "name": "SchemaValidatorFile",
+      "type": "File",
+      "path": "src/config/schema-validator.ts",
+      "imports": [],
+      "exports": ["schemaValidator", "validateTaskSchema"],
+      "position": {
+        "line": 69,
+        "column": 1
+      },
+      "raw": "SchemaValidatorFile @ src/config/schema-validator.ts:"
+    },
+    {
+      "name": "UtilsFile",
+      "type": "File",
+      "path": "src/utils/index.ts",
+      "imports": ["Logger", "FileUtils", "ProcessUtils"],
+      "exports": ["getLogger", "getFileUtils", "getProcessUtils", "networkUtils"],
+      "position": {
+        "line": 73,
+        "column": 1
+      },
+      "raw": "UtilsFile @ src/utils/index.ts:"
+    },
+    {
+      "name": "Logger",
+      "type": "ClassFile",
+      "path": "src/utils/logger.ts",
+      "implements": [],
+      "methods": ["info", "warn", "error", "debug"],
+      "imports": [],
+      "exports": ["createLogger"],
+      "position": {
+        "line": 77,
+        "column": 1
+      },
+      "raw": "Logger #: src/utils/logger.ts # Logger class and file",
+      "comment": "Logger class and file"
+    },
+    {
+      "name": "FileUtils",
+      "type": "ClassFile",
+      "path": "src/utils/file-utils.ts",
+      "implements": [],
+      "methods": ["glob", "read", "write", "copy", "remove"],
+      "imports": [],
+      "exports": ["findFiles", "copyFiles", "cleanDirectory"],
+      "position": {
+        "line": 81,
+        "column": 1
+      },
+      "raw": "FileUtils #: src/utils/file-utils.ts # File utilities class and file",
+      "comment": "File utilities class and file"
+    },
+    {
+      "name": "ProcessUtils",
+      "type": "ClassFile",
+      "path": "src/utils/process-utils.ts",
+      "implements": [],
+      "methods": ["spawn", "exec", "shell", "kill"],
+      "imports": [],
+      "exports": ["spawn", "exec", "shell"],
+      "position": {
+        "line": 85,
+        "column": 1
+      },
+      "raw": "ProcessUtils #: src/utils/process-utils.ts # Process utilities class and file",
+      "comment": "Process utilities class and file"
+    },
+    {
+      "name": "WorkerPoolFile",
+      "type": "File",
+      "path": "src/workers/worker-pool.ts",
+      "imports": ["WorkerFile"],
+      "exports": ["workerPool", "createWorker", "executeInWorker"],
+      "position": {
+        "line": 90,
+        "column": 1
+      },
+      "raw": "WorkerPoolFile @ src/workers/worker-pool.ts:"
+    },
+    {
+      "name": "WorkerFile",
+      "type": "File",
+      "path": "src/workers/worker.ts",
+      "imports": ["TasksFile", "workerConstants"],
+      "exports": ["taskWorker"],
+      "position": {
+        "line": 94,
+        "column": 1
+      },
+      "raw": "WorkerFile @ src/workers/worker.ts:"
+    },
+    {
+      "name": "NODE_ENV",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "Node environment",
+      "consumedBy": ["main"],
+      "position": {
+        "line": 99,
+        "column": 1
+      },
+      "raw": "NODE_ENV $env \"Node environment\" (optional)",
+      "defaultValue": "development"
+    },
+    {
+      "name": "TASKMASTER_HOME",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "TaskMaster home directory",
+      "consumedBy": ["loadConfig"],
+      "position": {
+        "line": 101,
+        "column": 1
+      },
+      "raw": "TASKMASTER_HOME $env \"TaskMaster home directory\" (optional)",
+      "defaultValue": "~/.taskmaster"
+    },
+    {
+      "name": "PARALLEL_JOBS",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "Maximum parallel jobs",
+      "consumedBy": ["runCommand", "runParallel"],
+      "position": {
+        "line": 103,
+        "column": 1
+      },
+      "raw": "PARALLEL_JOBS $env \"Maximum parallel jobs\" (optional)",
+      "defaultValue": "4"
+    },
+    {
+      "name": "LOG_LEVEL",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "Logging level",
+      "consumedBy": ["getLogger"],
+      "position": {
+        "line": 105,
+        "column": 1
+      },
+      "raw": "LOG_LEVEL $env \"Logging level\" (optional)",
+      "defaultValue": "info"
+    },
+    {
+      "name": "NO_COLOR",
+      "type": "RunParameter",
+      "paramType": "env",
+      "description": "Disable colored output",
+      "consumedBy": ["getLogger"],
+      "position": {
+        "line": 107,
+        "column": 1
+      },
+      "raw": "NO_COLOR $env \"Disable colored output\" (optional)",
+      "defaultValue": "false"
+    },
+    {
+      "name": "NODE_VERSION",
+      "type": "RunParameter",
+      "paramType": "runtime",
+      "description": "Node.js version",
+      "required": true,
+      "consumedBy": ["runCommand"],
+      "position": {
+        "line": 111,
+        "column": 1
+      },
+      "raw": "NODE_VERSION $runtime \"Node.js version\" (required)",
+      "defaultValue": "20.x"
+    },
+    {
+      "name": "NPM_VERSION",
+      "type": "RunParameter",
+      "paramType": "runtime",
+      "description": "NPM version",
+      "consumedBy": ["buildCommand"],
+      "position": {
+        "line": 113,
+        "column": 1
+      },
+      "raw": "NPM_VERSION $runtime \"NPM version\" (optional)",
+      "defaultValue": "10.x"
+    },
+    {
+      "name": "CONFIG_FILE",
+      "type": "RunParameter",
+      "paramType": "config",
+      "description": "Configuration file name",
+      "consumedBy": ["loadConfig"],
+      "position": {
+        "line": 117,
+        "column": 1
+      },
+      "raw": "CONFIG_FILE $config \"Configuration file name\" (optional)",
+      "defaultValue": "taskmaster.yml"
+    },
+    {
+      "name": "PLUGIN_DIR",
+      "type": "RunParameter",
+      "paramType": "config",
+      "description": "Plugin directory",
+      "consumedBy": ["loadPlugins"],
+      "position": {
+        "line": 119,
+        "column": 1
+      },
+      "raw": "PLUGIN_DIR $config \"Plugin directory\" (optional)",
+      "defaultValue": "./plugins"
+    },
+    {
+      "name": "CACHE_DIR",
+      "type": "RunParameter",
+      "paramType": "config",
+      "description": "Cache directory",
+      "consumedBy": ["cleanDirectory"],
+      "position": {
+        "line": 121,
+        "column": 1
+      },
+      "raw": "CACHE_DIR $config \"Cache directory\" (optional)",
+      "defaultValue": ".taskmaster-cache"
+    },
+    {
+      "name": "DEFAULT_SHELL",
+      "type": "RunParameter",
+      "paramType": "config",
+      "description": "Default shell for commands",
+      "consumedBy": ["getProcessUtils", "shell"],
+      "position": {
+        "line": 123,
+        "column": 1
+      },
+      "raw": "DEFAULT_SHELL $config \"Default shell for commands\" (optional)",
+      "defaultValue": "/bin/bash"
+    },
+    {
+      "name": "cli",
+      "type": "Class",
+      "implements": [],
+      "methods": ["parse", "run", "showVersion", "showHelp", "command"],
+      "imports": ["commander", "chalk", "ora"],
+      "position": {
+        "line": 127,
+        "column": 1
+      },
+      "raw": "cli <:"
+    },
+    {
+      "name": "taskRunner",
+      "type": "Class",
+      "implements": [],
+      "methods": ["run", "runTask", "runTasks", "stopAll"],
+      "imports": [],
+      "position": {
+        "line": 132,
+        "column": 1
+      },
+      "raw": "taskRunner <:"
+    },
+    {
+      "name": "taskRegistry",
+      "type": "Class",
+      "implements": [],
+      "methods": ["register", "get", "list", "clear"],
+      "imports": [],
+      "position": {
+        "line": 135,
+        "column": 1
+      },
+      "raw": "taskRegistry <:"
+    },
+    {
+      "name": "dependencyResolver",
+      "type": "Class",
+      "implements": [],
+      "methods": ["resolve", "buildGraph", "detectCycles"],
+      "imports": [],
+      "position": {
+        "line": 138,
+        "column": 1
+      },
+      "raw": "dependencyResolver <:"
+    },
+    {
+      "name": "taskScheduler",
+      "type": "Class",
+      "implements": [],
+      "methods": ["schedule", "cancel", "getStatus", "waitForCompletion"],
+      "imports": [],
+      "position": {
+        "line": 141,
+        "column": 1
+      },
+      "raw": "taskScheduler <:"
+    },
+    {
+      "name": "configLoader",
+      "type": "Class",
+      "implements": [],
+      "methods": ["load", "reload", "watch"],
+      "imports": ["yaml", "json5", "cosmiconfig"],
+      "position": {
+        "line": 144,
+        "column": 1
+      },
+      "raw": "configLoader <:"
+    },
+    {
+      "name": "schemaValidator",
+      "type": "Class",
+      "implements": [],
+      "methods": ["validate", "getErrors"],
+      "imports": ["ajv"],
+      "position": {
+        "line": 148,
+        "column": 1
+      },
+      "raw": "schemaValidator <:"
+    },
+    {
+      "name": "workerPool",
+      "type": "Class",
+      "implements": [],
+      "methods": ["execute", "terminate", "getWorkerCount"],
+      "imports": [],
+      "position": {
+        "line": 152,
+        "column": 1
+      },
+      "raw": "workerPool <:"
+    },
+    {
+      "name": "networkUtils",
+      "type": "Class",
+      "implements": [],
+      "methods": ["fetch", "download", "upload"],
+      "imports": [],
+      "position": {
+        "line": 155,
+        "column": 1
+      },
+      "raw": "networkUtils <:"
+    },
+    {
+      "name": "ShellTask",
+      "type": "Class",
+      "implements": [],
+      "methods": ["execute", "validate"],
+      "imports": [],
+      "position": {
+        "line": 159,
+        "column": 1
+      },
+      "raw": "ShellTask <:"
+    },
+    {
+      "name": "FileTask",
+      "type": "Class",
+      "implements": [],
+      "methods": ["execute", "validate"],
+      "imports": [],
+      "position": {
+        "line": 162,
+        "column": 1
+      },
+      "raw": "FileTask <:"
+    },
+    {
+      "name": "HttpTask",
+      "type": "Class",
+      "implements": [],
+      "methods": ["execute", "validate"],
+      "imports": [],
+      "position": {
+        "line": 165,
+        "column": 1
+      },
+      "raw": "HttpTask <:"
+    },
+    {
+      "name": "DockerTask",
+      "type": "Class",
+      "implements": [],
+      "methods": ["execute", "validate"],
+      "imports": [],
+      "position": {
+        "line": 168,
+        "column": 1
+      },
+      "raw": "DockerTask <:"
+    },
+    {
+      "name": "K8sTask",
+      "type": "Class",
+      "implements": [],
+      "methods": ["execute", "validate"],
+      "imports": [],
+      "position": {
+        "line": 171,
+        "column": 1
+      },
+      "raw": "K8sTask <:"
+    },
+    {
+      "name": "main",
+      "type": "Function",
+      "signature": "(argv: string[]) => Promise<void>",
+      "calls": ["parseArgs", "runCommand"],
+      "position": {
+        "line": 175,
+        "column": 1
+      },
+      "raw": "main :: (argv: string[]) => Promise<void>",
+      "consumes": ["NODE_ENV"]
+    },
+    {
+      "name": "parseArgs",
+      "type": "Function",
+      "signature": "(argv: string[]) => CLIArgs",
+      "calls": ["cli.parse"],
+      "position": {
+        "line": 180,
+        "column": 1
+      },
+      "raw": "parseArgs :: (argv: string[]) => CLIArgs",
+      "output": "CLIArgs"
+    },
+    {
+      "name": "displayHelp",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["cli.showHelp"],
+      "position": {
+        "line": 184,
+        "column": 1
+      },
+      "raw": "displayHelp :: () => void"
+    },
+    {
+      "name": "registerCommands",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["cli.command"],
+      "position": {
+        "line": 187,
+        "column": 1
+      },
+      "raw": "registerCommands :: () => void"
+    },
+    {
+      "name": "runCommand",
+      "type": "Function",
+      "signature": "(taskName: string, options: RunOptions) => Promise<void>",
+      "calls": ["taskRunner.runTask", "createLogger"],
+      "position": {
+        "line": 191,
+        "column": 1
+      },
+      "raw": "runCommand :: (taskName: string, options: RunOptions) => Promise<void>",
+      "input": "RunOptions",
+      "consumes": ["PARALLEL_JOBS", "NODE_VERSION"]
+    },
+    {
+      "name": "buildCommand",
+      "type": "Function",
+      "signature": "(options: BuildOptions) => Promise<void>",
+      "calls": ["taskRunner.runTasks", "cleanDirectory"],
+      "position": {
+        "line": 196,
+        "column": 1
+      },
+      "raw": "buildCommand :: (options: BuildOptions) => Promise<void>",
+      "input": "BuildOptions",
+      "consumes": ["NPM_VERSION"]
+    },
+    {
+      "name": "watchCommand",
+      "type": "Function",
+      "signature": "(pattern: string, options: WatchOptions) => Promise<void>",
+      "calls": ["findFiles", "taskRunner.runTask"],
+      "position": {
+        "line": 201,
+        "column": 1
+      },
+      "raw": "watchCommand :: (pattern: string, options: WatchOptions) => Promise<void>",
+      "input": "WatchOptions"
+    },
+    {
+      "name": "testCommand",
+      "type": "Function",
+      "signature": "(options: TestOptions) => Promise<void>",
+      "calls": ["taskRunner.runTask"],
+      "position": {
+        "line": 205,
+        "column": 1
+      },
+      "raw": "testCommand :: (options: TestOptions) => Promise<void>",
+      "input": "TestOptions"
+    },
+    {
+      "name": "deployCommand",
+      "type": "Function",
+      "signature": "(target: string, options: DeployOptions) => Promise<void>",
+      "calls": ["taskRunner.runTasks"],
+      "position": {
+        "line": 209,
+        "column": 1
+      },
+      "raw": "deployCommand :: (target: string, options: DeployOptions) => Promise<void>",
+      "input": "DeployOptions"
+    },
+    {
+      "name": "runTask",
+      "type": "Function",
+      "signature": "(name: string, context: TaskContext) => Promise<TaskResult>",
+      "calls": ["taskRegistry.get", "dependencyResolver.resolve", "taskScheduler.schedule"],
+      "position": {
+        "line": 214,
+        "column": 1
+      },
+      "raw": "runTask :: (name: string, context: TaskContext) => Promise<TaskResult>",
+      "input": "TaskContext",
+      "output": "TaskResult"
+    },
+    {
+      "name": "runParallel",
+      "type": "Function",
+      "signature": "(tasks: string[], context: TaskContext) => Promise<TaskResult[]>",
+      "calls": ["workerPool.execute"],
+      "position": {
+        "line": 219,
+        "column": 1
+      },
+      "raw": "runParallel :: (tasks: string[], context: TaskContext) => Promise<TaskResult[]>",
+      "input": "TaskContext",
+      "consumes": ["PARALLEL_JOBS"]
+    },
+    {
+      "name": "runSequential",
+      "type": "Function",
+      "signature": "(tasks: string[], context: TaskContext) => Promise<TaskResult[]>",
+      "calls": ["runTask"],
+      "position": {
+        "line": 225,
+        "column": 1
+      },
+      "raw": "runSequential :: (tasks: string[], context: TaskContext) => Promise<TaskResult[]>",
+      "input": "TaskContext"
+    },
+    {
+      "name": "registerTask",
+      "type": "Function",
+      "signature": "(name: string, definition: TaskDefinition) => void",
+      "calls": ["schemaValidator.validate"],
+      "position": {
+        "line": 231,
+        "column": 1
+      },
+      "raw": "registerTask :: (name: string, definition: TaskDefinition) => void",
+      "input": "TaskDefinition"
+    },
+    {
+      "name": "getTask",
+      "type": "Function",
+      "signature": "(name: string) => TaskDefinition",
+      "calls": [],
+      "position": {
+        "line": 235,
+        "column": 1
+      },
+      "raw": "getTask :: (name: string) => TaskDefinition",
+      "output": "TaskDefinition"
+    },
+    {
+      "name": "listTasks",
+      "type": "Function",
+      "signature": "() => TaskInfo[]",
+      "calls": [],
+      "position": {
+        "line": 238,
+        "column": 1
+      },
+      "raw": "listTasks :: () => TaskInfo[]"
+    },
+    {
+      "name": "resolveDependencies",
+      "type": "Function",
+      "signature": "(taskName: string) => string[]",
+      "calls": ["taskRegistry.get"],
+      "position": {
+        "line": 242,
+        "column": 1
+      },
+      "raw": "resolveDependencies :: (taskName: string) => string[]"
+    },
+    {
+      "name": "detectCycles",
+      "type": "Function",
+      "signature": "(graph: DependencyGraph) => string[]",
+      "calls": [],
+      "position": {
+        "line": 245,
+        "column": 1
+      },
+      "raw": "detectCycles :: (graph: DependencyGraph) => string[]",
+      "input": "DependencyGraph"
+    },
+    {
+      "name": "scheduleTask",
+      "type": "Function",
+      "signature": "(task: Task, context: TaskContext) => Promise<TaskResult>",
+      "calls": ["workerPool.execute"],
+      "position": {
+        "line": 249,
+        "column": 1
+      },
+      "raw": "scheduleTask :: (task: Task, context: TaskContext) => Promise<TaskResult>",
+      "output": "TaskResult"
+    },
+    {
+      "name": "cancelTask",
+      "type": "Function",
+      "signature": "(taskId: string) => void",
+      "calls": [],
+      "position": {
+        "line": 254,
+        "column": 1
+      },
+      "raw": "cancelTask :: (taskId: string) => void"
+    },
+    {
+      "name": "loadConfig",
+      "type": "Function",
+      "signature": "(path: string) => Promise<Config>",
+      "calls": ["findFiles", "schemaValidator.validate"],
+      "position": {
+        "line": 257,
+        "column": 1
+      },
+      "raw": "loadConfig :: (path: string) => Promise<Config>",
+      "output": "Config",
+      "consumes": ["CONFIG_FILE", "TASKMASTER_HOME"]
+    },
+    {
+      "name": "validateConfig",
+      "type": "Function",
+      "signature": "(config: Config) => ValidationResult",
+      "calls": [],
+      "position": {
+        "line": 262,
+        "column": 1
+      },
+      "raw": "validateConfig :: (config: Config) => ValidationResult",
+      "input": "Config",
+      "output": "ValidationResult"
+    },
+    {
+      "name": "validateTaskSchema",
+      "type": "Function",
+      "signature": "(definition: TaskDefinition) => ValidationResult",
+      "calls": [],
+      "position": {
+        "line": 266,
+        "column": 1
+      },
+      "raw": "validateTaskSchema :: (definition: TaskDefinition) => ValidationResult",
+      "input": "TaskDefinition",
+      "output": "ValidationResult"
+    },
+    {
+      "name": "loadPlugins",
+      "type": "Function",
+      "signature": "() => Promise<void>",
+      "calls": ["findFiles", "registerPlugin"],
+      "position": {
+        "line": 271,
+        "column": 1
+      },
+      "raw": "loadPlugins :: () => Promise<void>",
+      "consumes": ["PLUGIN_DIR"]
+    },
+    {
+      "name": "registerPlugin",
+      "type": "Function",
+      "signature": "(plugin: Plugin) => void",
+      "calls": ["createContext", "exposeAPI"],
+      "position": {
+        "line": 275,
+        "column": 1
+      },
+      "raw": "registerPlugin :: (plugin: Plugin) => void",
+      "input": "Plugin"
+    },
+    {
+      "name": "createContext",
+      "type": "Function",
+      "signature": "(task: Task) => PluginContext",
+      "calls": [],
+      "position": {
+        "line": 279,
+        "column": 1
+      },
+      "raw": "createContext :: (task: Task) => PluginContext",
+      "input": "Task",
+      "output": "PluginContext"
+    },
+    {
+      "name": "exposeAPI",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 283,
+        "column": 1
+      },
+      "raw": "exposeAPI :: () => void"
+    },
+    {
+      "name": "createWorker",
+      "type": "Function",
+      "signature": "() => Worker",
+      "calls": [],
+      "position": {
+        "line": 286,
+        "column": 1
+      },
+      "raw": "createWorker :: () => Worker",
+      "output": "Worker"
+    },
+    {
+      "name": "executeInWorker",
+      "type": "Function",
+      "signature": "(task: Task, context: TaskContext) => Promise<TaskResult>",
+      "calls": [],
+      "position": {
+        "line": 289,
+        "column": 1
+      },
+      "raw": "executeInWorker :: (task: Task, context: TaskContext) => Promise<TaskResult>",
+      "output": "TaskResult"
+    },
+    {
+      "name": "taskWorker",
+      "type": "Function",
+      "signature": "(message: WorkerMessage) => Promise<WorkerResult>",
+      "calls": [],
+      "position": {
+        "line": 293,
+        "column": 1
+      },
+      "raw": "taskWorker :: (message: WorkerMessage) => Promise<WorkerResult>",
+      "input": "WorkerMessage",
+      "output": "WorkerResult"
+    },
+    {
+      "name": "getLogger",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 298,
+        "column": 1
+      },
+      "raw": "getLogger :: () => void",
+      "consumes": ["LOG_LEVEL", "NO_COLOR"]
+    },
+    {
+      "name": "getFileUtils",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 301,
+        "column": 1
+      },
+      "raw": "getFileUtils :: () => void"
+    },
+    {
+      "name": "getProcessUtils",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": [],
+      "position": {
+        "line": 303,
+        "column": 1
+      },
+      "raw": "getProcessUtils :: () => void",
+      "consumes": ["DEFAULT_SHELL"]
+    },
+    {
+      "name": "createLogger",
+      "type": "Function",
+      "signature": "(options: LoggerOptions) => void",
+      "calls": [],
+      "position": {
+        "line": 306,
+        "column": 1
+      },
+      "raw": "createLogger :: (options: LoggerOptions) => void",
+      "input": "LoggerOptions"
+    },
+    {
+      "name": "findFiles",
+      "type": "Function",
+      "signature": "(pattern: string, options?: GlobOptions) => Promise<string[]>",
+      "calls": [],
+      "position": {
+        "line": 309,
+        "column": 1
+      },
+      "raw": "findFiles :: (pattern: string, options?: GlobOptions) => Promise<string[]>",
+      "input": "GlobOptions"
+    },
+    {
+      "name": "copyFiles",
+      "type": "Function",
+      "signature": "(src: string, dest: string) => Promise<void>",
+      "calls": [],
+      "position": {
+        "line": 312,
+        "column": 1
+      },
+      "raw": "copyFiles :: (src: string, dest: string) => Promise<void>"
+    },
+    {
+      "name": "cleanDirectory",
+      "type": "Function",
+      "signature": "(path: string) => Promise<void>",
+      "calls": [],
+      "position": {
+        "line": 314,
+        "column": 1
+      },
+      "raw": "cleanDirectory :: (path: string) => Promise<void>",
+      "consumes": ["CACHE_DIR"]
+    },
+    {
+      "name": "spawn",
+      "type": "Function",
+      "signature": "(command: string, args: string[], options?: SpawnOptions) => Promise<SpawnResult>",
+      "calls": [],
+      "position": {
+        "line": 317,
+        "column": 1
+      },
+      "raw": "spawn :: (command: string, args: string[], options?: SpawnOptions) => Promise<SpawnResult>",
+      "input": "SpawnOptions",
+      "output": "SpawnResult"
+    },
+    {
+      "name": "exec",
+      "type": "Function",
+      "signature": "(command: string, options?: ExecOptions) => Promise<ExecResult>",
+      "calls": [],
+      "position": {
+        "line": 321,
+        "column": 1
+      },
+      "raw": "exec :: (command: string, options?: ExecOptions) => Promise<ExecResult>",
+      "input": "ExecOptions",
+      "output": "ExecResult"
+    },
+    {
+      "name": "shell",
+      "type": "Function",
+      "signature": "(command: string, options?: ShellOptions) => Promise<ShellResult>",
+      "calls": [],
+      "position": {
+        "line": 325,
+        "column": 1
+      },
+      "raw": "shell :: (command: string, options?: ShellOptions) => Promise<ShellResult>",
+      "input": "ShellOptions",
+      "output": "ShellResult",
+      "consumes": ["DEFAULT_SHELL"]
+    },
+    {
+      "name": "CLIArgs",
+      "type": "DTO",
+      "purpose": "Parsed CLI arguments",
+      "fields": [
+        {
+          "name": "command",
+          "type": "string",
+          "description": "Command to run",
+          "optional": false
+        },
+        {
+          "name": "args",
+          "type": "string[]",
+          "description": "Command arguments",
+          "optional": false
+        },
+        {
+          "name": "options",
+          "type": "object",
+          "description": "Command options",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 331,
+        "column": 1
+      },
+      "raw": "CLIArgs % \"Parsed CLI arguments\""
+    },
+    {
+      "name": "RunOptions",
+      "type": "DTO",
+      "purpose": "Run command options",
+      "fields": [
+        {
+          "name": "watch",
+          "type": "boolean",
+          "description": "Watch mode",
+          "optional": false
+        },
+        {
+          "name": "parallel",
+          "type": "boolean",
+          "description": "Run in parallel",
+          "optional": false
+        },
+        {
+          "name": "env",
+          "type": "object",
+          "description": "Environment variables",
+          "optional": true
+        },
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Working directory",
+          "optional": true
+        }
+      ],
+      "position": {
+        "line": 336,
+        "column": 1
+      },
+      "raw": "RunOptions % \"Run command options\""
+    },
+    {
+      "name": "BuildOptions",
+      "type": "DTO",
+      "purpose": "Build command options",
+      "fields": [
+        {
+          "name": "clean",
+          "type": "boolean",
+          "description": "Clean before build",
+          "optional": false
+        },
+        {
+          "name": "production",
+          "type": "boolean",
+          "description": "Production build",
+          "optional": false
+        },
+        {
+          "name": "target",
+          "type": "string",
+          "description": "Build target",
+          "optional": true
+        }
+      ],
+      "position": {
+        "line": 342,
+        "column": 1
+      },
+      "raw": "BuildOptions % \"Build command options\""
+    },
+    {
+      "name": "WatchOptions",
+      "type": "DTO",
+      "purpose": "Watch command options",
+      "fields": [
+        {
+          "name": "task",
+          "type": "string",
+          "description": "Task to run",
+          "optional": false
+        },
+        {
+          "name": "debounce",
+          "type": "number",
+          "description": "Debounce delay",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 347,
+        "column": 1
+      },
+      "raw": "WatchOptions % \"Watch command options\""
+    },
+    {
+      "name": "TestOptions",
+      "type": "DTO",
+      "purpose": "Test command options",
+      "fields": [
+        {
+          "name": "coverage",
+          "type": "boolean",
+          "description": "Generate coverage",
+          "optional": false
+        },
+        {
+          "name": "watch",
+          "type": "boolean",
+          "description": "Watch mode",
+          "optional": false
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Test filter",
+          "optional": true
+        }
+      ],
+      "position": {
+        "line": 351,
+        "column": 1
+      },
+      "raw": "TestOptions % \"Test command options\""
+    },
+    {
+      "name": "DeployOptions",
+      "type": "DTO",
+      "purpose": "Deploy command options",
+      "fields": [
+        {
+          "name": "dry",
+          "type": "boolean",
+          "description": "Dry run",
+          "optional": false
+        },
+        {
+          "name": "force",
+          "type": "boolean",
+          "description": "Force deploy",
+          "optional": false
+        },
+        {
+          "name": "tag",
+          "type": "string",
+          "description": "Deployment tag",
+          "optional": true
+        }
+      ],
+      "position": {
+        "line": 356,
+        "column": 1
+      },
+      "raw": "DeployOptions % \"Deploy command options\""
+    },
+    {
+      "name": "TaskContext",
+      "type": "DTO",
+      "purpose": "Task execution context",
+      "fields": [
+        {
+          "name": "env",
+          "type": "object",
+          "description": "Environment variables",
+          "optional": false
+        },
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Working directory",
+          "optional": false
+        },
+        {
+          "name": "vars",
+          "type": "object",
+          "description": "Task variables",
+          "optional": false
+        },
+        {
+          "name": "secrets",
+          "type": "object",
+          "description": "Secret values",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 361,
+        "column": 1
+      },
+      "raw": "TaskContext % \"Task execution context\""
+    },
+    {
+      "name": "TaskResult",
+      "type": "DTO",
+      "purpose": "Task execution result",
+      "fields": [
+        {
+          "name": "success",
+          "type": "boolean",
+          "description": "Success flag",
+          "optional": false
+        },
+        {
+          "name": "duration",
+          "type": "number",
+          "description": "Execution time",
+          "optional": false
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "description": "Task output",
+          "optional": true
+        },
+        {
+          "name": "error",
+          "type": "string",
+          "description": "Error message",
+          "optional": true
+        }
+      ],
+      "position": {
+        "line": 367,
+        "column": 1
+      },
+      "raw": "TaskResult % \"Task execution result\""
+    },
+    {
+      "name": "TaskDefinition",
+      "type": "DTO",
+      "purpose": "Task definition",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Task name",
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Task type",
+          "optional": false
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Task description",
+          "optional": true
+        },
+        {
+          "name": "depends",
+          "type": "string[]",
+          "description": "Dependencies",
+          "optional": true
+        },
+        {
+          "name": "config",
+          "type": "object",
+          "description": "Task configuration",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 373,
+        "column": 1
+      },
+      "raw": "TaskDefinition % \"Task definition\""
+    },
+    {
+      "name": "TaskInfo",
+      "type": "DTO",
+      "purpose": "Task information",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Task name",
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Task type",
+          "optional": false
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description",
+          "optional": true
+        },
+        {
+          "name": "dependencies",
+          "type": "string[]",
+          "description": "Task dependencies",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 380,
+        "column": 1
+      },
+      "raw": "TaskInfo % \"Task information\""
+    },
+    {
+      "name": "Config",
+      "type": "DTO",
+      "purpose": "Configuration object",
+      "fields": [
+        {
+          "name": "version",
+          "type": "string",
+          "description": "Config version",
+          "optional": false
+        },
+        {
+          "name": "tasks",
+          "type": "TaskDefinition[]",
+          "description": "Task definitions",
+          "optional": false
+        },
+        {
+          "name": "variables",
+          "type": "object",
+          "description": "Global variables",
+          "optional": false
+        },
+        {
+          "name": "plugins",
+          "type": "string[]",
+          "description": "Plugin list",
+          "optional": true
+        }
+      ],
+      "position": {
+        "line": 386,
+        "column": 1
+      },
+      "raw": "Config % \"Configuration object\""
+    },
+    {
+      "name": "ValidationResult",
+      "type": "DTO",
+      "purpose": "Validation result",
+      "fields": [
+        {
+          "name": "valid",
+          "type": "boolean",
+          "description": "Validation status",
+          "optional": false
+        },
+        {
+          "name": "errors",
+          "type": "ValidationError[]",
+          "description": "Validation errors",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 392,
+        "column": 1
+      },
+      "raw": "ValidationResult % \"Validation result\""
+    },
+    {
+      "name": "ValidationError",
+      "type": "DTO",
+      "purpose": "Validation error",
+      "fields": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Error path",
+          "optional": false
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "description": "Error message",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 396,
+        "column": 1
+      },
+      "raw": "ValidationError % \"Validation error\""
+    },
+    {
+      "name": "Plugin",
+      "type": "DTO",
+      "purpose": "Plugin definition",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Plugin name",
+          "optional": false
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "description": "Plugin version",
+          "optional": false
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Path to plugin module",
+          "optional": false
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "description": "Whether plugin is enabled",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 400,
+        "column": 1
+      },
+      "raw": "Plugin % \"Plugin definition\""
+    },
+    {
+      "name": "Task",
+      "type": "DTO",
+      "purpose": "Task instance",
+      "fields": [
+        {
+          "name": "definition",
+          "type": "TaskDefinition",
+          "description": "Task definition",
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "description": "Task status",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 406,
+        "column": 1
+      },
+      "raw": "Task % \"Task instance\""
+    },
+    {
+      "name": "Worker",
+      "type": "DTO",
+      "purpose": "Worker instance",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Worker ID",
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "description": "Worker status",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 410,
+        "column": 1
+      },
+      "raw": "Worker % \"Worker instance\""
+    },
+    {
+      "name": "WorkerMessage",
+      "type": "DTO",
+      "purpose": "Worker message",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Message type",
+          "optional": false
+        },
+        {
+          "name": "task",
+          "type": "Task",
+          "description": "Task to execute",
+          "optional": false
+        },
+        {
+          "name": "context",
+          "type": "TaskContext",
+          "description": "Execution context",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 414,
+        "column": 1
+      },
+      "raw": "WorkerMessage % \"Worker message\""
+    },
+    {
+      "name": "WorkerResult",
+      "type": "DTO",
+      "purpose": "Worker result",
+      "fields": [
+        {
+          "name": "taskId",
+          "type": "string",
+          "description": "Task ID",
+          "optional": false
+        },
+        {
+          "name": "result",
+          "type": "TaskResult",
+          "description": "Task result",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 419,
+        "column": 1
+      },
+      "raw": "WorkerResult % \"Worker result\""
+    },
+    {
+      "name": "DependencyGraph",
+      "type": "DTO",
+      "purpose": "Task dependency graph",
+      "fields": [
+        {
+          "name": "nodes",
+          "type": "string[]",
+          "description": "Task names",
+          "optional": false
+        },
+        {
+          "name": "edges",
+          "type": "object",
+          "description": "Dependencies",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 423,
+        "column": 1
+      },
+      "raw": "DependencyGraph % \"Task dependency graph\""
+    },
+    {
+      "name": "GlobOptions",
+      "type": "DTO",
+      "purpose": "Glob options",
+      "fields": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Working directory",
+          "optional": true
+        },
+        {
+          "name": "ignore",
+          "type": "string[]",
+          "description": "Patterns to ignore",
+          "optional": true
+        }
+      ],
+      "position": {
+        "line": 427,
+        "column": 1
+      },
+      "raw": "GlobOptions % \"Glob options\""
+    },
+    {
+      "name": "SpawnOptions",
+      "type": "DTO",
+      "purpose": "Spawn options",
+      "fields": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Working directory",
+          "optional": true
+        },
+        {
+          "name": "env",
+          "type": "object",
+          "description": "Environment variables",
+          "optional": true
+        },
+        {
+          "name": "shell",
+          "type": "boolean",
+          "description": "Use shell",
+          "optional": true
+        }
+      ],
+      "position": {
+        "line": 431,
+        "column": 1
+      },
+      "raw": "SpawnOptions % \"Spawn options\""
+    },
+    {
+      "name": "SpawnResult",
+      "type": "DTO",
+      "purpose": "Spawn result",
+      "fields": [
+        {
+          "name": "exitCode",
+          "type": "number",
+          "description": "Exit code",
+          "optional": false
+        },
+        {
+          "name": "stdout",
+          "type": "string",
+          "description": "Standard output",
+          "optional": false
+        },
+        {
+          "name": "stderr",
+          "type": "string",
+          "description": "Standard error",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 436,
+        "column": 1
+      },
+      "raw": "SpawnResult % \"Spawn result\""
+    },
+    {
+      "name": "ExecOptions",
+      "type": "DTO",
+      "purpose": "Exec options",
+      "fields": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Working directory",
+          "optional": true
+        },
+        {
+          "name": "env",
+          "type": "object",
+          "description": "Environment variables",
+          "optional": true
+        },
+        {
+          "name": "timeout",
+          "type": "number",
+          "description": "Timeout in ms",
+          "optional": true
+        }
+      ],
+      "position": {
+        "line": 441,
+        "column": 1
+      },
+      "raw": "ExecOptions % \"Exec options\""
+    },
+    {
+      "name": "ExecResult",
+      "type": "DTO",
+      "purpose": "Exec result",
+      "fields": [
+        {
+          "name": "stdout",
+          "type": "string",
+          "description": "Standard output",
+          "optional": false
+        },
+        {
+          "name": "stderr",
+          "type": "string",
+          "description": "Standard error",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 446,
+        "column": 1
+      },
+      "raw": "ExecResult % \"Exec result\""
+    },
+    {
+      "name": "ShellOptions",
+      "type": "DTO",
+      "purpose": "Shell options",
+      "fields": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Working directory",
+          "optional": true
+        },
+        {
+          "name": "env",
+          "type": "object",
+          "description": "Environment variables",
+          "optional": true
+        },
+        {
+          "name": "shell",
+          "type": "string",
+          "description": "Shell to use",
+          "optional": true
+        }
+      ],
+      "position": {
+        "line": 450,
+        "column": 1
+      },
+      "raw": "ShellOptions % \"Shell options\""
+    },
+    {
+      "name": "ShellResult",
+      "type": "DTO",
+      "purpose": "Shell result",
+      "fields": [
+        {
+          "name": "exitCode",
+          "type": "number",
+          "description": "Exit code",
+          "optional": false
+        },
+        {
+          "name": "stdout",
+          "type": "string",
+          "description": "Standard output",
+          "optional": false
+        },
+        {
+          "name": "stderr",
+          "type": "string",
+          "description": "Standard error",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 455,
+        "column": 1
+      },
+      "raw": "ShellResult % \"Shell result\""
+    },
+    {
+      "name": "LoggerOptions",
+      "type": "DTO",
+      "purpose": "Logger options",
+      "fields": [
+        {
+          "name": "level",
+          "type": "string",
+          "description": "Log level",
+          "optional": false
+        },
+        {
+          "name": "colorize",
+          "type": "boolean",
+          "description": "Use colors",
+          "optional": false
+        },
+        {
+          "name": "timestamp",
+          "type": "boolean",
+          "description": "Include timestamps",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 460,
+        "column": 1
+      },
+      "raw": "LoggerOptions % \"Logger options\""
+    },
+    {
+      "name": "PluginContext",
+      "type": "DTO",
+      "purpose": "Plugin context",
+      "fields": [
+        {
+          "name": "task",
+          "type": "Task",
+          "description": "Current task",
+          "optional": false
+        },
+        {
+          "name": "api",
+          "type": "PluginAPI",
+          "description": "Plugin API",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 465,
+        "column": 1
+      },
+      "raw": "PluginContext % \"Plugin context\""
+    },
+    {
+      "name": "DTOsFile",
+      "type": "File",
+      "path": "src/types/index.ts",
+      "imports": [],
+      "exports": [
+        "CLIArgs",
+        "RunOptions",
+        "BuildOptions",
+        "WatchOptions",
+        "TestOptions",
+        "DeployOptions",
+        "TaskContext",
+        "TaskResult",
+        "TaskDefinition",
+        "TaskInfo",
+        "Config",
+        "ValidationResult",
+        "ValidationError",
+        "Plugin",
+        "Task",
+        "Worker",
+        "WorkerMessage",
+        "WorkerResult",
+        "DependencyGraph",
+        "GlobOptions",
+        "SpawnOptions",
+        "SpawnResult",
+        "ExecOptions",
+        "ExecResult",
+        "ShellOptions",
+        "ShellResult",
+        "LoggerOptions",
+        "PluginContext",
+        "TaskConstants",
+        "WorkerConstants"
+      ],
+      "position": {
+        "line": 496,
+        "column": 1
+      },
+      "raw": "DTOsFile @ src/types/index.ts:"
+    },
+    {
+      "name": "ConstantsFile",
+      "type": "File",
+      "path": "src/constants/index.ts",
+      "imports": [],
+      "exports": ["taskDefinitions", "workerConstants"],
+      "position": {
+        "line": 500,
+        "column": 1
+      },
+      "raw": "ConstantsFile @ src/constants/index.ts:"
+    },
+    {
+      "name": "taskDefinitions",
+      "type": "Constants",
+      "path": "src/tasks/constants.ts",
+      "schema": "TaskConstants",
+      "position": {
+        "line": 503,
+        "column": 1
+      },
+      "raw": "taskDefinitions ! src/tasks/constants.ts : TaskConstants"
+    },
+    {
+      "name": "TaskConstants",
+      "type": "DTO",
+      "purpose": "Task type constants",
+      "fields": [
+        {
+          "name": "TASK_TYPES",
+          "type": "string[]",
+          "description": "Available task types",
+          "optional": false
+        },
+        {
+          "name": "TASK_STATUS",
+          "type": "string[]",
+          "description": "Task status values",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 504,
+        "column": 1
+      },
+      "raw": "TaskConstants % \"Task type constants\""
+    },
+    {
+      "name": "workerConstants",
+      "type": "Constants",
+      "path": "src/workers/constants.ts",
+      "schema": "WorkerConstants",
+      "position": {
+        "line": 508,
+        "column": 1
+      },
+      "raw": "workerConstants ! src/workers/constants.ts : WorkerConstants"
+    },
+    {
+      "name": "WorkerConstants",
+      "type": "DTO",
+      "purpose": "Worker constants",
+      "fields": [
+        {
+          "name": "WORKER_STATUS",
+          "type": "string[]",
+          "description": "Worker status values",
+          "optional": false
+        },
+        {
+          "name": "MAX_WORKER_MEMORY",
+          "type": "string",
+          "description": "Maximum worker memory",
+          "optional": false
+        }
+      ],
+      "position": {
+        "line": 509,
+        "column": 1
+      },
+      "raw": "WorkerConstants % \"Worker constants\""
+    }
+  ],
+  "links": [
+    {
+      "source": "TaskMaster",
+      "target": "MainFile",
+      "type": "entry"
+    },
+    {
+      "source": "MainFile",
+      "target": "CLIFile",
+      "type": "import"
+    },
+    {
+      "source": "MainFile",
+      "target": "TaskRunnerFile",
+      "type": "import"
+    },
+    {
+      "source": "MainFile",
+      "target": "ConfigLoaderFile",
+      "type": "import"
+    },
+    {
+      "source": "MainFile",
+      "target": "TasksFile",
+      "type": "import"
+    },
+    {
+      "source": "MainFile",
+      "target": "PluginsFile",
+      "type": "import"
+    },
+    {
+      "source": "MainFile",
+      "target": "UtilsFile",
+      "type": "import"
+    },
+    {
+      "source": "MainFile",
+      "target": "ConstantsFile",
+      "type": "import"
+    },
+    {
+      "source": "MainFile",
+      "target": "DTOsFile",
+      "type": "import"
+    },
+    {
+      "source": "MainFile",
+      "target": "main",
+      "type": "export"
+    },
+    {
+      "source": "CLIFile",
+      "target": "CommandsFile",
+      "type": "import"
+    },
+    {
+      "source": "CLIFile",
+      "target": "cli",
+      "type": "export"
+    },
+    {
+      "source": "CLIFile",
+      "target": "parseArgs",
+      "type": "export"
+    },
+    {
+      "source": "CLIFile",
+      "target": "displayHelp",
+      "type": "export"
+    },
+    {
+      "source": "CommandsFile",
+      "target": "TaskRunnerFile",
+      "type": "import"
+    },
+    {
+      "source": "CommandsFile",
+      "target": "Logger",
+      "type": "import"
+    },
+    {
+      "source": "CommandsFile",
+      "target": "FileUtils",
+      "type": "import"
+    },
+    {
+      "source": "CommandsFile",
+      "target": "registerCommands",
+      "type": "export"
+    },
+    {
+      "source": "CommandsFile",
+      "target": "runCommand",
+      "type": "export"
+    },
+    {
+      "source": "CommandsFile",
+      "target": "buildCommand",
+      "type": "export"
+    },
+    {
+      "source": "CommandsFile",
+      "target": "watchCommand",
+      "type": "export"
+    },
+    {
+      "source": "CommandsFile",
+      "target": "testCommand",
+      "type": "export"
+    },
+    {
+      "source": "CommandsFile",
+      "target": "deployCommand",
+      "type": "export"
+    },
+    {
+      "source": "TaskRunnerFile",
+      "target": "TaskRegistryFile",
+      "type": "import"
+    },
+    {
+      "source": "TaskRunnerFile",
+      "target": "TaskSchedulerFile",
+      "type": "import"
+    },
+    {
+      "source": "TaskRunnerFile",
+      "target": "DependencyResolverFile",
+      "type": "import"
+    },
+    {
+      "source": "TaskRunnerFile",
+      "target": "WorkerPoolFile",
+      "type": "import"
+    },
+    {
+      "source": "TaskRunnerFile",
+      "target": "taskRunner",
+      "type": "export"
+    },
+    {
+      "source": "TaskRunnerFile",
+      "target": "runTask",
+      "type": "export"
+    },
+    {
+      "source": "TaskRunnerFile",
+      "target": "runParallel",
+      "type": "export"
+    },
+    {
+      "source": "TaskRunnerFile",
+      "target": "runSequential",
+      "type": "export"
+    },
+    {
+      "source": "TaskRegistryFile",
+      "target": "SchemaValidatorFile",
+      "type": "import"
+    },
+    {
+      "source": "TaskRegistryFile",
+      "target": "taskRegistry",
+      "type": "export"
+    },
+    {
+      "source": "TaskRegistryFile",
+      "target": "registerTask",
+      "type": "export"
+    },
+    {
+      "source": "TaskRegistryFile",
+      "target": "getTask",
+      "type": "export"
+    },
+    {
+      "source": "TaskRegistryFile",
+      "target": "listTasks",
+      "type": "export"
+    },
+    {
+      "source": "DependencyResolverFile",
+      "target": "dependencyResolver",
+      "type": "export"
+    },
+    {
+      "source": "DependencyResolverFile",
+      "target": "resolveDependencies",
+      "type": "export"
+    },
+    {
+      "source": "DependencyResolverFile",
+      "target": "detectCycles",
+      "type": "export"
+    },
+    {
+      "source": "TaskSchedulerFile",
+      "target": "WorkerPoolFile",
+      "type": "import"
+    },
+    {
+      "source": "TaskSchedulerFile",
+      "target": "taskScheduler",
+      "type": "export"
+    },
+    {
+      "source": "TaskSchedulerFile",
+      "target": "scheduleTask",
+      "type": "export"
+    },
+    {
+      "source": "TaskSchedulerFile",
+      "target": "cancelTask",
+      "type": "export"
+    },
+    {
+      "source": "TasksFile",
+      "target": "ProcessUtils",
+      "type": "import"
+    },
+    {
+      "source": "TasksFile",
+      "target": "FileUtils",
+      "type": "import"
+    },
+    {
+      "source": "TasksFile",
+      "target": "taskDefinitions",
+      "type": "import"
+    },
+    {
+      "source": "TasksFile",
+      "target": "ShellTask",
+      "type": "export"
+    },
+    {
+      "source": "TasksFile",
+      "target": "FileTask",
+      "type": "export"
+    },
+    {
+      "source": "TasksFile",
+      "target": "HttpTask",
+      "type": "export"
+    },
+    {
+      "source": "TasksFile",
+      "target": "DockerTask",
+      "type": "export"
+    },
+    {
+      "source": "TasksFile",
+      "target": "K8sTask",
+      "type": "export"
+    },
+    {
+      "source": "PluginsFile",
+      "target": "PluginAPI",
+      "type": "import"
+    },
+    {
+      "source": "PluginsFile",
+      "target": "FileUtils",
+      "type": "import"
+    },
+    {
+      "source": "PluginsFile",
+      "target": "loadPlugins",
+      "type": "export"
+    },
+    {
+      "source": "PluginsFile",
+      "target": "registerPlugin",
+      "type": "export"
+    },
+    {
+      "source": "PluginAPI",
+      "target": "TaskRegistryFile",
+      "type": "import"
+    },
+    {
+      "source": "PluginAPI",
+      "target": "createContext",
+      "type": "export"
+    },
+    {
+      "source": "PluginAPI",
+      "target": "exposeAPI",
+      "type": "export"
+    },
+    {
+      "source": "ConfigLoaderFile",
+      "target": "SchemaValidatorFile",
+      "type": "import"
+    },
+    {
+      "source": "ConfigLoaderFile",
+      "target": "FileUtils",
+      "type": "import"
+    },
+    {
+      "source": "ConfigLoaderFile",
+      "target": "configLoader",
+      "type": "export"
+    },
+    {
+      "source": "ConfigLoaderFile",
+      "target": "loadConfig",
+      "type": "export"
+    },
+    {
+      "source": "ConfigLoaderFile",
+      "target": "validateConfig",
+      "type": "export"
+    },
+    {
+      "source": "SchemaValidatorFile",
+      "target": "schemaValidator",
+      "type": "export"
+    },
+    {
+      "source": "SchemaValidatorFile",
+      "target": "validateTaskSchema",
+      "type": "export"
+    },
+    {
+      "source": "UtilsFile",
+      "target": "Logger",
+      "type": "import"
+    },
+    {
+      "source": "UtilsFile",
+      "target": "FileUtils",
+      "type": "import"
+    },
+    {
+      "source": "UtilsFile",
+      "target": "ProcessUtils",
+      "type": "import"
+    },
+    {
+      "source": "UtilsFile",
+      "target": "getLogger",
+      "type": "export"
+    },
+    {
+      "source": "UtilsFile",
+      "target": "getFileUtils",
+      "type": "export"
+    },
+    {
+      "source": "UtilsFile",
+      "target": "getProcessUtils",
+      "type": "export"
+    },
+    {
+      "source": "UtilsFile",
+      "target": "networkUtils",
+      "type": "export"
+    },
+    {
+      "source": "Logger",
+      "target": "createLogger",
+      "type": "export"
+    },
+    {
+      "source": "FileUtils",
+      "target": "findFiles",
+      "type": "export"
+    },
+    {
+      "source": "FileUtils",
+      "target": "copyFiles",
+      "type": "export"
+    },
+    {
+      "source": "FileUtils",
+      "target": "cleanDirectory",
+      "type": "export"
+    },
+    {
+      "source": "ProcessUtils",
+      "target": "spawn",
+      "type": "export"
+    },
+    {
+      "source": "ProcessUtils",
+      "target": "exec",
+      "type": "export"
+    },
+    {
+      "source": "ProcessUtils",
+      "target": "shell",
+      "type": "export"
+    },
+    {
+      "source": "WorkerPoolFile",
+      "target": "WorkerFile",
+      "type": "import"
+    },
+    {
+      "source": "WorkerPoolFile",
+      "target": "workerPool",
+      "type": "export"
+    },
+    {
+      "source": "WorkerPoolFile",
+      "target": "createWorker",
+      "type": "export"
+    },
+    {
+      "source": "WorkerPoolFile",
+      "target": "executeInWorker",
+      "type": "export"
+    },
+    {
+      "source": "WorkerFile",
+      "target": "TasksFile",
+      "type": "import"
+    },
+    {
+      "source": "WorkerFile",
+      "target": "workerConstants",
+      "type": "import"
+    },
+    {
+      "source": "WorkerFile",
+      "target": "taskWorker",
+      "type": "export"
+    },
+    {
+      "source": "cli",
+      "target": "commander",
+      "type": "import"
+    },
+    {
+      "source": "cli",
+      "target": "chalk",
+      "type": "import"
+    },
+    {
+      "source": "cli",
+      "target": "ora",
+      "type": "import"
+    },
+    {
+      "source": "configLoader",
+      "target": "yaml",
+      "type": "import"
+    },
+    {
+      "source": "configLoader",
+      "target": "json5",
+      "type": "import"
+    },
+    {
+      "source": "configLoader",
+      "target": "cosmiconfig",
+      "type": "import"
+    },
+    {
+      "source": "schemaValidator",
+      "target": "ajv",
+      "type": "import"
+    },
+    {
+      "source": "main",
+      "target": "parseArgs",
+      "type": "call"
+    },
+    {
+      "source": "main",
+      "target": "runCommand",
+      "type": "call"
+    },
+    {
+      "source": "runCommand",
+      "target": "createLogger",
+      "type": "call"
+    },
+    {
+      "source": "buildCommand",
+      "target": "cleanDirectory",
+      "type": "call"
+    },
+    {
+      "source": "watchCommand",
+      "target": "findFiles",
+      "type": "call"
+    },
+    {
+      "source": "runSequential",
+      "target": "runTask",
+      "type": "call"
+    },
+    {
+      "source": "loadConfig",
+      "target": "findFiles",
+      "type": "call"
+    },
+    {
+      "source": "loadPlugins",
+      "target": "findFiles",
+      "type": "call"
+    },
+    {
+      "source": "loadPlugins",
+      "target": "registerPlugin",
+      "type": "call"
+    },
+    {
+      "source": "registerPlugin",
+      "target": "createContext",
+      "type": "call"
+    },
+    {
+      "source": "registerPlugin",
+      "target": "exposeAPI",
+      "type": "call"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "CLIArgs",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "RunOptions",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "BuildOptions",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "WatchOptions",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "TestOptions",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "DeployOptions",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "TaskContext",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "TaskResult",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "TaskDefinition",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "TaskInfo",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "Config",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "ValidationResult",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "ValidationError",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "Plugin",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "Task",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "Worker",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "WorkerMessage",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "WorkerResult",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "DependencyGraph",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "GlobOptions",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "SpawnOptions",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "SpawnResult",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "ExecOptions",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "ExecResult",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "ShellOptions",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "ShellResult",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "LoggerOptions",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "PluginContext",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "TaskConstants",
+      "type": "export"
+    },
+    {
+      "source": "DTOsFile",
+      "target": "WorkerConstants",
+      "type": "export"
+    },
+    {
+      "source": "ConstantsFile",
+      "target": "taskDefinitions",
+      "type": "export"
+    },
+    {
+      "source": "ConstantsFile",
+      "target": "workerConstants",
+      "type": "export"
+    }
+  ],
+  "errors": [
+    {
+      "position": {
+        "line": 127,
+        "column": 1
+      },
+      "message": "Orphaned entity 'cli'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 132,
+        "column": 1
+      },
+      "message": "Orphaned entity 'taskRunner'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 135,
+        "column": 1
+      },
+      "message": "Orphaned entity 'taskRegistry'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 138,
+        "column": 1
+      },
+      "message": "Orphaned entity 'dependencyResolver'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 141,
+        "column": 1
+      },
+      "message": "Orphaned entity 'taskScheduler'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 144,
+        "column": 1
+      },
+      "message": "Orphaned entity 'configLoader'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 148,
+        "column": 1
+      },
+      "message": "Orphaned entity 'schemaValidator'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 152,
+        "column": 1
+      },
+      "message": "Orphaned entity 'workerPool'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 155,
+        "column": 1
+      },
+      "message": "Orphaned entity 'networkUtils'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 159,
+        "column": 1
+      },
+      "message": "Orphaned entity 'ShellTask'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 162,
+        "column": 1
+      },
+      "message": "Orphaned entity 'FileTask'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 165,
+        "column": 1
+      },
+      "message": "Orphaned entity 'HttpTask'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 168,
+        "column": 1
+      },
+      "message": "Orphaned entity 'DockerTask'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 171,
+        "column": 1
+      },
+      "message": "Orphaned entity 'K8sTask'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 175,
+        "column": 1
+      },
+      "message": "Orphaned entity 'main'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 184,
+        "column": 1
+      },
+      "message": "Orphaned entity 'displayHelp'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 187,
+        "column": 1
+      },
+      "message": "Orphaned entity 'registerCommands'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 196,
+        "column": 1
+      },
+      "message": "Orphaned entity 'buildCommand'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 201,
+        "column": 1
+      },
+      "message": "Orphaned entity 'watchCommand'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 205,
+        "column": 1
+      },
+      "message": "Orphaned entity 'testCommand'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 209,
+        "column": 1
+      },
+      "message": "Orphaned entity 'deployCommand'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 219,
+        "column": 1
+      },
+      "message": "Orphaned entity 'runParallel'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 225,
+        "column": 1
+      },
+      "message": "Orphaned entity 'runSequential'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 235,
+        "column": 1
+      },
+      "message": "Orphaned entity 'getTask'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 238,
+        "column": 1
+      },
+      "message": "Orphaned entity 'listTasks'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 242,
+        "column": 1
+      },
+      "message": "Orphaned entity 'resolveDependencies'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 249,
+        "column": 1
+      },
+      "message": "Orphaned entity 'scheduleTask'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 254,
+        "column": 1
+      },
+      "message": "Orphaned entity 'cancelTask'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 257,
+        "column": 1
+      },
+      "message": "Orphaned entity 'loadConfig'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 262,
+        "column": 1
+      },
+      "message": "Orphaned entity 'validateConfig'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 266,
+        "column": 1
+      },
+      "message": "Orphaned entity 'validateTaskSchema'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 271,
+        "column": 1
+      },
+      "message": "Orphaned entity 'loadPlugins'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 286,
+        "column": 1
+      },
+      "message": "Orphaned entity 'createWorker'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 289,
+        "column": 1
+      },
+      "message": "Orphaned entity 'executeInWorker'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 293,
+        "column": 1
+      },
+      "message": "Orphaned entity 'taskWorker'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 298,
+        "column": 1
+      },
+      "message": "Orphaned entity 'getLogger'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 301,
+        "column": 1
+      },
+      "message": "Orphaned entity 'getFileUtils'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 303,
+        "column": 1
+      },
+      "message": "Orphaned entity 'getProcessUtils'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 312,
+        "column": 1
+      },
+      "message": "Orphaned entity 'copyFiles'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 380,
+        "column": 1
+      },
+      "message": "Orphaned entity 'TaskInfo'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 396,
+        "column": 1
+      },
+      "message": "Orphaned entity 'ValidationError'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 504,
+        "column": 1
+      },
+      "message": "Orphaned entity 'TaskConstants'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 509,
+        "column": 1
+      },
+      "message": "Orphaned entity 'WorkerConstants'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 465,
+        "column": 1
+      },
+      "message": "DTO 'PluginContext' field 'api' references 'PluginAPI' which is a ClassFile, not a DTO or Class",
+      "severity": "error",
+      "suggestion": "Field types should reference DTO or Class entities for complex types"
+    }
+  ]
+}

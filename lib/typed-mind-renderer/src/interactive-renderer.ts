@@ -57,7 +57,9 @@ class InteractiveTypedMindRenderer {
     };
   }
 
-  constructor(private options: InteractiveRendererOptions = {}) {
+  private options: InteractiveRendererOptions;
+
+  constructor(options: InteractiveRendererOptions = {}) {
     this.options = {
       port: 3000,
       host: 'localhost',
@@ -3099,6 +3101,16 @@ ${this.generateInteractiveRendererJS()}
 
 })();
 `;
+  }
+
+  /**
+   * Public accessor over the private graph-data computation, added by
+   * RFC-TM-6 Q1 (rfc-tm-6-diamond.md) to capture legacy-baseline goldens
+   * before any bridge flip. Zero behavior change — same object this class
+   * has always produced.
+   */
+  getGraphSnapshot() {
+    return this.getGraphData();
   }
 
   private getGraphData() {
