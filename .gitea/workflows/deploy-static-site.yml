@@ -52,6 +52,19 @@ jobs:
       - name: Build site
         run: cd lib/typed-mind-static-website && mise exec -- node build.js
 
+      - name: Build grammar wasm
+        # RFC-TM-1 (rfc-tm-1-diamond.md) leaf L6. Guards on the frozen grammar path
+        # (lib/typed-mind/grammar/) established in the Diamond Doc; TM-2 activates this step
+        # by creating that directory, with no further workflow edit.
+        run: |
+          if [ ! -d "lib/typed-mind/grammar/" ]; then
+            echo "lib/typed-mind/grammar/ absent — skipping wasm build (dormant until RFC-TM-2)"
+            exit 0
+          fi
+          cd lib/typed-mind/grammar
+          mise exec -- tree-sitter build --wasm
+          cp *.wasm ../../typed-mind-static-website/dist/
+
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
