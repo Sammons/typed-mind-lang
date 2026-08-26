@@ -18,6 +18,8 @@
     "deploy": "pnpm build && pnpm exec wrangler pages deploy dist --project-name=typedmind --branch=main --commit-dirty=true"
   },
   "devDependencies": {
+    "monaco-editor": "0.44.0",
+    "prismjs": "1.29.0",
     "wrangler": "^4.125.0"
   }
 }
