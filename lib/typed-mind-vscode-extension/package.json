@@ -156,11 +156,13 @@
     "bundle-lsp": "cd ../typed-mind-lsp && pnpm run build:bundled && cd - && rm -rf ./lsp-bundled && cp -r ../typed-mind-lsp/dist-bundled ./lsp-bundled",
     "dev": "tsup --watch",
     "package": "vsce package --no-dependencies",
+    "test": "node --test 'src/**/*.test.ts'",
+    "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "clean": "rm -rf dist lsp-dist lsp-bundled node_modules *.vsix"
   },
   "dependencies": {
-    "@sammons/typed-mind": "^0.1.8",
-    "@sammons/typed-mind-lsp": "^0.1.8",
+    "@sammons/typed-mind": "workspace:*",
+    "@sammons/typed-mind-lsp": "workspace:*",
     "@sammons/typed-mind-renderer": "^0.2.1",
     "vscode-languageclient": "^9.0.1"
   },
@@ -169,6 +171,8 @@
     "@types/vscode": "^1.99.0",
     "@vscode/vsce": "^3.2.1",
     "tsup": "^8.3.5",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
   }
 }

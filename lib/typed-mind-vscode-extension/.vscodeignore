@@ -11,8 +11,15 @@ tsup.config.ts
 
 # Build and development files
 node_modules/**
-!node_modules/@sammons/typed-mind-lsp/**
 dist/**/*.map
+
+# lsp-bundled/ carries the bundled LSP server plus its wasm artifacts
+# (cli.js, grammar.wasm, web-tree-sitter.wasm) — RFC-TM-5 §3
+# (rfc-tm-5-diamond.md). Without this negation the node_modules/** rule above
+# has no effect on lsp-bundled/ (it is a sibling directory, not under
+# node_modules/), but the carve-out is made explicit design rather than
+# relying on omission.
+!lsp-bundled/**
 
 # Documentation and development files
 docs/**
