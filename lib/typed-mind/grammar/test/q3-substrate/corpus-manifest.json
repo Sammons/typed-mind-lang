@@ -1,0 +1,228 @@
+{
+  "_comment": "RFC-TM-2 Q3 (rfc-tm-2-diamond.md §3, §4 'Q3 -- Corpus proof + closure'). Quantum-local throwaway manifest -- deleted in the same PR that lands it, per the doc's exact lifecycle wording. Expected-ERROR entries for each of the 141 corpus documents plus the one explicit extra input (naming-edge-cases-example.tmd) that produce at least one ERROR/MISSING node. Every entry below was cross-checked against the LIVE regex parser's own behavior on the same line (parser-patterns.ts / longform-parser.ts, this conversation's empirical tests): each is either a line the live parser silently DROPS (its regex returns null, so the whole line vanishes with no diagnostic) or MANGLES (the live regex matches but captures a garbage/truncated value) -- never a form the live parser handles correctly that the grammar rejects. Files not listed here are expected to parse with ZERO ERROR/MISSING nodes. Six recurring defect classes account for all but two of the manifest lines; each entry names its class.",
+  "defect_classes": {
+    "empty-list": "A continuation's bracketed list is empty (`<- []`, `-> []`, `=> []`, `~> []`, `> []`). Every C1/C2/C3/C6/C7/C8/C9/C15 live regex requires `[^\\]]+` (one-or-more) inside the brackets and returns null on `[]`; the live parser drops these lines with no diagnostic. `name_list` in the grammar requires >=1 `list_entry` with no `optional`, so `[]` cannot match either.",
+    "multiline-bracket-list": "A bracketed continuation list wraps onto a second (or third) physical line before its closing `]`. The live parser processes input line-by-line (`this.lines = input.split('\\n')`); every list regex is anchored to one line and returns null when `]` is on a later line, so the live parser drops the tail. The grammar's `name_list`/`_line_end` shape is likewise single-line.",
+    "array-suffix-bare-name": "A bare (non-list) input/output continuation carries a trailing `[]` array-type suffix (`-> TaskResult[]`, `<- Message[]`) or a comma-separated pair of bare names (`<- Task, TaskContext`). `INPUT`/`OUTPUT` are `/^<-\\s*(\\w+)$/` and `/^->\\s*(\\w+)$/` -- anchored `$` after one `\\w+` run, so both drop on a trailing `[]` or a `, second-name` tail. The grammar's `input_name`/`output_name` are `seq($._indent, sigil, $.entity_name, ..., $._line_end)` with the same single-identifier shape.",
+    "classfile-trailing-colon": "A ClassFile shortform/sigil declaration's path carries a stray trailing `:` copied from the File-declaration convention (`Name #: path.ts:`). The live `CLASS_FILE` regex's path group is `[^\\s<]+` (colon-permissive), so it MANGLES the line -- it parses, but the captured path value is `path.ts:` with the colon baked in. The grammar's `path` token `/[^ \\t\\n:{}]+/` excludes `:`, so the trailing colon is a dangling token with nothing to attach to and lands in ERROR.",
+    "quoted-literal-union-field-type": "A DTO field type is a union of quoted string literals (`- theme: \"light\" | \"dark\" | \"system\" \"UI theme preference\"`). The live `DTO_FIELD` regex's type group is `[^\"]+?` (excludes quotes) and the whole regex fails to match at all (verified empirically: returns null), so the live parser drops the entire field line. The grammar's `field_type` token excludes `\"` from its character class for the identical reason (so a trailing description string can be split off), producing the same drop as an ERROR-class outcome.",
+    "unrecognized-form": "A line or block that matches none of the 11 entity-declaration patterns, none of the 15 continuation patterns, and none of the 12 longform headers in the live parser OR the grammar -- confirmed by testing every live top-level/continuation regex against the line and getting null across the board. Includes: `theme {` / `globalStyles {` bare-name block headers (scenario-32, doc-named), `*`-sigil declarations (scenario-46), `Name < \"desc\"` + `.method(...)` pseudo-interface blocks (scenario-34), `@`-prefixed field names (scenario-36), a multi-line parenthesized function signature's continuation-indented body lines (scenario-56), `123Name`/`$dollar`/`\"Name With Spaces\"`/kebab-case/Unicode entity names (scenario-54, doc-named for the digit case), and the `fields: [ {...}, ... ]` array-of-objects DTO-fields shape (getting-started-dto-longform, doc-named file for its P7 fixture but not this line)."
+  },
+  "files": {
+    "lib/typed-mind-static-website/snippets/getting-started-dto-longform.tmd": [
+      {
+        "lines": [5, 6, 7, 8, 9],
+        "class": "unrecognized-form",
+        "reason": "`fields: [` opens a multi-line array-of-inline-objects; none of the live longform parser's five per-line property regexes (`array-single-line`, `nested-object-open`, `string`, `bool`, `identifier`) match `fields: [` alone (all return null, verified empirically), so the block plus every array-item line is dropped silently by the live parser. The grammar's `dto_fields_block`/`property_list` productions require `fields: {` (nested block) or a single-line `[a, b]`, neither of which matches this array-of-objects form."
+      }
+    ],
+    "lib/typed-mind-static-website/snippets/hero-shortform.tmd": [
+      { "lines": [20], "class": "classfile-trailing-colon", "reason": "`BaseService #: base-service.ts:`" }
+    ],
+    "lib/typed-mind-static-website/snippets-supplementary/hero-longform.tmd": [
+      { "lines": [16], "class": "classfile-trailing-colon", "reason": "`BaseService #: base-service.ts:`" }
+    ],
+    "lib/typed-mind-static-website/snippets-supplementary/import-longform.tmd": [
+      { "lines": [14], "class": "classfile-trailing-colon", "reason": "`UserService #: src/services/user.ts:`" }
+    ],
+    "lib/typed-mind-static-website/snippets-supplementary/import-shortform.tmd": [
+      { "lines": [13], "class": "classfile-trailing-colon", "reason": "`UserService #: src/services/user.ts:`" }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-08-multiple-programs.tmd": [
+      { "lines": [7, 10], "class": "empty-list", "reason": "`-> []` x2" }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-10-dto-validation.tmd": [{ "lines": [20], "class": "empty-list", "reason": "`-> []`" }],
+    "lib/typed-mind-test-suite/scenarios/scenario-12-valid-complete.tmd": [{ "lines": [5], "class": "empty-list", "reason": "`-> []`" }],
+    "lib/typed-mind-test-suite/scenarios/scenario-16-complete-ui-example.tmd": [
+      { "lines": [5], "class": "empty-list", "reason": "`-> []`" }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-30-invalid-reference-types.tmd": [
+      { "lines": [9], "class": "empty-list", "reason": "`-> []`" }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-32-spa-react-app.tmd": [
+      { "lines": [23, 61, 71, 76, 86, 91, 96, 239], "class": "empty-list", "reason": "`<- []` / `-> []`" },
+      {
+        "lines": [295],
+        "class": "array-suffix-bare-name",
+        "reason": "`<- CreateOrderDTO, AddressDTO` -- comma-separated bare input names"
+      },
+      {
+        "lines": [440, 441, 442, 443, 444, 445, 448, 449, 450, 451, 452],
+        "class": "unrecognized-form",
+        "reason": "`theme {` (doc-named) and `globalStyles {` (doc-named) bare-name block headers, plus every `KEY: \"value\"` line inside each block body including each block's final property line (445, 452) -- the outer ERROR node for each block subsumes its interior; interior lines each also produce a nested ERROR since they match no valid top-level production without a recognized declaration sigil."
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-33-electron-desktop-app.tmd": [
+      {
+        "lines": [21, 25, 34, 38, 42, 46, 65, 74, 78, 82, 86, 90, 99, 103, 107, 112, 117, 211, 215, 219, 223, 227, 231, 236],
+        "class": "empty-list",
+        "reason": "`<- []`"
+      },
+      { "lines": [52, 96], "class": "empty-list", "reason": "`-> []`" }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-34-cli-tool.tmd": [
+      {
+        "lines": [221, 227, 239],
+        "class": "array-suffix-bare-name",
+        "reason": "`-> TaskResult[]` / `-> TaskInfo[]` (doc-named array-suffix-output pattern)"
+      },
+      {
+        "lines": [250, 290],
+        "class": "array-suffix-bare-name",
+        "reason": "`<- Task, TaskContext` -- comma-separated bare input names (doc-named comma-separated-bare-types pattern)"
+      },
+      {
+        "lines": [470, 471, 472, 473, 474, 476, 477, 478, 479, 480, 482, 483, 484, 485, 486, 487, 489, 490, 491, 492, 493],
+        "class": "unrecognized-form",
+        "reason": "`PluginAPI < \"Plugin API interface\"` / `Logger < \"Logger interface\"` / `FileUtils < \"File utilities interface\"` / `ProcessUtils < \"Process utilities interface\"` headers (doc-named `.method()` block forms) plus each `.methodName(args): ReturnType` body line under them -- matches none of the live parser's 11 top-level entity patterns (verified empirically) nor any C1-C15 continuation, so the whole four-block region is dropped by the live parser. Blank lines 475, 481, 488 are NOT flagged."
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-36-static-website.tmd": [
+      { "lines": [41, 45, 53, 57, 61, 75, 126, 131, 158], "class": "empty-list", "reason": "`-> []`" },
+      {
+        "lines": [361, 371, 439],
+        "class": "array-suffix-bare-name",
+        "reason": "`-> Post[]` / `-> object[]` (doc-named array-suffix-output pattern)"
+      },
+      {
+        "lines": [342, 343, 344, 345, 346, 347, 526, 527, 528, 529, 530, 531, 532],
+        "class": "unrecognized-form",
+        "reason": "`Name ! : Type` -- a Constants declaration with an EMPTY path before the optional `: Schema` (e.g. `logoSvg ! : string`). The live `CONSTANTS` regex's path group `[^:]+` MANGLES this: it matches a single literal space as the 'path' rather than failing, so the live parser accepts the line with a garbage whitespace-only path value. The grammar's `path` token `/[^ \\t\\n:{}]+/` requires >=1 non-space/colon character and cannot match an empty/whitespace-only span, so the grammar rejects outright what the live parser silently mangles."
+      },
+      {
+        "lines": [517, 518],
+        "class": "unrecognized-form",
+        "reason": "`- @context: string \"Schema context\"` / `- @type: string \"Schema type\"` -- DTO field names prefixed with `@`. The live `DTO_FIELD` regex's name group is `(\\w+)`, which does not admit a leading `@`, so the live parser drops both lines; the grammar's `field_name` token `/[A-Za-z_]\\w*/` is equally exclusive."
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-37-data-pipeline.tmd": [
+      { "lines": [55, 69, 83], "class": "empty-list", "reason": "`-> []`" },
+      { "lines": [284], "class": "array-suffix-bare-name", "reason": "`<- Message[]` -- bare input with array-type suffix" }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-38-dependency-validation.tmd": [
+      { "lines": [13], "class": "empty-list", "reason": "`-> []`" }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-46-function-undefined-calls.tmd": [
+      {
+        "lines": [41, 42],
+        "class": "unrecognized-form",
+        "reason": "`someConstant * \"Constants\"` -- `*` is not a recognized sigil in any of the 11 live entity patterns (verified empirically: matches none); the grammar has no `*`-sigil production either. Line 42 (`API_URL: \"https://api.example.com\"`) is the orphaned continuation-indented line under it -- with no valid parent entity, it matches no C1-C15 continuation pattern (no recognized sigil prefix) either."
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-51-uicomponent-circular-containment.tmd": [
+      {
+        "lines": [9, 10],
+        "class": "multiline-bracket-list",
+        "reason": "`-> [ValidRoot, ..., SelfContainer, ` wraps onto the next physical line before its closing `]`"
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-52-empty-entities-validation.tmd": [
+      {
+        "lines": [5, 6, 10, 11, 15, 19, 20, 30, 34],
+        "class": "empty-list",
+        "reason": "`<- []` / `-> []` / `=> []` / `~> []` / `> []` across every list sigil -- doc-flagged as a checker-verdict-movement file (empty strings/entities), and its empty LISTS hit the same live-parser silent-drop behavior as every other empty-list occurrence in the corpus."
+      },
+      {
+        "lines": [21],
+        "class": "unrecognized-form",
+        "reason": "`  <: BaseClass  # But has inheritance` -- a ClassFile declaration (line 18) followed by a continuation-indented `<:` inheritance line; `<:` inheritance is E4's top-level Class-declaration syntax, not a C1-C15 continuation form, so it matches none of the live parser's 15 continuation patterns (verified empirically) and is silently dropped -- the line's own comment ('But has inheritance') does not reflect what the live parser actually does with it."
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-53-classfile-inheritance-edge-cases.tmd": [
+      {
+        "lines": [9, 10],
+        "class": "multiline-bracket-list",
+        "reason": "`-> [ValidChild, ..., DeepChild, ` wraps onto the next physical line before its closing `]`"
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-54-entity-name-boundaries.tmd": [
+      {
+        "lines": [9, 10, 11],
+        "class": "multiline-bracket-list",
+        "reason": "`-> [ValidName, ..., PascalCaseName, ` wraps onto two more physical lines before its closing `]`"
+      },
+      {
+        "lines": [22],
+        "class": "unrecognized-form",
+        "reason": "`kebab-case-name @ src/kebab.ts:` -- a hyphenated entity name at declaration position; the live `FILE` regex's name group is `(\\w+)` (no hyphen), so it drops the line the same way the grammar's `entity_name` (`/[A-Za-z_]\\w*/`, no hyphen) does."
+      },
+      {
+        "lines": [40],
+        "class": "unrecognized-form",
+        "reason": "`123Name @ src/invalid-number.ts:` -- leading-digit name (doc-named S-GRAMMAR-4b disclosed narrowing; the live `\\w+` accepts this today, so this is a deliberate narrowing, not a shared drop)."
+      },
+      {
+        "lines": [47],
+        "class": "unrecognized-form",
+        "reason": "`$dollar @ src/dollar.ts:` -- `$` is outside both the live parser's `\\w+` name class and the grammar's `entity_name` class."
+      },
+      {
+        "lines": [51],
+        "class": "unrecognized-form",
+        "reason": "`\"Name With Spaces\" @ src/spaces.ts:` -- a quoted, space-containing name is not an entity_name in either the live parser or the grammar."
+      },
+      {
+        "lines": [65],
+        "class": "unrecognized-form",
+        "reason": "`名前 @ src/unicode.ts:` -- a non-ASCII (Unicode) entity name; JavaScript's `\\w` is ASCII-only, so the live `FILE` regex's `(\\w+)` group fails to match, dropping the line exactly as the grammar's ASCII-only `entity_name` does."
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-56-function-signature-edge-cases.tmd": [
+      {
+        "lines": [61, 62, 63, 64],
+        "class": "unrecognized-form",
+        "reason": "`complexFunc :: (` opens a multi-line parenthesized signature; the live `FUNCTION` regex (`/^(\\w+)\\s*::\\s*(.+)$/`) matches the OPENING line fine (capturing only `(` as the truncated signature, since `.+` cannot span the newline) -- so the top-level declaration itself is NOT an unexpected error -- but every subsequent continuation-indented body line (`param1: { nested: ... },` etc.) matches none of the live parser's 15 continuation patterns and is silently dropped. The grammar's `function_declaration`/`signature` productions share the identical single-line-signature shape and produce the identical per-body-line ERROR outcome."
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-57-import-export-confusion.tmd": [
+      {
+        "lines": [43, 44, 45, 46, 47, 48, 49, 50],
+        "class": "multiline-bracket-list",
+        "reason": "`-> [` opens a multi-line export list with a per-entry inline `#` comment on each continuation line (`helperFunc,      # OK - Function`); the live `EXPORTS` regex requires the closing `]` on the same line as `->`, so the whole multi-line block is dropped, matching the plain multiline-bracket-list class."
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-58-classfile-vs-class-file.tmd": [
+      {
+        "lines": [35],
+        "class": "unrecognized-form",
+        "reason": "`  @ src/wrongpath.ts:  # Classes can't have paths! This is invalid` -- a deliberately-invalid continuation-position `@ path:` line with no entity name (this scenario's own comment states the intent); matches no C1-C15 continuation pattern in the live parser or the grammar."
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-62-dependency-consumption.tmd": [
+      {
+        "lines": [88, 89],
+        "class": "unrecognized-form",
+        "reason": "`range-version ^ \"Range version\" ^4.0.0` (doc-named caret-version pattern) and `tilde-version ^ \"Tilde version\" ~5.0.0` -- npm-style range-prefixed (`^4.0.0` / `~5.0.0`) version strings. The live `DEPENDENCY` regex's version group `v?([\\d.\\-\\w]+)` admits neither a leading `^` nor a leading `~`, so it drops both lines entirely (verified empirically: both return null); the grammar's `version` token `/v?[\\d.\\-\\w]+/` is equally exclusive of both prefixes."
+      },
+      {
+        "lines": [162, 163, 164],
+        "class": "multiline-bracket-list",
+        "reason": "`-> [httpClient, serverSetup, s3Upload, renderUI, ` wraps onto two more physical lines before its closing `]` (doc-named multi-line-bracketed-list pattern)."
+      }
+    ],
+    "lib/typed-mind-test-suite/scenarios/scenario-63-file-isolation-patterns.tmd": [
+      {
+        "lines": [177],
+        "class": "empty-list",
+        "reason": "`-> []  # Explicitly empty exports` -- empty-list with a trailing inline comment; same live-parser drop as every other empty-list occurrence (the `EXPORTS` regex fails before the comment is ever considered)."
+      }
+    ],
+    "naming-edge-cases-example.tmd": [
+      {
+        "lines": [47],
+        "class": "parses",
+        "reason": "`_ValidationService #: src/internal/validation.ts` -- PARSES under S-GRAMMAR-4b's leading-underscore ClassFile widening (doc §3 explicit exception: 'line 47 parses under 4b normalization'). Listed for completeness; contributes NO error to this file's expected count."
+      },
+      {
+        "lines": [49],
+        "class": "unrecognized-form",
+        "reason": "`  <= [ValidationRuleDTO, _InternalConfigDTO]` -- the S-GRAMMAR-4a/4b defect exemplar (doc-named: 'line 49 must ERROR'); `<=` is not a recognized continuation sigil in the live parser or the grammar."
+      },
+      {
+        "lines": [180, 195, 198, 218, 228, 234, 249, 267, 291, 292],
+        "class": "quoted-literal-union-field-type",
+        "reason": "`- theme: \"light\" | \"dark\" | \"system\" \"UI theme preference\"` and 9 more DTO fields of the identical string-literal-union type-shape (union-of-quoted-literals field types) -- confirmed empirically that the live `DTO_FIELD` regex fails to match any of these lines at all (returns null), so the live parser drops every one of them with no diagnostic, same as the grammar."
+      }
+    ]
+  }
+}
