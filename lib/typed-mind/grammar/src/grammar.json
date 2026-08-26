@@ -2642,6 +2642,13 @@
         ]
       }
     },
+    "list_entry": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "[@\\w][\\w\\-/.]*"
+      }
+    },
     "name_list": {
       "type": "SEQ",
       "members": [
@@ -2651,7 +2658,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "entity_name"
+          "name": "list_entry"
         },
         {
           "type": "REPEAT",
@@ -2664,7 +2671,7 @@
               },
               {
                 "type": "SYMBOL",
-                "name": "entity_name"
+                "name": "list_entry"
               }
             ]
           }

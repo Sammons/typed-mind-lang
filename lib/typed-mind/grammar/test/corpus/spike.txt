@@ -156,8 +156,8 @@ Good2 % "ok"
   (contained_by_list
     (ERROR)
     (name_list
-      (entity_name)
-      (entity_name)))
+      (list_entry)
+      (list_entry)))
   (dto_declaration
     (entity_name)
     (string)))

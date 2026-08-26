@@ -1070,7 +1070,7 @@
       "required": true,
       "types": [
         {
-          "type": "entity_name",
+          "type": "list_entry",
           "named": true
         }
       ]
@@ -1645,6 +1645,10 @@
   },
   {
     "type": "inline_comment",
+    "named": true
+  },
+  {
+    "type": "list_entry",
     "named": true
   },
   {

@@ -325,8 +325,8 @@ MainFile @ src/main.ts:
     (path))
   (import_list
     (name_list
-      (entity_name)
-      (entity_name))))
+      (list_entry)
+      (list_entry))))
 
 ============================================================
 C2: -> [A,B] exports
@@ -343,8 +343,8 @@ MainFile @ src/main.ts:
     (path))
   (export_list
     (name_list
-      (entity_name)
-      (entity_name))))
+      (list_entry)
+      (list_entry))))
 
 ============================================================
 C3: ~> [A,B] calls (dotted names allowed as plain entity_name is NOT enough — dotted form is a signature-position concept; here bare names)
@@ -361,8 +361,8 @@ startApp :: () => void
     (signature))
   (calls_list
     (name_list
-      (entity_name)
-      (entity_name))))
+      (list_entry)
+      (list_entry))))
 
 ============================================================
 C4: <- Name bare input
@@ -410,9 +410,9 @@ cli <:
     (entity_name))
   (methods_list
     (name_list
-      (entity_name)
-      (entity_name)
-      (entity_name))))
+      (list_entry)
+      (list_entry)
+      (list_entry))))
 
 ============================================================
 C7: ~ [A,B] affects (function touches UI components)
@@ -429,8 +429,8 @@ refreshList :: () => void
     (signature))
   (affects_list
     (name_list
-      (entity_name)
-      (entity_name))))
+      (list_entry)
+      (list_entry))))
 
 ============================================================
 C8: > [A,B] contains (UIComponent children)
@@ -447,8 +447,8 @@ SystemDashboard &! "Main system dashboard"
     (string))
   (contains_list
     (name_list
-      (entity_name)
-      (entity_name))))
+      (list_entry)
+      (list_entry))))
 
 ============================================================
 C9: < [A,B] containedBy
@@ -465,7 +465,7 @@ UserManagementPanel & "User management interface"
     (string))
   (contained_by_list
     (name_list
-      (entity_name))))
+      (list_entry))))
 
 ============================================================
 C10: >> Name containsProgram
@@ -534,8 +534,8 @@ _PrivateAuthService #: src/internal/auth.ts
     (path))
   (methods_list
     (name_list
-      (entity_name)
-      (entity_name)))
+      (list_entry)
+      (list_entry)))
   (entity_comment
     (comment)))
 
@@ -587,8 +587,8 @@ versionConsumer :: () => void
     (signature))
   (consumes_list
     (name_list
-      (entity_name)
-      (entity_name))))
+      (list_entry)
+      (list_entry))))
 
 ============================================================
 D1: full-line comment at column 0
@@ -765,10 +765,10 @@ taskRunner <:
     (entity_name))
   (methods_list
     (name_list
-      (entity_name)
-      (entity_name)
-      (entity_name)
-      (entity_name))))
+      (list_entry)
+      (list_entry)
+      (list_entry)
+      (list_entry))))
 
 ============================================================
 scenario-62: unprefixed (v-less) dependency version, multiple forms in sequence
@@ -825,3 +825,59 @@ CACHE_DIR $config "Cache directory" (optional)
     (param_marker))
   (default_value
     (string)))
+
+============================================================
+BLOCKER FIX: C3 calls list with dotted entries (scenario-34-cli-tool.tmd:182 `~> [cli.parse]`)
+============================================================
+
+startApp :: () => void
+  ~> [cli.parse, cli.showHelp]
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature))
+  (calls_list
+    (name_list
+      (list_entry)
+      (list_entry))))
+
+============================================================
+BLOCKER FIX: C15 consumes list with a scoped package entry (scenario-62-dependency-consumption.tmd:33 `$< [@aws-sdk/client-s3]`)
+============================================================
+
+versionConsumer :: () => void
+  $< [react, @testing-library/react]
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature))
+  (consumes_list
+    (name_list
+      (list_entry)
+      (list_entry))))
+
+============================================================
+BLOCKER FIX: mixed list — dotted, dashed, scoped-slashed, and plain entries together
+============================================================
+
+startApp :: () => void
+  ~> [cli.parse, semantic-version, @scope/pkg-name, PlainName]
+
+---
+
+(source_file
+  (function_declaration
+    (entity_name)
+    (signature))
+  (calls_list
+    (name_list
+      (list_entry)
+      (list_entry)
+      (list_entry)
+      (list_entry))))
