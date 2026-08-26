@@ -42,7 +42,7 @@
     "test": "node --test \"src/**/*.test.ts\"",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
-    "generate-grammar-docs": "pnpm build && node dist/generate-grammar-doc.js",
+    "generate-grammar-docs": "node grammar/codegen/generate-grammar-docs.mjs",
     "prepack": "node scripts/build-wasm.mjs && node scripts/stage-published-wasm.mjs",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },

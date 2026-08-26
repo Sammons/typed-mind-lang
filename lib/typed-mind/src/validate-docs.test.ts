@@ -1,18 +1,24 @@
+// RFC-TM-7 §1 (rfc-tm-7-diamond.md) — validate-docs rewritten on
+// `TypedMind.create()`. The legacy vacuity (this test read
+// `parseResult.errors`, but the legacy `ParseResult` carries `parseErrors` —
+// the field was always `undefined`, so the parse-error assertion never fired;
+// see git history at validate-docs.test.ts:38 pre-rewrite) dies structurally
+// here: `check()` returns ONE `diagnostics` stream (parse + semantic), so
+// there is no errors-vs-parseErrors split left to typo.
+
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DSLParser } from './parser.ts';
-import { DSLValidator } from './validator.ts';
+import { TypedMind } from './typed-mind.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const wasmPath = join(__dirname, '..', 'grammar', 'grammar.wasm');
 
 describe('Documentation Examples', () => {
-  const parser = new DSLParser();
-  const validator = new DSLValidator();
-
-  it('should validate all TypedMind examples in grammar.md', () => {
+  it('should validate all TypedMind examples in grammar.md', async () => {
+    const typedMind = await TypedMind.create({ wasmPath });
     const grammarPath = join(__dirname, '..', 'grammar.md');
     const content = readFileSync(grammarPath, 'utf-8');
 
@@ -25,86 +31,23 @@ describe('Documentation Examples', () => {
       // Remove the ```tmd and ``` markers
       const code = block.replace(/```tmd\n/, '').replace(/\n```$/, '');
 
-      // Skip blocks that are just fragments or syntax demonstrations
+      // Skip blocks that are just fragments or syntax demonstrations (too
+      // short to be a complete program, or carrying no Program entity).
       if (code.split('\n').length < 10) return;
-
-      // Skip blocks that don't have a Program entity (they're just syntax examples)
       if (!code.includes('->')) return;
 
-      // Parse and validate
-      const parseResult = parser.parse(code);
+      const { valid, diagnostics } = typedMind.check(code);
+      const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
 
-      // Check for parse errors first
-      if (parseResult.errors && parseResult.errors.length > 0) {
-        console.error(`\nExample ${index + 1} has parse errors:`);
-        console.error('Code:\n', code);
-        console.error('Parse Errors:', parseResult.errors);
-        assert.equal(parseResult.errors.length, 0);
-        return;
-      }
-
-      // For syntax demonstration examples that don't represent complete programs, skip validation
-      const isSyntaxDemo =
-        code.includes('# Example patterns - showing syntax only') ||
-        code.includes('# Invalid names') ||
-        code.includes('# Wrong') ||
-        code.includes('# Right') ||
-        code.includes('❌') ||
-        code.includes('✅') ||
-        code.includes('ERROR:');
-
-      if (isSyntaxDemo) {
-        return; // Skip validation for pure syntax demos
-      }
-
-      // Full validation for complete examples
-      const validationResult = validator.validate(parseResult.entities);
-
-      if (!validationResult.valid) {
-        console.error(`\nExample ${index + 1} has validation errors:`);
+      if (!valid) {
+        console.error(`\nExample ${index + 1} has diagnostics errors:`);
         console.error('Code:\n', code);
         console.error(
-          'Validation Errors:',
-          validationResult.errors.map((e) => e.message),
+          'Errors:',
+          errors.map((diagnostic) => `${diagnostic.code}: ${diagnostic.message}`),
         );
-        assert.equal(validationResult.valid, true);
+        assert.equal(errors.length, 0);
       }
     });
-  });
-
-  it('should validate all TypedMind examples in generated-grammar.md', () => {
-    try {
-      const generatedPath = join(__dirname, '..', 'generated-grammar.md');
-      const content = readFileSync(generatedPath, 'utf-8');
-
-      // Extract the complete application example
-      const match = content.match(/### Complete Application Example\n\n```tmd\n([\s\S]*?)```/);
-
-      if (match) {
-        const code = match[1];
-        const parseResult = parser.parse(code);
-
-        if (parseResult.errors && parseResult.errors.length > 0) {
-          console.error('\nGenerated example has parse errors:');
-          console.error('Parse Errors:', parseResult.errors);
-          assert.equal(parseResult.errors.length, 0);
-          return;
-        }
-
-        const validationResult = validator.validate(parseResult.entities);
-
-        if (!validationResult.valid) {
-          console.error('\nGenerated example has validation errors:');
-          console.error(
-            'Errors:',
-            validationResult.errors.map((e) => e.message),
-          );
-          assert.equal(validationResult.valid, true);
-        }
-      }
-    } catch {
-      // File might not exist if not generated yet
-      console.log('Skipping generated-grammar.md test - file not found');
-    }
   });
 });

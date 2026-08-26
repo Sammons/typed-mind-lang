@@ -1,0 +1,41 @@
+program TodoApp {
+  entry: main
+}
+
+file main {
+  path: src/index.ts
+  imports: [UserService, BaseService]
+}
+
+UserService #: src/services/user.ts {
+  extends: BaseService
+  methods: [createUser, findUser]
+}
+
+file base {
+  path: src/services/base.ts
+  exports: [BaseService]
+}
+
+class BaseService {
+  methods: [init]
+}
+
+function createUser {
+  signature: (data: UserDTO) => UserDTO
+  input: UserDTO
+  output: UserDTO
+  calls: [init]
+}
+
+function findUser {
+  signature: (id: string) => UserDTO
+  output: UserDTO
+}
+
+dto UserDTO {
+  fields: {
+    name: { type: "string", description: "User name" }
+    email: { type: "string", description: "Email" }
+  }
+}
