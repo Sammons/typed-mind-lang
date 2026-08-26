@@ -152,3 +152,29 @@ describe('TypedMindParser (src dev layout, wasmPath override)', () => {
     assert.equal(root.dtoDeclarationChildren().length, 1);
   });
 });
+
+describe('TypedMindParser.parseWithCst (RFC-TM-5 §1 facade extension)', () => {
+  it('returns entities identical to parse() plus a CstSourceFile spanning the source', async () => {
+    const source = readFileSync(heroPath, 'utf8');
+    const parser = await createParser();
+    const parsed = parser.parse(source);
+    const withCst = parser.parseWithCst(source);
+    assert.deepEqual(withCst.entities, parsed.entities);
+    assert.deepEqual(withCst.imports, parsed.imports);
+    assert.deepEqual(withCst.diagnostics, parsed.diagnostics);
+    assert.equal(withCst.cst instanceof CstSourceFile, true);
+    const rootSpan = withCst.cst.span();
+    assert.deepEqual(rootSpan.start, { line: 1, column: 1 });
+    // The root span covers the whole source: its end line is the source's
+    // last line (whether or not that line ends with a trailing newline).
+    assert.equal(rootSpan.end.line, source.split('\n').length);
+  });
+
+  it('shares one tree between the AST walk and the returned CST (no second parse)', async () => {
+    const parser = await createParser();
+    const source = 'UserDTO %\n';
+    const withCst = parser.parseWithCst(source);
+    assert.equal(withCst.cst.dtoDeclarationChildren().length, 1);
+    assert.equal(withCst.cst.dtoDeclarationChildren().at(0)?.entityNameChildren().at(0)?.text, 'UserDTO');
+  });
+});

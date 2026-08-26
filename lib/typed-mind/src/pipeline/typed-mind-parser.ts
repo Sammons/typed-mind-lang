@@ -82,7 +82,26 @@ export class TypedMindParser {
   // pinned legacy ordering quirk (index.ts:104-127): an import-satisfied
   // dependency is never distributed yet never errored.
   parse(source: string): ParseOutcome {
-    const walked = walkCstToAst(this.parseCst(source), source).outcome;
+    return this.#parseFromCst(this.parseCst(source), source);
+  }
+
+  // RFC-TM-5 §1 (rfc-tm-5-diamond.md) — the `parseWithCst` facade extension.
+  // Parses the CST exactly once and walks it exactly once, sharing that single
+  // tree between the AST outcome and the returned CST — the Rejected
+  // Alternatives entry this doc names ("a second TypedMindParser instance or a
+  // re-parse") is exactly what this shared-tree shape avoids: one wasm-backed
+  // parse per document version, not two. ParseOutcome's frozen shape is
+  // untouched; this is a new method with a widened return on a new surface.
+  parseWithCst(source: string): ParseOutcome & { readonly cst: CstSourceFile } {
+    const cst = this.parseCst(source);
+    const outcome = this.#parseFromCst(cst, source);
+    return { ...outcome, cst };
+  }
+
+  // Shared parse-CST-once-then-walk core: both parse() and parseWithCst() walk
+  // the SAME already-produced CstSourceFile rather than each re-parsing.
+  #parseFromCst(cst: CstSourceFile, source: string): ParseOutcome {
+    const walked = walkCstToAst(cst, source).outcome;
     const entities = [...walked.entities];
     const semanticDiagnostics = distributeForwardSemantics(entities);
     const diagnostics = [...walked.diagnostics, ...semanticDiagnostics].sort(compareDiagnosticsBySpan);

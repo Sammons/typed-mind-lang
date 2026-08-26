@@ -7,6 +7,7 @@
 // keeps the Map-shaped ParseResult unchanged for its three named consumers.
 
 import type { Diagnostic } from './ast/diagnostic.ts';
+import type { CstSourceFile } from './ast/gen/cst-nodes.ts';
 import { AstValidator } from './checker/ast-validator.ts';
 import { toDiagnostics } from './checker/finding.ts';
 import { detectFormat, type FormatDetectionResult } from './emitter/detect-format.ts';
@@ -53,6 +54,18 @@ export class TypedMind {
 
   parse(source: string, filePath?: string): ParseOutput {
     const outcome = this.#parser.parse(source);
+    const links = computeLinks(outcome.entities);
+    void filePath;
+    return { ...outcome, links };
+  }
+
+  // RFC-TM-5 §1 (rfc-tm-5-diamond.md) — the `parseWithCst` facade extension.
+  // Consumers that need the CST (the LSP's NameOccurrenceIndex) get it plus
+  // the same links every other new-surface consumer sees, from ONE parse: the
+  // TypedMindParser shares its single walked tree between the AST outcome and
+  // the returned CST (see typed-mind-parser.ts#parseWithCst).
+  parseWithCst(source: string, filePath?: string): ParseOutput & { readonly cst: CstSourceFile } {
+    const outcome = this.#parser.parseWithCst(source);
     const links = computeLinks(outcome.entities);
     void filePath;
     return { ...outcome, links };

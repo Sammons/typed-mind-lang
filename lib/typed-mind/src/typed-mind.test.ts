@@ -23,6 +23,7 @@ TypedMind.create()
   .then((typedMind) => {
     const source = readFileSync(process.argv[2], 'utf8');
     const parsed = typedMind.parse(source);
+    const withCst = typedMind.parseWithCst(source);
     const checked = typedMind.check(source);
     const shortform = typedMind.emitShortform(source);
     const longform = typedMind.emitLongform(source);
@@ -32,6 +33,9 @@ TypedMind.create()
       JSON.stringify({
         entityCount: parsed.entities.length,
         linksIsPresent: typeof parsed.links.referencedBy === 'function',
+        withCstEntityCountMatches: withCst.entities.length === parsed.entities.length,
+        withCstLinksIsPresent: typeof withCst.links.referencedBy === 'function',
+        withCstHasSpanningCst: typeof withCst.cst.span === 'function' && withCst.cst.span().start.line === 1,
         checkedValid: checked.valid,
         diagnosticCount: checked.diagnostics.length,
         shortformNonEmpty: shortform.length > 0,
@@ -61,5 +65,8 @@ describe('TypedMind.create() (built dist layout, new surface smoke)', () => {
     assert.equal(result.longformNonEmpty, true);
     assert.equal(result.toggledNonEmpty, true);
     assert.equal(['shortform', 'longform', 'mixed'].includes(result.detectedFormat), true);
+    assert.equal(result.withCstEntityCountMatches, true);
+    assert.equal(result.withCstLinksIsPresent, true);
+    assert.equal(result.withCstHasSpanningCst, true);
   });
 });
