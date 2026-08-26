@@ -8,7 +8,5 @@
     "declarationMap": true
   },
   "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../typed-mind" }
-  ]
+  "references": [{ "path": "../typed-mind" }]
 }

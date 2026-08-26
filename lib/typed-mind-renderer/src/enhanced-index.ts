@@ -4,9 +4,9 @@
  * Author: Enhanced by Claude Code in Matt Pocock style
  */
 
-import { readFileSync } from 'fs';
-import { join } from 'path';
-import { createServer } from 'http';
+import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { join } from 'node:path';
 import type { ProgramGraph, ValidationResult } from '@sammons/typed-mind';
 
 export interface EnhancedRendererOptions {
@@ -95,7 +95,7 @@ ${this.generateRendererJS()}
       const interactiveHtmlPath = join(__dirname, 'static', 'interactive-index.html');
       try {
         return readFileSync(interactiveHtmlPath, 'utf-8');
-      } catch (error) {
+      } catch (_error) {
         console.warn('Interactive UI not found, falling back to enhanced');
       }
     }
@@ -104,7 +104,7 @@ ${this.generateRendererJS()}
       const enhancedHtmlPath = join(__dirname, 'static', 'enhanced-index.html');
       try {
         return readFileSync(enhancedHtmlPath, 'utf-8');
-      } catch (error) {
+      } catch (_error) {
         console.warn('Enhanced UI not found, falling back to original');
       }
     }
@@ -210,7 +210,7 @@ ${this.generateRendererJS()}
 
 })();
 `;
-    } catch (error) {
+    } catch (_error) {
       console.warn('Interactive renderer source not found, falling back to enhanced');
       return this.generateEnhancedRendererJS(data);
     }
@@ -1308,7 +1308,7 @@ ${this.generateRendererJS()}
   }
 
   private openInBrowser(url: string): void {
-    const { exec } = require('child_process');
+    const { exec } = require('node:child_process');
     const platform = process.platform;
 
     let command: string;

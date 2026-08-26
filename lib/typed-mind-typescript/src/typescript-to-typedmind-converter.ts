@@ -1,30 +1,30 @@
-import * as path from 'path';
-import * as fs from 'fs';
-import { createEntityName } from './types.ts';
-import type {
-  TypeScriptProjectAnalysis,
-  ParsedModule,
-  ParsedFunction,
-  ParsedClass,
-  ParsedInterface,
-  ParsedExport,
-  ConversionResult,
-  ConversionOptions,
-  ConversionError,
-  ConversionWarning,
-} from './types.ts';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type {
   AnyEntity,
-  ProgramEntity,
-  FileEntity,
-  FunctionEntity,
   ClassEntity,
   ClassFileEntity,
-  DTOEntity,
   ConstantsEntity,
-  DTOField,
   DependencyEntity,
+  DTOEntity,
+  DTOField,
+  FileEntity,
+  FunctionEntity,
+  ProgramEntity,
 } from '@sammons/typed-mind';
+import type {
+  ConversionError,
+  ConversionOptions,
+  ConversionResult,
+  ConversionWarning,
+  ParsedClass,
+  ParsedExport,
+  ParsedFunction,
+  ParsedInterface,
+  ParsedModule,
+  TypeScriptProjectAnalysis,
+} from './types.ts';
+import { createEntityName } from './types.ts';
 
 // Two-pass architecture data structures
 interface ExportRegistry {
@@ -1275,7 +1275,7 @@ export class TypeScriptToTypedMindConverter {
       if (!trimmed) continue;
 
       const match = trimmed.match(/^(\w+)(\?)?\s*:\s*(.+)$/);
-      if (match && match[1] && match[3]) {
+      if (match?.[1] && match[3]) {
         properties.push({
           name: match[1],
           type: match[3],

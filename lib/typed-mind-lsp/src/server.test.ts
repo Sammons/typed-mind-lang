@@ -1,7 +1,7 @@
-import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { TypedMindLanguageServer } from './server.ts';
+import { beforeEach, describe, it } from 'node:test';
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { TypedMindLanguageServer } from './server.ts';
 
 describe.skip('TypedMindLanguageServer', () => {
   let server: TypedMindLanguageServer;

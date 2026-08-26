@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync } from 'fs';
-import { resolve } from 'path';
-import { parseArgs } from 'util';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { parseArgs } from 'node:util';
 import { DSLChecker } from '@sammons/typed-mind';
 import { TypedMindRenderer } from '@sammons/typed-mind-renderer';
 
@@ -65,7 +65,7 @@ Examples:
 }
 
 async function main() {
-  let parsed;
+  let parsed: ReturnType<typeof parseArgs<{ options: typeof options; allowPositionals: true }>>;
 
   try {
     parsed = parseArgs({

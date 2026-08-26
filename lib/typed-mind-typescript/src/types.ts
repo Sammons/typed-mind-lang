@@ -1,5 +1,5 @@
-import * as ts from 'typescript';
 import type { AnyEntity } from '@sammons/typed-mind';
+import * as ts from 'typescript';
 
 export interface ParsedFunction {
   readonly name: string;

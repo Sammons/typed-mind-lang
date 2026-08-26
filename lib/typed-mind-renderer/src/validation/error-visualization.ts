@@ -99,7 +99,7 @@ export class ValidationErrorProcessor {
       if (!groups.has(groupKey)) {
         groups.set(groupKey, []);
       }
-      groups.get(groupKey)!.push(error);
+      groups.get(groupKey)?.push(error);
     }
 
     return Array.from(groups.entries()).map(([group, groupErrors]) => ({
@@ -154,7 +154,7 @@ export class ValidationErrorProcessor {
       category: 'syntax',
       documentation: 'Entity names must start with a letter and contain only letters, numbers, and underscores.',
       examples: ['ValidName', 'valid_name', 'Component123'],
-      quickFix: (error) => ({
+      quickFix: (_error) => ({
         title: 'Fix entity name',
         description: 'Rename to follow valid identifier rules',
         action: 'replace',
@@ -167,7 +167,7 @@ export class ValidationErrorProcessor {
       category: 'reference',
       documentation: 'Referenced entity does not exist in the current scope or imported modules.',
       examples: ['Make sure entity is defined', 'Check import statements', 'Verify spelling'],
-      quickFix: (error) => ({
+      quickFix: (_error) => ({
         title: 'Create missing entity',
         description: 'Generate a skeleton entity definition',
         action: 'add',
@@ -180,7 +180,7 @@ export class ValidationErrorProcessor {
       category: 'structure',
       documentation: 'Entities form a circular dependency chain, which can cause runtime issues.',
       examples: ['Introduce abstraction layer', 'Use dependency injection', 'Refactor shared logic'],
-      quickFix: (error) => ({
+      quickFix: (_error) => ({
         title: 'Break circular dependency',
         description: 'Extract shared functionality to new entity',
         action: 'restructure',
@@ -193,7 +193,7 @@ export class ValidationErrorProcessor {
       category: 'best-practice',
       documentation: 'Entity is defined but not referenced by any other entity.',
       examples: ['Remove if truly unused', 'Export for external use', 'Add documentation'],
-      quickFix: (error) => ({
+      quickFix: (_error) => ({
         title: 'Remove unused entity',
         description: 'Delete entity if not needed',
         action: 'remove',

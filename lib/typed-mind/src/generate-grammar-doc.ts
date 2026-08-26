@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { GrammarDocGenerator } from './grammar-doc-generator.ts';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
 
 const generator = new GrammarDocGenerator();
 

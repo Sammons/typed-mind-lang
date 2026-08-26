@@ -5,9 +5,9 @@
  * better type safety, and reduced boilerplate compared to direct object construction.
  */
 
-import type { AnyEntity, Position, ProgramEntity, FileEntity, FunctionEntity, ClassFileEntity, DTOEntity, DTOField } from './types.ts';
-import type { EntityName, FilePath, FunctionSignature, Version, Description } from './branded-types.ts';
+import type { Description, EntityName, FilePath, FunctionSignature, Version } from './branded-types.ts';
 import type { Result } from './result.ts';
+import type { AnyEntity, ClassFileEntity, DTOEntity, DTOField, FileEntity, FunctionEntity, Position, ProgramEntity } from './types.ts';
 
 // Base builder interface
 interface BaseBuilder<T extends AnyEntity> {

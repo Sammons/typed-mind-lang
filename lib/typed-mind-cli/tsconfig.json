@@ -7,8 +7,5 @@
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
-  "references": [
-    { "path": "../typed-mind" },
-    { "path": "../typed-mind-renderer" }
-  ]
+  "references": [{ "path": "../typed-mind" }, { "path": "../typed-mind-renderer" }]
 }

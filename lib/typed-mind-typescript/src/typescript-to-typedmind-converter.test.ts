@@ -1,8 +1,8 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
-import type { TypeScriptProjectAnalysis, ParsedModule } from './types.ts';
+import { describe, it } from 'node:test';
+import type { ParsedModule, TypeScriptProjectAnalysis } from './types.ts';
 import { createFilePath } from './types.ts';
+import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
 
 const createMockAnalysis = (): TypeScriptProjectAnalysis => ({
   modules: [

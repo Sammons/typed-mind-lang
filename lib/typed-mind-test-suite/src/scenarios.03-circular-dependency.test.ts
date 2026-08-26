@@ -1,8 +1,8 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { DSLChecker } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,15 +15,15 @@ describe('scenario-03-circular-dependency', () => {
   it('should detect circular dependency between functions', () => {
     const content = readFileSync(join(__dirname, '..', 'scenarios', scenarioFile), 'utf-8');
     const result = checker.check(content);
-    
+
     // The result should be invalid due to circular dependency
     assert.equal(result.valid, false);
-    
+
     // Should have exactly 1 error
-    assert.equal((result.errors).length, 1);
-    
+    assert.equal(result.errors.length, 1);
+
     const error = result.errors[0];
-    
+
     // Check error properties
     assert.equal(error.position.line, 3);
     assert.equal(error.position.column, 1);

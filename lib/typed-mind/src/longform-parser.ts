@@ -1,17 +1,17 @@
 import type {
   AnyEntity,
-  ProgramEntity,
-  FileEntity,
-  FunctionEntity,
+  AssetEntity,
   ClassEntity,
   ConstantsEntity,
+  DependencyEntity,
   DTOEntity,
   DTOField,
-  AssetEntity,
-  UIComponentEntity,
-  RunParameterEntity,
-  DependencyEntity,
+  FileEntity,
+  FunctionEntity,
   Position,
+  ProgramEntity,
+  RunParameterEntity,
+  UIComponentEntity,
 } from './types.ts';
 
 interface LongformBlock {
@@ -238,7 +238,7 @@ export class LongformParser {
           comment,
         } as ClassEntity;
 
-      case 'dto':
+      case 'dto': {
         const fields: DTOField[] = [];
         const fieldsObj = properties.get('fields') || {};
 
@@ -270,6 +270,7 @@ export class LongformParser {
           raw,
           comment,
         } as DTOEntity;
+      }
 
       case 'component':
         return {
@@ -308,7 +309,7 @@ export class LongformParser {
           comment,
         } as ConstantsEntity;
 
-      case 'parameter':
+      case 'parameter': {
         const paramType = properties.get('type') || 'env';
         return {
           name,
@@ -322,6 +323,7 @@ export class LongformParser {
           raw,
           comment,
         } as RunParameterEntity;
+      }
 
       case 'dependency':
         return {

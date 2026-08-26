@@ -1,22 +1,22 @@
+import type { ParseResult } from './parser.ts';
 import type {
   AnyEntity,
-  ClassEntity,
-  FileEntity,
-  FunctionEntity,
-  FunctionEntityWithDependencies,
-  UIComponentEntity,
   AssetEntity,
-  RunParameterEntity,
+  ClassEntity,
   ConstantsEntity,
   DependencyEntity,
   DTOEntity,
+  EntityType,
+  FileEntity,
+  FunctionEntity,
+  FunctionEntityWithDependencies,
   ProgramEntity,
+  ReferenceType,
+  RunParameterEntity,
+  UIComponentEntity,
   ValidationError,
   ValidationResult,
-  EntityType,
-  ReferenceType,
 } from './types.ts';
-import type { ParseResult } from './parser.ts';
 
 export interface ValidatorOptions {
   skipOrphanCheck?: boolean;
@@ -197,7 +197,7 @@ export class DSLValidator {
       if (!nameGroups.has(name)) {
         nameGroups.set(name, []);
       }
-      nameGroups.get(name)!.push(entity);
+      nameGroups.get(name)?.push(entity);
     }
 
     // Check for Class-File naming conflicts
@@ -789,7 +789,7 @@ export class DSLValidator {
     for (const entity of entities.values()) {
       if (entity.type === 'Dependency') {
         const depEntity = entity as DependencyEntity;
-        if (depEntity.exports && depEntity.exports.includes(dtoName)) {
+        if (depEntity.exports?.includes(dtoName)) {
           return true;
         }
       }
@@ -854,7 +854,7 @@ export class DSLValidator {
           if (!exportMap.has(exp)) {
             exportMap.set(exp, []);
           }
-          exportMap.get(exp)!.push(entity);
+          exportMap.get(exp)?.push(entity);
         }
       }
     }
@@ -1075,7 +1075,7 @@ export class DSLValidator {
               if (!componentAffectedBy.has(componentName)) {
                 componentAffectedBy.set(componentName, []);
               }
-              componentAffectedBy.get(componentName)!.push(entity.name);
+              componentAffectedBy.get(componentName)?.push(entity.name);
             }
           }
         }
@@ -1226,7 +1226,7 @@ export class DSLValidator {
               });
             } else {
               const func = funcEntity as FunctionEntity;
-              if (!func.consumes || !func.consumes.includes(entity.name)) {
+              if (!func.consumes?.includes(entity.name)) {
                 this.addError({
                   position: entity.position,
                   message: `RunParameter '${entity.name}' claims to be consumed by '${funcName}', but that function doesn't consume it`,
@@ -1286,10 +1286,10 @@ export class DSLValidator {
       }
 
       // Check if this reference already exists
-      const exists = target.referencedBy!.some((ref) => ref.from === from.name && ref.type === refType);
+      const exists = target.referencedBy?.some((ref) => ref.from === from.name && ref.type === refType);
 
       if (!exists) {
-        target.referencedBy!.push({
+        target.referencedBy?.push({
           from: from.name,
           type: refType,
           fromType: from.type,

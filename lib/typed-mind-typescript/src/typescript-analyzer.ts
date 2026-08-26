@@ -1,29 +1,29 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import * as ts from 'typescript';
-import path from 'path';
-import fs from 'fs';
+import type {
+  ParsedClass,
+  ParsedConstant,
+  ParsedExport,
+  ParsedFunction,
+  ParsedImport,
+  ParsedInterface,
+  ParsedMethod,
+  ParsedModule,
+  ParsedParameter,
+  ParsedProperty,
+  ParsedTypeAlias,
+  TypeScriptProjectAnalysis,
+} from './types.ts';
 import {
-  isFunction,
+  createFilePath,
   isClass,
+  isExportDeclaration,
+  isFunction,
+  isImportDeclaration,
   isInterface,
   isTypeAlias,
   isVariableStatement,
-  isExportDeclaration,
-  isImportDeclaration,
-  createFilePath,
-} from './types.ts';
-import type {
-  TypeScriptProjectAnalysis,
-  ParsedModule,
-  ParsedFunction,
-  ParsedClass,
-  ParsedInterface,
-  ParsedImport,
-  ParsedExport,
-  ParsedTypeAlias,
-  ParsedConstant,
-  ParsedMethod,
-  ParsedProperty,
-  ParsedParameter,
 } from './types.ts';
 
 export class TypeScriptAnalyzer {

@@ -81,8 +81,6 @@
     "dev": "tsc --build --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
     "test": "echo 'no tests in renderer package'",
-    "lint": "echo 'Skipping lint for now'",
-    "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },

@@ -1,32 +1,31 @@
-import {
-  createConnection,
-  TextDocuments,
-  DiagnosticSeverity,
-  ProposedFeatures,
-  TextDocumentSyncKind,
-  CompletionItemKind,
-  MarkupKind,
-  SemanticTokensBuilder,
-  SemanticTokenTypes,
-  SemanticTokenModifiers,
-} from 'vscode-languageserver/node.js';
+import type { AnyEntity } from '@sammons/typed-mind';
+import { DSLChecker, DSLParser, DSLValidator, SyntaxGenerator } from '@sammons/typed-mind';
 import type {
+  CompletionItem,
+  DefinitionParams,
   Diagnostic,
+  Hover,
   InitializeParams,
   InitializeResult,
-  CompletionItem,
-  TextDocumentPositionParams,
-  Hover,
-  DefinitionParams,
   Location,
   ReferenceParams,
-  SemanticTokensParams,
   SemanticTokens,
+  SemanticTokensParams,
+  TextDocumentPositionParams,
 } from 'vscode-languageserver/node.js';
-
+import {
+  CompletionItemKind,
+  createConnection,
+  DiagnosticSeverity,
+  MarkupKind,
+  ProposedFeatures,
+  SemanticTokenModifiers,
+  SemanticTokensBuilder,
+  SemanticTokenTypes,
+  TextDocumentSyncKind,
+  TextDocuments,
+} from 'vscode-languageserver/node.js';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { DSLParser, DSLValidator, SyntaxGenerator, DSLChecker } from '@sammons/typed-mind';
-import type { AnyEntity } from '@sammons/typed-mind';
 
 export class TypedMindLanguageServer {
   private connection = createConnection(ProposedFeatures.all);
@@ -315,13 +314,13 @@ export class TypedMindLanguageServer {
           if (!refsByType.has(ref.type)) {
             refsByType.set(ref.type, []);
           }
-          refsByType.get(ref.type)!.push(ref.from);
+          refsByType.get(ref.type)?.push(ref.from);
         } else if (typeof ref === 'string') {
           // Legacy string format
           if (!refsByType.has('reference')) {
             refsByType.set('reference', []);
           }
-          refsByType.get('reference')!.push(ref);
+          refsByType.get('reference')?.push(ref);
         }
       }
 
@@ -571,7 +570,7 @@ export class TypedMindLanguageServer {
 
   private isWordBoundary(char: string | undefined): boolean {
     if (!char) return true;
-    return /[\s\[\],<>@:~!=#\-]/.test(char);
+    return /[\s[\],<>@:~!=#-]/.test(char);
   }
 
   private provideSemanticTokens(params: SemanticTokensParams): SemanticTokens {

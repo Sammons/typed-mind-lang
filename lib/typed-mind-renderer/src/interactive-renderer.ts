@@ -4,9 +4,9 @@
  * Author: Enhanced by Claude Code in Matt Pocock style
  */
 
-import { readFileSync } from 'fs';
-import { join } from 'path';
-import { createServer } from 'http';
+import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { join } from 'node:path';
 import type { ProgramGraph, ValidationResult } from '@sammons/typed-mind';
 
 export interface InteractiveRendererOptions {
@@ -3171,7 +3171,7 @@ ${this.generateInteractiveRendererJS()}
   }
 
   private openInBrowser(url: string): void {
-    const { exec } = require('child_process');
+    const { exec } = require('node:child_process');
     const platform = process.platform;
 
     let command: string;

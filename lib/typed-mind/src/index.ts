@@ -1,77 +1,70 @@
-import { DSLParser } from './parser.ts';
-import { DSLValidator } from './validator.ts';
+import { dirname } from 'node:path';
+import type { FilePath } from './branded-types.ts';
 import { ErrorFormatter } from './formatter.ts';
 import { ImportResolver } from './import-resolver.ts';
-import { SyntaxGenerator, type SyntaxGenerationError } from './syntax-generator.ts';
-import type { ValidationResult, ProgramGraph, AnyEntity, ValidationError } from './types.ts';
+import { DSLParser } from './parser.ts';
 import type { Result } from './result.ts';
-import type { FilePath } from './branded-types.ts';
-import { dirname } from 'path';
-
-// Export all types explicitly for better TypeScript experience
-export type {
-  // Core types
-  EntityType,
-  Position,
-  ReferenceType,
-  Reference,
-  Entity,
-
-  // Entity types
-  ProgramEntity,
-  FileEntity,
-  FunctionEntity,
-  FunctionEntityWithDependencies,
-  ClassEntity,
-  ClassFileEntity,
-  ConstantsEntity,
-  DTOEntity,
-  DTOField,
-  AssetEntity,
-  UIComponentEntity,
-  RunParameterEntity,
-  DependencyEntity,
-  AnyEntity,
-
-  // Validation types
-  ValidationError,
-  ValidationResult,
-
-  // Import/Graph types
-  ImportStatement,
-  ProgramGraph,
-} from './types.ts';
+import { type SyntaxGenerationError, SyntaxGenerator } from './syntax-generator.ts';
+import type { AnyEntity, ProgramGraph, ValidationError, ValidationResult } from './types.ts';
+import { DSLValidator } from './validator.ts';
 
 // Export branded types
 export * from './branded-types.ts';
-
-// Export Result types
-export * from './result.ts';
-
-// Export error types
-export * from './error-types.ts';
-
+// Export EntityBuilder
+export * from './entity-builder.ts';
 // Export EntityMap
 export * from './entity-map.ts';
 
-// Export EntityBuilder
-export * from './entity-builder.ts';
-export { DSLParser, type ParseResult, type ParseError } from './parser.ts';
-export { DSLValidator } from './validator.ts';
+// Export error types
+export * from './error-types.ts';
 export { ErrorFormatter } from './formatter.ts';
-export { LongformParser } from './longform-parser.ts';
-export { GrammarValidator, type GrammarValidationResult, type GrammarValidationError } from './grammar-validator.ts';
-export { ENTITY_PATTERNS, CONTINUATION_PATTERNS, GENERAL_PATTERNS, PATTERN_DESCRIPTIONS } from './parser-patterns.ts';
 export { GrammarDocGenerator } from './grammar-doc-generator.ts';
+export { type GrammarValidationError, type GrammarValidationResult, GrammarValidator } from './grammar-validator.ts';
+export { LongformParser } from './longform-parser.ts';
+export { DSLParser, type ParseError, type ParseResult } from './parser.ts';
+export { CONTINUATION_PATTERNS, ENTITY_PATTERNS, GENERAL_PATTERNS, PATTERN_DESCRIPTIONS } from './parser-patterns.ts';
+// Export Result types
+export * from './result.ts';
 export {
-  SyntaxGenerator,
-  toggleSyntaxFormat,
   detectSyntaxFormat,
-  type SyntaxFormat,
-  type SyntaxGeneratorOptions,
-  type SyntaxGenerationError,
   type FormatDetectionResult,
+  type SyntaxFormat,
+  type SyntaxGenerationError,
+  SyntaxGenerator,
+  type SyntaxGeneratorOptions,
+  toggleSyntaxFormat,
 } from './syntax-generator.ts';
+// Export all types explicitly for better TypeScript experience
+export type {
+  AnyEntity,
+  AssetEntity,
+  ClassEntity,
+  ClassFileEntity,
+  ConstantsEntity,
+  DependencyEntity,
+  DTOEntity,
+  DTOField,
+  Entity,
+  // Core types
+  EntityType,
+  FileEntity,
+  FunctionEntity,
+  FunctionEntityWithDependencies,
+  // Import/Graph types
+  ImportStatement,
+  Position,
+  // Entity types
+  ProgramEntity,
+  ProgramGraph,
+  Reference,
+  ReferenceType,
+  RunParameterEntity,
+  UIComponentEntity,
+  // Validation types
+  ValidationError,
+  ValidationResult,
+} from './types.ts';
+export { DSLValidator } from './validator.ts';
 
 // Enhanced DSLChecker with better type safety
 export interface DSLCheckerOptions {

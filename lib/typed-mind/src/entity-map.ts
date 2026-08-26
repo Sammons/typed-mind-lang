@@ -5,23 +5,23 @@
  * and includes validation and utility methods for entity management.
  */
 
+import { EntityName } from './branded-types.ts';
+import type { Result } from './result.ts';
 import type {
   AnyEntity,
-  EntityType,
-  ProgramEntity,
-  FileEntity,
-  FunctionEntity,
+  AssetEntity,
   ClassEntity,
   ClassFileEntity,
   ConstantsEntity,
-  DTOEntity,
-  AssetEntity,
-  UIComponentEntity,
-  RunParameterEntity,
   DependencyEntity,
+  DTOEntity,
+  EntityType,
+  FileEntity,
+  FunctionEntity,
+  ProgramEntity,
+  RunParameterEntity,
+  UIComponentEntity,
 } from './types.ts';
-import { EntityName } from './branded-types.ts';
-import type { Result } from './result.ts';
 
 // Entity type mapping for type-safe retrieval
 export type EntityTypeMap = {

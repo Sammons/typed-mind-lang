@@ -393,8 +393,8 @@ export class ArchitectureDiffAnalyzer {
   }
 
   private detectRenames(
-    oldEntities: Map<string, AnyEntity>,
-    newEntities: Map<string, AnyEntity>,
+    _oldEntities: Map<string, AnyEntity>,
+    _newEntities: Map<string, AnyEntity>,
     existingDiffs: EntityDiff[],
   ): EntityDiff[] {
     const renames: EntityDiff[] = [];
@@ -560,7 +560,7 @@ export class ArchitectureDiffAnalyzer {
     };
   }
 
-  private createVisualizationConfig(entityDiffs: EntityDiff[], options: DiffOptions): DiffVisualization {
+  private createVisualizationConfig(_entityDiffs: EntityDiff[], options: DiffOptions): DiffVisualization {
     return {
       mode: options.visualizationMode || 'overlay',
       showUnchanged: options.showUnchanged ?? true,

@@ -1,19 +1,19 @@
+import { ENTITY_PATTERNS, GENERAL_PATTERNS } from './parser-patterns.ts';
+import type { Result } from './result.ts';
 import type {
   AnyEntity,
-  ProgramEntity,
-  FileEntity,
-  FunctionEntity,
+  AssetEntity,
   ClassEntity,
   ClassFileEntity,
   ConstantsEntity,
-  DTOEntity,
-  AssetEntity,
-  UIComponentEntity,
-  RunParameterEntity,
   DependencyEntity,
+  DTOEntity,
+  FileEntity,
+  FunctionEntity,
+  ProgramEntity,
+  RunParameterEntity,
+  UIComponentEntity,
 } from './types.ts';
-import { ENTITY_PATTERNS, GENERAL_PATTERNS } from './parser-patterns.ts';
-import type { Result } from './result.ts';
 
 /**
  * Syntax format types
@@ -99,8 +99,8 @@ export class SyntaxGenerator {
       }
 
       // Check for continuation lines (could be either format)
+      // These are neutral - don't count toward either format
       if (GENERAL_PATTERNS.CONTINUATION.test(line)) {
-        // These are neutral - don't count toward either format
         continue;
       }
     }

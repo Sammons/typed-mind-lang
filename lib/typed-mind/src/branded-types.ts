@@ -67,7 +67,7 @@ export const Version = {
   create: (version: string): Version => {
     // Strip 'v' prefix if present
     const normalizedVersion = version.startsWith('v') ? version.slice(1) : version;
-    if (!/^\d+(\.\d+)*(-[\w\-\.]+)?$/.test(normalizedVersion)) {
+    if (!/^\d+(\.\d+)*(-[\w\-.]+)?$/.test(normalizedVersion)) {
       throw new Error(`Invalid version format: ${version}`);
     }
     return normalizedVersion as Version;

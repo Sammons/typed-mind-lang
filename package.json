@@ -14,8 +14,8 @@
   "scripts": {
     "build": "pnpm run -r build",
     "test": "pnpm run -r test",
-    "lint": "pnpm run -r lint",
-    "lint:fix": "pnpm run -r lint:fix",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
     "typecheck": "pnpm run -r typecheck",
     "clean": "pnpm run -r clean && rm -rf node_modules",
     "dev": "pnpm run -r --parallel dev",
@@ -25,14 +25,9 @@
     "precommit": "pnpm run validate:fix"
   },
   "devDependencies": {
-    "@eslint/js": "^9.35.0",
+    "@biomejs/biome": "2.5.10",
     "@types/node": "^22.18.1",
-    "eslint": "^9.35.0",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.4",
-    "prettier": "^3.4.2",
-    "typescript": "^5.9.2",
-    "typescript-eslint": "^8.42.0"
+    "typescript": "^5.9.2"
   },
   "engines": {
     "node": ">=24.0.0",

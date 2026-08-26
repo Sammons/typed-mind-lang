@@ -39,8 +39,6 @@
     "clean": "rm -rf dist *.tsbuildinfo",
     "test": "node --test",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },
@@ -49,8 +47,7 @@
     "typescript": "^5.9.2"
   },
   "devDependencies": {
-    "@types/node": "^22.18.1",
-    "typescript-eslint": "^8.42.0"
+    "@types/node": "^22.18.1"
   },
   "publishConfig": {
     "access": "public"

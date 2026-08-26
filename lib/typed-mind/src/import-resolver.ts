@@ -1,8 +1,8 @@
-import { readFileSync } from 'fs';
-import { dirname, resolve, isAbsolute } from 'path';
-import type { ImportStatement, AnyEntity, ValidationError } from './types.ts';
+import { readFileSync } from 'node:fs';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import type { ParseResult } from './parser.ts';
 import { DSLParser } from './parser.ts';
+import type { AnyEntity, ImportStatement, ValidationError } from './types.ts';
 
 export interface ResolvedImport {
   import: ImportStatement;

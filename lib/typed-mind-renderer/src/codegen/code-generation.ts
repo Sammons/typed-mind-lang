@@ -625,7 +625,7 @@ abstract class LanguageGenerator {
 
   abstract generateEntity(entity: AnyEntity, config: CodeGenConfig, graph: ProgramGraph): Promise<GeneratedCode>;
 
-  protected createMetadata(entity: AnyEntity, confidence: number): CodeMetadata {
+  protected createMetadata(_entity: AnyEntity, confidence: number): CodeMetadata {
     return {
       generatedAt: new Date(),
       confidence,

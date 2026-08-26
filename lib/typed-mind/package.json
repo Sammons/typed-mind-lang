@@ -38,8 +38,6 @@
     "clean": "rm -rf dist *.tsbuildinfo",
     "test": "node --test \"src/**/*.test.ts\"",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
     "generate-grammar-docs": "pnpm build && node dist/generate-grammar-doc.js",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"

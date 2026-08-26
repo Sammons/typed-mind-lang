@@ -1,24 +1,24 @@
+import { GrammarValidator } from './grammar-validator.ts';
+import { LongformParser } from './longform-parser.ts';
+import { CONTINUATION_PATTERNS, ENTITY_PATTERNS, GENERAL_PATTERNS } from './parser-patterns.ts';
 import type {
   AnyEntity,
-  ProgramEntity,
-  FileEntity,
-  FunctionEntity,
-  FunctionEntityWithDependencies,
+  AssetEntity,
   ClassEntity,
   ClassFileEntity,
   ConstantsEntity,
+  DependencyEntity,
   DTOEntity,
   DTOField,
-  AssetEntity,
-  UIComponentEntity,
-  RunParameterEntity,
-  DependencyEntity,
-  Position,
+  FileEntity,
+  FunctionEntity,
+  FunctionEntityWithDependencies,
   ImportStatement,
+  Position,
+  ProgramEntity,
+  RunParameterEntity,
+  UIComponentEntity,
 } from './types.ts';
-import { LongformParser } from './longform-parser.ts';
-import { ENTITY_PATTERNS, CONTINUATION_PATTERNS, GENERAL_PATTERNS } from './parser-patterns.ts';
-import { GrammarValidator } from './grammar-validator.ts';
 
 export interface ParseError {
   line: number;
@@ -787,7 +787,7 @@ export class DSLParser {
                     funcEntity.calls.push(dep);
                   }
                   break;
-                case 'UIComponent':
+                case 'UIComponent': {
                   // These affect UI components
                   if (!funcEntity.affects) funcEntity.affects = [];
                   if (!funcEntity.affects.includes(dep)) {
@@ -803,6 +803,7 @@ export class DSLParser {
                     uiComponent.affectedBy.push(funcEntity.name);
                   }
                   break;
+                }
                 case 'Dependency':
                   // Dependencies cannot be directly consumed - they must be imported first
                   // This will be caught as an error by the validator

@@ -109,7 +109,7 @@ export class GraphMetricsAnalyzer {
    */
   private analyzeComplexity(): MetricCategory {
     const totalEntities = this.entities.length;
-    const entityTypeDistribution = this.getEntityTypeDistribution();
+    const _entityTypeDistribution = this.getEntityTypeDistribution();
     const avgDependenciesPerEntity = this.calculateAverageDependencies();
     const cyclomaticComplexity = this.calculateCyclomaticComplexity();
     const depthOfInheritance = this.calculateMaxInheritanceDepth();
@@ -457,7 +457,7 @@ export class GraphMetricsAnalyzer {
     const addDependency = (target: string) => {
       if (this.entityMap.has(target)) {
         deps.add(target);
-        this.reverseDependencyGraph.get(target)!.add(entity.name);
+        this.reverseDependencyGraph.get(target)?.add(entity.name);
       }
     };
 

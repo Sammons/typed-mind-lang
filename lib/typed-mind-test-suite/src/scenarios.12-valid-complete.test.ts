@@ -1,8 +1,8 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { DSLChecker } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,6 +20,6 @@ describe('scenario-12-valid-complete', () => {
     assert.equal(result.valid, true);
 
     // Should have no errors in a valid program
-    assert.equal((result.errors).length, 0);
+    assert.equal(result.errors.length, 0);
   });
 });

@@ -32,10 +32,7 @@
               "name": "support.type.typedmind"
             },
             "3": {
-              "patterns": [
-                { "include": "#strings" },
-                { "include": "#keywords" }
-              ]
+              "patterns": [{ "include": "#strings" }, { "include": "#keywords" }]
             }
           }
         }

@@ -1,8 +1,8 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { DSLChecker } from '@sammons/typed-mind';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,15 +16,15 @@ describe('scenario-24-import-not-found', () => {
     const filePath = join(__dirname, '..', 'scenarios', scenarioFile);
     const content = readFileSync(filePath, 'utf-8');
     const result = checker.check(content, filePath);
-    
+
     // Should be invalid due to import file not found
     assert.equal(result.valid, false);
-    
+
     // Should have exactly 2 errors (1 failed import + 1 orphaned entity)
-    assert.equal((result.errors).length, 2);
+    assert.equal(result.errors.length, 2);
 
     // Check for import file not found error
-    const importError = result.errors.find(err => err.message.includes('Failed to import'));
+    const importError = result.errors.find((err) => err.message.includes('Failed to import'));
     assert.notEqual(importError, undefined);
     assert.match(importError?.message, /Failed to import '\.\/non-existent-file\.tmd'/);
     assert.match(importError?.message, /ENOENT: no such file or directory/);
@@ -33,7 +33,7 @@ describe('scenario-24-import-not-found', () => {
     assert.equal(importError?.severity, 'error');
 
     // Check for orphaned entity error
-    const orphanedError = result.errors.find(err => err.message.includes("Orphaned entity 'main'"));
+    const orphanedError = result.errors.find((err) => err.message.includes("Orphaned entity 'main'"));
     assert.notEqual(orphanedError, undefined);
     assert.equal(orphanedError?.position.line, 9);
     assert.equal(orphanedError?.position.column, 1);
