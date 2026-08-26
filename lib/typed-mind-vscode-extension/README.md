@@ -115,6 +115,15 @@ reason this package retains `tsup`.
 - `pnpm build` - Build extension
 - `pnpm package` - Create .vsix
 
+### Dependencies
+
+`@sammons/typed-mind` and `@sammons/typed-mind-lsp` are `workspace:*` — RFC-TM-5 §3
+(`knowledge/projects/typedmind/rfc-tm-5-diamond.md`) Q3. `@sammons/typed-mind-renderer`
+stays pinned at the last-published `^0.2.1` until RFC-TM-6 merges: flipping it early would
+pull TM-6's in-flight renderer into the extension (the DAG's ordering constraint). The
+preview command (`src/extension.ts`) still `require`s the pinned renderer; the flip and the
+preview's AST migration are RFC-TM-5 Q4.
+
 ## Example Syntax
 
 ```tmd

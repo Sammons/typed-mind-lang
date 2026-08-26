@@ -17,8 +17,9 @@
     "comments": {
       "patterns": [
         {
+          "comment": "Negative lookahead excludes the ClassFile sigil (#:) — RFC-TM-5 §4 (rfc-tm-5-diamond.md) S-EDITOR-1 drift smoke: without it, this pattern (tried first in the top-level patterns list) swallows '#:' and everything after it on the line as a comment, leaving the ClassFile sigil and its path/extends clause unhighlighted.",
           "name": "comment.line.number-sign.typedmind",
-          "match": "#.*$"
+          "match": "#(?!:).*$"
         }
       ]
     },

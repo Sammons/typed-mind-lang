@@ -1,0 +1,25 @@
+# RFC-TM-5 §4 (rfc-tm-5-diamond.md), S-EDITOR-1 — one line per entity sigil
+# (`->`, `@`, `::`, `<:`, `#:`, `!`, `%`, `~`, `&`, `&!`, `$env`, `$config`,
+# `^`), each with a name immediately before the sigil, so the smoke test can
+# assert both the name token and the sigil token carry scopes beyond
+# source.typedmind (the historical ClassFile failure mode: a highlighted
+# operator next to an unhighlighted name). The grammar
+# (syntaxes/typedmind.tmLanguage.json) has no longform-block tokenization
+# (`program X { ... }` etc. fall through as plain source.typedmind text — see
+# vsix-packaging.test.ts's sibling textmate-drift-smoke.test.ts header for the
+# scope note); every sigil this doc names is a shortform-only operator, so
+# this fixture is shortform-only by construction.
+
+ProgramEntity -> mainFn v1.0.0
+FileEntity @ src/file.ts:
+FunctionEntity :: (input: string) => void
+ClassEntity <: BaseClass
+ClassFileEntity #: src/class-file.ts <: BaseClass
+ConstantsEntity ! src/config.ts : ConfigSchema
+DtoEntity %
+AssetEntity ~ "asset description"
+UiComponentEntity & "component description"
+RootUiComponentEntity &! "root component description"
+ENV_PARAM $env "environment parameter" (required)
+CONFIG_PARAM $config "config parameter"
+dependency-entity ^ "dependency purpose" v1.0.0

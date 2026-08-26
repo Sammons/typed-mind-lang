@@ -123,11 +123,11 @@ importers:
   lib/typed-mind-vscode-extension:
     dependencies:
       '@sammons/typed-mind':
-        specifier: ^0.1.8
-        version: 0.1.8
+        specifier: workspace:*
+        version: link:../typed-mind
       '@sammons/typed-mind-lsp':
-        specifier: ^0.1.8
-        version: 0.1.8
+        specifier: workspace:*
+        version: link:../typed-mind-lsp
       '@sammons/typed-mind-renderer':
         specifier: ^0.2.1
         version: 0.2.1
@@ -150,6 +150,12 @@ importers:
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
+      vscode-oniguruma:
+        specifier: ^2.0.1
+        version: 2.0.1
+      vscode-textmate:
+        specifier: ^9.3.2
+        version: 9.3.2
 
 packages:
 
@@ -1141,17 +1147,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@sammons/typed-mind-lsp@0.1.8':
-    resolution: {integrity: sha512-D4w9dwY8bvoAicb2sp4Ar6KUm/EE3QZ+n5t3dvltPhkI1oaczD1DEgFD6G7z/dr0I1Y4xuI5dBpdf9ROQP03EQ==}
-    engines: {node: '>=18.0.0'}
-    hasBin: true
-
   '@sammons/typed-mind-renderer@0.2.1':
     resolution: {integrity: sha512-pG4j1ggagkoMwd8HBmUFy/F8Y5PizZNEu99ZrcL6aXqTzSWxvbGNP2L/TIqS7wnM1bTiWuqO6DrKF9a+HVyXaQ==}
-    engines: {node: '>=22.0.0'}
-
-  '@sammons/typed-mind@0.1.8':
-    resolution: {integrity: sha512-3C8RZqva+eVE3TlrjBOsJWeXgAV7OkibHQDxML5sXaZoWbVpUTPTvOVGTH9NhAgfK1aLwT1ajtYzstvRX4TJTA==}
     engines: {node: '>=22.0.0'}
 
   '@secretlint/config-creator@10.2.1':
@@ -2738,6 +2735,12 @@ packages:
     resolution: {integrity: sha512-woByF3PDpkHFUreUa7Hos7+pUWdeWMXRd26+ZX2A8cFx6v/JPTtd4/uN0/jB6XQHYaOlHbio03NTHCqrgG5n7g==}
     hasBin: true
 
+  vscode-oniguruma@2.0.1:
+    resolution: {integrity: sha512-poJU8iHIWnC3vgphJnrLZyI3YdqRlR27xzqDmpPXYzA93R4Gk8z7T6oqDzDoHjoikA2aS82crdXFkjELCdJsjQ==}
+
+  vscode-textmate@9.3.2:
+    resolution: {integrity: sha512-n2uGbUcrjhUEBH16uGA0TvUfhWwliFZ1e3+pTjrkim1Mt7ydB41lV08aUvsi70OlzDWp6X7Bx3w/x3fAXIsN0Q==}
+
   web-tree-sitter@0.26.13:
     resolution: {integrity: sha512-5bUZ7vbQ1kcondet96wzP974+JfCZDeQ7bTpacICm2nnvHpa5cO0ByRsoMcAhUP+743vpkb4m0BFlVSm+Ye9VA==}
 
@@ -3503,17 +3506,9 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.45.3':
     optional: true
 
-  '@sammons/typed-mind-lsp@0.1.8':
-    dependencies:
-      '@sammons/typed-mind': link:lib/typed-mind
-      vscode-languageserver: 9.0.1
-      vscode-languageserver-textdocument: 1.0.12
-
   '@sammons/typed-mind-renderer@0.2.1':
     dependencies:
       '@sammons/typed-mind': link:lib/typed-mind
-
-  '@sammons/typed-mind@0.1.8': {}
 
   '@secretlint/config-creator@10.2.1':
     dependencies:
@@ -5323,6 +5318,10 @@ snapshots:
   vscode-languageserver@9.0.1:
     dependencies:
       vscode-languageserver-protocol: 3.17.5
+
+  vscode-oniguruma@2.0.1: {}
+
+  vscode-textmate@9.3.2: {}
 
   web-tree-sitter@0.26.13: {}
 
