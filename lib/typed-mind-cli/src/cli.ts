@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { DSLChecker } from '@sammons/typed-mind';
+import { DSLChecker, TypedMind } from '@sammons/typed-mind';
 import { TypedMindRenderer } from '@sammons/typed-mind-renderer';
 
 const options = {
@@ -96,36 +96,15 @@ async function main() {
   try {
     const absolutePath = resolve(filePath as string);
     const content = readFileSync(absolutePath, 'utf-8');
-    const checker = new DSLChecker({
-      skipOrphanCheck: values['skip-orphan-check'] as boolean,
-    });
 
-    if (values.check) {
-      console.log(`Checking ${filePath}...`);
-      const result = checker.check(content, absolutePath);
-
-      if (result.valid) {
-        console.log('\u2713 No errors found!');
-        process.exit(0);
-      } else {
-        // Display each error
-        for (const error of result.errors) {
-          const severity = error.severity === 'warning' ? 'WARNING' : 'ERROR';
-          console.error(`${severity} at line ${error.position.line}, col ${error.position.column}: ${error.message}`);
-          const errorLine = content.split('\n')[error.position.line - 1] || '';
-          console.error(`  ${error.position.line} | ${errorLine}`);
-          console.error(`     ${' '.repeat(String(error.position.line).length)}${''.padStart(error.position.column, ' ')}^`);
-          if (error.suggestion) {
-            console.error(`  Suggestion: ${error.suggestion}`);
-          }
-          console.error(''); // Empty line between errors
-        }
-
-        console.error(`\u2717 Found ${result.errors.length} error(s)`);
-        process.exit(1);
-      }
-    } else if (values.render) {
+    if (values.render) {
+      // RFC-TM-4 \u00a73 bridge: the renderer stays on the legacy Map-shaped
+      // ProgramGraph until TM-6 migrates it, so --render keeps the legacy
+      // DSLChecker for now.
       console.log(`Rendering ${filePath}...`);
+      const checker = new DSLChecker({
+        skipOrphanCheck: values['skip-orphan-check'] as boolean,
+      });
       const programGraph = checker.parse(content, absolutePath);
       const validationResult = checker.check(content, absolutePath);
 
@@ -150,28 +129,31 @@ async function main() {
         await renderer.serve();
       }
     } else {
-      // Default to check
+      // RFC-TM-4 \u00a73 (S-CONS-CLI-1): --check and the default-to-check path
+      // adopt the new surface \u2014 main() is already async, so awaiting
+      // TypedMind.create() here is the only change the flip requires.
       console.log(`Checking ${filePath}...`);
-      const result = checker.check(content, absolutePath);
+      const typedMind = await TypedMind.create({
+        skipOrphanCheck: values['skip-orphan-check'] as boolean,
+      });
+      const result = typedMind.check(content, absolutePath);
 
       if (result.valid) {
         console.log('\u2713 No errors found!');
         process.exit(0);
       } else {
-        // Display each error
-        for (const error of result.errors) {
-          const severity = error.severity === 'warning' ? 'WARNING' : 'ERROR';
-          console.error(`${severity} at line ${error.position.line}, col ${error.position.column}: ${error.message}`);
-          const errorLine = content.split('\n')[error.position.line - 1] || '';
-          console.error(`  ${error.position.line} | ${errorLine}`);
-          console.error(`     ${' '.repeat(String(error.position.line).length)}${''.padStart(error.position.column, ' ')}^`);
-          if (error.suggestion) {
-            console.error(`  Suggestion: ${error.suggestion}`);
-          }
-          console.error(''); // Empty line between errors
+        // Display each diagnostic
+        for (const diagnostic of result.diagnostics) {
+          const severity = diagnostic.severity === 'warning' ? 'WARNING' : 'ERROR';
+          const { line, column } = diagnostic.span.start;
+          console.error(`${severity} at line ${line}, col ${column}: ${diagnostic.message}`);
+          const errorLine = content.split('\n')[line - 1] || '';
+          console.error(`  ${line} | ${errorLine}`);
+          console.error(`     ${' '.repeat(String(line).length)}${''.padStart(column, ' ')}^`);
+          console.error(''); // Empty line between diagnostics
         }
 
-        console.error(`\u2717 Found ${result.errors.length} error(s)`);
+        console.error(`\u2717 Found ${result.diagnostics.length} diagnostic(s)`);
         process.exit(1);
       }
     }

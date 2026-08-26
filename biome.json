@@ -65,5 +65,17 @@
         "useLiteralKeys": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["lib/typed-mind/src/**", "!lib/typed-mind/src/longform-parser.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "error"
+          }
+        }
+      }
+    }
+  ]
 }

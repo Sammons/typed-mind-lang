@@ -17,7 +17,7 @@ getTodos :: () => Todo[]
   -> Todo
 
 # Convert BaseService to ClassFile for proper referencing
-BaseService #: base-service.ts:
+BaseService #: base-service.ts
   => [validate]
 
 validate :: (data: any) => boolean

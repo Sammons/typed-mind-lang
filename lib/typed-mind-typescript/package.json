@@ -31,7 +31,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "build": "tsc --build && chmod +x dist/cli.js",

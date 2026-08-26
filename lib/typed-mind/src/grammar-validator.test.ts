@@ -43,9 +43,12 @@ describe('GrammarValidator', () => {
     });
 
     it('should validate invalid entity type', () => {
+      // The outer `as AnyEntity` already covers the intentional type
+      // mismatch (EntityType is a closed union; 'InvalidType' is outside
+      // it) — no inner cast needed on top of it.
       const invalidEntity = {
         name: 'Invalid',
-        type: 'InvalidType' as any,
+        type: 'InvalidType',
         position: { line: 1, column: 1 },
         raw: 'Invalid',
       } as AnyEntity;
@@ -105,9 +108,10 @@ describe('GrammarValidator', () => {
         type: 'DTO',
         fields: [
           {
-            // missing name
+            // missing name — deliberately violates DTOField's shape to
+            // exercise the validator's required-field check.
             type: 'string',
-          } as any,
+          } as DTOEntity['fields'][number],
         ],
         position: { line: 1, column: 1 },
         raw: 'UserDTO %',

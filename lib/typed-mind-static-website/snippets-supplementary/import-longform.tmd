@@ -11,7 +11,7 @@ User % "User model"
   - email: string "User email"
 
 # ClassFile for the service
-UserService #: src/services/user.ts:
+UserService #: src/services/user.ts
   => [findUser]
 
 findUser :: (id: string) => User

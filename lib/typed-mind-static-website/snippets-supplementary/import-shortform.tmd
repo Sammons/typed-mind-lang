@@ -10,7 +10,7 @@ User % "User model"
   - name: string "User name"
   - email: string "User email"
 
-UserService #: src/services/user.ts:
+UserService #: src/services/user.ts
   => [findUser]
 
 findUser :: (id: string) => User

@@ -25,22 +25,25 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist",
+    "grammar.wasm",
     "README.md",
     "grammar.md",
     "grammar.ebnf"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
+    "prebuild": "node scripts/build-wasm.mjs",
     "build": "tsc --build",
     "dev": "tsc --build --watch",
-    "clean": "rm -rf dist *.tsbuildinfo",
+    "clean": "rm -rf dist *.tsbuildinfo grammar.wasm",
     "pretest": "node scripts/build-wasm.mjs",
     "test": "node --test \"src/**/*.test.ts\"",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
     "generate-grammar-docs": "pnpm build && node dist/generate-grammar-doc.js",
+    "prepack": "node scripts/build-wasm.mjs && node scripts/stage-published-wasm.mjs",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },
   "devDependencies": {

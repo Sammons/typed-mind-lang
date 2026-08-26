@@ -13,3 +13,8 @@ coverage/
 lib/typed-mind/grammar.json
 lib/typed-mind/grammar.ebnf
 worktree-description.md
+
+# RFC-TM-4 §3 (rfc-tm-4-diamond.md, S-CORE-3): the dist-adjacent staged wasm
+# copy (scripts/stage-published-wasm.mjs) — a build artifact, never committed,
+# same discipline as lib/typed-mind/grammar/grammar.wasm.
+lib/typed-mind/grammar.wasm

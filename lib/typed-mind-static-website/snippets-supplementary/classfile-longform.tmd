@@ -1,14 +1,8 @@
 # Supplementary content for classfile-longform snippet
-# Utility file to export the method functions
+# The snippet's mainFile imports 'utilities', which needs a File entity to
+# resolve against; the snippet does not define one so it lives here.
 
-utilities @ src/utils/methods.ts:
-  -> [findById, create, validate]
-
-# Functions exported by utilities
-findById :: (id: string) => object
-create :: (data: object) => object
-validate :: (data: object) => boolean
-
-# Import utilities in mainFile
-mainFile @ src/main.ts:
-  <- [utilities]
+file utilities {
+  path: "src/utils/methods.ts"
+  exports: [findById, create, validate]
+}
