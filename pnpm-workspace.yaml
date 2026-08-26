@@ -1,6 +1,12 @@
 packages:
   - lib/*
 
+allowBuilds:
+  '@vscode/vsce-sign': false
+  esbuild: false
+  keytar: false
+  workerd: false
+
 ignoredBuiltDependencies:
   - esbuild
 
