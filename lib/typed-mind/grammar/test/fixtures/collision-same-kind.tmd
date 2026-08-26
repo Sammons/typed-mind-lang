@@ -1,0 +1,6 @@
+# RFC-TM-3 Q2-authored duplicate-preservation fixture (executed in Q3, doc
+# FAQ Q2): a same-kind shortform name collision — two File declarations named
+# Api. The legacy parser silently overwrites (last-wins, parser.ts:122);
+# ParseOutcome.entities must contain BOTH declarations, each with its own span.
+Api @ src/api/a.ts:
+Api @ src/api/b.ts:
