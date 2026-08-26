@@ -180,25 +180,25 @@
         "line": 2,
         "column": 1
       },
-      "message": "Orphaned file 'UI.DatabaseFile' - none of its exports are imported",
+      "message": "Orphaned file 'UI.ComponentsFile' - none of its exports are imported",
       "severity": "error",
       "suggestion": "Remove this file or import its exports somewhere"
     },
     {
       "position": {
-        "line": 5,
+        "line": 10,
         "column": 1
       },
-      "message": "Orphaned entity 'UI.Connection'",
+      "message": "Orphaned entity 'UI.Input'",
       "severity": "error",
       "suggestion": "Remove or reference this entity"
     },
     {
       "position": {
-        "line": 8,
+        "line": 12,
         "column": 1
       },
-      "message": "Orphaned entity 'UI.query'",
+      "message": "Orphaned entity 'UI.Modal'",
       "severity": "error",
       "suggestion": "Remove or reference this entity"
     },
@@ -219,49 +219,6 @@
       "message": "Orphaned entity 'DB.query'",
       "severity": "error",
       "suggestion": "Remove or reference this entity"
-    },
-    {
-      "position": {
-        "line": 7,
-        "column": 1
-      },
-      "message": "Import 'UI.Button' not found",
-      "severity": "error"
-    },
-    {
-      "position": {
-        "line": 7,
-        "column": 1
-      },
-      "message": "Import 'UI.Form' not found",
-      "severity": "error"
-    },
-    {
-      "position": {
-        "line": 2,
-        "column": 1
-      },
-      "message": "Path 'src/db/connection.ts' already used by File 'UI.DatabaseFile'",
-      "severity": "error",
-      "suggestion": "Each File/ClassFile must have a unique path. Consider using ClassFile fusion with #:"
-    },
-    {
-      "position": {
-        "line": 5,
-        "column": 1
-      },
-      "message": "Class 'UI.Connection' is not exported by any file",
-      "severity": "error",
-      "suggestion": "Add 'UI.Connection' to the exports of a file entity or convert to ClassFile with #: operator"
-    },
-    {
-      "position": {
-        "line": 8,
-        "column": 1
-      },
-      "message": "Function 'UI.query' is not exported by any file and is not a class method",
-      "severity": "error",
-      "suggestion": "Either add 'UI.query' to the exports of a file entity or define it as a method of a class"
     },
     {
       "position": {
@@ -299,11 +256,39 @@
     },
     {
       "position": {
-        "line": 8,
+        "line": 2,
         "column": 1
       },
-      "message": "Call to 'Connection.execute' references unknown entity 'Connection'",
-      "severity": "error"
+      "message": "Export 'Button' is not defined anywhere in the codebase",
+      "severity": "error",
+      "suggestion": "Define 'Button' as a Function, Class, Constants, Asset, or UIComponent entity"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Export 'Form' is not defined anywhere in the codebase",
+      "severity": "error",
+      "suggestion": "Define 'Form' as a Function, Class, Constants, Asset, or UIComponent entity"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Export 'Input' is not defined anywhere in the codebase",
+      "severity": "error",
+      "suggestion": "Define 'Input' as a Function, Class, Constants, Asset, or UIComponent entity"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Export 'Modal' is not defined anywhere in the codebase",
+      "severity": "error",
+      "suggestion": "Define 'Modal' as a Function, Class, Constants, Asset, or UIComponent entity"
     },
     {
       "position": {
@@ -325,39 +310,66 @@
     },
     {
       "position": {
-        "line": 2,
+        "line": 5,
         "column": 1
       },
-      "message": "Export 'Connection' is not defined anywhere in the codebase",
+      "message": "UIComponent 'UI.Button' references unknown parent 'Form'",
       "severity": "error",
-      "suggestion": "Define 'Connection' as a Function, Class, Constants, Asset, or UIComponent entity"
+      "suggestion": "Define 'Form' as a UIComponent"
     },
     {
       "position": {
-        "line": 2,
+        "line": 5,
         "column": 1
       },
-      "message": "Export 'query' is not defined anywhere in the codebase",
+      "message": "UIComponent 'UI.Button' references unknown parent 'Modal'",
       "severity": "error",
-      "suggestion": "Define 'query' as a Function, Class, Constants, Asset, or UIComponent entity"
+      "suggestion": "Define 'Modal' as a UIComponent"
     },
     {
       "position": {
-        "line": 11,
+        "line": 7,
         "column": 1
       },
-      "message": "Function 'initializeApp' affects unknown component 'UI.Button'",
+      "message": "UIComponent 'UI.Form' contains unknown component 'Input'",
       "severity": "error",
-      "suggestion": "Define 'UI.Button' as a UIComponent"
+      "suggestion": "Define 'Input' as a UIComponent"
     },
     {
       "position": {
-        "line": 11,
+        "line": 7,
         "column": 1
       },
-      "message": "Function 'initializeApp' affects unknown component 'UI.Form'",
+      "message": "UIComponent 'UI.Form' contains unknown component 'Button'",
       "severity": "error",
-      "suggestion": "Define 'UI.Form' as a UIComponent"
+      "suggestion": "Define 'Button' as a UIComponent"
+    },
+    {
+      "position": {
+        "line": 10,
+        "column": 1
+      },
+      "message": "UIComponent 'UI.Input' references unknown parent 'Form'",
+      "severity": "error",
+      "suggestion": "Define 'Form' as a UIComponent"
+    },
+    {
+      "position": {
+        "line": 12,
+        "column": 1
+      },
+      "message": "UIComponent 'UI.Modal' contains unknown component 'Button'",
+      "severity": "error",
+      "suggestion": "Define 'Button' as a UIComponent"
+    },
+    {
+      "position": {
+        "line": 10,
+        "column": 1
+      },
+      "message": "UIComponent 'UI.Input' is not contained by any other UIComponent",
+      "severity": "error",
+      "suggestion": "Either add 'UI.Input' to another UIComponent's contains list, or mark it as a root component with &!"
     }
   ]
 }

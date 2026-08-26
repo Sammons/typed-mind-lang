@@ -14,7 +14,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { before, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { DSLChecker } from '@sammons/typed-mind';
 import { AdvancedTypedMindRenderer } from '../advanced-renderer.ts';
@@ -27,56 +27,69 @@ const testDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = join(testDir, '..', '..');
 const repoRoot = join(packageDir, '..', '..');
 const baselineDir = join(packageDir, 'goldens', 'legacy-baseline');
+const fixturesDir = join(testDir, 'fixtures');
 
 // Fixture documents named in rfc-tm-6-diamond.md §1 (closed list, 7 — the
 // circular pair counts as one two-file document): scenario-34 (A12 census
 // ClassFiles), scenario-35 (UIComponent containment, declared/derived
 // agreement), scenario-31 (mixed syntax), scenario-21 (aliased imports —
 // non-empty legacy errors), imports/circular/module-a + module-b (A6
-// family), and the purpose-built tm6-branches.tmd.
+// family), and the purpose-built tm6-branches.tmd. tm6-branches.tmd lives
+// under this package's own src/goldens/fixtures/ (NOT the shared
+// lib/typed-mind-test-suite/scenarios/ corpus root) so it does not perturb
+// lib/typed-mind/scripts/shadow-verdict-harness.mjs's frozen 141-document
+// corpus attestation (TM-4-owned, unrelated to this Quantum).
 interface FixtureDoc {
   readonly name: string;
-  readonly paths: readonly string[];
-  readonly parseFrom: string;
+  readonly absPath: string;
 }
 
 const FIXTURE_DOCS: readonly FixtureDoc[] = [
   {
     name: 'scenario-34-cli-tool',
-    paths: ['lib/typed-mind-test-suite/scenarios/scenario-34-cli-tool.tmd'],
-    parseFrom: 'lib/typed-mind-test-suite/scenarios/scenario-34-cli-tool.tmd',
+    absPath: join(repoRoot, 'lib/typed-mind-test-suite/scenarios/scenario-34-cli-tool.tmd'),
   },
   {
     name: 'scenario-35-video-game',
-    paths: ['lib/typed-mind-test-suite/scenarios/scenario-35-video-game.tmd'],
-    parseFrom: 'lib/typed-mind-test-suite/scenarios/scenario-35-video-game.tmd',
+    absPath: join(repoRoot, 'lib/typed-mind-test-suite/scenarios/scenario-35-video-game.tmd'),
   },
   {
     name: 'scenario-31-mixed-syntax',
-    paths: ['lib/typed-mind-test-suite/scenarios/scenario-31-mixed-syntax.tmd'],
-    parseFrom: 'lib/typed-mind-test-suite/scenarios/scenario-31-mixed-syntax.tmd',
+    absPath: join(repoRoot, 'lib/typed-mind-test-suite/scenarios/scenario-31-mixed-syntax.tmd'),
   },
   {
     name: 'scenario-21-aliased-import',
-    paths: ['lib/typed-mind-test-suite/scenarios/scenario-21-aliased-import.tmd'],
-    parseFrom: 'lib/typed-mind-test-suite/scenarios/scenario-21-aliased-import.tmd',
+    absPath: join(repoRoot, 'lib/typed-mind-test-suite/scenarios/scenario-21-aliased-import.tmd'),
   },
   {
     name: 'imports-circular-module-a-b',
-    paths: [
-      'lib/typed-mind-test-suite/scenarios/imports/circular/module-a.tmd',
-      'lib/typed-mind-test-suite/scenarios/imports/circular/module-b.tmd',
-    ],
-    parseFrom: 'lib/typed-mind-test-suite/scenarios/imports/circular/module-a.tmd',
+    absPath: join(repoRoot, 'lib/typed-mind-test-suite/scenarios/imports/circular/module-a.tmd'),
   },
   {
     name: 'tm6-branches',
-    paths: ['lib/typed-mind-test-suite/scenarios/tm6-branches.tmd'],
-    parseFrom: 'lib/typed-mind-test-suite/scenarios/tm6-branches.tmd',
+    absPath: join(fixturesDir, 'tm6-branches.tmd'),
   },
 ];
 
-const readFixture = (relativePath: string): string => readFileSync(join(repoRoot, relativePath), 'utf8');
+const readFixture = (absPath: string): string => readFileSync(absPath, 'utf8');
+
+// The legacy ImportResolver caches alias-PREFIXED clones per DSLChecker
+// instance (lib/typed-mind/src/import-resolver.ts:97-99). Reusing one
+// instance across parse() and check() — or across multiple documents —
+// cross-contaminates aliased-import resolution: scenario-21's
+// `@import ... as UI` / `as DB` entities collapse onto the wrong source
+// file when a shared instance's cache leaks between calls. This mirrors
+// lib/typed-mind/scripts/shadow-verdict-harness.mjs's runLegacy, which
+// deliberately constructs a FRESH `new DSLChecker()` for check() and
+// another FRESH one for parse() on every document — never reusing an
+// instance. Verified against the harness: this exact shape reproduces its
+// frozen A11 census (3 "references unknown parent" errors on scenario-21)
+// bit-for-bit; the earlier reused-instance version of this file produced
+// 22-23 unrelated errors and 0 matches, because the shared cache had
+// already resolved `database.tmd` under both the UI and DB aliases before
+// scenario-21's own calls ran.
+const checkDocument = (source: string, absPath: string) => new DSLChecker().check(source, absPath);
+const parseDocument = (source: string, absPath: string) => new DSLChecker().parse(source, absPath);
 
 // PerformanceMonitor.getAllMetrics() (performance/spatial-index.ts) records
 // wall-clock performance.now() deltas for 'graph-load-time' — genuinely
@@ -98,6 +111,35 @@ const normalizeAdvancedSnapshot = (snapshot: unknown): unknown => {
   return cloned;
 };
 
+// The legacy engine embeds absolute filesystem paths in several error
+// messages (e.g. import-resolver.ts's "Circular import detected: <abs> ->
+// <abs>" chain). Left as absolute paths, a golden captured on one machine
+// (a worktree nested under .claude/worktrees/<slug>/) never matches a
+// capture from another (a shallow CI checkout) even though nothing
+// regressed — this is the same class of bug as the converter's
+// process.cwd()-dependent relative paths, just baked in at a different
+// layer (message TEXT rather than a computed field). Every string value
+// anywhere in the snapshot gets repoRoot stripped and replaced with a
+// stable token before it is written to or compared against a golden.
+const REPO_ROOT_TOKEN = '<REPO_ROOT>';
+
+const normalizePaths = (value: unknown): unknown => {
+  if (typeof value === 'string') {
+    return value.split(repoRoot).join(REPO_ROOT_TOKEN);
+  }
+  if (Array.isArray(value)) {
+    return value.map(normalizePaths);
+  }
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      out[key] = normalizePaths(val);
+    }
+    return out;
+  }
+  return value;
+};
+
 const readGoldenIfPresent = (path: string): unknown => {
   if (!existsSync(path)) {
     return undefined;
@@ -116,35 +158,31 @@ const writeGolden = (path: string, value: unknown): void => {
 // run it asserts equality, so the legacy-baseline tree is truly read-only
 // after this Quantum merges.
 const assertMatchesGolden = (path: string, value: unknown): void => {
-  const existing = readGoldenIfPresent(path);
-  if (existing === undefined) {
-    writeGolden(path, value);
-    return;
-  }
   // The legacy entity objects carry explicit `undefined`-valued keys
   // (e.g. `comment: undefined`, `extends: undefined`) that JSON.stringify
   // drops on write. Round-tripping the live value through JSON before
   // comparing makes both sides the same shape the checked-in golden can
   // actually represent — otherwise node:assert/strict's deepEqual (which
   // is strict-equal, not loose, despite the name) fails on every run past
-  // the first even though nothing regressed.
-  const normalized = JSON.parse(JSON.stringify(value));
+  // the first even though nothing regressed. normalizePaths runs on the
+  // already-JSON-shaped value so both the write path and the compare path
+  // see identical treatment.
+  const normalized = normalizePaths(JSON.parse(JSON.stringify(value)));
+  const existing = readGoldenIfPresent(path);
+  if (existing === undefined) {
+    writeGolden(path, normalized);
+    return;
+  }
   assert.deepEqual(normalized, existing);
 };
 
 describe('RFC-TM-6 Q1 — legacy graph/metrics/dependency-branch goldens', () => {
-  let checker: DSLChecker;
-
-  before(() => {
-    checker = new DSLChecker();
-  });
-
   for (const doc of FIXTURE_DOCS) {
     describe(doc.name, () => {
       it('captures the interactive-renderer graph snapshot', () => {
-        const source = readFixture(doc.parseFrom);
-        const graph = checker.parse(source, join(repoRoot, doc.parseFrom));
-        const validation = checker.check(source, join(repoRoot, doc.parseFrom));
+        const source = readFixture(doc.absPath);
+        const graph = parseDocument(source, doc.absPath);
+        const validation = checkDocument(source, doc.absPath);
 
         const renderer = new InteractiveTypedMindRenderer();
         renderer.setProgramGraph(graph);
@@ -155,9 +193,9 @@ describe('RFC-TM-6 Q1 — legacy graph/metrics/dependency-branch goldens', () =>
       });
 
       it('captures the enhanced-index graph snapshot', () => {
-        const source = readFixture(doc.parseFrom);
-        const graph = checker.parse(source, join(repoRoot, doc.parseFrom));
-        const validation = checker.check(source, join(repoRoot, doc.parseFrom));
+        const source = readFixture(doc.absPath);
+        const graph = parseDocument(source, doc.absPath);
+        const validation = checkDocument(source, doc.absPath);
 
         const renderer = new EnhancedTypedMindRenderer();
         renderer.setProgramGraph(graph);
@@ -168,9 +206,9 @@ describe('RFC-TM-6 Q1 — legacy graph/metrics/dependency-branch goldens', () =>
       });
 
       it('captures the advanced-renderer graph snapshot (async, stubbed links captured as-is)', async () => {
-        const source = readFixture(doc.parseFrom);
-        const graph = checker.parse(source, join(repoRoot, doc.parseFrom));
-        const validation = checker.check(source, join(repoRoot, doc.parseFrom));
+        const source = readFixture(doc.absPath);
+        const graph = parseDocument(source, doc.absPath);
+        const validation = checkDocument(source, doc.absPath);
 
         const renderer = new AdvancedTypedMindRenderer();
         await renderer.setProgramGraph(graph);
@@ -181,8 +219,8 @@ describe('RFC-TM-6 Q1 — legacy graph/metrics/dependency-branch goldens', () =>
       });
 
       it('captures the GraphMetricsAnalyzer HealthScore', () => {
-        const source = readFixture(doc.parseFrom);
-        const graph = checker.parse(source, join(repoRoot, doc.parseFrom));
+        const source = readFixture(doc.absPath);
+        const graph = parseDocument(source, doc.absPath);
 
         const analyzer = new GraphMetricsAnalyzer(graph);
         const analysis = analyzer.analyzeGraph();
@@ -193,9 +231,9 @@ describe('RFC-TM-6 Q1 — legacy graph/metrics/dependency-branch goldens', () =>
   }
 
   it('captures the getEntityDependencies dependency-branch golden (tm6-branches.tmd)', () => {
-    const source = readFixture('lib/typed-mind-test-suite/scenarios/tm6-branches.tmd');
-    const filePath = join(repoRoot, 'lib/typed-mind-test-suite/scenarios/tm6-branches.tmd');
-    const graph = checker.parse(source, filePath);
+    const absPath = join(fixturesDir, 'tm6-branches.tmd');
+    const source = readFixture(absPath);
+    const graph = parseDocument(source, absPath);
 
     const engine = new CodeGenerationEngine();
     // getEntityDependencies (codegen/code-generation.ts:270-282) is private
