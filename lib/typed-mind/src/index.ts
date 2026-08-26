@@ -8,6 +8,31 @@ import { type SyntaxGenerationError, SyntaxGenerator } from './syntax-generator.
 import type { AnyEntity, ProgramGraph, ValidationError, ValidationResult } from './types.ts';
 import { DSLValidator } from './validator.ts';
 
+// RFC-TM-5 §1 (rfc-tm-5-diamond.md) — new-surface type/class re-exports the
+// parseWithCst leaf needs to be consumable outside this package: the LSP
+// (@sammons/typed-mind-lsp) is a sibling workspace package with no path into
+// lib/typed-mind/src other than what index.ts exports (no `exports` map, no
+// ast/ barrel per the no-barrel house rule). Enabling substrate for the
+// parseWithCst leaf, not new logic — every symbol below already ships and is
+// tested by RFC-TM-3/4.
+export { AssetNode } from './ast/asset-node.ts';
+export { ClassFileNode } from './ast/class-file-node.ts';
+export { ClassNode } from './ast/class-node.ts';
+export { ConstantsNode } from './ast/constants-node.ts';
+export { DependencyNode } from './ast/dependency-node.ts';
+export type { Diagnostic, DiagnosticSeverity } from './ast/diagnostic.ts';
+export { DtoFieldNode, type OptionalityMarker } from './ast/dto-field-node.ts';
+export { DtoNode } from './ast/dto-node.ts';
+export type { EntityKind, RunParameterType } from './ast/entity-kind.ts';
+export { EntityNode, type SourceForm } from './ast/entity-node.ts';
+export { FileNode } from './ast/file-node.ts';
+export { FunctionNode } from './ast/function-node.ts';
+export { CstNode, CstSourceFile } from './ast/gen/cst-nodes.ts';
+export { ImportStatementNode } from './ast/import-statement-node.ts';
+export { ProgramNode } from './ast/program-node.ts';
+export { RunParameterNode } from './ast/run-parameter-node.ts';
+export type { Span } from './ast/span.ts';
+export { UiComponentNode } from './ast/ui-component-node.ts';
 // Export branded types (trimmed to the FilePath half index.ts itself
 // consumes — the EntityName/Version/Description/etc. half died with
 // entity-builder.ts/entity-map.ts/error-types.ts, its only consumers).
@@ -18,6 +43,11 @@ export { type GrammarValidationError, type GrammarValidationResult, GrammarValid
 export { LongformParser } from './longform-parser.ts';
 export { DSLParser, type ParseError, type ParseResult } from './parser.ts';
 export { CONTINUATION_PATTERNS, ENTITY_PATTERNS, GENERAL_PATTERNS, PATTERN_DESCRIPTIONS } from './parser-patterns.ts';
+// Renamed on export: the legacy bridge already exports `Reference` (types.ts)
+// with a different shape (from/type/to/position) — LinkIndex's Reference
+// (from/fromType, link-index.ts) is a new-surface type with no relation to it.
+export { LinkIndex, type Reference as LinkReference } from './pipeline/link-index.ts';
+export type { ParseOutcome } from './pipeline/parse-outcome.ts';
 // Export Result types
 export * from './result.ts';
 export {
