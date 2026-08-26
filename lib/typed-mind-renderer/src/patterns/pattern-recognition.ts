@@ -487,7 +487,7 @@ class ObserverPatternMatcher implements PatternMatcher {
   readonly description = 'Event-driven pattern with subjects and observers';
   readonly category = 'behavioral' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
     // Implementation would detect observer/subject relationships
     return [];
   }
@@ -504,7 +504,7 @@ class SingletonPatternMatcher implements PatternMatcher {
   readonly description = 'Ensures single instance of a class';
   readonly category = 'creational' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
     // Implementation would detect singleton patterns
     return [];
   }
@@ -521,7 +521,7 @@ class AdapterPatternMatcher implements PatternMatcher {
   readonly description = 'Interface compatibility pattern';
   readonly category = 'structural' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
     // Implementation would detect adapter patterns
     return [];
   }
@@ -538,7 +538,7 @@ class LayeredArchitectureMatcher implements PatternMatcher {
   readonly description = 'Hierarchical layers with unidirectional dependencies';
   readonly category = 'architectural' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
     // Implementation would detect layered architecture
     return [];
   }
@@ -555,7 +555,7 @@ class MicroservicesPatternMatcher implements PatternMatcher {
   readonly description = 'Distributed architecture with independent services';
   readonly category = 'architectural' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
     // Implementation would detect microservices patterns
     return [];
   }
@@ -639,7 +639,7 @@ class CircularDependencyAntiPatternMatcher implements PatternMatcher {
   readonly description = 'Entities that depend on each other in a cycle';
   readonly category = 'anti-pattern' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
     // Implementation would detect circular dependencies
     return [];
   }
@@ -656,7 +656,7 @@ class DeadCodeAntiPatternMatcher implements PatternMatcher {
   readonly description = 'Code that is never used or executed';
   readonly category = 'anti-pattern' as const;
 
-  detect(graph: ProgramGraph): ArchitecturalPattern[] {
+  detect(_graph: ProgramGraph): ArchitecturalPattern[] {
     // Implementation would detect dead code
     return [];
   }

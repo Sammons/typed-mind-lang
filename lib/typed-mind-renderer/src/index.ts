@@ -3,78 +3,71 @@
  * Exports both the original renderer and the new advanced renderer
  */
 
-// Export original renderer for backward compatibility
-export { EnhancedTypedMindRenderer as TypedMindRenderer } from './enhanced-index.ts';
-
 // Export advanced renderer as the main export
 export { AdvancedTypedMindRenderer } from './advanced-renderer.ts';
-
-// Export all advanced system components for granular usage
 export {
-  VirtualizationManager,
-  PerformanceMonitor,
-  LevelOfDetailManager,
-  type ViewportInfo,
-  type SpatialItem,
-} from './performance/spatial-index.ts';
-
+  type CodeGenConfig,
+  CodeGenerationEngine,
+  type CodePreview,
+  type GeneratedCode,
+  type TargetFramework,
+  type TargetLanguage,
+} from './codegen/code-generation.ts';
 export {
-  ValidationErrorProcessor,
-  ErrorVisualizationRenderer,
-  type EnhancedValidationError,
-  type ErrorSeverity,
-} from './validation/error-visualization.ts';
-
-export {
-  PluginManager,
-  BuiltInPluginRegistry,
-  type Plugin,
-  type EntityRendererPlugin,
-  type LayoutPlugin,
-  type InteractionPlugin,
-  type DataProcessorPlugin,
-  type ThemePlugin,
-  type ExportPlugin,
-  type PluginContext,
-} from './plugins/plugin-system.ts';
+  type ArchitectureDiff,
+  ArchitectureDiffAnalyzer,
+  type DiffChangeType,
+  type DiffOptions,
+  type DiffSummary,
+  type EntityDiff,
+} from './diff/diff-visualization.ts';
+// Re-export enhanced renderer options for convenience
+export type { EnhancedRendererOptions } from './enhanced-index.ts';
+// Export original renderer for backward compatibility
+export { EnhancedTypedMindRenderer as TypedMindRenderer } from './enhanced-index.ts';
 
 export {
   GraphMetricsAnalyzer,
   type HealthScore,
-  type MetricCategory,
   type Metric,
+  type MetricCategory,
   type Recommendation,
   type Risk,
 } from './metrics/graph-metrics.ts';
 
 export {
-  PatternRecognitionEngine,
   type ArchitecturalPattern,
-  type PatternVisualization,
   type PatternMatcher,
+  PatternRecognitionEngine,
   type PatternRecommendation,
+  type PatternVisualization,
 } from './patterns/pattern-recognition.ts';
-
+// Export all advanced system components for granular usage
 export {
-  ArchitectureDiffAnalyzer,
-  type ArchitectureDiff,
-  type EntityDiff,
-  type DiffOptions,
-  type DiffChangeType,
-  type DiffSummary,
-} from './diff/diff-visualization.ts';
-
+  LevelOfDetailManager,
+  PerformanceMonitor,
+  type SpatialItem,
+  type ViewportInfo,
+  VirtualizationManager,
+} from './performance/spatial-index.ts';
 export {
-  CodeGenerationEngine,
-  type CodeGenConfig,
-  type GeneratedCode,
-  type CodePreview,
-  type TargetLanguage,
-  type TargetFramework,
-} from './codegen/code-generation.ts';
-
-// Re-export enhanced renderer options for convenience
-export type { EnhancedRendererOptions } from './enhanced-index.ts';
+  BuiltInPluginRegistry,
+  type DataProcessorPlugin,
+  type EntityRendererPlugin,
+  type ExportPlugin,
+  type InteractionPlugin,
+  type LayoutPlugin,
+  type Plugin,
+  type PluginContext,
+  PluginManager,
+  type ThemePlugin,
+} from './plugins/plugin-system.ts';
+export {
+  type EnhancedValidationError,
+  type ErrorSeverity,
+  ErrorVisualizationRenderer,
+  ValidationErrorProcessor,
+} from './validation/error-visualization.ts';
 
 // Type-only exports for advanced configuration
 export type AdvancedRendererOptions = {

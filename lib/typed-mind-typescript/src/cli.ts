@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync, existsSync, statSync } from 'fs';
-import { resolve, extname, dirname } from 'path';
-import { parseArgs } from 'util';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, extname, resolve } from 'node:path';
+import { parseArgs } from 'node:util';
+import { DSLChecker } from '@sammons/typed-mind';
+import { AssertionEngine } from './assertion-engine.ts';
+import type { ConversionOptions } from './types.ts';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
-import { AssertionEngine } from './assertion-engine.ts';
-import { DSLChecker } from '@sammons/typed-mind';
-import type { ConversionOptions } from './types.ts';
 
 const options = {
   help: {
@@ -103,7 +103,7 @@ Examples:
 }
 
 async function main() {
-  let parsed;
+  let parsed: ReturnType<typeof parseArgs<{ options: typeof options; allowPositionals: true }>>;
 
   try {
     parsed = parseArgs({
@@ -290,7 +290,7 @@ async function handleExport(values: any): Promise<void> {
     writeFileSync(outputPath, result.tmdContent);
     console.log(`\n✓ Exported ${result.entities.length} entities to ${outputPath}`);
   } else {
-    console.log('\n' + result.tmdContent);
+    console.log(`\n${result.tmdContent}`);
   }
 
   if (values.verbose) {

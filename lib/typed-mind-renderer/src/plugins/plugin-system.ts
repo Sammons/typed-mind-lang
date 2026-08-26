@@ -483,7 +483,7 @@ export class PluginManager {
     this.dependencyGraph.delete(pluginId);
 
     // Remove from other plugins' dependencies
-    for (const [id, deps] of this.dependencyGraph.entries()) {
+    for (const [_id, deps] of this.dependencyGraph.entries()) {
       deps.delete(pluginId);
     }
   }
@@ -641,7 +641,7 @@ export class BuiltInPluginRegistry {
       supportedEntityTypes: entityTypes,
       initialize: async () => {},
       renderEntity: renderer,
-      getEntityBounds: (entity) => ({ width: 100, height: 50 }), // Default bounds
+      getEntityBounds: (_entity) => ({ width: 100, height: 50 }), // Default bounds
     };
   }
 

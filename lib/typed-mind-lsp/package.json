@@ -39,8 +39,6 @@
     "dev": "tsc --build --watch",
     "test": "node --test 'src/**/*.test.ts'",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist dist-bundled *.tsbuildinfo",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"

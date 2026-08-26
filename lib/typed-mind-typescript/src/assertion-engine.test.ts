@@ -1,8 +1,8 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import type { DTOEntity, FunctionEntity } from '@sammons/typed-mind';
 import { AssertionEngine } from './assertion-engine.ts';
 import type { ConversionResult } from './types.ts';
-import type { FunctionEntity, DTOEntity } from '@sammons/typed-mind';
 
 const createMockConversionResult = (): ConversionResult => ({
   success: true,

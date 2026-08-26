@@ -1,7 +1,7 @@
-import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, rmSync } from 'fs';
-import { join } from 'path';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
 
 const testProjectDir = '/tmp/typed-mind-ts-test';

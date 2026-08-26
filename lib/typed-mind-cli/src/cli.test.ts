@@ -1,6 +1,6 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseArgs } from 'util';
+import { describe, it } from 'node:test';
+import { parseArgs } from 'node:util';
 
 // Options configuration matching the CLI
 const options = {

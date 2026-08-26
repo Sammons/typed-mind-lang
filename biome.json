@@ -1,0 +1,68 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/dist-bundled",
+      "!**/node_modules",
+      "!lib/typed-mind-static-website/dist",
+      "!**/*.vsix",
+      "!pnpm-lock.yaml",
+      "!lib/typed-mind-vscode-extension/lsp-bundled",
+      "!lib/typed-mind-static-website/assets",
+      "!**/*.html"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "all",
+      "arrowParentheses": "always",
+      "bracketSpacing": true,
+      "bracketSameLine": false
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "useConst": "error",
+        "useNodejsImportProtocol": "error"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noFallthroughSwitchClause": "warn",
+        "useIterableCallbackReturn": "warn"
+      },
+      "correctness": {
+        "noUnusedVariables": {
+          "level": "error",
+          "options": {
+            "ignoreRestSiblings": true
+          }
+        },
+        "noUnusedImports": "error",
+        "noUnsafeOptionalChaining": "warn",
+        "noConstantCondition": "warn",
+        "noUnusedPrivateClassMembers": "off"
+      },
+      "complexity": {
+        "noUselessEscapeInRegex": "warn",
+        "useLiteralKeys": "off"
+      }
+    }
+  }
+}

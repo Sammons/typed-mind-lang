@@ -1,7 +1,7 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { GrammarValidator } from './grammar-validator.ts';
-import type { AnyEntity, ProgramEntity, FileEntity, DTOEntity } from './types.ts';
+import type { AnyEntity, DTOEntity, FileEntity, ProgramEntity } from './types.ts';
 
 describe('GrammarValidator', () => {
   const validator = new GrammarValidator();

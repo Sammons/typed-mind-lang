@@ -1,7 +1,7 @@
-import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { SyntaxGenerator, detectSyntaxFormat, toggleSyntaxFormat } from './syntax-generator.ts';
-import type { AnyEntity, ProgramEntity, FileEntity, FunctionEntity, DTOEntity, ClassFileEntity } from './types.ts';
+import { beforeEach, describe, it } from 'node:test';
+import { detectSyntaxFormat, SyntaxGenerator, toggleSyntaxFormat } from './syntax-generator.ts';
+import type { AnyEntity, ClassFileEntity, DTOEntity, FileEntity, FunctionEntity, ProgramEntity } from './types.ts';
 
 describe('SyntaxGenerator', () => {
   let generator: SyntaxGenerator;

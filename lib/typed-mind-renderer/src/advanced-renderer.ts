@@ -4,25 +4,24 @@
  * Author: Enhanced by Claude Code in Matt Pocock style
  */
 
-import { readFileSync } from 'fs';
-import { join } from 'path';
-import { createServer } from 'http';
+import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { join } from 'node:path';
 import type { ProgramGraph, ValidationResult } from '@sammons/typed-mind';
-
+import { type CodeGenConfig, CodeGenerationEngine, type CodePreview } from './codegen/code-generation.ts';
+import { type ArchitectureDiff, ArchitectureDiffAnalyzer, type DiffOptions } from './diff/diff-visualization.ts';
+import { GraphMetricsAnalyzer, type HealthScore, type MetricCategory } from './metrics/graph-metrics.ts';
+import { type ArchitecturalPattern, PatternRecognitionEngine, type PatternVisualization } from './patterns/pattern-recognition.ts';
 // Import all the advanced systems
 import {
-  VirtualizationManager,
-  PerformanceMonitor,
   LevelOfDetailManager,
-  type ViewportInfo,
+  PerformanceMonitor,
   type SpatialItem,
+  type ViewportInfo,
+  VirtualizationManager,
 } from './performance/spatial-index.ts';
-import { ValidationErrorProcessor, ErrorVisualizationRenderer, type EnhancedValidationError } from './validation/error-visualization.ts';
-import { PluginManager, type Plugin, type PluginContext } from './plugins/plugin-system.ts';
-import { GraphMetricsAnalyzer, type HealthScore, type MetricCategory } from './metrics/graph-metrics.ts';
-import { PatternRecognitionEngine, type ArchitecturalPattern, type PatternVisualization } from './patterns/pattern-recognition.ts';
-import { ArchitectureDiffAnalyzer, type ArchitectureDiff, type DiffOptions } from './diff/diff-visualization.ts';
-import { CodeGenerationEngine, type CodeGenConfig, type CodePreview } from './codegen/code-generation.ts';
+import { type Plugin, type PluginContext, PluginManager } from './plugins/plugin-system.ts';
+import { type EnhancedValidationError, ErrorVisualizationRenderer, ValidationErrorProcessor } from './validation/error-visualization.ts';
 
 /**
  * Advanced renderer configuration
@@ -289,7 +288,7 @@ class AdvancedTypedMindRenderer {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, []);
     }
-    this.eventListeners.get(event)!.push(listener);
+    this.eventListeners.get(event)?.push(listener);
   }
 
   off<K extends keyof AdvancedRendererEvents>(event: K, listener?: (data: AdvancedRendererEvents[K]) => void): void {
@@ -468,7 +467,7 @@ class AdvancedTypedMindRenderer {
               if (typeof localStorage === 'undefined') return null;
               const value = localStorage.getItem(key);
               return value ? JSON.parse(value) : null;
-            } catch (error) {
+            } catch (_error) {
               return null;
             }
           },
@@ -526,13 +525,13 @@ class AdvancedTypedMindRenderer {
     this.state.pluginsLoaded = true;
   }
 
-  private async handleMainPage(req: any, res: any): Promise<void> {
+  private async handleMainPage(_req: any, res: any): Promise<void> {
     const html = this.getAdvancedHTML();
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(html);
   }
 
-  private async handleApiRequest(req: any, res: any, url: string): Promise<void> {
+  private async handleApiRequest(_req: any, res: any, url: string): Promise<void> {
     const path = url.replace('/api/', '');
 
     switch (path) {
@@ -567,7 +566,7 @@ class AdvancedTypedMindRenderer {
     }
   }
 
-  private async handleStaticAssets(req: any, res: any, url: string): Promise<void> {
+  private async handleStaticAssets(_req: any, res: any, url: string): Promise<void> {
     // Serve static files (CSS, JS, images)
     const filePath = url.replace('/static/', '');
 
@@ -588,7 +587,7 @@ class AdvancedTypedMindRenderer {
 
       res.writeHead(200, { 'Content-Type': contentType });
       res.end(content);
-    } catch (error) {
+    } catch (_error) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('File not found');
     }
@@ -598,7 +597,7 @@ class AdvancedTypedMindRenderer {
     try {
       const htmlPath = join(__dirname, 'static', 'advanced-index.html');
       return readFileSync(htmlPath, 'utf-8');
-    } catch (error) {
+    } catch (_error) {
       return this.generateFallbackHTML();
     }
   }
@@ -784,7 +783,7 @@ class AdvancedTypedMindRenderer {
   }
 
   private openInBrowser(url: string): void {
-    const { exec } = require('child_process');
+    const { exec } = require('node:child_process');
     const platform = process.platform;
 
     let command: string;
@@ -804,39 +803,37 @@ class AdvancedTypedMindRenderer {
   }
 }
 
-// Export the advanced renderer as the main export
-export { AdvancedTypedMindRenderer };
-
-// Re-export all the advanced systems for direct use
-export {
-  VirtualizationManager,
-  PerformanceMonitor,
-  LevelOfDetailManager,
-  ValidationErrorProcessor,
-  ErrorVisualizationRenderer,
-  PluginManager,
-  GraphMetricsAnalyzer,
-  PatternRecognitionEngine,
-  ArchitectureDiffAnalyzer,
-  CodeGenerationEngine,
-};
-
 // Export types for TypeScript users
 export type {
+  AdvancedRendererEvents,
   AdvancedRendererOptions,
   AdvancedRendererState,
-  AdvancedRendererEvents,
-  ViewportInfo,
-  SpatialItem,
-  EnhancedValidationError,
-  Plugin,
-  PluginContext,
-  HealthScore,
-  MetricCategory,
   ArchitecturalPattern,
-  PatternVisualization,
   ArchitectureDiff,
-  DiffOptions,
   CodeGenConfig,
   CodePreview,
+  DiffOptions,
+  EnhancedValidationError,
+  HealthScore,
+  MetricCategory,
+  PatternVisualization,
+  Plugin,
+  PluginContext,
+  SpatialItem,
+  ViewportInfo,
+};
+// Export the advanced renderer as the main export
+// Re-export all the advanced systems for direct use
+export {
+  AdvancedTypedMindRenderer,
+  ArchitectureDiffAnalyzer,
+  CodeGenerationEngine,
+  ErrorVisualizationRenderer,
+  GraphMetricsAnalyzer,
+  LevelOfDetailManager,
+  PatternRecognitionEngine,
+  PerformanceMonitor,
+  PluginManager,
+  ValidationErrorProcessor,
+  VirtualizationManager,
 };
