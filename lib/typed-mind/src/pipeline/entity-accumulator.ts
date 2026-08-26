@@ -14,7 +14,7 @@ import { DependencyNode } from '../ast/dependency-node.ts';
 import type { DtoFieldNode } from '../ast/dto-field-node.ts';
 import { DtoNode } from '../ast/dto-node.ts';
 import type { EntityKind, RunParameterType } from '../ast/entity-kind.ts';
-import type { EntityNode, EntityNodeArgs } from '../ast/entity-node.ts';
+import type { EntityNode, EntityNodeArgs, SourceForm } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
@@ -63,6 +63,11 @@ export interface EntityAccumulatorArgs {
   // continuation surface (description_line attaches purpose, parser.ts:611-613)
   // that a declared `#:` ClassFile never had.
   readonly viaLookahead?: boolean | undefined;
+  // RFC-TM-4 §2 (rfc-tm-4-diamond.md, FID-6): which CST node class opened this
+  // entity — a line declaration (openers) is 'shortform'; a brace-block header
+  // (buildFromLongformBlock / buildFromClassfileBlockSigil, the latter for the
+  // sigil-with-brace ClassFile header `Name #: path {`) is 'longform'.
+  readonly sourceForm: SourceForm;
 }
 
 export class EntityAccumulator {
@@ -72,6 +77,7 @@ export class EntityAccumulator {
   readonly raw: string;
   readonly comment: string | undefined;
   readonly viaLookahead: boolean;
+  readonly sourceForm: SourceForm;
   readonly slots: AccumulatorSlots = {};
 
   constructor(args: EntityAccumulatorArgs) {
@@ -81,6 +87,7 @@ export class EntityAccumulator {
     this.raw = args.raw;
     this.comment = args.comment;
     this.viaLookahead = args.viaLookahead ?? false;
+    this.sourceForm = args.sourceForm;
   }
 
   baseArgs(): EntityNodeArgs {
@@ -88,6 +95,7 @@ export class EntityAccumulator {
       name: this.name,
       span: this.span,
       raw: this.raw,
+      sourceForm: this.sourceForm,
       ...(this.comment !== undefined ? { comment: this.comment } : {}),
     };
   }

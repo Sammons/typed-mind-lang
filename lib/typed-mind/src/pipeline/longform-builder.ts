@@ -447,6 +447,8 @@ export const buildFromLongformBlock = (block: CstLongformBlock): LongformBuildRe
     raw: block.syntaxNode.text.trimEnd(),
     // Legacy longform comment = the description property (longform-parser.ts:183).
     comment: collected.scalars.get('description'),
+    // RFC-TM-4 §2 (rfc-tm-4-diamond.md): a brace-block header is 'longform'.
+    sourceForm: 'longform',
   });
   return buildResult(accumulator, collected);
 };
@@ -459,6 +461,9 @@ export const buildFromClassfileBlockSigil = (block: CstClassfileBlockSigil): Lon
     span: tokenSpanOf(block.syntaxNode),
     raw: block.syntaxNode.text.trimEnd(),
     comment: collected.scalars.get('description'),
+    // RFC-TM-4 §2 (rfc-tm-4-diamond.md, FID-6): the sigil-with-brace ClassFile
+    // header `Name #: path {` is a brace-block header => 'longform'.
+    sourceForm: 'longform',
   });
   // Header parts win their slots first; block properties may override.
   accumulator.slots.path = (block.pathChildren().at(0)?.text ?? '').trim();

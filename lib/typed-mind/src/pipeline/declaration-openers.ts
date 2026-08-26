@@ -57,6 +57,9 @@ const baseArgs = (
     raw: syntaxNode.text.trimEnd(),
     comment,
     viaLookahead,
+    // RFC-TM-4 §2 (rfc-tm-4-diamond.md): every declaration opener here
+    // corresponds to a line-declaration CST production => 'shortform'.
+    sourceForm: 'shortform',
   };
 };
 
