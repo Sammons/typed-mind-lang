@@ -103,6 +103,15 @@ const main = () => {
   }
   console.log('[check:generated] step 5: no tracked *.wasm under the grammar dir (OK)');
 
+  // Step 6: RFC-TM-2 Q3 (review SD-CB-1) — the node-types completeness check.
+  // Diffs the named-node set in the just-regenerated src/node-types.json
+  // against the checked-in inventory (test/node-types-inventory.json, derived
+  // from the doc's §1 production inventory) and fails on any mismatch in
+  // either direction. Unlike the Q3 corpus substrate (deleted in the same PR
+  // that lands it), this check and its inventory are PERMANENT.
+  run('node', [join(GRAMMAR_DIR, 'test', 'check-node-types-completeness.mjs')], { stdio: 'inherit' });
+  console.log('[check:generated] step 6: node-types completeness OK');
+
   console.log('[check:generated] PASS');
 };
 
