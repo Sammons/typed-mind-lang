@@ -1,0 +1,11 @@
+# TM-3 Q1 hero fixture: longform headers (identifier + quoted), shortform
+# declarations, a continuation line, and an EOF line with no trailing newline.
+program TodoApp {
+  entry: AppEntry
+}
+dependency "left-pad" {
+  purpose: "padding helper"
+}
+UserService @ src/services/user.ts:
+  <- [Logger]
+UserDTO %
