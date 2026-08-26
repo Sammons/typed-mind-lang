@@ -41,13 +41,12 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
-    "generate-grammar-docs": "tsx src/generate-grammar-doc.ts",
+    "generate-grammar-docs": "pnpm build && node dist/generate-grammar-doc.js",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },
   "devDependencies": {
     "@types/node": "^22.18.1",
     "tsup": "^8.3.5",
-    "tsx": "^4.20.5",
     "vitest": "^3.2.4"
   },
   "publishConfig": {

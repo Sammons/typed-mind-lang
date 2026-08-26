@@ -11,16 +11,13 @@
   },
   "homepage": "https://typedmind.sammons.io",
   "scripts": {
-    "dev": "pnpm exec http-server dist -p 8080 -c-1",
+    "dev": "pnpm exec wrangler pages dev dist --port 8080",
     "prebuild": "cd ../typed-mind && pnpm build && cd ../typed-mind-renderer && pnpm build && cd ../typed-mind-cli && pnpm build",
     "build": "node build.js",
     "serve": "pnpm build && pnpm dev",
     "deploy": "pnpm build && pnpm exec wrangler pages deploy dist --project-name=typedmind --branch=main --commit-dirty=true"
   },
   "devDependencies": {
-    "http-server": "^14.1.1",
-    "marked": "^16.2.1",
-    "prismjs": "^1.29.0",
     "wrangler": "^4.125.0"
   }
 }
