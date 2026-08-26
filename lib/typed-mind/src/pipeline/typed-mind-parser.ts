@@ -4,7 +4,8 @@
 
 import { Language, Parser } from 'web-tree-sitter';
 import { CstSourceFile } from '../ast/gen/cst-nodes.ts';
-import { walkCstToAst } from './cst-to-ast.ts';
+import { compareDiagnosticsBySpan, walkCstToAst } from './cst-to-ast.ts';
+import { distributeForwardSemantics } from './forward-semantics.ts';
 import type { ParseOutcome } from './parse-outcome.ts';
 
 export interface TypedMindParserOptions {
@@ -76,8 +77,15 @@ export class TypedMindParser {
   }
 
   // §3.1: the pipeline entry. Always tolerant — parse problems land in
-  // ParseOutcome.diagnostics, never as throws (§3.3).
+  // ParseOutcome.diagnostics, never as throws (§3.3). The Q4 forward-semantics
+  // phase (§3.4) runs here, per document and BEFORE any import merge — the
+  // pinned legacy ordering quirk (index.ts:104-127): an import-satisfied
+  // dependency is never distributed yet never errored.
   parse(source: string): ParseOutcome {
-    return walkCstToAst(this.parseCst(source), source).outcome;
+    const walked = walkCstToAst(this.parseCst(source), source).outcome;
+    const entities = [...walked.entities];
+    const semanticDiagnostics = distributeForwardSemantics(entities);
+    const diagnostics = [...walked.diagnostics, ...semanticDiagnostics].sort(compareDiagnosticsBySpan);
+    return { entities, imports: walked.imports, diagnostics };
   }
 }

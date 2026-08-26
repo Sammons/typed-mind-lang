@@ -486,7 +486,7 @@ describe('CST→AST walk/attach layer', () => {
     });
   });
 
-  it('a mixed `<- [...]` list on a Function lands on pendingDependencies until the Q4 distribution phase (§3.4)', () => {
+  it('a mixed `<- [...]` list of undeclared names stays on pendingDependencies through the §3.4 distribution phase', () => {
     const outcome = parser.parse('createOrder :: () => void\n  <- [OrderDTO, Database, EmailService]\n');
     const fn = outcome.entities.at(0);
     assert.deepEqual(
