@@ -22,7 +22,7 @@
     "check:toolchain": "node scripts/check-toolchain.mjs",
     "check:generated": "node scripts/check-generated.mjs",
     "validate": "pnpm run build && pnpm run lint && pnpm run typecheck && pnpm run check:toolchain && pnpm run check:generated && pnpm run test",
-    "validate:fix": "pnpm run build && pnpm run lint:fix && pnpm run typecheck && pnpm run test",
+    "validate:fix": "pnpm run build && pnpm run check:toolchain && pnpm run check:generated && pnpm run lint:fix && pnpm run typecheck && pnpm run test",
     "ci": "pnpm run validate",
     "precommit": "pnpm run validate:fix"
   },
