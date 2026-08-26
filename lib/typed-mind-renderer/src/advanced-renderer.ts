@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
-import type { ProgramGraph, ValidationResult } from '@sammons/typed-mind';
+import type { Diagnostic, ParseOutput } from '@sammons/typed-mind';
 import { type CodeGenConfig, CodeGenerationEngine, type CodePreview } from './codegen/code-generation.ts';
 import { type ArchitectureDiff, ArchitectureDiffAnalyzer, type DiffOptions } from './diff/diff-visualization.ts';
 import { GraphMetricsAnalyzer, type HealthScore, type MetricCategory } from './metrics/graph-metrics.ts';
@@ -68,8 +68,11 @@ interface AdvancedRendererOptions {
  */
 interface AdvancedRendererState {
   // Core data
-  programGraph: ProgramGraph | null;
-  validationResult: ValidationResult | null;
+  graph: ParseOutput | null;
+  // RFC-TM-6 §2/FAQ Q3 (rfc-tm-6-diamond.md) — Diagnostic[] from check(),
+  // not ParseOutput.diagnostics (parse-only). See interactive-renderer.ts's
+  // matching field for the full rationale.
+  diagnostics: readonly Diagnostic[];
 
   // Performance state
   viewport: ViewportInfo;
@@ -100,8 +103,8 @@ interface AdvancedRendererState {
  */
 interface AdvancedRendererEvents {
   // Core events
-  'graph-loaded': { graph: ProgramGraph };
-  'validation-complete': { result: ValidationResult; errors: EnhancedValidationError[] };
+  'graph-loaded': { graph: ParseOutput };
+  'validation-complete': { diagnostics: readonly Diagnostic[]; errors: EnhancedValidationError[] };
 
   // Performance events
   'viewport-changed': { viewport: ViewportInfo };
@@ -162,10 +165,10 @@ class AdvancedTypedMindRenderer {
   /**
    * Set program graph and trigger analysis
    */
-  async setProgramGraph(graph: ProgramGraph): Promise<void> {
+  async setGraph(graph: ParseOutput): Promise<void> {
     const startTime = performance.now();
 
-    this.state.programGraph = graph;
+    this.state.graph = graph;
 
     // Initialize spatial indexing for large graphs
     if (this.options.enableVirtualization) {
@@ -196,20 +199,20 @@ class AdvancedTypedMindRenderer {
   /**
    * Set validation result and process errors
    */
-  async setValidationResult(result: ValidationResult): Promise<void> {
-    this.state.validationResult = result;
+  async setValidationResult(diagnostics: readonly Diagnostic[]): Promise<void> {
+    this.state.diagnostics = diagnostics;
 
-    if (this.options.enableErrorVisualization && result.errors.length > 0) {
-      const enhancedErrors = this.errorProcessor.processErrors(result);
+    if (this.options.enableErrorVisualization && diagnostics.length > 0) {
+      const enhancedErrors = this.errorProcessor.processErrors(diagnostics);
       this.state.showErrorPanel = true;
-      this.emit('validation-complete', { result, errors: enhancedErrors });
+      this.emit('validation-complete', { diagnostics, errors: enhancedErrors });
     }
   }
 
   /**
    * Compare two architectures (diff mode)
    */
-  async compareArchitectures(oldGraph: ProgramGraph, newGraph: ProgramGraph, options?: DiffOptions): Promise<ArchitectureDiff> {
+  async compareArchitectures(oldGraph: ParseOutput, newGraph: ParseOutput, options?: DiffOptions): Promise<ArchitectureDiff> {
     if (!this.options.enableDiffMode) {
       throw new Error('Diff mode is not enabled');
     }
@@ -229,7 +232,7 @@ class AdvancedTypedMindRenderer {
       throw new Error('Code generation is not enabled');
     }
 
-    const entity = this.state.programGraph?.entities.get(entityId);
+    const entity = this.state.graph?.entities.find((candidate) => candidate.name === entityId);
     if (!entity) {
       throw new Error(`Entity not found: ${entityId}`);
     }
@@ -359,8 +362,8 @@ class AdvancedTypedMindRenderer {
 
   private initializeState(): AdvancedRendererState {
     return {
-      programGraph: null,
-      validationResult: null,
+      graph: null,
+      diagnostics: [],
       viewport: { x: 0, y: 0, width: 1200, height: 800, scale: 1 },
       visibleItems: [],
       lodLevel: 0,
@@ -379,8 +382,8 @@ class AdvancedTypedMindRenderer {
     };
   }
 
-  private async initializeVirtualization(graph: ProgramGraph): Promise<void> {
-    const entities = Array.from(graph.entities.values());
+  private async initializeVirtualization(graph: ParseOutput): Promise<void> {
+    const entities = graph.entities;
 
     // Calculate graph bounds
     const bounds = this.calculateGraphBounds(entities);
@@ -401,7 +404,7 @@ class AdvancedTypedMindRenderer {
     this.virtualizationManager.updateIndex(spatialItems);
   }
 
-  private calculateGraphBounds(entities: any[]): { x: number; y: number; width: number; height: number } {
+  private calculateGraphBounds(entities: readonly any[]): { x: number; y: number; width: number; height: number } {
     const nodeCount = entities.length;
     const estimatedArea = nodeCount * 15000; // Rough estimate
     const aspectRatio = 16 / 9;
@@ -775,17 +778,17 @@ class AdvancedTypedMindRenderer {
   }
 
   private getGraphData(): any {
-    if (!this.state.programGraph) {
+    if (!this.state.graph) {
       return { entities: [], links: [], errors: [] };
     }
 
     // This would generate the comprehensive graph data
     // including performance optimizations, error annotations, etc.
-    const entities = Array.from(this.state.programGraph.entities.values());
+    const entities = this.state.graph.entities;
     return {
       entities,
       links: [], // Would be populated with relationship links
-      errors: this.state.validationResult?.errors || [],
+      errors: this.state.diagnostics,
       metadata: {
         healthScore: this.state.healthScore,
         patterns: this.state.detectedPatterns,

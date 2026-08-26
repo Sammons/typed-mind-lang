@@ -4,7 +4,16 @@
  * Author: Enhanced by Claude Code in Matt Pocock style
  */
 
-import type { AnyEntity, EntityType, ProgramGraph } from '@sammons/typed-mind';
+import {
+  ClassFileNode,
+  ClassNode,
+  type EntityKind,
+  type EntityNode,
+  FileNode,
+  FunctionNode,
+  LinkIndex,
+  type ParseOutput,
+} from '@sammons/typed-mind';
 
 /**
  * Target programming languages for code generation
@@ -31,7 +40,7 @@ export type TargetFramework =
  */
 export interface GeneratedCode {
   entityId: string;
-  entityType: EntityType;
+  entityType: EntityKind;
   language: TargetLanguage;
   framework: TargetFramework;
   files: GeneratedFile[];
@@ -117,8 +126,8 @@ export class CodeGenerationEngine {
   /**
    * Generate code for entire architecture
    */
-  async generateArchitecture(graph: ProgramGraph, config: CodeGenConfig): Promise<ArchitectureCodeResult> {
-    const entities = Array.from(graph.entities.values());
+  async generateArchitecture(graph: ParseOutput, config: CodeGenConfig): Promise<ArchitectureCodeResult> {
+    const entities = graph.entities;
     const generatedEntities: GeneratedCode[] = [];
     const globalDependencies = new Set<CodeDependency>();
 
@@ -153,7 +162,7 @@ export class CodeGenerationEngine {
   /**
    * Generate code for a single entity
    */
-  async generateEntity(entity: AnyEntity, config: CodeGenConfig, graph: ProgramGraph): Promise<GeneratedCode> {
+  async generateEntity(entity: EntityNode, config: CodeGenConfig, graph: ParseOutput): Promise<GeneratedCode> {
     const generator = this.generators.get(config.language);
     if (!generator) {
       throw new Error(`No generator available for language: ${config.language}`);
@@ -165,11 +174,25 @@ export class CodeGenerationEngine {
   /**
    * Preview code generation for UI display
    */
-  async previewCode(entity: AnyEntity, config: Partial<CodeGenConfig>): Promise<CodePreview> {
+  async previewCode(entity: EntityNode, config: Partial<CodeGenConfig>): Promise<CodePreview> {
     const fullConfig: CodeGenConfig = this.mergeWithDefaults(config);
 
     try {
-      const generated = await this.generateEntity(entity, fullConfig, new Map() as any);
+      // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — previewCode has never had a real
+      // graph to pass generateEntity (legacy also stubbed this with an empty
+      // Map); the stub carries the new ParseOutput shape instead of the
+      // legacy Map-shaped ProgramGraph. LinkIndexMaps isn't part of the
+      // package's public surface, so the empty index is built from empty
+      // per-relation maps directly (the same shape computeLinks([]) yields).
+      const emptyLinks = new LinkIndex({
+        referencedBy: new Map(),
+        containedBy: new Map(),
+        affectedBy: new Map(),
+        consumedBy: new Map(),
+        importedBy: new Map(),
+      });
+      const emptyGraph: ParseOutput = { entities: [], imports: [], diagnostics: [], links: emptyLinks };
+      const generated = await this.generateEntity(entity, fullConfig, emptyGraph);
 
       return {
         success: true,
@@ -228,13 +251,14 @@ export class CodeGenerationEngine {
     this.registerGenerator('rust', new RustGenerator(this.templateEngine));
   }
 
-  private sortEntitiesByDependencies(entities: AnyEntity[], graph: ProgramGraph): AnyEntity[] {
+  private sortEntitiesByDependencies(entities: readonly EntityNode[], graph: ParseOutput): EntityNode[] {
     // Topological sort based on dependencies
-    const sorted: AnyEntity[] = [];
+    const sorted: EntityNode[] = [];
     const visited = new Set<string>();
     const visiting = new Set<string>();
+    const byName = new Map(graph.entities.map((candidate) => [candidate.name, candidate]));
 
-    const visit = (entity: AnyEntity) => {
+    const visit = (entity: EntityNode) => {
       if (visiting.has(entity.name)) {
         // Circular dependency - add anyway
         return;
@@ -249,7 +273,7 @@ export class CodeGenerationEngine {
       // Visit dependencies first
       const dependencies = this.getEntityDependencies(entity);
       for (const depName of dependencies) {
-        const depEntity = graph.entities.get(depName);
+        const depEntity = byName.get(depName);
         if (depEntity) {
           visit(depEntity);
         }
@@ -267,15 +291,29 @@ export class CodeGenerationEngine {
     return sorted;
   }
 
-  private getEntityDependencies(entity: AnyEntity): string[] {
+  // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — class dispatch over EntityNode
+  // subclasses replaces the legacy six-field duck-typing ('imports' in
+  // entity / 'extends' in entity / 'implements' in entity / 'input' in
+  // entity / 'output' in entity / 'consumes' in entity). Field ownership on
+  // the new AST: imports on File|ClassFile; extends/implements on
+  // Class|ClassFile; input/output/consumes on Function. The dependency-
+  // branch golden (goldens/legacy-baseline/dependency-branches/
+  // tm6-branches.json, captured in Q1) exercises every branch.
+  private getEntityDependencies(entity: EntityNode): string[] {
     const deps: string[] = [];
 
-    if ('imports' in entity) deps.push(...(entity.imports || []));
-    if ('extends' in entity && entity.extends) deps.push(entity.extends);
-    if ('implements' in entity) deps.push(...(entity.implements || []));
-    if ('input' in entity && entity.input) deps.push(entity.input);
-    if ('output' in entity && entity.output) deps.push(entity.output);
-    if ('consumes' in entity) deps.push(...(entity.consumes || []));
+    if (entity instanceof FileNode || entity instanceof ClassFileNode) {
+      deps.push(...entity.imports);
+    }
+    if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
+      if (entity.extends) deps.push(entity.extends);
+      deps.push(...entity.implements);
+    }
+    if (entity instanceof FunctionNode) {
+      if (entity.input) deps.push(entity.input);
+      if (entity.output) deps.push(entity.output);
+      deps.push(...(entity.consumes ?? []));
+    }
 
     return deps;
   }
@@ -537,11 +575,11 @@ Generated at: ${new Date().toISOString()}
     `;
   }
 
-  private createErrorPreviewHTML(entity: AnyEntity, error: unknown): string {
+  private createErrorPreviewHTML(entity: EntityNode, error: unknown): string {
     return `
       <div class="code-preview-error">
         <h3>Code Generation Error</h3>
-        <p>Failed to generate code for <strong>${entity.name}</strong> (${entity.type})</p>
+        <p>Failed to generate code for <strong>${entity.name}</strong> (${entity.kind})</p>
         <div class="error-message">
           <code>${error instanceof Error ? error.message : 'Unknown error'}</code>
         </div>
@@ -597,7 +635,7 @@ Generated at: ${new Date().toISOString()}
     };
   }
 
-  private generateRecommendations(entities: GeneratedCode[], _graph: ProgramGraph): string[] {
+  private generateRecommendations(entities: GeneratedCode[], _graph: ParseOutput): string[] {
     const recommendations: string[] = [];
 
     // Check for common issues
@@ -627,9 +665,9 @@ abstract class LanguageGenerator {
     this.templateEngine = templateEngine;
   }
 
-  abstract generateEntity(entity: AnyEntity, config: CodeGenConfig, graph: ProgramGraph): Promise<GeneratedCode>;
+  abstract generateEntity(entity: EntityNode, config: CodeGenConfig, graph: ParseOutput): Promise<GeneratedCode>;
 
-  protected createMetadata(_entity: AnyEntity, confidence: number): CodeMetadata {
+  protected createMetadata(_entity: EntityNode, confidence: number): CodeMetadata {
     return {
       generatedAt: new Date(),
       confidence,
@@ -642,11 +680,11 @@ abstract class LanguageGenerator {
 }
 
 class TypeScriptGenerator extends LanguageGenerator {
-  async generateEntity(entity: AnyEntity, config: CodeGenConfig, _graph: ProgramGraph): Promise<GeneratedCode> {
+  async generateEntity(entity: EntityNode, config: CodeGenConfig, _graph: ParseOutput): Promise<GeneratedCode> {
     const files: GeneratedFile[] = [];
     const dependencies: CodeDependency[] = [];
 
-    switch (entity.type) {
+    switch (entity.kind) {
       case 'DTO':
         files.push(this.generateDTOInterface(entity as any, config));
         break;
@@ -668,7 +706,7 @@ class TypeScriptGenerator extends LanguageGenerator {
 
     return {
       entityId: entity.name,
-      entityType: entity.type,
+      entityType: entity.kind,
       language: 'typescript',
       framework: config.framework,
       files,
@@ -909,7 +947,7 @@ export interface ArchitectureSummary {
 
 export interface CodePreview {
   success: boolean;
-  entity: AnyEntity;
+  entity: EntityNode;
   config: CodeGenConfig;
   files?: GeneratedFile[];
   metadata?: CodeMetadata;

@@ -4,7 +4,7 @@
  * Author: Enhanced by Claude Code in Matt Pocock style
  */
 
-import type { AnyEntity, EntityType } from '@sammons/typed-mind';
+import type { EntityKind, EntityNode } from '@sammons/typed-mind';
 import type * as d3 from 'd3';
 
 /**
@@ -56,23 +56,23 @@ export interface PluginContext {
  */
 export interface EntityRendererPlugin extends Plugin {
   readonly type: 'renderer';
-  readonly supportedEntityTypes: EntityType[];
+  readonly supportedEntityTypes: EntityKind[];
 
   /**
    * Render entity in SVG
    */
-  renderEntity(entity: AnyEntity, group: d3.Selection<SVGGElement, any, any, any>, context: EntityRenderContext): EntityRenderResult;
+  renderEntity(entity: EntityNode, group: d3.Selection<SVGGElement, any, any, any>, context: EntityRenderContext): EntityRenderResult;
 
   /**
    * Update entity visual state
    */
-  updateEntity?(entity: AnyEntity, group: d3.Selection<SVGGElement, any, any, any>, context: EntityRenderContext): void;
+  updateEntity?(entity: EntityNode, group: d3.Selection<SVGGElement, any, any, any>, context: EntityRenderContext): void;
 
   /**
    * Get entity bounds for layout calculations
    */
   getEntityBounds(
-    entity: AnyEntity,
+    entity: EntityNode,
     context: EntityRenderContext,
   ): {
     width: number;
@@ -83,7 +83,7 @@ export interface EntityRendererPlugin extends Plugin {
   /**
    * Handle entity interactions
    */
-  handleInteraction?(event: EntityInteractionEvent, entity: AnyEntity, context: EntityRenderContext): boolean; // Return true if handled, false to continue
+  handleInteraction?(event: EntityInteractionEvent, entity: EntityNode, context: EntityRenderContext): boolean; // Return true if handled, false to continue
 }
 
 /**
@@ -96,7 +96,7 @@ export interface LayoutPlugin extends Plugin {
   /**
    * Calculate layout positions for entities
    */
-  calculateLayout(entities: AnyEntity[], links: LayoutLink[], constraints: LayoutConstraints): Promise<LayoutResult> | LayoutResult;
+  calculateLayout(entities: EntityNode[], links: LayoutLink[], constraints: LayoutConstraints): Promise<LayoutResult> | LayoutResult;
 
   /**
    * Update layout incrementally (for animations)
@@ -141,7 +141,7 @@ export interface DataProcessorPlugin extends Plugin {
   /**
    * Process graph data for analysis
    */
-  processData(entities: AnyEntity[], context: DataProcessorContext): Promise<ProcessorResult> | ProcessorResult;
+  processData(entities: EntityNode[], context: DataProcessorContext): Promise<ProcessorResult> | ProcessorResult;
 
   /**
    * Get analysis results display
@@ -315,7 +315,7 @@ export interface ThemeDefinition {
   cssVariables: Record<string, string>;
   customCSS?: string;
   entityStyles?: Record<
-    EntityType,
+    EntityKind,
     {
       fill: string;
       stroke: string;
@@ -336,7 +336,7 @@ export interface ThemeDefinition {
 
 export interface ExportContext {
   svg: SVGSVGElement;
-  entities: AnyEntity[];
+  entities: EntityNode[];
   selectedEntities: Set<string>;
   viewport: { x: number; y: number; width: number; height: number; scale: number };
   theme: ThemeDefinition;
@@ -403,7 +403,7 @@ export interface StorageApi {
 export interface ThemeApi {
   getCurrentTheme(): ThemeDefinition;
   setTheme(theme: ThemeDefinition): void;
-  getEntityStyle(entityType: EntityType): Record<string, any>;
+  getEntityStyle(entityType: EntityKind): Record<string, any>;
   getLinkStyle(linkType: string): Record<string, any>;
 }
 
@@ -632,7 +632,7 @@ export class BuiltInPluginRegistry {
   static createEntityRenderer(
     id: string,
     name: string,
-    entityTypes: EntityType[],
+    entityTypes: EntityKind[],
     renderer: EntityRendererPlugin['renderEntity'],
   ): EntityRendererPlugin {
     return {

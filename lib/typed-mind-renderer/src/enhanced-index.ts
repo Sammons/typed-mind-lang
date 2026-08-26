@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
-import type { ProgramGraph, ValidationResult } from '@sammons/typed-mind';
+import { ClassFileNode, DependencyNode, type Diagnostic, FileNode, FunctionNode, type ParseOutput, ProgramNode } from '@sammons/typed-mind';
 
 export interface EnhancedRendererOptions {
   port?: number;
@@ -22,8 +22,11 @@ export interface EnhancedRendererOptions {
 }
 
 class EnhancedTypedMindRenderer {
-  private programGraph: ProgramGraph | null = null;
-  private validationResult: ValidationResult | null = null;
+  private graph: ParseOutput | null = null;
+  // RFC-TM-6 §2/FAQ Q3 (rfc-tm-6-diamond.md) — see interactive-renderer.ts's
+  // matching field for the full rationale: getGraphSnapshot().errors is the
+  // Diagnostic[] from check(), not ParseOutput.diagnostics.
+  private diagnostics: readonly Diagnostic[] = [];
 
   private options: EnhancedRendererOptions;
 
@@ -42,12 +45,12 @@ class EnhancedTypedMindRenderer {
     };
   }
 
-  setProgramGraph(graph: ProgramGraph): void {
-    this.programGraph = graph;
+  setGraph(output: ParseOutput): void {
+    this.graph = output;
   }
 
-  setValidationResult(result: ValidationResult): void {
-    this.validationResult = result;
+  setValidationResult(diagnostics: readonly Diagnostic[]): void {
+    this.diagnostics = diagnostics;
   }
 
   async serve(): Promise<void> {
@@ -1250,7 +1253,7 @@ ${this.generateRendererJS()}
   }
 
   private getGraphData() {
-    if (!this.programGraph) {
+    if (!this.graph) {
       return {
         entities: [],
         links: [],
@@ -1258,64 +1261,51 @@ ${this.generateRendererJS()}
       };
     }
 
-    const entities = Array.from(this.programGraph.entities.values());
+    const entities = this.graph.entities;
+    const byName = new Map(entities.map((entity) => [entity.name, entity]));
     const links: any[] = [];
 
-    // Create links from entity relationships
+    // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — class dispatch over EntityNode
+    // subclasses replaces the legacy 'imports' in entity / 'exports' in
+    // entity / 'calls' in entity duck-typing (near-verbatim duplicate of
+    // interactive-renderer.ts's getGraphData, per the doc's Problem section).
     for (const entity of entities) {
-      // Handle different entity types and their relationships
-      if ('imports' in entity && entity.imports) {
+      if (entity instanceof FileNode || entity instanceof ClassFileNode) {
         for (const imp of entity.imports) {
-          if (this.programGraph.entities.has(imp)) {
-            links.push({
-              source: entity.name,
-              target: imp,
-              type: 'import',
-            });
+          if (byName.has(imp)) {
+            links.push({ source: entity.name, target: imp, type: 'import' });
           }
         }
-      }
-
-      if ('exports' in entity && entity.exports) {
         for (const exp of entity.exports) {
-          if (this.programGraph.entities.has(exp)) {
-            links.push({
-              source: entity.name,
-              target: exp,
-              type: 'export',
-            });
+          if (byName.has(exp)) {
+            links.push({ source: entity.name, target: exp, type: 'export' });
+          }
+        }
+      } else if (entity instanceof DependencyNode || entity instanceof ProgramNode) {
+        for (const exp of entity.exports ?? []) {
+          if (byName.has(exp)) {
+            links.push({ source: entity.name, target: exp, type: 'export' });
           }
         }
       }
 
-      if ('calls' in entity && entity.calls) {
+      if (entity instanceof FunctionNode) {
         for (const call of entity.calls) {
-          if (this.programGraph.entities.has(call)) {
-            links.push({
-              source: entity.name,
-              target: call,
-              type: 'call',
-            });
+          if (byName.has(call)) {
+            links.push({ source: entity.name, target: call, type: 'call' });
           }
         }
       }
 
-      if (entity.type === 'Program' && 'entry' in entity) {
-        const progEntity = entity as any;
-        if (this.programGraph.entities.has(progEntity.entry)) {
-          links.push({
-            source: entity.name,
-            target: progEntity.entry,
-            type: 'entry',
-          });
-        }
+      if (entity instanceof ProgramNode && byName.has(entity.entry)) {
+        links.push({ source: entity.name, target: entity.entry, type: 'entry' });
       }
     }
 
     return {
       entities,
       links,
-      errors: this.validationResult?.errors || [],
+      errors: this.diagnostics,
     };
   }
 

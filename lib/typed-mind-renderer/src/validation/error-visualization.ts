@@ -4,11 +4,18 @@
  * Author: Enhanced by Claude Code in Matt Pocock style
  */
 
-import type { ValidationError, ValidationResult } from '@sammons/typed-mind';
+import type { Diagnostic } from '@sammons/typed-mind';
 
 export type ErrorSeverity = 'error' | 'warning' | 'info' | 'success';
 
-export interface EnhancedValidationError extends ValidationError {
+// RFC-TM-6 §2/FAQ Q3 (rfc-tm-6-diamond.md) — Diagnostic replaces the legacy
+// ValidationError field-for-field where populated (the ERRSHAPE cause
+// class): `code`/`severity`/`span`/`message` instead of
+// `position`/`message`/`severity`/`suggestion?`. This module's logic never
+// reads `.position` or `.suggestion` (categorizeError/extractAffectedEntities/
+// getErrorCatalogEntry all pattern-match `.message` text only), so the swap
+// is a type-only change here.
+export interface EnhancedValidationError extends Diagnostic {
   id: string;
   category: 'syntax' | 'reference' | 'structure' | 'best-practice' | 'performance';
   affectedEntities: string[];
@@ -43,7 +50,7 @@ export class ValidationErrorProcessor {
     string,
     {
       category: EnhancedValidationError['category'];
-      quickFix?: (error: ValidationError) => QuickFix | null;
+      quickFix?: (error: Diagnostic) => QuickFix | null;
       documentation: string;
       examples: string[];
     }
@@ -56,8 +63,8 @@ export class ValidationErrorProcessor {
   /**
    * Process validation result into enhanced error format
    */
-  processErrors(result: ValidationResult): EnhancedValidationError[] {
-    return result.errors.map((error, index) => {
+  processErrors(diagnostics: readonly Diagnostic[]): EnhancedValidationError[] {
+    return diagnostics.map((error, index) => {
       const enhanced: EnhancedValidationError = {
         ...error,
         id: `error-${index}-${Date.now()}`,
@@ -202,7 +209,7 @@ export class ValidationErrorProcessor {
     });
   }
 
-  private categorizeError(error: ValidationError): EnhancedValidationError['category'] {
+  private categorizeError(error: Diagnostic): EnhancedValidationError['category'] {
     const message = error.message.toLowerCase();
 
     if (message.includes('invalid') || message.includes('syntax')) {
@@ -228,14 +235,14 @@ export class ValidationErrorProcessor {
     return 'syntax'; // Default fallback
   }
 
-  private extractAffectedEntities(error: ValidationError): string[] {
+  private extractAffectedEntities(error: Diagnostic): string[] {
     // Extract entity names from error message using regex
     const entityPattern = /\b([A-Z][a-zA-Z0-9_]*)\b/g;
     const matches = error.message.match(entityPattern) || [];
     return [...new Set(matches)]; // Remove duplicates
   }
 
-  private getErrorCatalogEntry(error: ValidationError) {
+  private getErrorCatalogEntry(error: Diagnostic) {
     // Try to match error message to known patterns
     for (const [pattern, entry] of this.errorCatalog.entries()) {
       if (error.message.toLowerCase().includes(pattern.toLowerCase())) {
@@ -289,8 +296,8 @@ export class ErrorVisualizationRenderer {
   /**
    * Render error visualization panel
    */
-  renderErrorPanel(result: ValidationResult): void {
-    const errors = this.processor.processErrors(result);
+  renderErrorPanel(diagnostics: readonly Diagnostic[]): void {
+    const errors = this.processor.processErrors(diagnostics);
     const stats = this.processor.generateErrorStats(errors);
     const groups = this.options.groupRelatedErrors
       ? this.processor.groupRelatedErrors(errors)
@@ -425,13 +432,11 @@ export class ErrorVisualizationRenderer {
         }
 
         ${
-          error.suggestion
-            ? `
-          <div class="error-item-suggestion">
-            <strong>Suggestion:</strong> ${error.suggestion}
-          </div>
-        `
-            : ''
+          // RFC-TM-6 §2/FAQ Q3 (rfc-tm-6-diamond.md, ERRSHAPE) — Diagnostic
+          // carries no `suggestion` field (the legacy ValidationError one
+          // does); the block that rendered it is unreachable post-flip and
+          // is dropped rather than kept as always-false dead code.
+          ''
         }
 
         ${

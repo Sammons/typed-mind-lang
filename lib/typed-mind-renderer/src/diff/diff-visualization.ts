@@ -4,7 +4,7 @@
  * Author: Enhanced by Claude Code in Matt Pocock style
  */
 
-import type { AnyEntity, ProgramGraph } from '@sammons/typed-mind';
+import type { EntityNode, ParseOutput } from '@sammons/typed-mind';
 
 /**
  * Change types for diff analysis
@@ -19,8 +19,8 @@ export interface EntityDiff {
   changeType: DiffChangeType;
   entityName: string;
   entityType: string;
-  oldVersion?: Partial<AnyEntity>;
-  newVersion?: Partial<AnyEntity>;
+  oldVersion?: Partial<EntityNode>;
+  newVersion?: Partial<EntityNode>;
   fieldChanges: FieldDiff[];
   relationshipChanges: RelationshipDiff[];
   impact: DiffImpact;
@@ -153,7 +153,7 @@ export class ArchitectureDiffAnalyzer {
   /**
    * Compare two architecture graphs
    */
-  async compareArchitectures(oldGraph: ProgramGraph, newGraph: ProgramGraph, options: DiffOptions = {}): Promise<ArchitectureDiff> {
+  async compareArchitectures(oldGraph: ParseOutput, newGraph: ParseOutput, options: DiffOptions = {}): Promise<ArchitectureDiff> {
     const startTime = Date.now();
 
     // Create entity mappings for comparison
@@ -217,13 +217,13 @@ export class ArchitectureDiffAnalyzer {
     this.registerChangeDetector(new BreakingChangeDetector());
   }
 
-  private createEntityMap(graph: ProgramGraph): Map<string, AnyEntity> {
-    return new Map(Array.from(graph.entities.entries()));
+  private createEntityMap(graph: ParseOutput): Map<string, EntityNode> {
+    return new Map(graph.entities.map((entity) => [entity.name, entity]));
   }
 
   private async analyzeEntityChanges(
-    oldEntities: Map<string, AnyEntity>,
-    newEntities: Map<string, AnyEntity>,
+    oldEntities: Map<string, EntityNode>,
+    newEntities: Map<string, EntityNode>,
     options: DiffOptions,
   ): Promise<EntityDiff[]> {
     const entityDiffs: EntityDiff[] = [];
@@ -263,8 +263,8 @@ export class ArchitectureDiffAnalyzer {
   private async createEntityDiff(
     changeType: DiffChangeType,
     entityName: string,
-    oldVersion?: AnyEntity,
-    newVersion?: AnyEntity,
+    oldVersion?: EntityNode,
+    newVersion?: EntityNode,
     options?: DiffOptions,
   ): Promise<EntityDiff> {
     const impact = await this.assessImpact(changeType, oldVersion, newVersion, options);
@@ -273,7 +273,7 @@ export class ArchitectureDiffAnalyzer {
       id: `${changeType}-${entityName}`,
       changeType,
       entityName,
-      entityType: (oldVersion || newVersion)?.type || 'Unknown',
+      entityType: (oldVersion || newVersion)?.kind || 'Unknown',
       oldVersion,
       newVersion,
       fieldChanges: [],
@@ -283,7 +283,7 @@ export class ArchitectureDiffAnalyzer {
     };
   }
 
-  private async compareEntities(oldEntity: AnyEntity, newEntity: AnyEntity, options: DiffOptions): Promise<EntityDiff | null> {
+  private async compareEntities(oldEntity: EntityNode, newEntity: EntityNode, options: DiffOptions): Promise<EntityDiff | null> {
     const fieldChanges = this.compareEntityFields(oldEntity, newEntity);
     const relationshipChanges = this.compareEntityRelationships(oldEntity, newEntity);
 
@@ -297,7 +297,7 @@ export class ArchitectureDiffAnalyzer {
       id: `modified-${oldEntity.name}`,
       changeType: 'modified',
       entityName: oldEntity.name,
-      entityType: oldEntity.type,
+      entityType: oldEntity.kind,
       oldVersion: oldEntity,
       newVersion: newEntity,
       fieldChanges,
@@ -307,7 +307,7 @@ export class ArchitectureDiffAnalyzer {
     };
   }
 
-  private compareEntityFields(oldEntity: AnyEntity, newEntity: AnyEntity): FieldDiff[] {
+  private compareEntityFields(oldEntity: EntityNode, newEntity: EntityNode): FieldDiff[] {
     const fieldDiffs: FieldDiff[] = [];
 
     // Compare all properties
@@ -331,7 +331,7 @@ export class ArchitectureDiffAnalyzer {
     return fieldDiffs;
   }
 
-  private compareEntityRelationships(oldEntity: AnyEntity, newEntity: AnyEntity): RelationshipDiff[] {
+  private compareEntityRelationships(oldEntity: EntityNode, newEntity: EntityNode): RelationshipDiff[] {
     const relationshipDiffs: RelationshipDiff[] = [];
 
     // Compare imports, exports, calls, etc.
@@ -357,7 +357,7 @@ export class ArchitectureDiffAnalyzer {
     return relationshipDiffs;
   }
 
-  private async analyzeRelationshipChanges(oldGraph: ProgramGraph, newGraph: ProgramGraph): Promise<RelationshipDiff[]> {
+  private async analyzeRelationshipChanges(oldGraph: ParseOutput, newGraph: ParseOutput): Promise<RelationshipDiff[]> {
     const relationshipDiffs: RelationshipDiff[] = [];
 
     // Build relationship maps for both graphs
@@ -393,8 +393,8 @@ export class ArchitectureDiffAnalyzer {
   }
 
   private detectRenames(
-    _oldEntities: Map<string, AnyEntity>,
-    _newEntities: Map<string, AnyEntity>,
+    _oldEntities: Map<string, EntityNode>,
+    _newEntities: Map<string, EntityNode>,
     existingDiffs: EntityDiff[],
   ): EntityDiff[] {
     const renames: EntityDiff[] = [];
@@ -404,7 +404,7 @@ export class ArchitectureDiffAnalyzer {
     // Use fuzzy matching to detect potential renames
     for (const removed of removedEntities) {
       for (const added of addedEntities) {
-        const similarity = this.calculateSimilarity(removed.oldVersion as AnyEntity, added.newVersion as AnyEntity);
+        const similarity = this.calculateSimilarity(removed.oldVersion as EntityNode, added.newVersion as EntityNode);
         if (similarity > 0.8) {
           // High similarity threshold
           renames.push({
@@ -443,8 +443,8 @@ export class ArchitectureDiffAnalyzer {
 
   private async assessImpact(
     changeType: DiffChangeType,
-    oldVersion?: AnyEntity,
-    newVersion?: AnyEntity,
+    oldVersion?: EntityNode,
+    newVersion?: EntityNode,
     options?: DiffOptions,
   ): Promise<DiffImpact> {
     const impact: DiffImpact = {
@@ -505,16 +505,16 @@ export class ArchitectureDiffAnalyzer {
     return changes;
   }
 
-  private buildRelationshipMap(_graph: ProgramGraph): Map<string, { from: string; to: string; type: string }> {
+  private buildRelationshipMap(_graph: ParseOutput): Map<string, { from: string; to: string; type: string }> {
     const relationships = new Map();
     // Implementation would build relationship map from graph
     return relationships;
   }
 
-  private calculateSimilarity(entity1: AnyEntity, entity2: AnyEntity): number {
+  private calculateSimilarity(entity1: EntityNode, entity2: EntityNode): number {
     // Implement fuzzy matching algorithm (e.g., Levenshtein distance)
     let score = 0;
-    if (entity1.type === entity2.type) score += 0.3;
+    if (entity1.kind === entity2.kind) score += 0.3;
     // Add more similarity metrics
     return score;
   }
@@ -639,7 +639,7 @@ export interface ChangeDetector {
   name: string;
   description: string;
 
-  assessImpact(changeType: DiffChangeType, oldVersion?: AnyEntity, newVersion?: AnyEntity, options?: DiffOptions): Promise<DiffImpact>;
+  assessImpact(changeType: DiffChangeType, oldVersion?: EntityNode, newVersion?: EntityNode, options?: DiffOptions): Promise<DiffImpact>;
 }
 
 // Built-in change detectors
@@ -648,7 +648,7 @@ class EntityStructureDetector implements ChangeDetector {
   name = 'Entity Structure Detector';
   description = 'Detects structural changes in entities';
 
-  async assessImpact(changeType: DiffChangeType, _oldVersion?: AnyEntity, _newVersion?: AnyEntity): Promise<DiffImpact> {
+  async assessImpact(changeType: DiffChangeType, _oldVersion?: EntityNode, _newVersion?: EntityNode): Promise<DiffImpact> {
     return {
       severity: changeType === 'removed' ? 'high' : 'low',
       affectedEntities: [],
@@ -699,11 +699,11 @@ class BreakingChangeDetector implements ChangeDetector {
   name = 'Breaking Change Detector';
   description = 'Detects changes that break API compatibility';
 
-  async assessImpact(changeType: DiffChangeType, oldVersion?: AnyEntity, newVersion?: AnyEntity): Promise<DiffImpact> {
+  async assessImpact(changeType: DiffChangeType, oldVersion?: EntityNode, newVersion?: EntityNode): Promise<DiffImpact> {
     const isBreaking =
       changeType === 'removed' ||
-      (oldVersion?.type === 'Function' &&
-        newVersion?.type === 'Function' &&
+      (oldVersion?.kind === 'Function' &&
+        newVersion?.kind === 'Function' &&
         'signature' in oldVersion &&
         'signature' in newVersion &&
         oldVersion.signature !== newVersion.signature);
