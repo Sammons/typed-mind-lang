@@ -1,0 +1,4 @@
+UserDTO %
+  - name: string "User name"
+  - email?: string "Email"
+  - nickname: string "Display name" (optional)

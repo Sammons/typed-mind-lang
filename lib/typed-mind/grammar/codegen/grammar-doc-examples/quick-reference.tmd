@@ -1,0 +1,34 @@
+TodoApp -> main v1.0.0
+main @ src/index.ts:
+  <- [UserService, Config, App, Logger, createLogger]
+  -> [startApp]
+
+UserService #: src/services/user.ts
+  <- [UserDTO, startApp]
+  => [createUser, findUser]
+
+startApp :: () => void
+  ~> [createUser]
+  ~ [App]
+  $< [DATABASE_URL, Logo]
+
+createUser :: (data: UserDTO) => UserDTO
+  <- UserDTO
+  -> UserDTO
+  ~> [createLogger, Logger.info]
+
+UserDTO %
+  - name: string "User name"
+  - email: string "Email"
+
+App &! "Root component"
+DATABASE_URL $env "DB connection" (required)
+Config ! src/config.ts
+Logo ~ "Company logo"
+winston ^ "Logging library" v3.0.0
+  -> [Logger, createLogger]
+
+Logger <:
+  => [info]
+
+createLogger :: (options?: object) => Logger

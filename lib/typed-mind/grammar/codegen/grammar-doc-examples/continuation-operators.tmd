@@ -1,0 +1,22 @@
+TodoApp -> main v1.0.0
+main @ src/index.ts:
+  <- [App, Logo, DATABASE_URL, startApp]
+  -> [startApp, UserDTO]
+
+App &! "Root component"
+  > [Header]
+
+Header & "Header component"
+  < [App]
+
+Logo ~ "Company logo"
+DATABASE_URL $env "DB connection" (required)
+  = "postgres://localhost/dev"
+
+startApp :: () => void
+  <- UserDTO
+  ~ [App]
+  $< [DATABASE_URL, Logo]
+
+UserDTO %
+  - name: string "User name"

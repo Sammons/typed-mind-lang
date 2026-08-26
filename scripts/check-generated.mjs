@@ -33,6 +33,7 @@ const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const GRAMMAR_DIR = join(REPO_ROOT, 'lib', 'typed-mind', 'grammar');
 const GRAMMAR_SRC_PATHSPEC = 'lib/typed-mind/grammar/src';
 const CST_GEN_PATHSPEC = 'lib/typed-mind/src/ast/gen';
+const GRAMMAR_DOC_PATHSPEC = 'lib/typed-mind/grammar.md';
 
 class GeneratedCheckError extends Error {}
 
@@ -92,6 +93,19 @@ const main = () => {
     );
   }
   console.log('[check:generated] step 2b: src/ast/gen wrappers match node-types.json (diff gate OK)');
+
+  // Step 2c: RFC-TM-7 §1 (rfc-tm-7-diamond.md) — the grammar.md doc must
+  // match what grammar.json generates (issue #7's drift-gate half; same gate
+  // shape as steps 2/2b).
+  run('node', [join(GRAMMAR_DIR, 'codegen', 'generate-grammar-docs.mjs')], { stdio: ['pipe', 'inherit', 'inherit'] });
+  try {
+    run('git', ['diff', '--exit-code', '--', GRAMMAR_DOC_PATHSPEC]);
+  } catch {
+    throw new GeneratedCheckError(
+      `${GRAMMAR_DOC_PATHSPEC} drifted from grammar.json — run \`node lib/typed-mind/grammar/codegen/generate-grammar-docs.mjs\` and commit the regenerated doc`,
+    );
+  }
+  console.log('[check:generated] step 2c: grammar.md matches grammar.json (diff gate OK)');
 
   // Step 3: the S-TEST-3 grammar corpus. --rebuild defeats the CLI's stale
   // build cache (keyed by language name, not grammar content).
