@@ -1,0 +1,601 @@
+============================================================
+H1: program keyword header
+============================================================
+
+program TodoApp {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H2: file keyword header
+============================================================
+
+file Config {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H3: function keyword header
+============================================================
+
+function getUser {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H4: class keyword header
+============================================================
+
+class UserService {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H5: dto keyword header
+============================================================
+
+dto User {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H6: component keyword header
+============================================================
+
+component UserProfile {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H7: asset keyword header
+============================================================
+
+asset APIGateway {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H8: constants keyword header
+============================================================
+
+constants API_VERSION {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H9: parameter keyword header
+============================================================
+
+parameter DATABASE_URL {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H10a: dependency keyword header, identifier name
+============================================================
+
+dependency axios {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H10b: dependency keyword header, QUOTED name — scoped-package asymmetry fix
+(snippets/dependency-longform.tmd:17 `dependency "@types/node" {`)
+============================================================
+
+dependency "@types/node" {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_quoted_name))))
+
+============================================================
+H11: classfile keyword header (new keyword, S-GRAMMAR-2a)
+============================================================
+
+classfile SvcFile {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+H12a: sigil-with-brace ClassFile, no inheritance (hero-longform.tmd:8 shape)
+============================================================
+
+TodoService #: api.ts {
+}
+
+---
+
+(source_file
+  (classfile_block_sigil
+    (entity_name)
+    (path)))
+
+============================================================
+H12b: sigil-with-brace ClassFile, with inheritance
+============================================================
+
+UserController #: src/controllers/user.ts <: BaseController {
+}
+
+---
+
+(source_file
+  (classfile_block_sigil
+    (entity_name)
+    (path)
+    (inherit_list
+      (entity_name))))
+
+============================================================
+H1-H11 single-character name (header_name_rest absent — the name-split's
+edge case, see grammar.js's H1-H12 name-extraction design note)
+============================================================
+
+dto X {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
+
+============================================================
+P1: key: "string"
+============================================================
+
+dto User {
+  description: "User entity"
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))))
+
+============================================================
+P2: key: [a, b] (dotted list entries admitted — scenario-31-mixed-syntax.tmd:30
+`calls: [Database.delete]`)
+============================================================
+
+function startApp {
+  calls: [findById, create, Database.delete]
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_list
+        (property_key)
+        (name_list
+          (list_entry)
+          (list_entry)
+          (list_entry))))))
+
+============================================================
+P3: key: identifier
+============================================================
+
+class UserService {
+  extends: BaseService
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_identifier
+        (property_key)
+        (entity_name)))))
+
+============================================================
+P4: key: true|false (bool_literal wins the equal-length tie against entity_name)
+============================================================
+
+parameter DATABASE_URL {
+  required: true
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_bool
+        (property_key)
+        (bool_literal)))))
+
+============================================================
+P4b: key: false
+============================================================
+
+parameter FLAG {
+  required: false
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_bool
+        (property_key)
+        (bool_literal)))))
+
+============================================================
+P5: fields: { <nested per-field blocks> } — multi-line, one nesting level
+(dto-longform.tmd:13-29 shape)
+============================================================
+
+dto User {
+  fields: {
+    id: {
+      type: "string"
+      description: "User ID"
+    }
+    email: {
+      type: "string"
+    }
+  }
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (dto_fields_block
+        (property_key)
+        (dto_field_block
+          (property_key)
+          (block_property
+            (property_string
+              (property_key)
+              (string)))
+          (block_property
+            (property_string
+              (property_key)
+              (string))))
+        (dto_field_block
+          (property_key)
+          (block_property
+            (property_string
+              (property_key)
+              (string))))))))
+
+============================================================
+P5b: single-line inline field object — fieldName: { type: "string",
+description: "..." } (corpus: scenario-31-mixed-syntax.tmd:41-42,
+snippets/{class,file,classfile}-longform.tmd)
+============================================================
+
+dto User {
+  fields: {
+    id: { type: "string", description: "User ID" }
+  }
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (dto_fields_block
+        (property_key)
+        (dto_field_block
+          (dto_field_inline
+            (property_key)
+            (inline_field_pair
+              (property_key)
+              (string))
+            (inline_field_pair
+              (property_key)
+              (string))))))))
+
+============================================================
+P6: '#' comment line inside a block body
+============================================================
+
+dto User {
+  # a comment inside the block
+  description: "User entity"
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_comment_line
+      (comment))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))))
+
+============================================================
+P7: TOTAL free-text fallback — key: <rest-of-line> for a value matching none
+of P1-P5b (snippets/getting-started-dto-longform.tmd:19
+`signature: (id: string) => User`, unquoted, containing parens and a
+nested colon)
+============================================================
+
+function getUser {
+  signature: (id: string) => User
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_freetext
+        (property_key)
+        (freetext_value)))))
+
+============================================================
+P7b: free-text fallback for an unquoted path value (`path: src/app.ts` —
+a slash/dot-bearing value that is not a legal entity_name and is not
+quoted, so P1-P4/P5b all fail and P7 wins; property parsing never ERRORs
+on a well-formed `key: value` line)
+============================================================
+
+file Config {
+  path: src/app.ts
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_freetext
+        (property_key)
+        (freetext_value)))))
+
+============================================================
+S-GRAMMAR-2: colon-style longform (`Name:` + `type: Kind`) yields ERROR —
+explicitly absent from the grammar (census: 0 colon-style documents across
+all 172 tracked .tmd files, round-1 re-verified)
+============================================================
+
+User:
+  type: DTO
+
+---
+
+(source_file
+  (ERROR
+    (entity_name)
+    (UNEXPECTED 'y')
+    (UNEXPECTED 'D')))
+
+============================================================
+Unterminated block recovers as ERROR at EOF without hanging — the
+self-delimiting rationale of S-GRAMMAR-2, fixture-bound in Q2 (doc §2)
+============================================================
+
+dto User {
+  description: "test"
+
+---
+
+(source_file
+  (ERROR
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))))
+
+============================================================
+S-GRAMMAR-2a hero check: hero-longform.tmd:8 `TodoService #: api.ts {`
+parses to a ClassFile-kinded node named TodoService
+============================================================
+
+TodoService #: api.ts {
+  extends: BaseService
+  methods: [createTodo, getTodos]
+}
+
+---
+
+(source_file
+  (classfile_block_sigil
+    (entity_name)
+    (path)
+    (block_property
+      (property_identifier
+        (property_key)
+        (entity_name)))
+    (block_property
+      (property_list
+        (property_key)
+        (name_list
+          (list_entry)
+          (list_entry))))))
+
+============================================================
+scenario-31 shape: shortform and longform mixing in one document (modeled
+on scenario-31-mixed-syntax.tmd) — a shortform Program immediately
+followed by a longform Program block
+============================================================
+
+TodoApp -> AppEntry v1.0.0
+
+program APIServer {
+  entry: ApiMain
+  version: "2.0.0"
+}
+
+---
+
+(source_file
+  (program_declaration
+    (entity_name)
+    (entity_name)
+    (version))
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_identifier
+        (property_key)
+        (entity_name)))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))))
+
+============================================================
+keyword×sigil matrix stays green under Q2's typed block_header: every
+keyword still lexes as a plain entity_name in sigil position even though
+the SAME keyword now opens a typed, name-extracting header
+============================================================
+
+dependency ^ "d"
+classfile #: src/k.ts
+class :: (x) => y
+dto Foo {
+}
+
+---
+
+(source_file
+  (dependency_declaration
+    (entity_name)
+    (string))
+  (classfile_declaration
+    (entity_name)
+    (path))
+  (function_declaration
+    (entity_name)
+    (signature))
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))))
