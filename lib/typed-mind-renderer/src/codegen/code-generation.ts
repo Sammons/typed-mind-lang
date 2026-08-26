@@ -621,7 +621,11 @@ Generated at: ${new Date().toISOString()}
 // Language-specific generators (abbreviated implementations)
 
 abstract class LanguageGenerator {
-  constructor(protected templateEngine: CodeTemplateEngine) {}
+  protected templateEngine: CodeTemplateEngine;
+
+  constructor(templateEngine: CodeTemplateEngine) {
+    this.templateEngine = templateEngine;
+  }
 
   abstract generateEntity(entity: AnyEntity, config: CodeGenConfig, graph: ProgramGraph): Promise<GeneratedCode>;
 

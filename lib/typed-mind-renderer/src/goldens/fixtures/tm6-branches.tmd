@@ -1,0 +1,24 @@
+BranchApp -> AppEntry v1.0.0
+AppEntry @ src/entry.ts:
+  <- [helperFn, BaseSvc, Serializable, ChildSvc, RootPanel, SidePanel]
+  -> [BaseSvc, Serializable, ChildSvc, helperFn]
+BaseSvc <:
+  => [baseRun]
+Serializable <:
+  => [toJson]
+ChildSvc <: BaseSvc, Serializable
+  => [childRun]
+helperFn :: (input: InputDto) => OutputDto
+  <- InputDto
+  -> OutputDto
+  $< [APP_MODE]
+InputDto %
+  - id: string
+OutputDto %
+  - ok: boolean
+APP_MODE ! src/config.ts
+RootPanel &! "Root panel"
+  > [OrphanPanel, SidePanel]
+SidePanel & "Side panel, declares no contains"
+OrphanPanel & "Mismatch child"
+  < [SidePanel]

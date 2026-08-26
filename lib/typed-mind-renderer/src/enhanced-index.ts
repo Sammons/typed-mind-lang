@@ -25,7 +25,9 @@ class EnhancedTypedMindRenderer {
   private programGraph: ProgramGraph | null = null;
   private validationResult: ValidationResult | null = null;
 
-  constructor(private options: EnhancedRendererOptions = {}) {
+  private options: EnhancedRendererOptions;
+
+  constructor(options: EnhancedRendererOptions = {}) {
     this.options = {
       port: 3000,
       host: 'localhost',
@@ -1235,6 +1237,16 @@ ${this.generateRendererJS()}
   window.typedMindRenderer = new TypedMindInteractiveRenderer(graphData);
 })();
 `;
+  }
+
+  /**
+   * Public accessor over the private graph-data computation, added by
+   * RFC-TM-6 Q1 (rfc-tm-6-diamond.md) to capture legacy-baseline goldens
+   * before any bridge flip. Zero behavior change — same object this class
+   * has always produced.
+   */
+  getGraphSnapshot() {
+    return this.getGraphData();
   }
 
   private getGraphData() {

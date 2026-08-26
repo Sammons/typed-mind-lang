@@ -422,7 +422,11 @@ export class PluginManager {
   private pluginContexts = new Map<string, PluginContext>();
   private dependencyGraph = new Map<string, Set<string>>();
 
-  constructor(private baseContext: Omit<PluginContext, 'config'>) {}
+  private baseContext: Omit<PluginContext, 'config'>;
+
+  constructor(baseContext: Omit<PluginContext, 'config'>) {
+    this.baseContext = baseContext;
+  }
 
   /**
    * Register a plugin

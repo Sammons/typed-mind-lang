@@ -762,6 +762,18 @@ class AdvancedTypedMindRenderer {
 `;
   }
 
+  /**
+   * Public accessor over the private graph-data computation, added by
+   * RFC-TM-6 Q1 (rfc-tm-6-diamond.md) to capture legacy-baseline goldens
+   * before any bridge flip. Zero behavior change — same object this class
+   * has always produced, including the stubbed `links: []` (its live
+   * caller is the published VS Code extension; populating the stub is out
+   * of this RFC's migration mandate per the doc's FAQ Q5).
+   */
+  getGraphSnapshot(): any {
+    return this.getGraphData();
+  }
+
   private getGraphData(): any {
     if (!this.state.programGraph) {
       return { entities: [], links: [], errors: [] };

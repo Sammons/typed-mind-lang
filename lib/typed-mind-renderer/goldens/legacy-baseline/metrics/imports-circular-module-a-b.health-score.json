@@ -1,0 +1,14 @@
+{
+  "overall": 91,
+  "categories": {
+    "Complexity": 100,
+    "Coupling": 99.16666666666667,
+    "Structure": 94,
+    "Testability": 80,
+    "Maintainability": 61.666666666666664,
+    "Performance": 84.83333333333333
+  },
+  "trends": {},
+  "recommendations": [],
+  "risks": []
+}

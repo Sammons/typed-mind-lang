@@ -1,0 +1,369 @@
+{
+  "entities": [
+    {
+      "name": "WebApp",
+      "type": "Program",
+      "entry": "AppFile",
+      "version": "1.0.0",
+      "position": {
+        "line": 5,
+        "column": 1
+      },
+      "raw": "WebApp -> AppFile v1.0.0"
+    },
+    {
+      "name": "AppFile",
+      "type": "File",
+      "path": "src/app.ts",
+      "imports": ["DB.Connection", "UI.Button", "UI.Form"],
+      "exports": ["initializeApp"],
+      "position": {
+        "line": 7,
+        "column": 1
+      },
+      "raw": "AppFile @ src/app.ts:"
+    },
+    {
+      "name": "initializeApp",
+      "type": "Function",
+      "signature": "() => void",
+      "calls": ["DB.Connection.connect"],
+      "position": {
+        "line": 11,
+        "column": 1
+      },
+      "raw": "initializeApp :: () => void",
+      "affects": ["UI.Button", "UI.Form"]
+    },
+    {
+      "name": "UI.ComponentsFile",
+      "type": "File",
+      "path": "src/components/index.ts",
+      "imports": [],
+      "exports": ["Button", "Form", "Input", "Modal"],
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "raw": "ComponentsFile @ src/components/index.ts:"
+    },
+    {
+      "name": "UI.Button",
+      "type": "UIComponent",
+      "purpose": "Reusable button component",
+      "root": true,
+      "contains": [],
+      "containedBy": ["Form", "Modal"],
+      "affectedBy": [],
+      "position": {
+        "line": 5,
+        "column": 1
+      },
+      "raw": "Button &! \"Reusable button component\""
+    },
+    {
+      "name": "UI.Form",
+      "type": "UIComponent",
+      "purpose": "Form container",
+      "root": true,
+      "contains": ["Input", "Button"],
+      "containedBy": [],
+      "affectedBy": [],
+      "position": {
+        "line": 7,
+        "column": 1
+      },
+      "raw": "Form &! \"Form container\""
+    },
+    {
+      "name": "UI.Input",
+      "type": "UIComponent",
+      "purpose": "Form input field",
+      "contains": [],
+      "containedBy": ["Form"],
+      "affectedBy": [],
+      "position": {
+        "line": 10,
+        "column": 1
+      },
+      "raw": "Input & \"Form input field\""
+    },
+    {
+      "name": "UI.Modal",
+      "type": "UIComponent",
+      "purpose": "Modal dialog",
+      "root": true,
+      "contains": ["Button"],
+      "containedBy": [],
+      "affectedBy": [],
+      "position": {
+        "line": 12,
+        "column": 1
+      },
+      "raw": "Modal &! \"Modal dialog\""
+    },
+    {
+      "name": "DB.DatabaseFile",
+      "type": "File",
+      "path": "src/db/connection.ts",
+      "imports": [],
+      "exports": ["Connection", "query"],
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "raw": "DatabaseFile @ src/db/connection.ts:"
+    },
+    {
+      "name": "DB.Connection",
+      "type": "Class",
+      "implements": [],
+      "methods": ["connect", "disconnect", "execute"],
+      "imports": [],
+      "position": {
+        "line": 5,
+        "column": 1
+      },
+      "raw": "Connection <:"
+    },
+    {
+      "name": "DB.query",
+      "type": "Function",
+      "signature": "(sql: string) => Promise<any[]>",
+      "calls": ["Connection.execute"],
+      "position": {
+        "line": 8,
+        "column": 1
+      },
+      "raw": "query :: (sql: string) => Promise<any[]>"
+    }
+  ],
+  "links": [],
+  "errors": [
+    {
+      "position": {
+        "line": 11,
+        "column": 1
+      },
+      "message": "Orphaned entity 'initializeApp'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Orphaned file 'UI.ComponentsFile' - none of its exports are imported",
+      "severity": "error",
+      "suggestion": "Remove this file or import its exports somewhere"
+    },
+    {
+      "position": {
+        "line": 10,
+        "column": 1
+      },
+      "message": "Orphaned entity 'UI.Input'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 12,
+        "column": 1
+      },
+      "message": "Orphaned entity 'UI.Modal'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Orphaned file 'DB.DatabaseFile' - none of its exports are imported",
+      "severity": "error",
+      "suggestion": "Remove this file or import its exports somewhere"
+    },
+    {
+      "position": {
+        "line": 8,
+        "column": 1
+      },
+      "message": "Orphaned entity 'DB.query'",
+      "severity": "error",
+      "suggestion": "Remove or reference this entity"
+    },
+    {
+      "position": {
+        "line": 5,
+        "column": 1
+      },
+      "message": "Class 'DB.Connection' is not exported by any file",
+      "severity": "error",
+      "suggestion": "Add 'DB.Connection' to the exports of a file entity or convert to ClassFile with #: operator"
+    },
+    {
+      "position": {
+        "line": 8,
+        "column": 1
+      },
+      "message": "Function 'DB.query' is not exported by any file and is not a class method",
+      "severity": "error",
+      "suggestion": "Either add 'DB.query' to the exports of a file entity or define it as a method of a class"
+    },
+    {
+      "position": {
+        "line": 11,
+        "column": 1
+      },
+      "message": "Call to 'DB.Connection.connect' references unknown entity 'DB'",
+      "severity": "error"
+    },
+    {
+      "position": {
+        "line": 8,
+        "column": 1
+      },
+      "message": "Call to 'Connection.execute' references unknown entity 'Connection'",
+      "severity": "error"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Export 'Button' is not defined anywhere in the codebase",
+      "severity": "error",
+      "suggestion": "Define 'Button' as a Function, Class, Constants, Asset, or UIComponent entity"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Export 'Form' is not defined anywhere in the codebase",
+      "severity": "error",
+      "suggestion": "Define 'Form' as a Function, Class, Constants, Asset, or UIComponent entity"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Export 'Input' is not defined anywhere in the codebase",
+      "severity": "error",
+      "suggestion": "Define 'Input' as a Function, Class, Constants, Asset, or UIComponent entity"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Export 'Modal' is not defined anywhere in the codebase",
+      "severity": "error",
+      "suggestion": "Define 'Modal' as a Function, Class, Constants, Asset, or UIComponent entity"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Export 'Connection' is not defined anywhere in the codebase",
+      "severity": "error",
+      "suggestion": "Define 'Connection' as a Function, Class, Constants, Asset, or UIComponent entity"
+    },
+    {
+      "position": {
+        "line": 2,
+        "column": 1
+      },
+      "message": "Export 'query' is not defined anywhere in the codebase",
+      "severity": "error",
+      "suggestion": "Define 'query' as a Function, Class, Constants, Asset, or UIComponent entity"
+    },
+    {
+      "position": {
+        "line": 5,
+        "column": 1
+      },
+      "message": "UIComponent 'UI.Button' references unknown parent 'Form'",
+      "severity": "error",
+      "suggestion": "Define 'Form' as a UIComponent"
+    },
+    {
+      "position": {
+        "line": 5,
+        "column": 1
+      },
+      "message": "UIComponent 'UI.Button' references unknown parent 'Modal'",
+      "severity": "error",
+      "suggestion": "Define 'Modal' as a UIComponent"
+    },
+    {
+      "position": {
+        "line": 7,
+        "column": 1
+      },
+      "message": "UIComponent 'UI.Form' contains unknown component 'Input'",
+      "severity": "error",
+      "suggestion": "Define 'Input' as a UIComponent"
+    },
+    {
+      "position": {
+        "line": 7,
+        "column": 1
+      },
+      "message": "UIComponent 'UI.Form' contains unknown component 'Button'",
+      "severity": "error",
+      "suggestion": "Define 'Button' as a UIComponent"
+    },
+    {
+      "position": {
+        "line": 10,
+        "column": 1
+      },
+      "message": "UIComponent 'UI.Input' references unknown parent 'Form'",
+      "severity": "error",
+      "suggestion": "Define 'Form' as a UIComponent"
+    },
+    {
+      "position": {
+        "line": 12,
+        "column": 1
+      },
+      "message": "UIComponent 'UI.Modal' contains unknown component 'Button'",
+      "severity": "error",
+      "suggestion": "Define 'Button' as a UIComponent"
+    },
+    {
+      "position": {
+        "line": 10,
+        "column": 1
+      },
+      "message": "UIComponent 'UI.Input' is not contained by any other UIComponent",
+      "severity": "error",
+      "suggestion": "Either add 'UI.Input' to another UIComponent's contains list, or mark it as a root component with &!"
+    }
+  ],
+  "metadata": {
+    "healthScore": {
+      "overall": 92,
+      "categories": {
+        "Complexity": 100,
+        "Coupling": 100,
+        "Structure": 91.5,
+        "Testability": 80,
+        "Maintainability": 75.3030303030303,
+        "Performance": 84.83333333333333
+      },
+      "trends": {},
+      "recommendations": [],
+      "risks": []
+    },
+    "patterns": [],
+    "performance": {
+      "graph-load-time": "<normalized: non-deterministic wall-clock timing>"
+    }
+  }
+}

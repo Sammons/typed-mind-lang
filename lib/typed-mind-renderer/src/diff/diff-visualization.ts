@@ -723,11 +723,15 @@ class BreakingChangeDetector implements ChangeDetector {
  * Diff renderer for visualizing changes
  */
 class DiffRenderer {
-  constructor(
-    private diff: ArchitectureDiff,
-    private container: HTMLElement,
-    private mode: DiffVisualization['mode'],
-  ) {}
+  private diff: ArchitectureDiff;
+  private container: HTMLElement;
+  private mode: DiffVisualization['mode'];
+
+  constructor(diff: ArchitectureDiff, container: HTMLElement, mode: DiffVisualization['mode']) {
+    this.diff = diff;
+    this.container = container;
+    this.mode = mode;
+  }
 
   render(): void {
     // Implementation would create visual diff representation
