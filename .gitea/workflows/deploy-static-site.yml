@@ -8,7 +8,6 @@ on:
       - 'lib/typed-mind-static-website/**'
       - 'lib/typed-mind/**'
       - 'lib/typed-mind-cli/**'
-      - 'lib/typed-mind-renderer/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - '.gitea/workflows/deploy-static-site.yml'
@@ -46,7 +45,6 @@ jobs:
       - name: Build packages
         run: |
           mise exec -- pnpm --dir lib/typed-mind build
-          mise exec -- pnpm --dir lib/typed-mind-renderer build
           mise exec -- pnpm --dir lib/typed-mind-cli build
 
       - name: Build site
