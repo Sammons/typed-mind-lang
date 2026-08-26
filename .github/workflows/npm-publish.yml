@@ -48,6 +48,19 @@ jobs:
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
+      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
+      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml). Mirrors
+      # .gitea/workflows/deploy-static-site.yml's mise setup shape. Without
+      # this, @sammons/typed-mind's prebuild/prepack (build-wasm.mjs) fails
+      # for lack of `mise where tree-sitter` / `mise where http:wasi-sdk`.
+      - name: Install mise
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install toolchain
+        run: mise install
+
       - name: Lint
         run: pnpm lint
 
@@ -93,6 +106,16 @@ jobs:
 
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
+
+      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — see the matching step in
+      # the validate job above for the full rationale.
+      - name: Install mise
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install toolchain
+        run: mise install
 
       - name: Build publishable packages only
         run: |
