@@ -1,0 +1,5 @@
+# RFC-TM-3 Q3 manifest-class fixture: array-suffix-bare-name (PR #18 manifest).
+getTasks :: () => TaskResult
+  -> TaskResult[]
+processTask :: (task: Task) => void
+  <- Task, TaskContext

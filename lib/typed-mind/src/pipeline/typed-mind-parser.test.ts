@@ -64,7 +64,7 @@ describe('TypedMindParser (src dev layout, wasmPath override)', () => {
 
   it('parses the hero fixture into a wrapped CST root with a real 1-based span', async () => {
     const parser = await createParser();
-    const root = parser.parse(readFileSync(heroPath, 'utf8'));
+    const root = parser.parseCst(readFileSync(heroPath, 'utf8'));
     assert.deepEqual(
       {
         isSourceFile: root instanceof CstSourceFile,
@@ -79,7 +79,7 @@ describe('TypedMindParser (src dev layout, wasmPath override)', () => {
 
   it('reassembles longform header names via headerName(), identifier and quoted forms', async () => {
     const parser = await createParser();
-    const root = parser.parse(readFileSync(heroPath, 'utf8'));
+    const root = parser.parseCst(readFileSync(heroPath, 'utf8'));
     const headers = root.longformBlockChildren().map((block) => block.blockHeaderChildren().at(0));
     const identifierHeader = headers.at(0);
     assert.deepEqual(
@@ -100,7 +100,7 @@ describe('TypedMindParser (src dev layout, wasmPath override)', () => {
 
   it('normalizes the _final twin: the EOF dto declaration wraps into the same class as its base', async () => {
     const parser = await createParser();
-    const root = parser.parse(readFileSync(heroPath, 'utf8'));
+    const root = parser.parseCst(readFileSync(heroPath, 'utf8'));
     const eofDto = root.dtoDeclarationChildren().at(0);
     assert.deepEqual(
       {
@@ -120,14 +120,14 @@ describe('TypedMindParser (src dev layout, wasmPath override)', () => {
 
   it('wraps the newline-terminated base twin into the same class with isFinal false', async () => {
     const parser = await createParser();
-    const root = parser.parse('UserDTO %\n');
+    const root = parser.parseCst('UserDTO %\n');
     const dto = root.dtoDeclarationChildren().at(0);
     assert.deepEqual({ concreteType: dto?.syntaxNode.type, isFinal: dto?.isFinal }, { concreteType: 'dto_declaration', isFinal: false });
   });
 
   it('exposes flat-line siblings (declaration, continuation) with per-line spans', async () => {
     const parser = await createParser();
-    const root = parser.parse(readFileSync(heroPath, 'utf8'));
+    const root = parser.parseCst(readFileSync(heroPath, 'utf8'));
     const fileDeclaration = root.fileDeclarationChildren().at(0);
     const importContinuation = root.importListChildren().at(0);
     assert.deepEqual(
@@ -148,7 +148,7 @@ describe('TypedMindParser (src dev layout, wasmPath override)', () => {
 
   it('accepts the wasmBytes override', async () => {
     const parser = await TypedMindParser.create({ wasmBytes: new Uint8Array(readFileSync(wasmPath)) });
-    const root = parser.parse('UserDTO %\n');
+    const root = parser.parseCst('UserDTO %\n');
     assert.equal(root.dtoDeclarationChildren().length, 1);
   });
 });

@@ -21,7 +21,7 @@ const { readFileSync } = require('node:fs');
 const { TypedMindParser } = require(process.argv[1]);
 TypedMindParser.create()
   .then((parser) => {
-    const root = parser.parse(readFileSync(process.argv[2], 'utf8'));
+    const root = parser.parseCst(readFileSync(process.argv[2], 'utf8'));
     const headers = root.longformBlockChildren().map((block) => block.blockHeaderChildren()[0].headerName());
     const eofDto = root.dtoDeclarationChildren()[0];
     console.log(
