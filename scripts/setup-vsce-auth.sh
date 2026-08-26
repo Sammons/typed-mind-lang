@@ -48,12 +48,12 @@ if [ -z "$REPO" ]; then
 fi
 echo -e "${GREEN}✓${NC} Repository: $REPO"
 
-# Check if vsce is installed
-if ! command -v vsce &> /dev/null; then
-    echo -e "${YELLOW}Installing @vscode/vsce...${NC}"
-    npm install -g @vscode/vsce
+# vsce is a devDependency of the extension package; make sure deps are installed
+if [ ! -d lib/typed-mind-vscode-extension/node_modules ]; then
+    echo -e "${YELLOW}Installing workspace dependencies...${NC}"
+    pnpm install --frozen-lockfile --ignore-scripts
 fi
-echo -e "${GREEN}✓${NC} vsce CLI available"
+echo -e "${GREEN}✓${NC} vsce available via pnpm exec"
 
 echo ""
 echo "================================================"
@@ -111,7 +111,7 @@ echo "Testing token with vsce..."
 cd lib/typed-mind-vscode-extension
 
 # Use vsce verify-pat to test the token
-if echo "$VSCE_PAT" | npx @vscode/vsce verify-pat "$PUBLISHER" 2>/dev/null; then
+if echo "$VSCE_PAT" | pnpm exec vsce verify-pat "$PUBLISHER" 2>/dev/null; then
     echo -e "${GREEN}✓ Token is valid!${NC}"
 else
     echo -e "${RED}✗ Token verification failed${NC}"

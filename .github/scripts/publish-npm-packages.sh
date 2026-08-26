@@ -37,7 +37,7 @@ publish_package() {
 
   if [ "$DRY_RUN" = true ]; then
     echo "Would publish: pnpm publish --access public --no-git-checks"
-    pnpm publish --dry-run --no-git-checks
+    pnpm publish --dry-run --access public --no-git-checks
   else
     pnpm publish --access public --no-git-checks
     
