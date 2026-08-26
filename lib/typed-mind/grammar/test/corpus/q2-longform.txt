@@ -330,6 +330,50 @@ parameter FLAG {
         (bool_literal)))))
 
 ============================================================
+P4/P3 regression pair (PR #17 review): bare `true` is bool_literal, but an
+identifier that only STARTS with `true`/`false` is still property_identifier
+============================================================
+
+parameter FLAG {
+  required: true
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_bool
+        (property_key)
+        (bool_literal)))))
+
+============================================================
+P4/P3 regression pair (PR #17 review): `extends: trueClassName` is a full
+property_identifier match, NOT bool_literal truncated to `true` with the
+rest stranded as an ERROR (the defect the original bool_literal prec(1)
+fix introduced — grammar.js's `bool_prefixed_identifier` fixes it)
+============================================================
+
+class UserService {
+  extends: trueClassName
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_identifier
+        (property_key)
+        (entity_name)))))
+
+============================================================
 P5: fields: { <nested per-field blocks> } — multi-line, one nesting level
 (dto-longform.tmd:13-29 shape)
 ============================================================
