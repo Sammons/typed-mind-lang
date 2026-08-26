@@ -26,7 +26,7 @@ publish_package() {
   echo "Checking $package_name@$version..."
 
   # Check if this version already exists
-  if npm view "$package_name@$version" version >/dev/null 2>&1; then
+  if pnpm view "$package_name@$version" version >/dev/null 2>&1; then
     echo "✓ $package_name@$version already published, skipping..."
     return 0
   fi
@@ -36,10 +36,10 @@ publish_package() {
   cd "$package_dir"
 
   if [ "$DRY_RUN" = true ]; then
-    echo "Would publish: npm publish --access public"
-    npm pack --dry-run
+    echo "Would publish: pnpm publish --access public --no-git-checks"
+    pnpm publish --dry-run --access public --no-git-checks
   else
-    npm publish --access public
+    pnpm publish --access public --no-git-checks
     
     # Wait for package to be available
     echo "Waiting for $package_name@$version to be available on npm..."
@@ -47,7 +47,7 @@ publish_package() {
     local max_retries=30
     
     while [ $retries -lt $max_retries ]; do
-      if npm view "$package_name@$version" version >/dev/null 2>&1; then
+      if pnpm view "$package_name@$version" version >/dev/null 2>&1; then
         echo "✓ $package_name@$version is now available on npm"
         break
       fi

@@ -64,15 +64,17 @@
     "prepack": "pnpm run lint && pnpm run typecheck",
     "build:check": "pnpm run build && node dist/cli.cjs --help",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run lint && pnpm run typecheck && pnpm test",
-    "validate:package": "npx publint && npx attw --pack .",
-    "release:dry": "pnpm run build && pnpm run validate:package && npm publish --dry-run"
+    "validate:package": "pnpm exec publint && pnpm exec attw --pack .",
+    "release:dry": "pnpm run build && pnpm run validate:package && pnpm publish --dry-run --no-git-checks"
   },
   "dependencies": {
     "@sammons/typed-mind": "workspace:*",
     "@sammons/typed-mind-renderer": "workspace:*"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@types/node": "^22.18.1",
+    "publint": "^0.3.24",
     "tsup": "^8.3.5",
     "vitest": "^3.2.4"
   },

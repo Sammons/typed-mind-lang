@@ -1,6 +1,7 @@
 {
   "name": "@sammons/typed-mind-monorepo",
   "version": "0.1.5",
+  "packageManager": "pnpm@11.15.1",
   "private": true,
   "type": "module",
   "description": "TypedMind - A domain-specific language for program architecture",

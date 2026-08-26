@@ -39,10 +39,10 @@ fi
 echo "✅ VSCE_PAT secret exists"
 echo ""
 
-# Check if vsce is installed
-if ! command -v vsce &> /dev/null; then
-    echo "Installing vsce CLI tool..."
-    npm install -g @vscode/vsce
+# vsce is a devDependency of the extension package; make sure deps are installed
+if [ ! -d lib/typed-mind-vscode-extension/node_modules ]; then
+    echo "Installing workspace dependencies..."
+    pnpm install --frozen-lockfile --ignore-scripts
 fi
 
 echo "Testing token with vsce (this won't publish anything)..."
@@ -73,7 +73,7 @@ if ls *.vsix 1> /dev/null 2>&1; then
     echo ""
     echo "You can also manually publish with:"
     echo "  cd lib/typed-mind-vscode-extension"
-    echo "  vsce publish --pat YOUR_PAT"
+    echo "  pnpm exec vsce publish --pat YOUR_PAT"
     echo ""
 fi
 

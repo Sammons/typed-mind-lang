@@ -42,7 +42,7 @@
     "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
     "generate-grammar-docs": "tsx src/generate-grammar-doc.ts",
-    "prepublishOnly": "npm run clean && npm run build && npm test"
+    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },
   "devDependencies": {
     "@types/node": "^22.18.1",
