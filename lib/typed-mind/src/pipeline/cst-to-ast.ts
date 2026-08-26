@@ -65,7 +65,7 @@ const logicalTypeOf = (concreteType: string): string => {
   return concreteType.endsWith('_final') ? concreteType.slice(0, -'_final'.length) : concreteType;
 };
 
-const bySpanStart = (left: Diagnostic, right: Diagnostic): number => {
+export const compareDiagnosticsBySpan = (left: Diagnostic, right: Diagnostic): number => {
   if (left.span.start.line !== right.span.start.line) {
     return left.span.start.line - right.span.start.line;
   }
@@ -105,7 +105,7 @@ export class CstToAstWalker {
       this.#dispatch(lineNode);
     }
     this.#closeOpenEntity();
-    const diagnostics = [...collectSyntaxDiagnostics(this.#root.syntaxNode), ...this.#diagnostics].sort(bySpanStart);
+    const diagnostics = [...collectSyntaxDiagnostics(this.#root.syntaxNode), ...this.#diagnostics].sort(compareDiagnosticsBySpan);
     return {
       outcome: { entities: this.#entities, imports: this.#imports, diagnostics },
       attachments: this.#attachments,
