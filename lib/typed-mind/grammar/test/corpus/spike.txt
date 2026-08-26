@@ -886,11 +886,21 @@ class :: (x) => y
 
 (source_file
   (longform_block
-    (block_header)
-    (block_line_text))
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_freetext
+        (property_key)
+        (freetext_value))))
   (longform_block
-    (block_header)
-    (block_line_text))
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_freetext
+        (property_key)
+        (freetext_value))))
   (function_declaration
     (entity_name)
     (signature)))
