@@ -86,24 +86,20 @@ const shortform = typedMind.emitShortform(dslContent);
 const longform = typedMind.emitLongform(dslContent);
 ```
 
-`DSLChecker` (below) is a transient legacy bridge — synchronous, Map-shaped
-entities — kept running unchanged for the LSP, the TypeScript converter, and
-`@sammons/typed-mind-renderer` while those packages migrate onto the surface
-above. New integrations should use `TypedMind.create()`.
+Rendering a visualization from a parsed document:
 
 ```typescript
-import { DSLChecker } from '@sammons/typed-mind';
+import { TypedMind } from '@sammons/typed-mind';
 import { TypedMindRenderer } from '@sammons/typed-mind-renderer';
 
-// Parse and validate DSL
-const checker = new DSLChecker();
-const result = checker.check(dslContent);
+const typedMind = await TypedMind.create();
+const { valid, diagnostics } = typedMind.check(dslContent);
 
-if (result.valid) {
-  // Render visualization
-  const graph = checker.parse(dslContent);
+if (valid) {
+  const parseOutput = typedMind.parse(dslContent);
   const renderer = new TypedMindRenderer();
-  renderer.setProgramGraph(graph);
+  renderer.setGraph(parseOutput);
+  renderer.setValidationResult(diagnostics);
   await renderer.serve();
 }
 ```

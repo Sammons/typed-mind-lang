@@ -35,9 +35,9 @@ TypedMind is a Domain Specific Language (DSL) for declaratively describing softw
 
 ```js
 // ESM
-import { DSLChecker } from '@sammons/typed-mind-cli';
+import { TypedMind } from '@sammons/typed-mind-cli';
 // CJS
-const { DSLChecker } = require('@sammons/typed-mind-cli');
+const { TypedMind } = require('@sammons/typed-mind-cli');
 ```
 
 ## Requirements
