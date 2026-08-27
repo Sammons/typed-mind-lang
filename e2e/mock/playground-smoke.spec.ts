@@ -16,14 +16,27 @@ import { expect, test } from '@playwright/test';
 
 const BASE_URL = process.env.PLAYGROUND_URL ?? 'http://127.0.0.1:8080';
 
-const KNOWN_GOOD_SNIPPET = `TodoApp -> models v1.0.0
+// Genuinely orphan-clean under the real checker's default (non-skip) orphan
+// check — verified directly against TypedMindBrowser.check() (the same
+// construction typedmind-browser-init.js uses, no skipOrphanCheck) before
+// landing here. This matters because EVERY one of the 38 website snippets
+// (lib/typed-mind-static-website/snippets/*.tmd) is only valid with
+// --skip-orphan-check (see build.js's validateSnippets(), which passes that
+// flag to the CLI) — they are illustrative fragments, not complete programs,
+// so none of them work as a "known good, no flags" smoke fixture. The
+// original fixture here referenced a DTO ('Todo') that nothing consumed and
+// failed with checker/orphaned-entity — a fixture bug, not a facade bug (the
+// browser and CLI paths agreed on the same diagnostic). Dependency entities
+// are always orphan-exempt (checker/check-orphans.ts), so Program -> File
+// <- [Dependency] is the minimal clean shape; mirrors the real, checked-in
+// lib/typed-mind-cli/architecture.tmd, one of only two documents in the
+// examples-inventory golden set with valid: true.
+const KNOWN_GOOD_SNIPPET = `TodoApp -> main v1.0.0
 
-models @ models.ts:
-  -> [Todo]
+Fs ^ "File system operations"
 
-Todo % "Todo entity"
-  - id: string "Unique identifier"
-  - title: string "Todo title"
+main @ main.ts:
+  <- [Fs]
 `;
 
 // Deliberately invalid: references an entity ('Ghost') that is never
