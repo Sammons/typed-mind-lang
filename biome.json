@@ -68,7 +68,7 @@
   },
   "overrides": [
     {
-      "includes": ["lib/typed-mind/src/**", "!lib/typed-mind/src/longform-parser.ts"],
+      "includes": ["lib/typed-mind/src/**"],
       "linter": {
         "rules": {
           "suspicious": {
