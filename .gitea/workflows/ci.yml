@@ -37,3 +37,41 @@ jobs:
 
       - name: Validate (build, lint, typecheck, test)
         run: mise exec -- pnpm run ci
+
+  playground-smoke:
+    # RFC-TM-7 §2 (rfc-tm-7-diamond.md, S-CONS-WEB-1) — the headless
+    # docker-Playwright smoke, wired into every PR per the doc's ruling (the
+    # node-graph parity test in the `validate` job pins verdict equality;
+    # this job pins module loading, the import map, and wasm MIME on the
+    # actual built/served site — properties only a real browser exercises).
+    name: Playground browser smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mise
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install toolchain
+        run: mise install
+
+      - name: Install pnpm
+        run: |
+          mise exec -- corepack enable
+          mise exec -- corepack prepare pnpm@11 --activate
+
+      - name: Install dependencies
+        run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build site (includes the browser bundle, per build.js)
+        run: |
+          mise exec -- pnpm --dir lib/typed-mind build
+          mise exec -- pnpm --dir lib/typed-mind-cli build
+          cd lib/typed-mind-static-website && mise exec -- node build.js
+
+      - name: Run headless smoke in Docker
+        run: ./e2e/mock/run.sh

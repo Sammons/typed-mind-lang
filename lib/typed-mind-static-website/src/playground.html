@@ -204,7 +204,15 @@
     
     <!-- Scripts -->
     <script src="vendor/monaco/vs/loader.js"></script>
-    <script src="assets/js/typedmind-parser-browser.js"></script>
+    <!-- RFC-TM-7 §2 (rfc-tm-7-diamond.md, S-CONS-WEB-1): the import map
+         resolves the one bare specifier the tsc-emitted browser build
+         imports (web-tree-sitter) to the same-origin vendored ESM file —
+         the exact file the package's `import` export condition names, never
+         the whole package directory (it also ships a .cjs build). -->
+    <script type="importmap">
+      { "imports": { "web-tree-sitter": "./assets/web-tree-sitter.js" } }
+    </script>
+    <script type="module" src="assets/js/typedmind-browser-init.js"></script>
     <script src="assets/js/snippet-loader.js"></script>
     <script src="assets/js/playground-examples-standalone.js"></script>
     <script src="assets/js/token-manager.js"></script>

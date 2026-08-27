@@ -1,18 +1,19 @@
-// RFC-TM-4 §4 (rfc-tm-4-diamond.md) S-TEST-4 — the 31-document examples-inventory
+// RFC-TM-4 §4 (rfc-tm-4-diamond.md) S-TEST-4 — the 30-document examples-inventory
 // golden-diagnostics harness. Each file in the inventory (ast-v2-goal-scope.md
 // vocab section: 5 at repo root, 6 in examples/ plus the 4 import-resolution
 // fixtures in examples/imports/, 3 in the VS Code extension, 2 in the
-// test-suite package root, the 10 architecture.tmd/program.tmd dogfood
-// documents, and lib/typed-mind-static-website/temp.tmd) parses through the
-// new surface and its full diagnostics list is compared against a checked-in
-// expectation (goldens/examples-inventory-expected.json) — empty for clean
-// examples, the known defects (including naming-edge-cases-example.tmd's
-// lines 47/49 and its A1/A2-attested rows) for the rest. This is how
-// showcase files that intentionally carry defects are conserved without
-// freezing their brokenness as "passing."
+// test-suite package root, and the 10 architecture.tmd/program.tmd dogfood
+// documents) parses through the new surface and its full diagnostics list is
+// compared against a checked-in expectation
+// (goldens/examples-inventory-expected.json) — empty for clean examples, the
+// known defects (including naming-edge-cases-example.tmd's lines 47/49 and
+// its A1/A2-attested rows) for the rest. This is how showcase files that
+// intentionally carry defects are conserved without freezing their
+// brokenness as "passing."
 //
-// `temp.tmd` (lib/typed-mind-static-website/temp.tmd) is treated as present
-// until TM-7 deletes it (§4).
+// RFC-TM-7 §2 (rfc-tm-7-diamond.md, S-CONS-WEB-1) deleted
+// lib/typed-mind-static-website/temp.tmd (the playground migration's
+// same-PR S-TEST-4 handoff) and dropped it from this inventory, 31 -> 30.
 //
 // The 4 examples/imports/* fixtures exercise cross-file @import resolution
 // (S-PARSE-5, ast-v2-goal-scope.md). `TypedMind.check()` does not wire
@@ -44,7 +45,7 @@ const IMPORT_TOUCHING = new Set([
   'examples/imports/ui/components.tmd',
 ]);
 
-// The 31-document examples inventory (ast-v2-goal-scope.md vocab section).
+// The 30-document examples inventory (ast-v2-goal-scope.md vocab section).
 const EXAMPLES_INVENTORY: readonly string[] = [
   'complex-dto-example.tmd',
   'method-calls-example.tmd',
@@ -76,7 +77,6 @@ const EXAMPLES_INVENTORY: readonly string[] = [
   'lib/typed-mind-renderer/program.tmd',
   'lib/typed-mind-typescript/architecture.tmd',
   'lib/typed-mind-typescript/typed-mind-cli-architecture.tmd',
-  'lib/typed-mind-static-website/temp.tmd',
 ];
 
 interface GoldenDiagnostic {
@@ -121,8 +121,8 @@ describe('examples inventory golden diagnostics (S-TEST-4)', () => {
   const expectedPath = join(import.meta.dirname, 'goldens', 'examples-inventory-expected.json');
   const expected: Record<string, GoldenEntry> = JSON.parse(readFileSync(expectedPath, 'utf-8'));
 
-  it('the golden fixture covers exactly the 31-document examples inventory', () => {
-    assert.equal(EXAMPLES_INVENTORY.length, 31);
+  it('the golden fixture covers exactly the 30-document examples inventory', () => {
+    assert.equal(EXAMPLES_INVENTORY.length, 30);
     assert.deepEqual(Object.keys(expected).sort(), [...EXAMPLES_INVENTORY].sort());
   });
 

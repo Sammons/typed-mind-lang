@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist-browser",
+    "tsBuildInfoFile": "./dist-browser/.tsbuildinfo",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "noUncheckedIndexedAccess": false,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["src/browser.ts"],
+  "exclude": ["node_modules", "dist", "dist-browser", "**/*.test.ts", "**/*.spec.ts", "src/pipeline/import-resolver.ts"]
+}
