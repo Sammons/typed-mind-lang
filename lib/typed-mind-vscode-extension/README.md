@@ -117,12 +117,15 @@ reason this package retains `tsup`.
 
 ### Dependencies
 
-`@sammons/typed-mind` and `@sammons/typed-mind-lsp` are `workspace:*` — RFC-TM-5 §3
-(`knowledge/projects/typedmind/rfc-tm-5-diamond.md`) Q3. `@sammons/typed-mind-renderer`
-stays pinned at the last-published `^0.2.1` until RFC-TM-6 merges: flipping it early would
-pull TM-6's in-flight renderer into the extension (the DAG's ordering constraint). The
-preview command (`src/extension.ts`) still `require`s the pinned renderer; the flip and the
-preview's AST migration are RFC-TM-5 Q4.
+All three runtime dependencies — `@sammons/typed-mind`, `@sammons/typed-mind-lsp`, and
+`@sammons/typed-mind-renderer` — are `workspace:*`. `typed-mind` and `typed-mind-lsp`
+flipped in RFC-TM-5 §3 (`knowledge/projects/typedmind/rfc-tm-5-diamond.md`) Q3.
+`typed-mind-renderer` stayed pinned at the last-published `^0.2.1` through Q3 because
+RFC-TM-6 was still migrating the renderer off the legacy bridge; flipping early would have
+pulled TM-6's in-flight renderer into the extension (the DAG's ordering constraint). RFC-TM-6
+merged, so Q4 flips the renderer to `workspace:*` and migrates the preview command
+(`src/extension.ts`) onto `TypedMind.create()` + the renderer's `setGraph`/`setValidationResult`
+entry point — the `DSLChecker` require and `setProgramGraph` call are gone.
 
 ## Example Syntax
 

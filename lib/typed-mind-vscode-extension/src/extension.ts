@@ -1,4 +1,6 @@
 import * as path from 'node:path';
+import { TypedMind } from '@sammons/typed-mind';
+import { AdvancedTypedMindRenderer } from '@sammons/typed-mind-renderer';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions, TransportKind } from 'vscode-languageclient/node';
 
 // Use require for vscode to avoid __toESM issues
@@ -107,19 +109,27 @@ async function handlePreview(_context: vscode.ExtensionContext): Promise<void> {
   // Get the document content
   const content = editor.document.getText();
   const fileName = path.basename(editor.document.fileName);
+  const filePath = editor.document.fileName;
 
   try {
-    // Import TypedMind packages
-    const { DSLChecker } = require('@sammons/typed-mind');
-    const { AdvancedTypedMindRenderer } = require('@sammons/typed-mind-renderer');
+    // RFC-TM-5 §3 Q4 (rfc-tm-5-diamond.md) — the preview consumes the AST
+    // surface directly: TypedMind.create() + parse()/check() replace the
+    // legacy DSLChecker require, and the renderer's setGraph/setValidationResult
+    // entry point (rfc-tm-6-diamond.md §2) replaces setProgramGraph. filePath
+    // is passed through so @import-resolved multi-file documents preview
+    // correctly, matching the main CLI's --render path (lib/typed-mind-cli/src/cli.ts).
+    const typedMind = await TypedMind.create();
 
     // Parse and validate the TypedMind content
-    const checker = new DSLChecker();
-    const result = checker.check(content);
+    const { diagnostics } = typedMind.check(content, filePath);
+    const hasErrors = diagnostics.some((diagnostic) => diagnostic.severity === 'error');
 
-    if (!result.valid) {
+    if (hasErrors) {
       // Show validation errors
-      const errorMessages = result.errors.map((err: any) => `Line ${err.position?.line || 0}: ${err.message}`).join('\n');
+      const errorMessages = diagnostics
+        .filter((diagnostic) => diagnostic.severity === 'error')
+        .map((diagnostic) => `Line ${diagnostic.span.start.line}: ${diagnostic.message}`)
+        .join('\n');
 
       vscode.window.showErrorMessage(`TypedMind validation errors:\n${errorMessages}`);
 
@@ -132,7 +142,7 @@ async function handlePreview(_context: vscode.ExtensionContext): Promise<void> {
     }
 
     // Parse the content into a graph
-    const graph = checker.parse(content);
+    const graph = typedMind.parse(content, filePath);
 
     // Create a webview panel
     const panel = vscode.window.createWebviewPanel('typedmindPreview', `TypedMind Preview: ${fileName}`, vscode.ViewColumn.Beside, {
@@ -141,15 +151,22 @@ async function handlePreview(_context: vscode.ExtensionContext): Promise<void> {
     });
 
     // Generate the HTML content using the advanced renderer
+    // Note: `enableInteractiveFeatures` was passed here pre-migration but is
+    // not (and never was) a member of AdvancedRendererOptions — the legacy
+    // `require()` call erased the type, which hid the mistake. Dropped as
+    // part of RFC-TM-5 Q4's AST migration (rfc-tm-5-diamond.md §3); the
+    // renderer's actual interactive-feature options are its `enable*`
+    // fields already listed below plus `enableDeepLinking`, unrelated to the
+    // removed key.
     const renderer = new AdvancedTypedMindRenderer({
       enableVirtualization: true,
-      enableInteractiveFeatures: true,
       enablePatternRecognition: true,
       themePreference: vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark ? 'dark' : 'light',
     });
 
-    renderer.setProgramGraph(graph);
-    const html = await renderer.generateStaticHTML();
+    await renderer.setGraph(graph);
+    await renderer.setValidationResult(diagnostics);
+    const html = renderer.generateStaticHTML();
 
     // Set the webview content
     panel.webview.html = html;
@@ -171,16 +188,12 @@ async function handlePreview(_context: vscode.ExtensionContext): Promise<void> {
       }
       updateTimeout = setTimeout(async () => {
         const newContent = editor.document.getText();
-        const newChecker = new DSLChecker();
-        const newResult = newChecker.check(newContent);
-
-        if (newResult.valid || true) {
-          // Allow preview even with errors
-          const newGraph = newChecker.parse(newContent);
-          renderer.setProgramGraph(newGraph);
-          const newHtml = await renderer.generateStaticHTML();
-          panel.webview.html = newHtml;
-        }
+        const newGraph = typedMind.parse(newContent, filePath);
+        const { diagnostics: newDiagnostics } = typedMind.check(newContent, filePath);
+        await renderer.setGraph(newGraph);
+        await renderer.setValidationResult(newDiagnostics);
+        const newHtml = renderer.generateStaticHTML();
+        panel.webview.html = newHtml;
       }, 500); // Debounce for 500ms
     };
 

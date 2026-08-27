@@ -129,8 +129,8 @@ importers:
         specifier: workspace:*
         version: link:../typed-mind-lsp
       '@sammons/typed-mind-renderer':
-        specifier: ^0.2.1
-        version: 0.2.1
+        specifier: workspace:*
+        version: link:../typed-mind-renderer
       vscode-languageclient:
         specifier: ^9.0.1
         version: 9.0.1
@@ -1146,10 +1146,6 @@ packages:
     resolution: {integrity: sha512-HwHCH5GQTOeGYP5wBEBXFVhfQecwRl24Rugoqhh8YwGarsU09bHhOKuqlyW4ZolZCan3eTUax7UJbGSmKSM51A==}
     cpu: [x64]
     os: [win32]
-
-  '@sammons/typed-mind-renderer@0.2.1':
-    resolution: {integrity: sha512-pG4j1ggagkoMwd8HBmUFy/F8Y5PizZNEu99ZrcL6aXqTzSWxvbGNP2L/TIqS7wnM1bTiWuqO6DrKF9a+HVyXaQ==}
-    engines: {node: '>=22.0.0'}
 
   '@secretlint/config-creator@10.2.1':
     resolution: {integrity: sha512-nyuRy8uo2+mXPIRLJ93wizD1HbcdDIsVfgCT01p/zGVFrtvmiL7wqsl4KgZH0QFBM/KRLDLeog3/eaM5ASjtvw==}
@@ -3505,10 +3501,6 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.45.3':
     optional: true
-
-  '@sammons/typed-mind-renderer@0.2.1':
-    dependencies:
-      '@sammons/typed-mind': link:lib/typed-mind
 
   '@secretlint/config-creator@10.2.1':
     dependencies:
