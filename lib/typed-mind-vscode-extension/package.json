@@ -163,7 +163,7 @@
   "dependencies": {
     "@sammons/typed-mind": "workspace:*",
     "@sammons/typed-mind-lsp": "workspace:*",
-    "@sammons/typed-mind-renderer": "^0.2.1",
+    "@sammons/typed-mind-renderer": "workspace:*",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
