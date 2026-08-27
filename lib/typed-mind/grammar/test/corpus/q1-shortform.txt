@@ -497,7 +497,14 @@ UserDTO %
     (entity_name))
   (dto_field
     (field_name)
-    (field_type)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))
     (string)
     (optional_marker)))
 
@@ -515,7 +522,14 @@ UserDTO %
     (entity_name))
   (dto_field
     (field_name)
-    (field_type)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))
     (string)))
 
 ============================================================
@@ -666,7 +680,14 @@ UserDTO %
     (entity_name))
   (dto_field
     (field_name)
-    (field_type)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))
     (string)
     (optional_marker)
     (inline_comment)))
@@ -746,10 +767,15 @@ S-GRAMMAR-4b arm 2 (NARROWS): leading-digit entity name yields ERROR (scenario-5
 
 ---
 
+; X-TYPE-1 collateral (rfc-tm-8-diamond.md §1): the ERROR-recovery internal
+; shape moved (was `(ERROR (dependency_name) (UNEXPECTED 's'))`) because the
+; type-expression sub-grammar adds new token shapes to the grammar's global
+; token table, which GLR error recovery draws from at every recovery point —
+; not because this line's OWN meaning changed. The document-level verdict is
+; unchanged: this is still, and only, an ERROR.
 (source_file
   (ERROR
-    (dependency_name)
-    (UNEXPECTED 's')))
+    (dependency_name)))
 
 ============================================================
 scenario-34: bare inheritance in a real multi-line class body
@@ -779,6 +805,13 @@ range-version ^ "Range version" ^4.0.0
 
 ---
 
+; X-TYPE-1 collateral (rfc-tm-8-diamond.md §1): the ERROR-recovery internal
+; shape moved (was `(ERROR (UNEXPECTED '4'))`) — GLR error recovery now finds
+; `4.0.0` matches the new type_literal_number token (`-?\d+(\.\d+)?`) at this
+; recovery point (that token is grammar-global, not scoped to dto_field), so
+; recovery consumes it as a real leaf instead of an opaque UNEXPECTED
+; placeholder. The line's own meaning is unchanged: `^4.0.0` is still, and
+; only, an ERROR for a dependency version (this fixture's whole point).
 (source_file
   (dependency_declaration
     (dependency_name)
@@ -788,7 +821,7 @@ range-version ^ "Range version" ^4.0.0
     (dependency_name)
     (string)
     (ERROR
-      (UNEXPECTED '4'))))
+      (type_literal_number))))
 
 ============================================================
 scenario-38: unprefixed dependency version alongside v-prefixed sibling
@@ -881,3 +914,425 @@ startApp :: () => void
       (list_entry)
       (list_entry)
       (list_entry))))
+
+============================================================
+X-TYPE-1: union of string literals
+============================================================
+
+UserDTO %
+  - status: "active" | "inactive" | "pending"
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_string
+                  (string)))))
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_string
+                  (string)))))
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_string
+                  (string))))))))))
+
+============================================================
+X-TYPE-1: intersection of named types
+============================================================
+
+UserDTO %
+  - x: EntityNodeArgs & Foo
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))))
+
+============================================================
+X-TYPE-1: generic with a string literal argument (Pick<S3Client, "send">)
+============================================================
+
+UserDTO %
+  - x: Pick<S3Client, "send">
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_generic
+                  base: (type_named
+                    (entity_name))
+                  (type_expr
+                    (type_union
+                      (type_intersection
+                        (type_postfix
+                          (type_atom
+                            (type_named
+                              (entity_name)))))))
+                  (type_expr
+                    (type_union
+                      (type_intersection
+                        (type_postfix
+                          (type_atom
+                            (type_literal_string
+                              (string))))))))))))))))
+
+============================================================
+X-TYPE-1: nested generic
+============================================================
+
+UserDTO %
+  - x: Record<string, Array<number>>
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_generic
+                  base: (type_named
+                    (entity_name))
+                  (type_expr
+                    (type_union
+                      (type_intersection
+                        (type_postfix
+                          (type_atom
+                            (type_named
+                              (entity_name)))))))
+                  (type_expr
+                    (type_union
+                      (type_intersection
+                        (type_postfix
+                          (type_atom
+                            (type_generic
+                              base: (type_named
+                                (entity_name))
+                              (type_expr
+                                (type_union
+                                  (type_intersection
+                                    (type_postfix
+                                      (type_atom
+                                        (type_named
+                                          (entity_name))))))))))))))))))))))
+
+============================================================
+X-TYPE-1: array of a parenthesized union ((string | number)[])
+============================================================
+
+UserDTO %
+  - x: (string | number)[]
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name)))))
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name)))))))))))))))
+
+============================================================
+X-TYPE-1: readonly array of a named type
+============================================================
+
+UserDTO %
+  - x: readonly DtoFieldNode[]
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_readonly_array
+                  (readonly_kw)
+                  element: (readonly_name_rest))))))))))
+
+============================================================
+X-TYPE-1: readonly array of a parenthesized union
+============================================================
+
+UserDTO %
+  - x: readonly (string | number)[]
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_readonly_array
+                  (readonly_kw)
+                  element: (readonly_paren_rest))))))))))
+
+============================================================
+X-TYPE-1: readonly[] collision — readonly lexes as a plain named type, not the keyword
+============================================================
+
+UserDTO %
+  - x: readonly[]
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))))
+
+============================================================
+X-TYPE-1: unquoted numeric literal union (complex-dto-example.tmd:42 `1 | 2 | 3 | 4 | 5`)
+============================================================
+
+UserDTO %
+  - priority: 1 | 2 | 3 | 4 | 5
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_number))))
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_number))))
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_number))))
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_number))))
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_number)))))))))
+
+============================================================
+X-TYPE-1: two strings — the type's literal atom, then the description slot
+============================================================
+
+UserDTO %
+  - f: "active" "desc"
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_string
+                  (string))))))))
+    (string)))
+
+============================================================
+X-TYPE-1: lone string — the type's literal atom, no description (behavior change, X-TYPE-6)
+============================================================
+
+UserDTO %
+  - f: "onlystring"
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_string
+                  (string))))))))))
+
+============================================================
+X-TYPE-1: opaque fallback — object literal with an index signature
+============================================================
+
+UserDTO %
+  - x: { [key: string]: number }
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque)))))))))
+
+============================================================
+X-TYPE-1: opaque fallback — tuple
+============================================================
+
+UserDTO %
+  - x: [string, number, boolean]
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque)))))))))
+
+============================================================
+X-TYPE-1: opaque fallback — function type (extrapolated, no corpus instance)
+============================================================
+
+UserDTO %
+  - x: () => void
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque)))))))))
+
+============================================================
+X-TYPE-1: array-of-array depth (complex-dto-example.tmd:45 `number[][]`)
+============================================================
+
+UserDTO %
+  - x: number[][]
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))))
