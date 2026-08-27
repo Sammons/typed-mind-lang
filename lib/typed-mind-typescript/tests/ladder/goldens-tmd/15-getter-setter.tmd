@@ -1,0 +1,8 @@
+WidgetApp -> WidgetFile v1.0.0
+  -> [Widget]
+
+WidgetFile @ tests/ladder/repros-analyzer/15-getter-setter/src/widget.ts:
+  -> [Widget]
+
+Widget <:
+  => [describe, name]

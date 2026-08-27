@@ -17,7 +17,8 @@
       "!lib/typed-mind/grammar/src",
       "!lib/typed-mind-vscode-extension/lsp-bundled",
       "!lib/typed-mind-static-website/assets",
-      "!**/*.html"
+      "!**/*.html",
+      "!lib/typed-mind-typescript/tests/ladder/repros-analyzer"
     ]
   },
   "formatter": {

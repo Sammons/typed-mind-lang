@@ -1,0 +1,13 @@
+MainApp -> MainFile v1.0.0
+  -> [describe]
+
+MainFile @ tests/ladder/repros-analyzer/08b-type-only-noext/src/main.ts:
+  <- [Widget]
+  -> [describe]
+
+describe :: describe(w: Widget) => string
+  <- Widget
+
+Widget %
+  - id: string
+  - name: string

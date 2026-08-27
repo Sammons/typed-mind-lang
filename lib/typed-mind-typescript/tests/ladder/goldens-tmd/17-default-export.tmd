@@ -1,0 +1,13 @@
+MainApp -> MainFile v1.0.0
+  -> [mainFn]
+
+MainFile @ tests/ladder/repros-analyzer/17-default-export/src/main.ts:
+  <- [helperFn]
+  -> [mainFn]
+
+HelperFile @ tests/ladder/repros-analyzer/17-default-export/src/helper.ts:
+  -> [helperFn]
+
+mainFn :: mainFn() => string
+
+helperFn :: helperFn() => string

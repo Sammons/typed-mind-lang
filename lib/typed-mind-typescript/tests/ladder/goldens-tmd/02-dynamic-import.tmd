@@ -1,0 +1,12 @@
+MainApp -> MainFile v1.0.0
+  -> [run]
+
+MainFile @ tests/ladder/repros-analyzer/02-dynamic-import/src/main.ts:
+  -> [run]
+
+WorkerFile @ tests/ladder/repros-analyzer/02-dynamic-import/src/worker.ts:
+  -> [doWork]
+
+run :: async run() => Promise<string>
+
+doWork :: doWork() => string

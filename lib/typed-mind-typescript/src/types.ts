@@ -39,6 +39,9 @@ export interface ParsedMethod {
   readonly parameters: readonly ParsedParameter[];
   readonly returnType: string;
   readonly isAsync: boolean;
+  // X-AN-8: get/set pairs on the same name fold into one method entry.
+  // undefined for a plain method (not an accessor).
+  readonly accessorKind: 'get' | 'set' | 'both' | undefined;
 }
 
 export interface ParsedProperty {
@@ -68,6 +71,9 @@ export interface ParsedModule {
   readonly interfaces: readonly ParsedInterface[];
   readonly types: readonly ParsedTypeAlias[];
   readonly constants: readonly ParsedConstant[];
+  // X-AN-2 — literal specifiers found in dynamic `import(...)` calls in this
+  // module. Followed by the traversal queue the same way static imports are.
+  readonly dynamicImportSpecifiers: readonly string[];
 }
 
 export interface ParsedImport {
@@ -81,7 +87,12 @@ export interface ParsedImport {
 export interface ParsedExport {
   readonly name: string;
   readonly isDefault: boolean;
-  readonly type: 'function' | 'class' | 'interface' | 'type' | 'constant' | 'variable';
+  // X-AN-3: 'namespace-reexport' models `export * from '<source>'` — `name`
+  // is the literal marker '*', `source` is the target module specifier. The
+  // converter's export-registry phase folds the target module's own exports
+  // in when resolving an import against a module whose export list carries
+  // this marker (transitively, with a visited-set cycle guard).
+  readonly type: 'function' | 'class' | 'interface' | 'type' | 'constant' | 'variable' | 'namespace-reexport';
   readonly source: string | undefined; // Re-export source
 }
 
@@ -104,6 +115,43 @@ export interface TypeScriptProjectAnalysis {
   readonly modules: readonly ParsedModule[];
   readonly entryPoints: readonly string[];
   readonly projectConfig: ts.CompilerOptions;
+  // X-DIAG-1: extraction diagnostics substrate. Populated by
+  // TypeScriptAnalyzer during traversal/resolution — never silently
+  // discarded (I-11/I-13 degrade-never-discard).
+  readonly diagnostics: readonly AnalyzerDiagnostic[];
+  // X-AN-1 leaf check (module-graph.json golden): the exact resolved edge
+  // list for this analysis run, one record per resolved import/re-export.
+  readonly moduleGraph: readonly ModuleGraphEdge[];
+}
+
+// X-DIAG-1 — analyzer-level diagnostics. Every silence mode named in the
+// Diamond Doc §7 produces one of these instead of a bare `continue`/`return
+// null`: unresolvable imports, non-literal dynamic imports, skipped
+// modules, and (Q1) the entrypoint-outside-file-set case.
+export interface AnalyzerDiagnostic {
+  readonly severity: 'error' | 'warning';
+  readonly category:
+    | 'entrypoint-not-in-program'
+    | 'unresolvable-import'
+    | 'non-literal-dynamic-import'
+    | 'skipped-module'
+    | 'zero-entities';
+  readonly message: string;
+  readonly filePath: string | undefined;
+  readonly specifier: string | undefined;
+}
+
+// X-AN-1 — one record per resolved import/re-export edge. `target` is
+// project-root-relative when internal, and the raw resolved
+// node_modules-relative package specifier when external. This is the exact
+// edge-list the module-graph.json golden asserts against (count summaries
+// are explicitly rejected as a check — see RFC-TM-9 §1 Rejected
+// Alternatives).
+export interface ModuleGraphEdge {
+  readonly sourceModule: string;
+  readonly specifier: string;
+  readonly resolvedTarget: string | undefined;
+  readonly classification: 'internal' | 'external' | 'unresolved';
 }
 
 export interface ConversionOptions {

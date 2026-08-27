@@ -1,0 +1,14 @@
+MainApp -> MainFile v1.0.0
+  -> [mainFn]
+
+MainFile @ tests/ladder/repros-analyzer/10-export-star/src/main.ts:
+  -> [mainFn]
+
+LibFile @ tests/ladder/repros-analyzer/10-export-star/src/lib.ts:
+
+WidgetFile @ tests/ladder/repros-analyzer/10-export-star/src/widget.ts:
+  -> [makeWidget]
+
+mainFn :: mainFn() => string
+
+makeWidget :: makeWidget() => string

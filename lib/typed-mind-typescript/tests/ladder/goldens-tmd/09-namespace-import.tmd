@@ -1,0 +1,18 @@
+MainApp -> MainFile v1.0.0
+  -> [mainFn]
+
+MainFile @ tests/ladder/repros-analyzer/09-namespace-import/src/main.ts:
+  -> [mainFn]
+
+MathutilsFile @ tests/ladder/repros-analyzer/09-namespace-import/src/mathutils.ts:
+  -> [add, sub]
+
+MathUtils <: NamespaceImport
+  "Namespace import: MathUtils from ./mathutils.js"
+  => [default]
+
+mainFn :: mainFn() => number
+
+add :: add(a: number, b: number) => number
+
+sub :: sub(a: number, b: number) => number

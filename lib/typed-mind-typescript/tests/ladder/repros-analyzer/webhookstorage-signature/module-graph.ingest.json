@@ -1,0 +1,8 @@
+[
+  {
+    "sourceModule": "src/server.ts",
+    "specifier": "../../core/src/notification-signing.ts",
+    "resolvedTarget": "../core/src/notification-signing.ts",
+    "classification": "internal"
+  }
+]
