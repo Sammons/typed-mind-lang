@@ -1,0 +1,12 @@
+MainApp -> MainFile v1.0.0
+  -> [mainFn]
+
+MainFile @ tests/ladder/repros-analyzer/01-js-ext/src/main.ts:
+  -> [mainFn]
+
+HelperFile @ tests/ladder/repros-analyzer/01-js-ext/src/helper.ts:
+  -> [helperFn]
+
+mainFn :: mainFn() => string
+
+helperFn :: helperFn() => string

@@ -1,0 +1,14 @@
+MainApp -> MainFile v1.0.0
+  -> [mainFn]
+
+MainFile @ tests/ladder/repros-analyzer/07-barrel-reexport/src/main.ts:
+  -> [mainFn]
+
+IndexFile @ tests/ladder/repros-analyzer/07-barrel-reexport/src/lib/index.ts:
+
+WidgetFile @ tests/ladder/repros-analyzer/07-barrel-reexport/src/lib/widget.ts:
+  -> [makeWidget]
+
+mainFn :: mainFn() => string
+
+makeWidget :: makeWidget() => string

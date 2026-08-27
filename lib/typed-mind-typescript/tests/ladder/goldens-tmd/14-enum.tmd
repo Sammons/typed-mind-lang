@@ -1,0 +1,15 @@
+MainApp -> MainFile v1.0.0
+  -> [Job, describe]
+
+MainFile @ tests/ladder/repros-analyzer/14-enum/src/main.ts:
+  <- [Status]
+  -> [Job, describe]
+
+describe :: describe(j: Job) => string
+  <- Job
+
+Job %
+  - id: string
+  - status: Status
+
+Status ! tests/ladder/repros-analyzer/14-enum/src/status.ts : enum

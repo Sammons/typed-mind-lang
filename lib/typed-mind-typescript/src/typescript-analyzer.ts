@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as ts from 'typescript';
 import type {
+  AnalyzerDiagnostic,
+  ModuleGraphEdge,
   ParsedClass,
   ParsedConstant,
   ParsedExport,
@@ -15,20 +17,47 @@ import type {
   ParsedTypeAlias,
   TypeScriptProjectAnalysis,
 } from './types.ts';
-import {
-  createFilePath,
-  isClass,
-  isExportDeclaration,
-  isFunction,
-  isImportDeclaration,
-  isInterface,
-  isTypeAlias,
-  isVariableStatement,
-} from './types.ts';
+import { createFilePath, isClass, isExportDeclaration, isFunction, isInterface, isTypeAlias, isVariableStatement } from './types.ts';
+
+// X-AN-1 — resolution outcome for one specifier, resolved via
+// `ts.resolveModuleName` against the union program's own compiler options.
+// Replaces the hand-rolled `fs.existsSync` probing entirely: no
+// `startsWith('.')` guard anywhere in this resolution path (the RFC's
+// negative check), so `paths`-aliased and NodeNext `.js`-suffixed
+// specifiers resolve through the same call as everything else.
+interface ResolutionOutcome {
+  readonly resolvedPath: string | undefined;
+  readonly classification: 'internal' | 'external' | 'unresolved';
+}
+
+// A parse-config-file host that reads from the real filesystem and reports
+// diagnostics into an accumulator rather than to stderr, since a broken
+// referenced tsconfig should surface as an AnalyzerDiagnostic, not a
+// console line the caller can't see.
+class CollectingParseConfigHost implements ts.ParseConfigFileHost {
+  useCaseSensitiveFileNames = ts.sys.useCaseSensitiveFileNames;
+  readonly diagnostics: ts.Diagnostic[] = [];
+
+  readDirectory = ts.sys.readDirectory;
+  fileExists = ts.sys.fileExists;
+  readFile = ts.sys.readFile;
+
+  getCurrentDirectory(): string {
+    return ts.sys.getCurrentDirectory();
+  }
+
+  onUnRecoverableConfigFileDiagnostic(diagnostic: ts.Diagnostic): void {
+    this.diagnostics.push(diagnostic);
+  }
+}
 
 export class TypeScriptAnalyzer {
   private program: ts.Program;
   private checker: ts.TypeChecker;
+  private compilerOptions: ts.CompilerOptions;
+  private readonly moduleResolutionCache: ts.ModuleResolutionCache;
+  private readonly diagnostics: AnalyzerDiagnostic[] = [];
+  private readonly moduleGraph: ModuleGraphEdge[] = [];
 
   private readonly projectPath: string;
   private readonly configPath?: string;
@@ -49,9 +78,83 @@ export class TypeScriptAnalyzer {
       skipLibCheck: true,
     };
 
-    this.program = ts.createProgram(config.fileNames || [], compilerOptions);
+    // X-AN-1 — config-graph union program: `ts.resolveModuleName` can only
+    // resolve into files the program already knows about, and passing
+    // `projectReferences` to `ts.createProgram` attaches reference metadata
+    // WITHOUT pulling the referenced projects' sources into the program's
+    // file set (RFC-TM-9 §1, Rejected Alternatives — this was the r2 review
+    // finding, not an assumption). So: starting from the target tsconfig,
+    // recursively parse each referenced tsconfig via
+    // `ts.getParsedCommandLineOfConfigFile`, union the `fileNames` across
+    // the reference graph (visited-set on config paths, cycle-safe), and
+    // build one `ts.createProgram` over the union with a shared compiler
+    // host. `composite: true` on referenced configs is honored as parsed.
+    const unionFileNames = this.unionFileNamesAcrossReferences(configFilePath, config.fileNames || [], config.projectReferences);
 
+    this.compilerOptions = compilerOptions;
+    this.program = ts.createProgram(unionFileNames, compilerOptions);
     this.checker = this.program.getTypeChecker();
+    this.moduleResolutionCache = ts.createModuleResolutionCache(ts.sys.getCurrentDirectory(), (fileName) => fileName, compilerOptions);
+  }
+
+  // Recursively walks `references` in each parsed tsconfig, unioning every
+  // reachable project's `fileNames` into one flat list. `visitedConfigs` is
+  // keyed by the resolved absolute config path so a reference cycle (two
+  // packages referencing each other) terminates instead of looping.
+  private unionFileNamesAcrossReferences(
+    rootConfigPath: string,
+    rootFileNames: readonly string[],
+    rootReferences: readonly ts.ProjectReference[] | undefined,
+    visitedConfigs: Set<string> = new Set(),
+  ): string[] {
+    const normalizedRoot = path.resolve(rootConfigPath);
+    if (visitedConfigs.has(normalizedRoot)) {
+      return [];
+    }
+    visitedConfigs.add(normalizedRoot);
+
+    const union = new Set<string>(rootFileNames);
+
+    for (const reference of rootReferences || []) {
+      const referencedConfigPath = this.resolveProjectReferencePath(reference.path, path.dirname(normalizedRoot));
+      if (!referencedConfigPath || visitedConfigs.has(path.resolve(referencedConfigPath))) {
+        continue;
+      }
+
+      const host = new CollectingParseConfigHost();
+      const parsed = ts.getParsedCommandLineOfConfigFile(referencedConfigPath, undefined, host);
+
+      if (!parsed) {
+        this.diagnostics.push({
+          severity: 'warning',
+          category: 'skipped-module',
+          message: `Failed to parse referenced tsconfig: ${referencedConfigPath}`,
+          filePath: referencedConfigPath,
+          specifier: undefined,
+        });
+        continue;
+      }
+
+      for (const fileName of parsed.fileNames) {
+        union.add(fileName);
+      }
+
+      const nested = this.unionFileNamesAcrossReferences(referencedConfigPath, parsed.fileNames, parsed.projectReferences, visitedConfigs);
+      for (const fileName of nested) {
+        union.add(fileName);
+      }
+    }
+
+    return Array.from(union);
+  }
+
+  private resolveProjectReferencePath(referencePath: string, fromDir: string): string | undefined {
+    const resolved = path.resolve(fromDir, referencePath);
+    if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+      const candidate = path.join(resolved, 'tsconfig.json');
+      return fs.existsSync(candidate) ? candidate : undefined;
+    }
+    return fs.existsSync(resolved) ? resolved : undefined;
   }
 
   analyze(): TypeScriptProjectAnalysis {
@@ -60,16 +163,44 @@ export class TypeScriptAnalyzer {
     const modules = sourceFiles.map((file) => this.analyzeModule(file));
     const entryPoints = this.detectEntryPoints(modules);
 
+    if (modules.length === 0) {
+      this.diagnostics.push({
+        severity: 'error',
+        category: 'zero-entities',
+        message: 'Analysis produced zero modules: no source files matched the program.',
+        filePath: undefined,
+        specifier: undefined,
+      });
+    }
+
     return {
       modules,
       entryPoints,
       projectConfig: this.program.getCompilerOptions(),
+      diagnostics: this.diagnostics,
+      moduleGraph: this.moduleGraph,
     } as const;
   }
 
   analyzeFromEntrypoint(absoluteEntryPath: string): TypeScriptProjectAnalysis {
     if (!fs.existsSync(absoluteEntryPath)) {
       throw new Error(`Entry point file not found: ${absoluteEntryPath}`);
+    }
+
+    // X-DIAG-1 — an entrypoint outside the program's file set (e.g. a
+    // tsconfig `include` miss) is a descriptive error, not a silent
+    // "Found 0 modules". Checked before the traversal loop starts.
+    const entrySourceFile = this.program.getSourceFile(absoluteEntryPath);
+    if (!entrySourceFile) {
+      const message = `Entry point exists on disk but is not included by this tsconfig's include/files configuration: ${absoluteEntryPath}. Add it to 'include' or pass a different --project.`;
+      this.diagnostics.push({
+        severity: 'error',
+        category: 'entrypoint-not-in-program',
+        message,
+        filePath: absoluteEntryPath,
+        specifier: undefined,
+      });
+      throw new Error(message);
     }
 
     // Traverse dependency graph starting from entrypoint
@@ -89,6 +220,15 @@ export class TypeScriptAnalyzer {
       // Get the source file from the TypeScript program
       const sourceFile = this.program.getSourceFile(currentPath);
       if (!sourceFile || sourceFile.isDeclarationFile) {
+        if (currentPath !== absoluteEntryPath) {
+          this.diagnostics.push({
+            severity: 'warning',
+            category: 'skipped-module',
+            message: `Module not found in program, skipped: ${currentPath}`,
+            filePath: currentPath,
+            specifier: undefined,
+          });
+        }
         continue;
       }
 
@@ -98,29 +238,94 @@ export class TypeScriptAnalyzer {
 
       // Add imported modules to the traversal queue
       for (const importSpec of module.imports) {
-        const resolvedPath = this.resolveImportPath(currentPath, importSpec.specifier);
-        if (resolvedPath && !visitedModules.has(resolvedPath)) {
-          traverseQueue.push(resolvedPath);
+        const outcome = this.resolveImportPath(currentPath, importSpec.specifier);
+        this.recordModuleGraphEdge(currentPath, importSpec.specifier, outcome);
+        if (outcome.resolvedPath && outcome.classification === 'internal' && !visitedModules.has(outcome.resolvedPath)) {
+          traverseQueue.push(outcome.resolvedPath);
+        } else if (outcome.classification === 'unresolved') {
+          this.diagnostics.push({
+            severity: 'warning',
+            category: 'unresolvable-import',
+            message: `Could not resolve import specifier '${importSpec.specifier}' from ${currentPath}`,
+            filePath: currentPath,
+            specifier: importSpec.specifier,
+          });
         }
       }
 
-      // Add re-exported modules to the traversal queue
-      // Re-exports (export { X } from './module') should also include the source modules
+      // Add re-exported modules to the traversal queue.
+      // Both named re-exports (export { X } from './module') and X-AN-3's
+      // star re-exports (export * from './module', type: 'namespace-reexport')
+      // carry a `source` and are followed the same way.
       for (const exportSpec of module.exports) {
         if (exportSpec.source) {
-          const resolvedPath = this.resolveImportPath(currentPath, exportSpec.source);
-          if (resolvedPath && !visitedModules.has(resolvedPath)) {
-            traverseQueue.push(resolvedPath);
+          const outcome = this.resolveImportPath(currentPath, exportSpec.source);
+          this.recordModuleGraphEdge(currentPath, exportSpec.source, outcome);
+          if (outcome.resolvedPath && outcome.classification === 'internal' && !visitedModules.has(outcome.resolvedPath)) {
+            traverseQueue.push(outcome.resolvedPath);
+          } else if (outcome.classification === 'unresolved') {
+            this.diagnostics.push({
+              severity: 'warning',
+              category: 'unresolvable-import',
+              message: `Could not resolve re-export source '${exportSpec.source}' from ${currentPath}`,
+              filePath: currentPath,
+              specifier: exportSpec.source,
+            });
           }
         }
       }
+
+      // X-AN-2 — dynamic import() targets discovered during the visitor
+      // walk also join the traversal queue, mirroring static imports.
+      for (const dynamicSpecifier of module.dynamicImportSpecifiers) {
+        const outcome = this.resolveImportPath(currentPath, dynamicSpecifier);
+        this.recordModuleGraphEdge(currentPath, dynamicSpecifier, outcome);
+        if (outcome.resolvedPath && outcome.classification === 'internal' && !visitedModules.has(outcome.resolvedPath)) {
+          traverseQueue.push(outcome.resolvedPath);
+        } else if (outcome.classification === 'unresolved') {
+          this.diagnostics.push({
+            severity: 'warning',
+            category: 'unresolvable-import',
+            message: `Could not resolve dynamic import specifier '${dynamicSpecifier}' from ${currentPath}`,
+            filePath: currentPath,
+            specifier: dynamicSpecifier,
+          });
+        }
+      }
+    }
+
+    if (modules.length === 0) {
+      this.diagnostics.push({
+        severity: 'error',
+        category: 'zero-entities',
+        message: `Traversal from entrypoint ${absoluteEntryPath} produced zero modules.`,
+        filePath: absoluteEntryPath,
+        specifier: undefined,
+      });
     }
 
     return {
       modules,
       entryPoints: [createFilePath(absoluteEntryPath)],
       projectConfig: this.program.getCompilerOptions(),
+      diagnostics: this.diagnostics,
+      moduleGraph: this.moduleGraph,
     } as const;
+  }
+
+  private recordModuleGraphEdge(sourceModule: string, specifier: string, outcome: ResolutionOutcome): void {
+    const projectRoot = this.projectPath;
+    const target =
+      outcome.resolvedPath && outcome.classification === 'internal'
+        ? path.relative(projectRoot, outcome.resolvedPath)
+        : outcome.resolvedPath;
+
+    this.moduleGraph.push({
+      sourceModule: path.relative(projectRoot, sourceModule),
+      specifier,
+      resolvedTarget: target,
+      classification: outcome.classification,
+    });
   }
 
   private resolveConfigPath(): string {
@@ -132,24 +337,45 @@ export class TypeScriptAnalyzer {
     return ts.findConfigFile(searchPath, ts.sys.fileExists, 'tsconfig.json') || path.join(searchPath, 'tsconfig.json');
   }
 
-  private loadTsConfig(configPath: string): { config: any; error?: ts.Diagnostic } {
+  // Normalizes both branches (missing tsconfig vs. a real parsed one) to
+  // the same shape: `compilerOptions`/`fileNames`/`projectReferences`.
+  // `ts.parseJsonConfigFileContent`'s result is a `ts.ParsedCommandLine`,
+  // whose compiler-options field is named `.options`, not
+  // `.compilerOptions` — this normalization is what makes `paths`/`baseUrl`
+  // actually reach `this.compilerOptions` in the constructor (census gap 6's
+  // root cause was `paths` never being consulted at all; this is the fix
+  // that makes the round-trip work, not merely the round-trip itself).
+  private loadTsConfig(configPath: string): {
+    config: { compilerOptions: ts.CompilerOptions; fileNames: string[]; projectReferences: readonly ts.ProjectReference[] | undefined };
+    error?: ts.Diagnostic;
+  } {
     if (!fs.existsSync(configPath)) {
       return {
         config: {
           compilerOptions: ts.getDefaultCompilerOptions(),
           fileNames: this.getSourceFiles(this.projectPath),
+          projectReferences: undefined,
         },
       };
     }
 
     const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
     if (configFile.error) {
-      return { config: {}, error: configFile.error };
+      return {
+        config: { compilerOptions: ts.getDefaultCompilerOptions(), fileNames: [], projectReferences: undefined },
+        error: configFile.error,
+      };
     }
 
     const parsedConfig = ts.parseJsonConfigFileContent(configFile.config, ts.sys, path.dirname(configPath));
 
-    return { config: parsedConfig };
+    return {
+      config: {
+        compilerOptions: parsedConfig.options,
+        fileNames: parsedConfig.fileNames,
+        projectReferences: parsedConfig.projectReferences,
+      },
+    };
   }
 
   private getSourceFiles(dir: string): string[] {
@@ -181,10 +407,28 @@ export class TypeScriptAnalyzer {
     const interfaces: ParsedInterface[] = [];
     const types: ParsedTypeAlias[] = [];
     const constants: ParsedConstant[] = [];
+    const dynamicImportSpecifiers: string[] = [];
 
     const visit = (node: ts.Node) => {
-      if (isImportDeclaration(node)) {
+      if (ts.isImportDeclaration(node)) {
         imports.push(this.parseImport(node));
+      } else if (this.isDynamicImportCall(node)) {
+        // X-AN-2 — dynamic import() calls. A literal specifier is recorded
+        // as a discovered edge that joins the traversal queue like a static
+        // import; a non-literal specifier (a computed path) cannot be
+        // followed, so it surfaces as a diagnostic instead of silence.
+        const argument = node.arguments[0];
+        if (argument && ts.isStringLiteralLike(argument)) {
+          dynamicImportSpecifiers.push(argument.text);
+        } else {
+          this.diagnostics.push({
+            severity: 'warning',
+            category: 'non-literal-dynamic-import',
+            message: `Dynamic import() with a non-literal specifier at ${sourceFile.fileName}:${this.lineOf(sourceFile, node)}`,
+            filePath: sourceFile.fileName,
+            specifier: undefined,
+          });
+        }
       } else if (isExportDeclaration(node)) {
         exports.push(...this.parseExportDeclaration(node));
       } else if (isFunction(node)) {
@@ -236,11 +480,24 @@ export class TypeScriptAnalyzer {
           } as const);
         }
       } else if (isVariableStatement(node)) {
-        const consts = this.parseVariableStatement(node);
-        constants.push(...consts);
+        // X-AN-5 (site one) — before treating declarations as constants,
+        // check each initializer for an arrow function / function
+        // expression. Matches parse through the function path and are
+        // registered as 'function' exports instead of 'constant'.
+        const { functions: arrowFunctions, constants: plainConstants } = this.parseVariableStatement(node);
+        functions.push(...arrowFunctions);
+        constants.push(...plainConstants);
 
         if (this.hasExportModifier(node)) {
-          for (const constant of consts) {
+          for (const func of arrowFunctions) {
+            exports.push({
+              name: func.name,
+              isDefault: false,
+              type: 'function',
+              source: undefined,
+            } as const);
+          }
+          for (const constant of plainConstants) {
             exports.push({
               name: constant.name,
               isDefault: false,
@@ -280,6 +537,11 @@ export class TypeScriptAnalyzer {
 
     ts.forEachChild(sourceFile, visit);
 
+    // X-AN-8 — fold get/set accessor pairs discovered on classes during
+    // `parseClass` into a single accessorKind: 'both' entry per name. The
+    // per-class fold happens inside parseClass itself (it owns the member
+    // loop); nothing left to do here.
+
     return {
       filePath: createFilePath(sourceFile.fileName),
       imports,
@@ -289,7 +551,16 @@ export class TypeScriptAnalyzer {
       interfaces,
       types,
       constants,
+      dynamicImportSpecifiers,
     } as const;
+  }
+
+  private lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
+    return sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+  }
+
+  private isDynamicImportCall(node: ts.Node): node is ts.CallExpression {
+    return ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword;
   }
 
   private parseImport(node: ts.ImportDeclaration): ParsedImport {
@@ -336,11 +607,22 @@ export class TypeScriptAnalyzer {
   private parseExportDeclaration(node: ts.ExportDeclaration): ParsedExport[] {
     const exports: ParsedExport[] = [];
 
-    // Handle export * from 'module'
+    // X-AN-3 — `export * from 'module'`: record a distinct
+    // namespace-reexport edge instead of discarding it. The traversal queue
+    // follows `source` exactly as it already does for named re-exports; the
+    // converter's export-registry phase folds the target module's exports
+    // in transitively (visited-set cycle guard, mirroring
+    // `visitedModules`).
     if (!node.exportClause && node.moduleSpecifier) {
-      // For export *, we don't know what's being exported
-      // This will be resolved later by the import resolver
-      return [];
+      const source = (node.moduleSpecifier as ts.StringLiteral).text;
+      return [
+        {
+          name: '*',
+          isDefault: false,
+          type: 'namespace-reexport',
+          source,
+        },
+      ];
     }
 
     // Handle export { name1, name2 } from 'module'
@@ -384,7 +666,7 @@ export class TypeScriptAnalyzer {
     const isAsync = this.hasAsyncModifier(node);
     const decorators = this.parseDecorators(node);
     const signature = this.buildFunctionSignature(name, parameters, returnType, isAsync);
-    const description = this.extractJSDocDescription(node);
+    const description = node.name ? this.extractJSDocDescription(node.name) : this.extractJSDocDescriptionFallback(node);
 
     return {
       name,
@@ -397,6 +679,30 @@ export class TypeScriptAnalyzer {
     } as const;
   }
 
+  // X-AN-5 (site one, arrow/function-expression parse path) — shared by
+  // parseVariableStatement's arrow-const branch. Parses a `ts.ArrowFunction`
+  // or `ts.FunctionExpression` through the same path as parseFunction:
+  // parameters, return type, and signature all reuse the same builders, but
+  // the name comes from the variable's binding name (arrow functions are
+  // anonymous) rather than from the function node itself.
+  private parseArrowOrFunctionExpression(name: string, node: ts.ArrowFunction | ts.FunctionExpression, nameNode: ts.Node): ParsedFunction {
+    const parameters = this.parseParameters(node.parameters);
+    const returnType = this.getTypeString(node.type);
+    const isAsync = this.hasAsyncModifier(node);
+    const signature = this.buildFunctionSignature(name, parameters, returnType, isAsync);
+    const description = this.extractJSDocDescription(nameNode);
+
+    return {
+      name,
+      signature,
+      parameters,
+      returnType,
+      isAsync,
+      description: description || undefined,
+      decorators: [],
+    } as const;
+  }
+
   private parseClass(node: ts.ClassDeclaration): ParsedClass {
     const name = node.name?.text || '<anonymous>';
     const isAbstract = this.hasAbstractModifier(node);
@@ -405,7 +711,7 @@ export class TypeScriptAnalyzer {
     const methods: ParsedMethod[] = [];
     const properties: ParsedProperty[] = [];
     const decorators = this.parseDecorators(node);
-    const description = this.extractJSDocDescription(node);
+    const description = node.name ? this.extractJSDocDescription(node.name) : this.extractJSDocDescriptionFallback(node);
 
     if (node.heritageClauses) {
       for (const clause of node.heritageClauses) {
@@ -417,13 +723,45 @@ export class TypeScriptAnalyzer {
       }
     }
 
+    // X-AN-8 — get/set accessors are folded into one logical method entry
+    // per name: a get/set pair on the same name yields accessorKind: 'both'.
+    // Track by name in encounter order so a lone getter or setter still
+    // records correctly.
+    const accessorsByName = new Map<string, ParsedMethod>();
+
     for (const member of node.members) {
       if (ts.isMethodDeclaration(member)) {
         methods.push(this.parseMethod(member));
       } else if (ts.isPropertyDeclaration(member)) {
-        properties.push(this.parseProperty(member));
+        const { property, arrowMethod } = this.parseProperty(member);
+        if (arrowMethod) {
+          // X-AN-5 (site two) — a class-property arrow joins the class's
+          // method list (with its signature) instead of the property list.
+          methods.push(arrowMethod);
+        } else if (property) {
+          properties.push(property);
+        }
+      } else if (ts.isGetAccessorDeclaration(member) || ts.isSetAccessorDeclaration(member)) {
+        const parsedAccessor = this.parseAccessor(member);
+        const existing = accessorsByName.get(parsedAccessor.name);
+        if (existing) {
+          const merged: ParsedMethod = {
+            ...existing,
+            accessorKind: 'both',
+            // A setter carries the parameter; a getter carries the return
+            // type. Prefer whichever side actually has the information so
+            // the folded entry is as complete as either half.
+            parameters: existing.parameters.length > 0 ? existing.parameters : parsedAccessor.parameters,
+            returnType: existing.returnType !== 'any' ? existing.returnType : parsedAccessor.returnType,
+          };
+          accessorsByName.set(parsedAccessor.name, merged);
+        } else {
+          accessorsByName.set(parsedAccessor.name, parsedAccessor);
+        }
       }
     }
+
+    methods.push(...accessorsByName.values());
 
     return {
       name,
@@ -437,12 +775,36 @@ export class TypeScriptAnalyzer {
     } as const;
   }
 
+  private parseAccessor(node: ts.GetAccessorDeclaration | ts.SetAccessorDeclaration): ParsedMethod {
+    const name = (node.name as ts.Identifier).text;
+    const isGet = ts.isGetAccessorDeclaration(node);
+    const parameters = this.parseParameters(node.parameters);
+    const returnType = isGet ? this.getTypeString(node.type) : 'void';
+    const isStatic = this.hasStaticModifier(node);
+    const isPrivate = this.hasPrivateModifier(node);
+    const isProtected = this.hasProtectedModifier(node);
+    const signature = this.buildFunctionSignature(name, parameters, returnType, false);
+
+    return {
+      name,
+      signature,
+      isStatic,
+      isPrivate,
+      isProtected,
+      isAbstract: false,
+      parameters,
+      returnType,
+      isAsync: false,
+      accessorKind: isGet ? 'get' : 'set',
+    } as const;
+  }
+
   private parseInterface(node: ts.InterfaceDeclaration): ParsedInterface {
     const name = node.name.text;
     const extendsInterfaces: string[] = [];
     const properties: ParsedProperty[] = [];
     const methods: ParsedMethod[] = [];
-    const description = this.extractJSDocDescription(node);
+    const description = this.extractJSDocDescription(node.name);
 
     if (node.heritageClauses) {
       for (const clause of node.heritageClauses) {
@@ -474,7 +836,7 @@ export class TypeScriptAnalyzer {
   private parseTypeAlias(node: ts.TypeAliasDeclaration): ParsedTypeAlias {
     const name = node.name.text;
     const type = this.getTypeString(node.type);
-    const description = this.extractJSDocDescription(node);
+    const description = this.extractJSDocDescription(node.name);
 
     return {
       name,
@@ -483,13 +845,24 @@ export class TypeScriptAnalyzer {
     } as const;
   }
 
-  private parseVariableStatement(node: ts.VariableStatement): ParsedConstant[] {
+  private parseVariableStatement(node: ts.VariableStatement): { functions: ParsedFunction[]; constants: ParsedConstant[] } {
+    const functions: ParsedFunction[] = [];
     const constants: ParsedConstant[] = [];
 
     for (const declaration of node.declarationList.declarations) {
       const name = declaration.name.getText();
-      const type = this.getTypeString(declaration.type) || this.inferTypeFromInitializer(declaration.initializer);
-      const value = declaration.initializer?.getText();
+      const initializer = declaration.initializer;
+
+      // X-AN-5 (site one) — an arrow function or function expression bound
+      // to a const/let/var is a function, not data. Route through the
+      // shared arrow-parse path instead of building a ParsedConstant.
+      if (initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))) {
+        functions.push(this.parseArrowOrFunctionExpression(name, initializer, declaration.name));
+        continue;
+      }
+
+      const type = this.getTypeString(declaration.type) || this.inferTypeFromInitializer(initializer);
+      const value = initializer?.getText();
       const isEnum = false; // Will be handled separately for actual enums
       const isConst = !!(node.declarationList.flags & ts.NodeFlags.Const);
 
@@ -503,7 +876,7 @@ export class TypeScriptAnalyzer {
       } as const);
     }
 
-    return constants;
+    return { functions, constants };
   }
 
   private inferTypeFromInitializer(initializer?: ts.Expression): string {
@@ -549,11 +922,45 @@ export class TypeScriptAnalyzer {
       parameters,
       returnType,
       isAsync,
+      accessorKind: undefined,
     } as const;
   }
 
-  private parseProperty(node: ts.PropertyDeclaration): ParsedProperty {
+  private parseProperty(node: ts.PropertyDeclaration): { property: ParsedProperty | undefined; arrowMethod: ParsedMethod | undefined } {
     const name = (node.name as ts.Identifier).text;
+    const initializer = node.initializer;
+
+    // X-AN-5 (site two) — a class-property arrow (`handleClick = () => {}`)
+    // is a method, not a property. `parseProperty`'s original omission was
+    // reading only the declared type and modifiers, never the initializer —
+    // this is the same root cause as site one (FAQ Q7 in the Diamond Doc),
+    // fixed the same way: inspect the initializer before classifying.
+    if (initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))) {
+      const parameters = this.parseParameters(initializer.parameters);
+      const returnType = this.getTypeString(initializer.type);
+      const isStatic = this.hasStaticModifier(node);
+      const isPrivate = this.hasPrivateModifier(node);
+      const isProtected = this.hasProtectedModifier(node);
+      const isAsync = this.hasAsyncModifier(initializer);
+      const signature = this.buildFunctionSignature(name, parameters, returnType, isAsync);
+
+      return {
+        property: undefined,
+        arrowMethod: {
+          name,
+          signature,
+          isStatic,
+          isPrivate,
+          isProtected,
+          isAbstract: false,
+          parameters,
+          returnType,
+          isAsync,
+          accessorKind: undefined,
+        },
+      };
+    }
+
     const type = this.getTypeString(node.type);
     const isReadonly = this.hasReadonlyModifier(node);
     const isStatic = this.hasStaticModifier(node);
@@ -562,14 +969,17 @@ export class TypeScriptAnalyzer {
     const isOptional = !!node.questionToken;
 
     return {
-      name,
-      type,
-      isReadonly,
-      isStatic,
-      isPrivate,
-      isProtected,
-      isOptional,
-    } as const;
+      property: {
+        name,
+        type,
+        isReadonly,
+        isStatic,
+        isPrivate,
+        isProtected,
+        isOptional,
+      },
+      arrowMethod: undefined,
+    };
   }
 
   private parsePropertySignature(node: ts.PropertySignature): ParsedProperty {
@@ -605,6 +1015,7 @@ export class TypeScriptAnalyzer {
       parameters,
       returnType,
       isAsync,
+      accessorKind: undefined,
     } as const;
   }
 
@@ -676,20 +1087,39 @@ export class TypeScriptAnalyzer {
     return modifiers?.some((modifier) => modifier.kind === kind) || false;
   }
 
-  private extractJSDocDescription(node: ts.Node): string | undefined {
-    const symbol = this.checker.getSymbolAtLocation(node);
-    if (!symbol) return undefined;
+  // X-AN-6 — JSDoc extraction fix. `getSymbolAtLocation` needs an
+  // identifier-shaped location: the census's isolated probe proved that
+  // passing the whole declaration node returns `undefined` in the general
+  // case, while passing `node.name` retrieves the doc comment from the same
+  // checker instance. Every call site now passes the name node explicitly.
+  private extractJSDocDescription(nameNode: ts.Node): string | undefined {
+    const symbol = this.checker.getSymbolAtLocation(nameNode);
+    if (!symbol) return this.extractJSDocDescriptionFallback(nameNode);
 
     const jsDocTags = symbol.getJsDocTags();
     const descriptionTag = jsDocTags.find((tag) => tag.name === 'description');
 
-    return (
+    const resolved =
       descriptionTag?.text?.map((text) => text.text).join('') ||
       symbol
         .getDocumentationComment(this.checker)
         .map((comment) => comment.text)
-        .join('')
-    );
+        .join('');
+
+    return resolved || this.extractJSDocDescriptionFallback(nameNode);
+  }
+
+  // Fallback for declarations with no bindable name node (anonymous
+  // default exports) — a checker-free path via `ts.getJSDocCommentsAndTags`
+  // that works even when there is no symbol to resolve.
+  private extractJSDocDescriptionFallback(node: ts.Node): string | undefined {
+    const tagsAndComments = ts.getJSDocCommentsAndTags(node);
+    for (const entry of tagsAndComments) {
+      if (ts.isJSDoc(entry) && entry.comment) {
+        return typeof entry.comment === 'string' ? entry.comment : entry.comment.map((part) => part.text).join('');
+      }
+    }
+    return undefined;
   }
 
   private detectEntryPoints(modules: readonly ParsedModule[]): string[] {
@@ -718,41 +1148,32 @@ export class TypeScriptAnalyzer {
     return entryPoints;
   }
 
-  private resolveImportPath(fromPath: string, importSpecifier: string): string | null {
-    // Skip external modules (not relative imports)
-    if (!importSpecifier.startsWith('.')) {
-      return null;
+  // X-AN-1 — replaces the hand-rolled `resolveImportPath`. Per-specifier
+  // resolution is `ts.resolveModuleName(specifier, fromPath, compilerOptions,
+  // ts.sys)`. A result landing outside `node_modules` with
+  // `isExternalLibraryImport: false` is an internal edge; a `node_modules`
+  // result or a failed resolution classifies as external/unresolved.
+  //
+  // Negative check (RFC-TM-9 §1): no `startsWith('.')` guard anywhere in
+  // this path — classification comes from the resolution OUTCOME
+  // (isExternalLibraryImport / packageId / resolution failure), never from
+  // the specifier's own shape. This is what lets `paths`-aliased bare
+  // specifiers resolve into the project instead of being discarded before
+  // resolution starts.
+  private resolveImportPath(fromPath: string, importSpecifier: string): ResolutionOutcome {
+    const result = ts.resolveModuleName(importSpecifier, fromPath, this.compilerOptions, ts.sys, this.moduleResolutionCache);
+
+    const resolvedModule = result.resolvedModule;
+    if (!resolvedModule) {
+      return { resolvedPath: undefined, classification: 'unresolved' };
     }
 
-    const fromDir = path.dirname(fromPath);
-    const resolvedPath = path.resolve(fromDir, importSpecifier);
+    const resolvedPath = resolvedModule.resolvedFileName;
+    const isExternal = resolvedModule.isExternalLibraryImport === true || resolvedPath.includes('node_modules');
 
-    // Try different extensions if the import doesn't have one
-    const extensions = ['.ts', '.tsx', '.js', '.jsx'];
-
-    // First try exact match
-    if (fs.existsSync(resolvedPath)) {
-      return resolvedPath;
-    }
-
-    // Try with extensions
-    for (const ext of extensions) {
-      const pathWithExt = resolvedPath + ext;
-      if (fs.existsSync(pathWithExt)) {
-        return pathWithExt;
-      }
-    }
-
-    // Try index files in directory
-    if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isDirectory()) {
-      for (const ext of extensions) {
-        const indexPath = path.join(resolvedPath, `index${ext}`);
-        if (fs.existsSync(indexPath)) {
-          return indexPath;
-        }
-      }
-    }
-
-    return null;
+    return {
+      resolvedPath,
+      classification: isExternal ? 'external' : 'internal',
+    };
   }
 }
