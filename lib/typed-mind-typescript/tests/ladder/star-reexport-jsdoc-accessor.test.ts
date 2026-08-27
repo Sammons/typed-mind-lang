@@ -99,4 +99,45 @@ describe('RFC-TM-9 Q1 — census gap 12, get/set accessors (X-AN-8)', () => {
 
     assert.equal(widget?.methods.length, 2, 'exactly one folded accessor entry plus describe — no duplicate get/set rows');
   });
+
+  it('15b-accessor-order-and-static: setter-before-getter ordering does not lose the getter half, and static/instance accessors stay separate', () => {
+    // Adversarial-review-found edge cases (PR #49): the fold key must
+    // include isStatic (a static and instance accessor sharing a name are
+    // two distinct members), and the return-type/parameters merge must use
+    // an explicit hasGet/hasSet flag rather than inferring "already
+    // populated" from a value sentinel — a setter always parses to
+    // returnType 'void', so a naive `!== 'any'` check on that field gets
+    // setter-first ordering backwards and silently drops the getter's real
+    // return type.
+    const analyzer = new TypeScriptAnalyzer(fixturePath('15b-accessor-order-and-static'));
+    const analysis = analyzer.analyzeFromEntrypoint(fixturePath('15b-accessor-order-and-static', 'src', 'widget.ts'));
+
+    const module = analysis.modules[0];
+    const widget = module?.classes.find((c) => c.name === 'Widget');
+    assert.notEqual(widget, undefined);
+
+    const instanceEntries = widget?.methods.filter((m) => m.name === 'name' && !m.isStatic);
+    assert.equal(instanceEntries?.length, 1, 'the setter-first instance pair must fold into exactly one entry');
+    const instanceName = instanceEntries?.[0];
+    assert.equal(instanceName?.accessorKind, 'both');
+    assert.equal(instanceName?.returnType, 'string', 'setter-first ordering must not lose the getter return type');
+    assert.equal(
+      instanceName?.signature,
+      'name(value: string) => string',
+      'the folded signature must reflect the merged shape, not a stale half',
+    );
+    assert.equal(instanceName?.parameters[0]?.name, 'value');
+
+    const staticEntries = widget?.methods.filter((m) => m.name === 'name' && m.isStatic);
+    assert.equal(staticEntries?.length, 1, 'the static accessor must not merge with the instance accessor of the same name');
+    assert.equal(staticEntries?.[0]?.accessorKind, 'get');
+    assert.equal(staticEntries?.[0]?.returnType, 'number');
+
+    const writeOnly = widget?.methods.find((m) => m.name === 'writeOnly');
+    assert.notEqual(writeOnly, undefined, 'a lone setter with no paired getter must still be recorded');
+    assert.equal(writeOnly?.accessorKind, 'set');
+    assert.equal(writeOnly?.returnType, 'void');
+
+    assert.equal(widget?.methods.length, 3, 'instance name (folded) + static name + writeOnly — no duplicates, no drops');
+  });
 });

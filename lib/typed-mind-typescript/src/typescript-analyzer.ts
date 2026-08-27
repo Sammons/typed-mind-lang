@@ -725,9 +725,21 @@ export class TypeScriptAnalyzer {
 
     // X-AN-8 — get/set accessors are folded into one logical method entry
     // per name: a get/set pair on the same name yields accessorKind: 'both'.
-    // Track by name in encounter order so a lone getter or setter still
-    // records correctly.
-    const accessorsByName = new Map<string, ParsedMethod>();
+    // Track by a (name, isStatic) key — a static and an instance accessor
+    // sharing a name are two distinct class members, not one pair, and
+    // folding them together would silently merge unrelated entries. Track
+    // which half (get/set) has actually been seen per key, rather than
+    // inferring "already populated" from a sentinel return value: a setter
+    // always parses to returnType 'void' and a getter's OWN return type can
+    // legitimately be 'void' too, so a sentinel check on the value gets the
+    // setter-before-getter ordering wrong and silently drops the getter's
+    // real return type.
+    interface AccessorFold {
+      readonly method: ParsedMethod;
+      readonly hasGet: boolean;
+      readonly hasSet: boolean;
+    }
+    const accessorsByKey = new Map<string, AccessorFold>();
 
     for (const member of node.members) {
       if (ts.isMethodDeclaration(member)) {
@@ -742,26 +754,38 @@ export class TypeScriptAnalyzer {
           properties.push(property);
         }
       } else if (ts.isGetAccessorDeclaration(member) || ts.isSetAccessorDeclaration(member)) {
+        const isGet = ts.isGetAccessorDeclaration(member);
         const parsedAccessor = this.parseAccessor(member);
-        const existing = accessorsByName.get(parsedAccessor.name);
+        const key = `${parsedAccessor.isStatic ? 'static:' : 'instance:'}${parsedAccessor.name}`;
+        const existing = accessorsByKey.get(key);
+
         if (existing) {
-          const merged: ParsedMethod = {
-            ...existing,
-            accessorKind: 'both',
-            // A setter carries the parameter; a getter carries the return
-            // type. Prefer whichever side actually has the information so
-            // the folded entry is as complete as either half.
-            parameters: existing.parameters.length > 0 ? existing.parameters : parsedAccessor.parameters,
-            returnType: existing.returnType !== 'any' ? existing.returnType : parsedAccessor.returnType,
-          };
-          accessorsByName.set(parsedAccessor.name, merged);
+          // Only the getter half carries a meaningful return type and only
+          // the setter half carries a meaningful parameter — pick each
+          // field from whichever half actually produced it, using the
+          // hasGet/hasSet flags (not a value sentinel) as the source of
+          // truth, so order never matters.
+          const returnType = isGet ? parsedAccessor.returnType : existing.hasGet ? existing.method.returnType : parsedAccessor.returnType;
+          const parameters = isGet ? (existing.hasSet ? existing.method.parameters : parsedAccessor.parameters) : parsedAccessor.parameters;
+          // The folded entry's own `signature` string must be rebuilt from
+          // the merged parameters/returnType, not inherited from whichever
+          // half parsed first — otherwise a direct reader of `signature`
+          // sees the same stale-half bug the returnType/parameters merge
+          // above exists to fix.
+          const signature = this.buildFunctionSignature(parsedAccessor.name, parameters, returnType, false);
+
+          accessorsByKey.set(key, {
+            method: { ...existing.method, accessorKind: 'both', parameters, returnType, signature },
+            hasGet: existing.hasGet || isGet,
+            hasSet: existing.hasSet || !isGet,
+          });
         } else {
-          accessorsByName.set(parsedAccessor.name, parsedAccessor);
+          accessorsByKey.set(key, { method: parsedAccessor, hasGet: isGet, hasSet: !isGet });
         }
       }
     }
 
-    methods.push(...accessorsByName.values());
+    methods.push(...Array.from(accessorsByKey.values()).map((fold) => fold.method));
 
     return {
       name,
