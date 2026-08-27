@@ -40,12 +40,31 @@ jobs:
 
   playground-smoke:
     # RFC-TM-7 §2 (rfc-tm-7-diamond.md, S-CONS-WEB-1) — the headless
-    # docker-Playwright smoke, wired into every PR per the doc's ruling (the
+    # Playwright smoke, wired into every PR per the doc's ruling (the
     # node-graph parity test in the `validate` job pins verdict equality;
     # this job pins module loading, the import map, and wasm MIME on the
     # actual built/served site — properties only a real browser exercises).
+    #
+    # This job runs INSIDE the Playwright image via the job-level `container:`
+    # directive rather than invoking `docker build`/`docker run` as steps.
+    # crankshaft-ci (the only registered runner, per
+    # knowledge/infrastructure/crankshaft.md) is itself a Docker-based
+    # act_runner label (`ubuntu-latest:docker://.../runner-images:ubuntu-latest`)
+    # — its host act_runner daemon already spawns each job's container via
+    # host Docker; `container:` just names a different image for that same
+    # spawn, no DinD or docker socket needed inside the job. The runner's job
+    # containers are unprivileged with no docker socket (per the decommissioned
+    # cube runner's shape note in knowledge/infrastructure/gitea-act-runner-cube.md
+    # — "no host docker socket, no writable host mounts" — the same
+    # unprivileged-container shape crankshaft-ci's jobs run under), which is
+    # exactly why the original docker-build/docker-run-as-steps design failed:
+    # DinD needs a socket or privileged mode this runner does not grant.
+    # e2e/mock/Dockerfile + run.sh stay for local dev (see e2e/mock/README.md);
+    # CI never invokes them.
     name: Playground browser smoke
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -73,5 +92,10 @@ jobs:
           mise exec -- pnpm --dir lib/typed-mind-cli build
           cd lib/typed-mind-static-website && mise exec -- node build.js
 
-      - name: Run headless smoke in Docker
-        run: ./e2e/mock/run.sh
+      - name: Install e2e/mock's Playwright test runner
+        run: cd e2e/mock && npm install --no-audit --no-fund
+
+      - name: Run headless smoke (browsers baked into this job's image)
+        env:
+          SERVE_JS_PATH: ../../lib/typed-mind-static-website/serve.js
+        run: cd e2e/mock && npx playwright test
