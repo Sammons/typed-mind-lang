@@ -1,0 +1,13 @@
+{
+  "name": "@sammons/typed-mind-e2e-mock",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RFC-TM-7 §2 (rfc-tm-7-diamond.md, S-CONS-WEB-1) — headless Playwright smoke for the TypedMind playground, run in Docker per the claude-home ui-testing skill's docker-first pattern.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

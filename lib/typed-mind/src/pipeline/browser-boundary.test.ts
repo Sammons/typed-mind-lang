@@ -5,71 +5,23 @@
 // checks: the clean direction on the real entry, and the detection direction
 // twice — on the real Node-only import-resolver.ts (whose node:fs/node:path
 // imports the walker must find), and on a seeded temp-dir graph with a
-// deliberate node:fs import. TM-7 hardens this against the real bundle.
+// deliberate node:fs import.
+//
+// RFC-TM-7 §2 (rfc-tm-7-diamond.md, I-8) extracted `walkModuleGraph` to
+// ./module-graph-walker.ts (unchanged) so scripts/check-browser-graph.mjs can
+// reuse it against the real dist-browser/ bundle rather than re-implementing
+// the walk. This test keeps the node:fs/node:path half of the I-8 gate; the
+// script owns the bare-specifier-allowlist half.
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { after, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { walkModuleGraph } from './module-graph-walker.ts';
 
 const pipelineDir = dirname(fileURLToPath(import.meta.url));
-
-const BANNED_SPECIFIERS = ['node:fs', 'node:path'];
-
-// Static import/export specifiers only: `import ... from '...'`,
-// `export ... from '...'`, and bare `import '...'`. The lazy
-// `require('node:path')` inside typed-mind-parser.ts's CJS-only default-wasm
-// branch is NOT a static import and is out of I-8's scope by design (doc §3.1).
-const STATIC_SPECIFIER_PATTERN = /^(?:import|export)\s[^;]*?from\s+['"]([^'"]+)['"]|^import\s+['"]([^'"]+)['"]/gms;
-
-const staticSpecifiersOf = (source: string): string[] => {
-  const specifiers: string[] = [];
-  for (const match of source.matchAll(STATIC_SPECIFIER_PATTERN)) {
-    const specifier = match[1] ?? match[2];
-    if (specifier !== undefined) {
-      specifiers.push(specifier);
-    }
-  }
-  return specifiers;
-};
-
-export interface ModuleGraphReport {
-  readonly visitedFiles: readonly string[];
-  readonly externalSpecifiers: readonly string[];
-  readonly bannedReaches: readonly { file: string; specifier: string }[];
-}
-
-export const walkModuleGraph = (entryFile: string): ModuleGraphReport => {
-  const visited = new Set<string>();
-  const externals = new Set<string>();
-  const bannedReaches: { file: string; specifier: string }[] = [];
-  const queue = [resolve(entryFile)];
-  while (queue.length > 0) {
-    const file = queue.pop();
-    if (file === undefined || visited.has(file)) {
-      continue;
-    }
-    visited.add(file);
-    const source = readFileSync(file, 'utf8');
-    for (const specifier of staticSpecifiersOf(source)) {
-      if (specifier.startsWith('.')) {
-        queue.push(resolve(dirname(file), specifier));
-      } else {
-        externals.add(specifier);
-        if (BANNED_SPECIFIERS.includes(specifier)) {
-          bannedReaches.push({ file, specifier });
-        }
-      }
-    }
-  }
-  return {
-    visitedFiles: [...visited].sort(),
-    externalSpecifiers: [...externals].sort(),
-    bannedReaches,
-  };
-};
 
 describe('I-8 browser-boundary check (§3.7): module graph from src/pipeline/index.ts', () => {
   it('reaches no node:fs/node:path import and never pulls in the Node-only ImportResolver', () => {

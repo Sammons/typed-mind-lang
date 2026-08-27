@@ -28,8 +28,9 @@
     "check:golden-deltas": "pnpm run --if-present -r check:golden-deltas",
     "check:pack": "node scripts/check-pack.mjs",
     "check:version-lockstep": "node scripts/check-version-lockstep.mjs",
-    "validate": "pnpm run build && pnpm run lint && pnpm run typecheck && pnpm run check:toolchain && pnpm run check:generated && pnpm run check:legacy-freeze && pnpm run check:engines && pnpm run check:fix-orphans-deleted && pnpm run check:version-lockstep && pnpm run check:pack && pnpm run test && pnpm run check:golden-deltas",
-    "validate:fix": "pnpm run build && pnpm run check:toolchain && pnpm run check:generated && pnpm run check:legacy-freeze && pnpm run check:engines && pnpm run check:fix-orphans-deleted && pnpm run check:version-lockstep && pnpm run check:pack && pnpm run lint:fix && pnpm run typecheck && pnpm run test && pnpm run check:golden-deltas",
+    "check:browser-graph": "pnpm --dir lib/typed-mind run build:browser && node scripts/check-browser-graph.mjs",
+    "validate": "pnpm run build && pnpm run lint && pnpm run typecheck && pnpm run check:toolchain && pnpm run check:generated && pnpm run check:legacy-freeze && pnpm run check:engines && pnpm run check:fix-orphans-deleted && pnpm run check:version-lockstep && pnpm run check:pack && pnpm run check:browser-graph && pnpm run test && pnpm run check:golden-deltas",
+    "validate:fix": "pnpm run build && pnpm run check:toolchain && pnpm run check:generated && pnpm run check:legacy-freeze && pnpm run check:engines && pnpm run check:fix-orphans-deleted && pnpm run check:version-lockstep && pnpm run check:pack && pnpm run check:browser-graph && pnpm run lint:fix && pnpm run typecheck && pnpm run test && pnpm run check:golden-deltas",
     "ci": "pnpm run validate",
     "precommit": "pnpm run validate:fix"
   },

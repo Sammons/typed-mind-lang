@@ -36,8 +36,9 @@
   "scripts": {
     "prebuild": "node scripts/build-wasm.mjs",
     "build": "tsc --build",
+    "build:browser": "tsc --build tsconfig.browser.json",
     "dev": "tsc --build --watch",
-    "clean": "rm -rf dist *.tsbuildinfo grammar.wasm",
+    "clean": "rm -rf dist dist-browser *.tsbuildinfo grammar.wasm",
     "pretest": "node scripts/build-wasm.mjs",
     "test": "node --test \"src/**/*.test.ts\"",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
