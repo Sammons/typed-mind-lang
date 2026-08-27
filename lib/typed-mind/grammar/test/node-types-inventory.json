@@ -37,7 +37,8 @@
       "type_opaque",
       "readonly_kw",
       "readonly_name_rest",
-      "readonly_paren_rest"
+      "readonly_paren_rest",
+      "readonly_brace_rest"
     ],
     "C12_comment": ["entity_comment", "entity_comment_final"],
     "C13_description": ["description_line", "description_line_final"],

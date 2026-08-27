@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { ClassFileNode, DtoFieldNode, DtoNode, FunctionNode, ProgramNode, type Span } from '@sammons/typed-mind';
+import { ClassFileNode, DtoFieldNode, DtoNode, FunctionNode, ProgramNode, parseTypeExprText, type Span } from '@sammons/typed-mind';
 import { AssertionEngine } from './assertion-engine.ts';
 import type { ConversionResult } from './types.ts';
 
@@ -11,6 +11,17 @@ import type { ConversionResult } from './types.ts';
 // per the M8 disposition — this fixture is not itself a converter output,
 // but it stands in for one in these (currently skipped) assertion tests.
 const SYNTHETIC_SPAN: Span = { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } };
+
+// RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2) — DtoFieldNode.typeExpr via the
+// shared string-based parser, mirroring the converter's own construction sites.
+const stringField = (name: string): DtoFieldNode =>
+  new DtoFieldNode({
+    name,
+    type: 'string',
+    typeExpr: parseTypeExprText('string').typeExpr,
+    optionalityMarker: 'none',
+    span: SYNTHETIC_SPAN,
+  });
 
 const createMockConversionResult = (): ConversionResult => ({
   success: true,
@@ -43,11 +54,7 @@ const createMockConversionResult = (): ConversionResult => ({
       span: SYNTHETIC_SPAN,
       raw: 'UserDTO %',
       sourceForm: 'shortform',
-      fields: [
-        new DtoFieldNode({ name: 'id', type: 'string', optionalityMarker: 'none', span: SYNTHETIC_SPAN }),
-        new DtoFieldNode({ name: 'name', type: 'string', optionalityMarker: 'none', span: SYNTHETIC_SPAN }),
-        new DtoFieldNode({ name: 'email', type: 'string', optionalityMarker: 'none', span: SYNTHETIC_SPAN }),
-      ],
+      fields: [stringField('id'), stringField('name'), stringField('email')],
     }),
     new ProgramNode({
       name: 'IndexApp',

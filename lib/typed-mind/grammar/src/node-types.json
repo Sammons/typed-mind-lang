@@ -2029,6 +2029,10 @@
         "required": true,
         "types": [
           {
+            "type": "readonly_brace_rest",
+            "named": true
+          },
+          {
             "type": "readonly_name_rest",
             "named": true
           },
@@ -2261,6 +2265,10 @@
   },
   {
     "type": "path",
+    "named": true
+  },
+  {
+    "type": "readonly_brace_rest",
     "named": true
   },
   {

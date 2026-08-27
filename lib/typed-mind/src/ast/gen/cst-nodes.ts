@@ -1,16 +1,16 @@
 // GENERATED FILE — DO NOT EDIT.
 // Emitted by lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs (RFC-TM-3 §2.1)
-// from lib/typed-mind/grammar/src/node-types.json: 109 named nodes,
-// 28 `_final` twins → 81 wrapper classes (one per logical production).
+// from lib/typed-mind/grammar/src/node-types.json: 110 named nodes,
+// 28 `_final` twins → 82 wrapper classes (one per logical production).
 // Regenerate: node lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs
 // CI diff-gates this file via scripts/check-generated.mjs step 2b.
 
 import type { Node as SyntaxNode } from 'web-tree-sitter';
 import type { Span } from '../span.ts';
 
-export const CST_NAMED_NODE_TYPE_COUNT = 109;
+export const CST_NAMED_NODE_TYPE_COUNT = 110;
 export const CST_FINAL_TWIN_COUNT = 28;
-export const CST_LOGICAL_CLASS_COUNT = 81;
+export const CST_LOGICAL_CLASS_COUNT = 82;
 
 const spanOf = (syntaxNode: SyntaxNode): Span => ({
   start: { line: syntaxNode.startPosition.row + 1, column: syntaxNode.startPosition.column + 1 },
@@ -875,6 +875,13 @@ export class CstPropertyString extends CstNode {
   }
 }
 
+export class CstReadonlyBraceRest extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['readonly_brace_rest'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstReadonlyBraceRest.nodeTypes);
+  }
+}
+
 export class CstReadonlyKw extends CstNode {
   static readonly nodeTypes: readonly string[] = ['readonly_kw'];
   constructor(syntaxNode: SyntaxNode) {
@@ -1149,10 +1156,13 @@ export class CstTypeReadonlyArray extends CstNode {
   constructor(syntaxNode: SyntaxNode) {
     super(syntaxNode, CstTypeReadonlyArray.nodeTypes);
   }
-  elementField(): CstReadonlyNameRest | CstReadonlyParenRest | undefined {
+  elementField(): CstReadonlyBraceRest | CstReadonlyNameRest | CstReadonlyParenRest | undefined {
     const fieldNode = this.syntaxNode.childForFieldName('element');
     if (fieldNode === null) {
       return undefined;
+    }
+    if (fieldNode.type === 'readonly_brace_rest') {
+      return new CstReadonlyBraceRest(fieldNode);
     }
     if (fieldNode.type === 'readonly_name_rest') {
       return new CstReadonlyNameRest(fieldNode);
@@ -1262,6 +1272,7 @@ export type CstNamedNode =
   | CstPropertyList
   | CstPropertyNestedBlock
   | CstPropertyString
+  | CstReadonlyBraceRest
   | CstReadonlyKw
   | CstReadonlyNameRest
   | CstReadonlyParenRest
@@ -1376,6 +1387,7 @@ export const cstNodeClassByType: ReadonlyMap<string, new (syntaxNode: SyntaxNode
   ['property_list', CstPropertyList],
   ['property_nested_block', CstPropertyNestedBlock],
   ['property_string', CstPropertyString],
+  ['readonly_brace_rest', CstReadonlyBraceRest],
   ['readonly_kw', CstReadonlyKw],
   ['readonly_name_rest', CstReadonlyNameRest],
   ['readonly_paren_rest', CstReadonlyParenRest],

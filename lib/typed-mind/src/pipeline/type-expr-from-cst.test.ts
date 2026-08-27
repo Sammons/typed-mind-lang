@@ -223,6 +223,34 @@ describe('X-TYPE-1/X-TYPE-2: per-shape shortform type-expression fixtures', () =
     assert.deepEqual(syntaxDiagnostics, []);
   });
 
+  it('regression fix: qualified/dotted type reference falls to opaque (lib/typed-mind-typescript/architecture.tmd:107 `ts.CompilerOptions`)', () => {
+    const outcome = parser.parse('UserDTO %\n  - x: ts.CompilerOptions\n');
+    const dto = outcome.entities.find((entity): entity is DtoNode => entity instanceof DtoNode);
+    const field = dto?.fields.at(0);
+    assert.notEqual(field, undefined);
+    const typeExpr = field?.typeExpr;
+    assert.equal(typeExpr?.kind, 'opaque');
+    assert.equal(typeExpr !== undefined && typeExpr.kind === 'opaque' ? typeExpr.text : undefined, 'ts.CompilerOptions');
+    const syntaxDiagnostics = outcome.diagnostics.filter((diagnostic) => diagnostic.code.startsWith('syntax/'));
+    assert.deepEqual(syntaxDiagnostics, []);
+  });
+
+  it('regression fix: readonly array of an inline object literal (lib/typed-mind-typescript/architecture.tmd:102)', () => {
+    const outcome = parser.parse('UserDTO %\n  - enumValues: readonly { name: string; value?: string }[]\n');
+    const dto = outcome.entities.find((entity): entity is DtoNode => entity instanceof DtoNode);
+    const field = dto?.fields.at(0);
+    assert.notEqual(field, undefined);
+    const typeExpr = withoutSpans(field?.typeExpr as TypeExprNode);
+    assert.deepEqual(typeExpr, {
+      kind: 'array',
+      readonly: true,
+      spelling: 'suffix',
+      element: { kind: 'opaque', text: '{ name: string; value?: string }' },
+    });
+    const syntaxDiagnostics = outcome.diagnostics.filter((diagnostic) => diagnostic.code.startsWith('syntax/'));
+    assert.deepEqual(syntaxDiagnostics, []);
+  });
+
   it('deeply-nested object literal (complex-dto-example.tmd:42 depth-3)', () => {
     const outcome = parser.parse('UserDTO %\n  - x: { user: { profile: { settings: string[] } } }\n');
     const dto = outcome.entities.find((entity): entity is DtoNode => entity instanceof DtoNode);
