@@ -120,7 +120,7 @@ describe('RFC-TM-9 Q2 check — X-CONV-3: script-shaped entrypoint forces a File
       // cwd deliberately NOT the target project — proves getRelativePath
       // relativizes against the project root (the tsconfig's directory),
       // never process.cwd().
-      execFileSync('/usr/bin/node', [cliPath, 'export', '--project', projectDir, '--entrypoint', 'src/main.ts', '--output', outputPath], {
+      execFileSync(process.execPath, [cliPath, 'export', '--project', projectDir, '--entrypoint', 'src/main.ts', '--output', outputPath], {
         cwd: tmpdir(),
       });
       const content = readFileSync(outputPath, 'utf-8');
@@ -154,9 +154,13 @@ describe('RFC-TM-9 Q2 check — X-CONV-4: collision-safe naming + I-13 degrade-n
     try {
       let exitCode = 0;
       try {
-        execFileSync('/usr/bin/node', [cliPath, 'export', '--project', projectDir, '--entrypoint', 'src/main.ts', '--output', outputPath], {
-          stdio: 'pipe',
-        });
+        execFileSync(
+          process.execPath,
+          [cliPath, 'export', '--project', projectDir, '--entrypoint', 'src/main.ts', '--output', outputPath],
+          {
+            stdio: 'pipe',
+          },
+        );
       } catch (error) {
         exitCode = (error as { status?: number }).status ?? 1;
       }
