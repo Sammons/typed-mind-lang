@@ -1,10 +1,23 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
 
-const testProjectDir = '/tmp/typed-mind-ts-test';
+// Pre-existing bug fix (unrelated to RFC-TM-9): this suite used to hardcode
+// a single literal path, '/tmp/typed-mind-ts-test', shared across every
+// process that ever runs this file. On a shared CI runner (or a shared dev
+// host running two worktrees of this same repo, as happens during
+// RFC-TM-8/RFC-TM-9 parallel development) that path can collide across
+// concurrent runs — one process's `after()` teardown removes the directory
+// while another process's tests are still reading it, producing an ENOENT
+// on `readdirSync`. `mkdtempSync` gives this suite's fixture directory a
+// unique name per process, eliminating the collision. Reproduced
+// deterministically on the actual CI runner across two consecutive PR
+// pushes; fixed here because it was blocking RFC-TM-9 Q2's merge, even
+// though the bug itself predates this RFC and touches no X-CONV/X-AN item.
+const testProjectDir = mkdtempSync(join(tmpdir(), 'typed-mind-ts-test-'));
 
 describe('TypeScriptAnalyzer', () => {
   before(() => {
