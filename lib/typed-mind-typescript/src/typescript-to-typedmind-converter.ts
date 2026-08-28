@@ -181,7 +181,7 @@ export class TypeScriptToTypedMindConverter {
       let tmdContent = '';
       try {
         sortedEntities = sortIntoLegacySectionOrder(this.entities);
-        tmdContent = this.emitter.emitShortform({ entities: sortedEntities, imports: [], diagnostics: [] });
+        tmdContent = this.emitter.emitShortform({ entities: sortedEntities, imports: [], suppressions: [], diagnostics: [] });
       } catch (emitError) {
         this.addError(`Partial-output emission also failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`);
         sortedEntities = [...this.entities];

@@ -3537,10 +3537,10 @@
       {
         "code": "checker/dto-field-unknown-type",
         "severity": "error",
-        "line": 40,
-        "column": 1,
-        "endLine": 40,
-        "endColumn": 38,
+        "line": 49,
+        "column": 14,
+        "endLine": 49,
+        "endColumn": 24,
         "message": "DTO 'UserDTO' field 'profile' references undefined type 'ProfileDTO'"
       },
       {
@@ -3722,15 +3722,6 @@
         "endLine": 97,
         "endColumn": 35,
         "message": "Function 'fibonacci' is not exported by any file and is not a class method"
-      },
-      {
-        "code": "checker/dto-field-unknown-type",
-        "severity": "error",
-        "line": 104,
-        "column": 1,
-        "endLine": 104,
-        "endColumn": 50,
-        "message": "DTO 'ComplexDTO' field 'promise' references undefined type 'Promise<UserDTO>'"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4216,6 +4207,15 @@
         "message": "Orphaned entity 'DSLChecker'"
       },
       {
+        "code": "checker/dto-field-non-data-type",
+        "severity": "error",
+        "line": 43,
+        "column": 27,
+        "endLine": 43,
+        "endColumn": 36,
+        "message": "DTO 'ParseResult' field 'entities' references 'AnyEntity' which is a Constants, not a DTO or Class"
+      },
+      {
         "code": "syntax/error",
         "severity": "error",
         "line": 45,
@@ -4315,6 +4315,15 @@
         "message": "Orphaned entity 'ResolvedImport'"
       },
       {
+        "code": "checker/dto-field-non-data-type",
+        "severity": "error",
+        "line": 60,
+        "column": 27,
+        "endLine": 60,
+        "endColumn": 36,
+        "message": "DTO 'ResolvedImport' field 'entities' references 'AnyEntity' which is a Constants, not a DTO or Class"
+      },
+      {
         "code": "checker/orphaned-entity",
         "severity": "error",
         "line": 63,
@@ -4322,15 +4331,6 @@
         "endLine": 63,
         "endColumn": 16,
         "message": "Orphaned entity 'LongformBlock'"
-      },
-      {
-        "code": "checker/dto-field-non-data-type",
-        "severity": "error",
-        "line": 69,
-        "column": 1,
-        "endLine": 69,
-        "endColumn": 25,
-        "message": "DTO 'GrammarValidationError' field 'type' references 'EntityType' which is a Constants, not a DTO or Class"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4342,6 +4342,15 @@
         "message": "Orphaned entity 'GrammarValidationError'"
       },
       {
+        "code": "checker/dto-field-non-data-type",
+        "severity": "error",
+        "line": 71,
+        "column": 11,
+        "endLine": 71,
+        "endColumn": 21,
+        "message": "DTO 'GrammarValidationError' field 'type' references 'EntityType' which is a Constants, not a DTO or Class"
+      },
+      {
         "code": "checker/orphaned-entity",
         "severity": "error",
         "line": 76,
@@ -4349,24 +4358,6 @@
         "endLine": 76,
         "endColumn": 26,
         "message": "Orphaned entity 'GrammarValidationResult'"
-      },
-      {
-        "code": "checker/dto-field-non-data-type",
-        "severity": "error",
-        "line": 82,
-        "column": 1,
-        "endLine": 82,
-        "endColumn": 12,
-        "message": "DTO 'Reference' field 'fromType' references 'EntityType' which is a Constants, not a DTO or Class"
-      },
-      {
-        "code": "checker/dto-field-non-data-type",
-        "severity": "error",
-        "line": 82,
-        "column": 1,
-        "endLine": 82,
-        "endColumn": 12,
-        "message": "DTO 'Reference' field 'type' references 'ReferenceType' which is a Constants, not a DTO or Class"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4380,11 +4371,20 @@
       {
         "code": "checker/dto-field-non-data-type",
         "severity": "error",
-        "line": 86,
-        "column": 1,
-        "endLine": 86,
-        "endColumn": 9,
-        "message": "DTO 'Entity' field 'type' references 'EntityType' which is a Constants, not a DTO or Class"
+        "line": 84,
+        "column": 11,
+        "endLine": 84,
+        "endColumn": 24,
+        "message": "DTO 'Reference' field 'type' references 'ReferenceType' which is a Constants, not a DTO or Class"
+      },
+      {
+        "code": "checker/dto-field-non-data-type",
+        "severity": "error",
+        "line": 85,
+        "column": 16,
+        "endLine": 85,
+        "endColumn": 26,
+        "message": "DTO 'Reference' field 'fromType' references 'EntityType' which is a Constants, not a DTO or Class"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4394,6 +4394,24 @@
         "endLine": 86,
         "endColumn": 9,
         "message": "Orphaned entity 'Entity'"
+      },
+      {
+        "code": "checker/dto-field-non-data-type",
+        "severity": "error",
+        "line": 88,
+        "column": 11,
+        "endLine": 88,
+        "endColumn": 21,
+        "message": "DTO 'Entity' field 'type' references 'EntityType' which is a Constants, not a DTO or Class"
+      },
+      {
+        "code": "checker/dto-field-non-data-type",
+        "severity": "error",
+        "line": 184,
+        "column": 27,
+        "endLine": 184,
+        "endColumn": 36,
+        "message": "DTO 'ProgramGraph' field 'entities' references 'AnyEntity' which is a Constants, not a DTO or Class"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4819,8 +4837,18 @@
     ]
   },
   "lib/typed-mind-typescript/architecture.tmd": {
-    "valid": true,
-    "diagnostics": []
+    "valid": false,
+    "diagnostics": [
+      {
+        "code": "checker/dto-field-unknown-type",
+        "severity": "error",
+        "line": 116,
+        "column": 24,
+        "endLine": 116,
+        "endColumn": 33,
+        "message": "DTO 'ConversionResult' field 'entities' references undefined type 'AnyEntity'"
+      }
+    ]
   },
   "lib/typed-mind-typescript/typed-mind-cli-architecture.tmd": {
     "valid": false,

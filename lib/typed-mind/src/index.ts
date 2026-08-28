@@ -19,7 +19,7 @@ export { DependencyNode } from './ast/dependency-node.ts';
 export type { Diagnostic, DiagnosticSeverity } from './ast/diagnostic.ts';
 export { DtoFieldNode, type OptionalityMarker } from './ast/dto-field-node.ts';
 export { DtoNode } from './ast/dto-node.ts';
-export type { EntityKind, RunParameterType } from './ast/entity-kind.ts';
+export type { EntityKind, RunParameterType, TypeDefVariant } from './ast/entity-kind.ts';
 export { EntityNode, type SourceForm } from './ast/entity-node.ts';
 export { FileNode } from './ast/file-node.ts';
 export { FunctionNode } from './ast/function-node.ts';
@@ -28,6 +28,11 @@ export { ImportStatementNode } from './ast/import-statement-node.ts';
 export { ProgramNode } from './ast/program-node.ts';
 export { RunParameterNode } from './ast/run-parameter-node.ts';
 export type { Span } from './ast/span.ts';
+// RFC-TM-8 §5 (rfc-tm-8-diamond.md, X-TYPE-7) — TypeDefNode joins the other
+// ten semantic classes on the public surface, same rationale as every other
+// entity class re-export above: sibling workspace packages (LSP, converter)
+// need it to narrow EntityNode by `instanceof`.
+export { TypeDefNode } from './ast/type-def-node.ts';
 // RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2) — DtoFieldNode's new required
 // typeExpr construction argument means every out-of-package DtoFieldNode
 // builder (the TM-6/TM-9 TypeScript-to-TypedMind converter,

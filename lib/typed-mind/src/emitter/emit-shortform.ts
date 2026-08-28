@@ -23,7 +23,9 @@ import type { FileNode } from '../ast/file-node.ts';
 import type { FunctionNode } from '../ast/function-node.ts';
 import type { ProgramNode } from '../ast/program-node.ts';
 import type { RunParameterNode } from '../ast/run-parameter-node.ts';
+import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
+import { printTypeExpr } from './print-type-expr.ts';
 
 // A shortform `comment` is an INLINE trailing comment on the declaration's
 // own first line (grammar.js: every *_declaration production takes an
@@ -231,6 +233,20 @@ const dependencyToShortform = (entity: DependencyNode): string[] => {
   return lines;
 };
 
+// X-TYPE-7 (rfc-tm-8-diamond.md §5): `Name = enum [A, B]` / `Name = TypeExpr`,
+// grammar.js's typedef_declaration shape. The alias variant prints its
+// aliasType through the canonical printer (X-TYPE-3, print-type-expr.ts) —
+// TypeDefNode carries no preserved raw type-text field the way DtoFieldNode
+// does (there is no per-field `type` string to fall back on here; the
+// aliasType IS the entity's declared type), so this is a genuine synthetic-
+// printer consumer, not a raw-carriage byte-preservation case.
+const typeDefToShortform = (entity: TypeDefNode): string[] => {
+  if (entity.variant === 'enum') {
+    return [`${entity.name} = enum [${(entity.members ?? []).join(', ')}]`];
+  }
+  return [`${entity.name} = ${entity.aliasType === undefined ? '' : printTypeExpr(entity.aliasType)}`];
+};
+
 export const emitShortform = (entity: EntityNode): string[] => {
   const body = ((): string[] => {
     switch (entity.kind) {
@@ -256,6 +272,8 @@ export const emitShortform = (entity: EntityNode): string[] => {
         return runParameterToShortform(entity as RunParameterNode);
       case 'Dependency':
         return dependencyToShortform(entity as DependencyNode);
+      case 'TypeDef':
+        return typeDefToShortform(entity as TypeDefNode);
     }
   })();
   return withInlineComment(body, entity.comment);

@@ -37,6 +37,8 @@ export const getCompletionItemKind = (kind: EntityKind): CompletionItemKind => {
       return CompletionItemKind.Property;
     case 'Dependency':
       return CompletionItemKind.Module;
+    case 'TypeDef':
+      return CompletionItemKind.TypeParameter;
     default:
       return assertNever(kind);
   }
@@ -78,6 +80,8 @@ export const getSemanticTokenType = (kind: EntityKind): number => {
     case 'Dependency':
       return SEMANTIC_TOKEN_LEGEND.indexOf(SemanticTokenTypes.namespace);
     case 'File':
+      return SEMANTIC_TOKEN_LEGEND.indexOf(SemanticTokenTypes.type);
+    case 'TypeDef':
       return SEMANTIC_TOKEN_LEGEND.indexOf(SemanticTokenTypes.type);
     default:
       return assertNever(kind);

@@ -14,7 +14,16 @@ export type EntityKind =
   | 'Asset'
   | 'UIComponent'
   | 'RunParameter'
-  | 'Dependency';
+  | 'Dependency'
+  | 'TypeDef';
+
+// RFC-TM-8 §5 (rfc-tm-8-diamond.md, X-TYPE-7) — one entity kind covers both
+// enum and alias named-type declarations (RULING: two kinds were rejected —
+// the census evidence shows both constructs share every reference position,
+// so doubling VALID_REFERENCES and the grammar surface for a distinction one
+// discriminant carries is not worth it). `variant` is TypeDefNode's own
+// discriminant, one level below EntityKind's own `kind`.
+export type TypeDefVariant = 'enum' | 'alias';
 
 // RunParameter category sigil (grammar: env/iam/runtime/config), unchanged
 // from the legacy literal union at types.ts RunParameterEntity.paramType.

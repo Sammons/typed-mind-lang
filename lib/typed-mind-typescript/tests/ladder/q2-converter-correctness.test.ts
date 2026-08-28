@@ -56,7 +56,7 @@ const cliPath = join(testDir, '..', '..', 'dist', 'cli.js');
 
 const checkViaLongform = async (entities: readonly unknown[]) => {
   const emitter = new SyntaxEmitter();
-  const longform = emitter.emitLongform({ entities: entities as never, imports: [], diagnostics: [] });
+  const longform = emitter.emitLongform({ entities: entities as never, imports: [], suppressions: [], diagnostics: [] });
   const tm = await TypedMind.create();
   return { longform, result: tm.check(longform) };
 };

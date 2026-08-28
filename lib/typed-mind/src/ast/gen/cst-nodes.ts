@@ -1,16 +1,16 @@
 // GENERATED FILE — DO NOT EDIT.
 // Emitted by lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs (RFC-TM-3 §2.1)
-// from lib/typed-mind/grammar/src/node-types.json: 117 named nodes,
-// 29 `_final` twins → 88 wrapper classes (one per logical production).
+// from lib/typed-mind/grammar/src/node-types.json: 121 named nodes,
+// 30 `_final` twins → 91 wrapper classes (one per logical production).
 // Regenerate: node lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs
 // CI diff-gates this file via scripts/check-generated.mjs step 2b.
 
 import type { Node as SyntaxNode } from 'web-tree-sitter';
 import type { Span } from '../span.ts';
 
-export const CST_NAMED_NODE_TYPE_COUNT = 117;
-export const CST_FINAL_TWIN_COUNT = 29;
-export const CST_LOGICAL_CLASS_COUNT = 88;
+export const CST_NAMED_NODE_TYPE_COUNT = 121;
+export const CST_FINAL_TWIN_COUNT = 30;
+export const CST_LOGICAL_CLASS_COUNT = 91;
 
 const spanOf = (syntaxNode: SyntaxNode): Span => ({
   start: { line: syntaxNode.startPosition.row + 1, column: syntaxNode.startPosition.column + 1 },
@@ -505,6 +505,13 @@ export class CstEntityName extends CstNode {
   static readonly nodeTypes: readonly string[] = ['entity_name'];
   constructor(syntaxNode: SyntaxNode) {
     super(syntaxNode, CstEntityName.nodeTypes);
+  }
+}
+
+export class CstEnumKw extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['enum_kw'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstEnumKw.nodeTypes);
   }
 }
 
@@ -1040,6 +1047,9 @@ export class CstSourceFile extends CstNode {
   suppressionBlockChildren(): CstSuppressionBlock[] {
     return this.childrenOfTypes(['suppression_block'], CstSuppressionBlock);
   }
+  typedefDeclarationChildren(): CstTypedefDeclaration[] {
+    return this.childrenOfTypes(['typedef_declaration', 'typedef_declaration_final'], CstTypedefDeclaration);
+  }
   uicomponentDeclarationChildren(): CstUicomponentDeclaration[] {
     return this.childrenOfTypes(['uicomponent_declaration', 'uicomponent_declaration_final'], CstUicomponentDeclaration);
   }
@@ -1313,6 +1323,38 @@ export class CstTypeUnion extends CstNode {
   }
 }
 
+export class CstTypedefDeclaration extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['typedef_declaration', 'typedef_declaration_final'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypedefDeclaration.nodeTypes);
+  }
+  entityNameChildren(): CstEntityName[] {
+    return this.childrenOfTypes(['entity_name'], CstEntityName);
+  }
+  inlineCommentChildren(): CstInlineComment[] {
+    return this.childrenOfTypes(['inline_comment'], CstInlineComment);
+  }
+  typeExprChildren(): CstTypeExpr[] {
+    return this.childrenOfTypes(['type_expr'], CstTypeExpr);
+  }
+  typedefEnumVariantChildren(): CstTypedefEnumVariant[] {
+    return this.childrenOfTypes(['typedef_enum_variant'], CstTypedefEnumVariant);
+  }
+}
+
+export class CstTypedefEnumVariant extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['typedef_enum_variant'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypedefEnumVariant.nodeTypes);
+  }
+  enumKwChildren(): CstEnumKw[] {
+    return this.childrenOfTypes(['enum_kw'], CstEnumKw);
+  }
+  listEntryChildren(): CstListEntry[] {
+    return this.childrenOfTypes(['list_entry'], CstListEntry);
+  }
+}
+
 export class CstUicomponentDeclaration extends CstNode {
   static readonly nodeTypes: readonly string[] = ['uicomponent_declaration', 'uicomponent_declaration_final'];
   constructor(syntaxNode: SyntaxNode) {
@@ -1367,6 +1409,7 @@ export type CstNamedNode =
   | CstDtoFieldsBlock
   | CstEntityComment
   | CstEntityName
+  | CstEnumKw
   | CstExportList
   | CstFieldName
   | CstFieldType
@@ -1423,6 +1466,8 @@ export type CstNamedNode =
   | CstTypePostfix
   | CstTypeReadonlyArray
   | CstTypeUnion
+  | CstTypedefDeclaration
+  | CstTypedefEnumVariant
   | CstUicomponentDeclaration
   | CstVersion;
 
@@ -1479,6 +1524,7 @@ export const cstNodeClassByType: ReadonlyMap<string, new (syntaxNode: SyntaxNode
   ['entity_comment', CstEntityComment],
   ['entity_comment_final', CstEntityComment],
   ['entity_name', CstEntityName],
+  ['enum_kw', CstEnumKw],
   ['export_list', CstExportList],
   ['export_list_final', CstExportList],
   ['field_name', CstFieldName],
@@ -1546,6 +1592,9 @@ export const cstNodeClassByType: ReadonlyMap<string, new (syntaxNode: SyntaxNode
   ['type_postfix', CstTypePostfix],
   ['type_readonly_array', CstTypeReadonlyArray],
   ['type_union', CstTypeUnion],
+  ['typedef_declaration', CstTypedefDeclaration],
+  ['typedef_declaration_final', CstTypedefDeclaration],
+  ['typedef_enum_variant', CstTypedefEnumVariant],
   ['uicomponent_declaration', CstUicomponentDeclaration],
   ['uicomponent_declaration_final', CstUicomponentDeclaration],
   ['version', CstVersion],

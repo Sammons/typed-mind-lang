@@ -18,10 +18,12 @@ import {
   type CstInheritList,
   CstProgramDeclaration,
   CstRunparameterDeclaration,
+  CstTypedefDeclaration,
   CstUicomponentDeclaration,
 } from '../ast/gen/cst-nodes.ts';
 import { EntityAccumulator, type EntityAccumulatorArgs } from './entity-accumulator.ts';
 import { tokenSpanOf } from './spans.ts';
+import { typeExprFromCst } from './type-expr-from-cst.ts';
 
 const unquote = (text: string): string => {
   return text.replace(/^"/, '').replace(/"$/, '');
@@ -242,5 +244,29 @@ export const openDependency = (syntaxNode: SyntaxNode): EntityAccumulator => {
   if (versionText !== undefined) {
     accumulator.slots.version = stripVersionPrefix(versionText);
   }
+  return accumulator;
+};
+
+// X-TYPE-7 (rfc-tm-8-diamond.md §5): `Name = enum [A, B]` (enum variant) or
+// `Name = TypeExpr` (alias variant) — grammar.js's typedef_declaration choice
+// makes the two variants mutually exclusive at parse time (typedef_enum_variant
+// XOR a bare type_expr child), so the opener need only check which CST child
+// is present, mirroring dtoFieldFromCst's typeExprOf pattern for the alias
+// case (attachment-rules.ts).
+export const openTypeDef = (syntaxNode: SyntaxNode): EntityAccumulator => {
+  const declaration = new CstTypedefDeclaration(syntaxNode);
+  const accumulator = new EntityAccumulator(
+    baseArgs('TypeDef', declaration.entityNameChildren().at(0)?.text ?? '', syntaxNode, inlineCommentTextOf(declaration)),
+  );
+  const enumVariant = declaration.typedefEnumVariantChildren().at(0);
+  if (enumVariant !== undefined) {
+    accumulator.slots.typeDefVariant = 'enum';
+    accumulator.slots.members = enumVariant.listEntryChildren().map((entry) => entry.text);
+    return accumulator;
+  }
+  accumulator.slots.typeDefVariant = 'alias';
+  const typeExprCst = declaration.typeExprChildren().at(0);
+  accumulator.slots.aliasType =
+    typeExprCst === undefined ? { kind: 'opaque', text: '', span: accumulator.span } : typeExprFromCst(typeExprCst);
   return accumulator;
 };

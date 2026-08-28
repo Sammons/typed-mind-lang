@@ -42,6 +42,7 @@ import {
   openFunction,
   openProgram,
   openRunParameter,
+  openTypeDef,
   openUiComponent,
 } from './declaration-openers.ts';
 import type { EntityAccumulator } from './entity-accumulator.ts';
@@ -92,6 +93,7 @@ const DECLARATION_OPENERS: Record<string, (syntaxNode: SyntaxNode, sourceLines: 
   uicomponent_declaration: (syntaxNode) => openUiComponent(syntaxNode),
   runparameter_declaration: (syntaxNode) => openRunParameter(syntaxNode),
   dependency_declaration: (syntaxNode) => openDependency(syntaxNode),
+  typedef_declaration: (syntaxNode) => openTypeDef(syntaxNode),
 };
 
 export class CstToAstWalker {
