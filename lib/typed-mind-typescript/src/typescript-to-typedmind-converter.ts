@@ -244,6 +244,13 @@ export class TypeScriptToTypedMindConverter {
   private countSuppressionsByReason(suppressions: readonly SuppressionNode[]): Record<SuppressionReason, number> {
     const counts = this.emptySuppressionCounts();
     for (const suppression of suppressions) {
+      // SuppressionNode.reason is a bare `string` (lib/typed-mind's
+      // ast/suppression-node.ts — no enumerated reason type exists at that
+      // layer). The cast is safe here because this converter is the ONLY
+      // producer of every suppression it counts: `computeSuppressions`
+      // (below) never constructs a SuppressionNode with a reason outside
+      // `SuppressionReason`'s two members, so every value flowing into this
+      // loop is provably one of them.
       const reason = suppression.reason as SuppressionReason;
       counts[reason] = (counts[reason] ?? 0) + 1;
     }
