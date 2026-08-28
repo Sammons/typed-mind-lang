@@ -23,6 +23,7 @@ import {
   type LinkIndex,
   ProgramNode,
   RunParameterNode,
+  TypeDefNode,
   UiComponentNode,
 } from '@sammons/typed-mind';
 
@@ -146,6 +147,28 @@ const renderDto = (entity: DtoNode): string[] => {
   return lines;
 };
 
+// X-TYPE-7 (rfc-tm-8-diamond.md §5): minimal TypeDef rendering — the doc's
+// "hover keeps quoting the raw spelling" FAQ answer scopes DtoFieldNode's
+// preserved `type` string specifically; TypeDefNode carries no such raw-text
+// field (its declared type IS the structured aliasType, no separate raw
+// string), so this renders the variant discriminant and enum member list
+// only, without a printed alias-type spelling — no new public printer
+// dependency for a hover-only need.
+const renderTypeDef = (entity: TypeDefNode): string[] => {
+  const lines = [`**Variant**: ${entity.variant}`];
+  if (entity.variant === 'enum') {
+    const members = listSection('Members', entity.members);
+    if (members !== undefined) {
+      lines.push(members);
+    }
+  }
+  const purpose = section('Purpose', entity.purpose);
+  if (purpose !== undefined) {
+    lines.push(purpose);
+  }
+  return lines;
+};
+
 const renderAsset = (entity: AssetNode): string[] => {
   return [section('Description', entity.description), section('Contains Program', entity.containsProgram)].filter(
     (line): line is string => line !== undefined,
@@ -221,6 +244,8 @@ export const renderHoverContents = (entity: EntityNode, links: LinkIndex): strin
     lines.push(...renderDependency(entity, links));
   } else if (entity instanceof DtoNode) {
     lines.push(...renderDto(entity));
+  } else if (entity instanceof TypeDefNode) {
+    lines.push(...renderTypeDef(entity));
   }
   const referencedBy = renderReferencedBy(entity, links);
   if (referencedBy !== undefined) {

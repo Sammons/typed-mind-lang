@@ -92,6 +92,9 @@ export const VALID_REFERENCES: Record<ReferenceKind, ReferenceLegality> = {
   },
   schema: {
     from: ['Constants'],
-    to: ['Class', 'DTO'], // Schema can reference a type definition
+    // RFC-TM-8 §5 (rfc-tm-8-diamond.md, X-TYPE-7): TypeDef joins the legal
+    // schema-reference targets — a Constants entity's schema may now name an
+    // enum or alias TypeDef, not only a Class or DTO.
+    to: ['Class', 'DTO', 'TypeDef'], // Schema can reference a type definition
   },
 };

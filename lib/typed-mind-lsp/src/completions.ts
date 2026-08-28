@@ -19,6 +19,7 @@ const ENTITY_TYPE_ITEMS: readonly CompletionItem[] = [
   'UIComponent',
   'RunParameter',
   'Dependency',
+  'TypeDef',
 ].map((type) => ({ label: type, kind: CompletionItemKind.Keyword, detail: `Entity type: ${type}` }));
 
 const OPERATOR_ITEMS: readonly CompletionItem[] = [
@@ -44,6 +45,7 @@ const OPERATOR_ITEMS: readonly CompletionItem[] = [
   { label: '>>', detail: 'Asset contains program' },
   { label: '>', detail: 'UIComponent contains' },
   { label: '<', detail: 'UIComponent contained by' },
+  { label: '=', detail: 'TypeDef operator' },
 ].map((op) => ({ label: op.label, kind: CompletionItemKind.Operator, detail: op.detail }));
 
 export const provideCompletionsForEntities = (entities: ReadonlyMap<string, EntityNode>): CompletionItem[] => {

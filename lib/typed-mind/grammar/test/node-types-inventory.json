@@ -1,5 +1,5 @@
 {
-  "_comment": "RFC-TM-2 Q3 (rfc-tm-2-diamond.md §3, §4 'Q3 -- Corpus proof + closure', review SD-CB-1). PERMANENT, checked-in inventory of every named node the grammar must produce, derived from the doc's Solution section 1 production inventory (E1-E11 top-level entity declarations, C1-C15 continuation lines, D1-D4 document-level forms, H1-H12 braced longform block headers, P1-P7 block-body property productions) plus the grammar's own structural/token nodes not directly named by a single inventory row (source_file, entity_name, string, path, version, etc.) and the `_final` EOF-without-trailing-newline variant of every line-ending production (grammar.js's `_final_line_no_newline` alternative, Q1 report item). Consumed by check-node-types-completeness.mjs (wired into scripts/check-generated.mjs step 6) -- unlike the Q3 corpus substrate script and manifest, this script and list are NOT deleted; SD-CB-1 requires the node-types completeness check to stay executable going forward.",
+  "_comment": "RFC-TM-2 Q3 (rfc-tm-2-diamond.md §3, §4 'Q3 -- Corpus proof + closure', review SD-CB-1). PERMANENT, checked-in inventory of every named node the grammar must produce, derived from the doc's Solution section 1 production inventory (E1-E11 top-level entity declarations, C1-C15 continuation lines, D1-D4 document-level forms, H1-H12 braced longform block headers, P1-P7 block-body property productions) plus the grammar's own structural/token nodes not directly named by a single inventory row (source_file, entity_name, string, path, version, etc.) and the `_final` EOF-without-trailing-newline variant of every line-ending production (grammar.js's `_final_line_no_newline` alternative, Q1 report item). E12_typedef (RFC-TM-8 §5, rfc-tm-8-diamond.md, X-TYPE-7) adds the TypeDef entity's shortform declaration to the inventory alongside the original E1-E11 set. Consumed by check-node-types-completeness.mjs (wired into scripts/check-generated.mjs step 6) -- unlike the Q3 corpus substrate script and manifest, this script and list are NOT deleted; SD-CB-1 requires the node-types completeness check to stay executable going forward.",
   "rows": {
     "E1_program": ["program_declaration", "program_declaration_final"],
     "E2_file": ["file_declaration", "file_declaration_final"],
@@ -12,6 +12,7 @@
     "E9_uicomponent": ["uicomponent_declaration", "uicomponent_declaration_final"],
     "E10_runparameter": ["runparameter_declaration", "runparameter_declaration_final", "param_type", "param_marker"],
     "E11_dependency": ["dependency_declaration", "dependency_declaration_final", "dependency_name"],
+    "E12_typedef": ["typedef_declaration", "typedef_declaration_final", "typedef_enum_variant", "enum_kw"],
     "C1_imports": ["import_list", "import_list_final"],
     "C2_exports": ["export_list", "export_list_final"],
     "C3_calls": ["calls_list", "calls_list_final"],

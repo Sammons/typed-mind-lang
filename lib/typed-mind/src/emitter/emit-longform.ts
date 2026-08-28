@@ -31,7 +31,9 @@ import type { FileNode } from '../ast/file-node.ts';
 import type { FunctionNode } from '../ast/function-node.ts';
 import type { ProgramNode } from '../ast/program-node.ts';
 import type { RunParameterNode } from '../ast/run-parameter-node.ts';
+import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
+import { printTypeExpr } from './print-type-expr.ts';
 
 const indent = (lines: string[]): string[] => lines.map((line) => `  ${line}`);
 
@@ -237,6 +239,35 @@ const dependencyToLongform = (entity: DependencyNode): string[] => {
   return [`dependency ${dependencyHeaderName(entity.name)} {`, ...indent(body), '}'];
 };
 
+// X-TYPE-7 (rfc-tm-8-diamond.md §5): `typedef Name { variant: enum, members:
+// [...] }` or `typedef Name { type: TypeExpr }` — NO decorative `type: TypeDef`
+// line here (unlike every other kind): TypeDef's OWN `type:` key is reserved
+// for the alias variant's aliased type text (mirrors RunParameter's identical
+// `type:`-key-collision avoidance above — longform-builder.ts's applyProperties
+// reads the alias's type FROM the `type:` key itself). A decorative
+// `type: TypeDef` line would collide with and overwrite the real aliasType on
+// reparse. `variant:` defaults to alias when unspelled (applyProperties
+// mirrors this same default on parse), so a re-emitted alias round-trips
+// without ever printing a redundant `variant: alias` line. The alias type is
+// emitted QUOTED (`type: "..."`), matching a DTO field's longform
+// `type: "string[]"` spelling (§6): a bare, unquoted multi-part type
+// (`type: string | number`) does not survive P3's property_identifier
+// (grammar.js block_property choice order) trying first and matching only
+// the leading `string`, stranding `| number` as unparsable text — quoting
+// routes it through the SAME string-based re-parse path
+// (type-expr-from-text.ts) longform-builder.ts's dtoFieldOf already uses.
+const typeDefToLongform = (entity: TypeDefNode): string[] => {
+  const body: string[] = [];
+  if (entity.variant === 'enum') {
+    body.push('variant: enum');
+    body.push(`members: [${(entity.members ?? []).join(', ')}]`);
+  } else {
+    body.push(`type: "${entity.aliasType === undefined ? '' : printTypeExpr(entity.aliasType)}"`);
+  }
+  body.push(...descriptionAndPurposeLines(entity.comment, entity.purpose));
+  return [`typedef ${entity.name} {`, ...indent(body), '}'];
+};
+
 export const emitLongform = (entity: EntityNode): string[] => {
   switch (entity.kind) {
     case 'Program':
@@ -261,5 +292,7 @@ export const emitLongform = (entity: EntityNode): string[] => {
       return runParameterToLongform(entity as RunParameterNode);
     case 'Dependency':
       return dependencyToLongform(entity as DependencyNode);
+    case 'TypeDef':
+      return typeDefToLongform(entity as TypeDefNode);
   }
 };

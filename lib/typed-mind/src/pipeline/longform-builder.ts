@@ -58,6 +58,8 @@ const LONGFORM_KIND_BY_KEYWORD: Record<string, EntityKind> = {
   constants: 'Constants',
   parameter: 'RunParameter',
   dependency: 'Dependency',
+  // X-TYPE-7 (rfc-tm-8-diamond.md §5): `typedef Name { ... }` longform.
+  typedef: 'TypeDef',
 };
 
 const unquote = (text: string): string => {
@@ -430,6 +432,33 @@ const applyProperties = (accumulator: EntityAccumulator, collected: CollectedPro
       const exports = list('exports');
       if (exports !== undefined) {
         slots.exports = exports;
+      }
+      break;
+    }
+    case 'TypeDef': {
+      // X-TYPE-7 (rfc-tm-8-diamond.md §5): `variant: enum|alias` is the
+      // discriminant key (distinct from every other kind's `type: <Kind>`
+      // decorative line — TypeDef's OWN `type:` key is reserved for the
+      // alias variant's aliased type text, mirroring a DTO field's `type:`
+      // property, longform-builder.ts's dtoFieldOf). `members: [...]` carries
+      // the enum's member list; a `type:` value with no `variant: enum` line
+      // defaults to the alias reading (the common case — most longform
+      // TypeDefs alias a type and never spell `variant:` at all).
+      const variant = scalar('variant') === 'enum' ? 'enum' : 'alias';
+      slots.typeDefVariant = variant;
+      if (variant === 'enum') {
+        slots.members = list('members') ?? [];
+      } else {
+        const aliasTypeProperty = collected.scalars.get('type');
+        const aliasTypeSpanStart = collected.all.find((property) => property.key === 'type')?.span.start ?? accumulator.span.start;
+        const typeText = aliasTypeProperty ?? 'any';
+        slots.aliasType = parseTypeExprText(typeText, {
+          baseLine: aliasTypeSpanStart.line,
+          baseColumn: aliasTypeSpanStart.column,
+        }).typeExpr;
+      }
+      if (purposeOrDescription !== undefined) {
+        slots.purpose = purposeOrDescription;
       }
       break;
     }

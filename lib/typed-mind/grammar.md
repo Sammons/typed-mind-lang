@@ -38,6 +38,7 @@ One entity per line. `<symbol>` names a grammar production; `[...]` marks an opt
 | UIComponent | `<entity_name> &!|& <string>` |
 | RunParameter | `<entity_name> <param_type> <string> [<param_marker>]` |
 | Dependency | `<entity_name>|<dependency_name> ^ <string> [<version>]` |
+| TypeDef | `<entity_name> = <typedef_enum_variant>|<type_expr>` |
 
 ## Continuation Operators
 
@@ -107,6 +108,7 @@ Longform wraps the same entity kinds in a brace-delimited block: `keyword Name {
 | constants | `constants Name {` |
 | parameter | `parameter Name {` |
 | classfile | `classfile Name {` |
+| typedef | `typedef Name {` |
 | dependency | `dependency Name {` or `dependency "quoted-name" {` |
 
 ## DTO Field Syntax

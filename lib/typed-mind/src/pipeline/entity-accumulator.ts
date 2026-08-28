@@ -13,13 +13,15 @@ import { ConstantsNode } from '../ast/constants-node.ts';
 import { DependencyNode } from '../ast/dependency-node.ts';
 import type { DtoFieldNode } from '../ast/dto-field-node.ts';
 import { DtoNode } from '../ast/dto-node.ts';
-import type { EntityKind, RunParameterType } from '../ast/entity-kind.ts';
+import type { EntityKind, RunParameterType, TypeDefVariant } from '../ast/entity-kind.ts';
 import type { EntityNode, EntityNodeArgs, SourceForm } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
 import { RunParameterNode } from '../ast/run-parameter-node.ts';
 import type { Span } from '../ast/span.ts';
+import { TypeDefNode } from '../ast/type-def-node.ts';
+import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 
 export interface AccumulatorSlots {
@@ -50,6 +52,13 @@ export interface AccumulatorSlots {
   paramType?: string | undefined;
   defaultValue?: string | undefined;
   required?: boolean | undefined;
+  // X-TYPE-7 (rfc-tm-8-diamond.md §5): TypeDef's own slots. variant is always
+  // set by the opener/builder before finalize(); members/aliasType are set
+  // per-variant (mutually exclusive, mirroring TypeDefNode's own constructor
+  // discriminant).
+  typeDefVariant?: TypeDefVariant | undefined;
+  members?: string[] | undefined;
+  aliasType?: TypeExprNode | undefined;
 }
 
 export interface EntityAccumulatorArgs {
@@ -225,6 +234,29 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
       purpose: slots.purpose ?? '',
       ...(slots.version !== undefined ? { version: slots.version } : {}),
       ...(slots.exports !== undefined ? { exports: slots.exports } : {}),
+    });
+  },
+  TypeDef: (accumulator) => {
+    const { slots } = accumulator;
+    const purposeArgs = slots.purpose !== undefined ? { purpose: slots.purpose } : {};
+    // Defensive default: a malformed/incomplete accumulation (e.g. a future
+    // parse-recovery path that opens a TypeDef without ever setting its
+    // variant) falls back to an empty alias-of-opaque rather than throwing —
+    // parsing stays tolerant end to end, matching the same tolerance
+    // attachment-rules.ts's typeExprOf documents for a missing type_expr.
+    if (slots.typeDefVariant === 'enum') {
+      return new TypeDefNode({
+        ...accumulator.baseArgs(),
+        variant: 'enum',
+        members: slots.members ?? [],
+        ...purposeArgs,
+      });
+    }
+    return new TypeDefNode({
+      ...accumulator.baseArgs(),
+      variant: 'alias',
+      aliasType: slots.aliasType ?? { kind: 'opaque', text: '', span: accumulator.span },
+      ...purposeArgs,
     });
   },
 };
