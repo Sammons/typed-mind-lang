@@ -90,7 +90,7 @@ describe('X-TYPE-1/X-TYPE-2: per-shape shortform type-expression fixtures', () =
     });
   });
 
-  it('nested generic: Record<string, Array<number>>', () => {
+  it('nested generic: Record<string, Array<number>> — the inner Array<T> normalizes to the array kind (doc §2, review finding B3)', () => {
     const typeExpr = firstFieldTypeExpr('UserDTO %\n  - x: Record<string, Array<number>>\n', parser);
     assert.deepEqual(withoutSpans(typeExpr), {
       kind: 'generic',
@@ -98,12 +98,30 @@ describe('X-TYPE-1/X-TYPE-2: per-shape shortform type-expression fixtures', () =
       args: [
         { kind: 'named', name: 'string' },
         {
-          kind: 'generic',
-          base: { kind: 'named', name: 'Array' },
-          args: [{ kind: 'named', name: 'number' }],
+          kind: 'array',
+          element: { kind: 'named', name: 'number' },
+          readonly: false,
+          spelling: 'generic',
         },
       ],
     });
+  });
+
+  it('Array<T> at top level normalizes to the array kind, spelling: generic (doc §2, review finding B3)', () => {
+    const typeExpr = firstFieldTypeExpr('UserDTO %\n  - x: Array<string>\n', parser);
+    assert.deepEqual(withoutSpans(typeExpr), {
+      kind: 'array',
+      element: { kind: 'named', name: 'string' },
+      readonly: false,
+      spelling: 'generic',
+    });
+  });
+
+  it('Pick and Record do NOT normalize — only Array does (doc §2 names Array exclusively)', () => {
+    const pickExpr = firstFieldTypeExpr('UserDTO %\n  - x: Pick<S3Client, "send">\n', parser);
+    assert.equal(pickExpr.kind, 'generic');
+    const recordExpr = firstFieldTypeExpr('UserDTO %\n  - x: Record<string, number>\n', parser);
+    assert.equal(recordExpr.kind, 'generic');
   });
 
   it('array of a parenthesized union: (string | number)[]', () => {
@@ -158,6 +176,28 @@ describe('X-TYPE-1/X-TYPE-2: per-shape shortform type-expression fixtures', () =
         members: [
           { kind: 'named', name: 'string' },
           { kind: 'named', name: 'number' },
+        ],
+      },
+    });
+  });
+
+  it('readonly array of a parenthesized union: exact span values for the compound-token reassembly (non-blocking review note)', () => {
+    // Pins the readonly_kw-last-character + rest-text reassembly math in
+    // typeReadonlyArrayFromCst — every prior test in this file strips spans
+    // before comparing, so this fiddly compound-token span computation had
+    // no value-level regression coverage.
+    const typeExpr = firstFieldTypeExpr('UserDTO %\n  - x: readonly (string | number)[]\n', parser);
+    assert.deepEqual(typeExpr, {
+      kind: 'array',
+      readonly: true,
+      spelling: 'suffix',
+      span: { start: { line: 2, column: 8 }, end: { line: 2, column: 36 } },
+      element: {
+        kind: 'union',
+        span: { start: { line: 2, column: 18 }, end: { line: 2, column: 33 } },
+        members: [
+          { kind: 'named', name: 'string', span: { start: { line: 2, column: 18 }, end: { line: 2, column: 24 } } },
+          { kind: 'named', name: 'number', span: { start: { line: 2, column: 27 }, end: { line: 2, column: 33 } } },
         ],
       },
     });

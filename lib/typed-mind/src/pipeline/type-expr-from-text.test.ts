@@ -101,4 +101,56 @@ describe('parseTypeExprText: the shared string-based type-expression parser', ()
       assert.equal(result.typeExpr.name, 'readonly');
     }
   });
+
+  it('falls back to opaque for a qualified/dotted type reference, not a truncated named type (review finding B1)', () => {
+    const result = parseTypeExprText('ts.CompilerOptions');
+    assert.equal(result.typeExpr.kind, 'opaque');
+    if (result.typeExpr.kind === 'opaque') {
+      assert.equal(result.typeExpr.text, 'ts.CompilerOptions');
+    }
+    assert.equal(result.remainder, '');
+  });
+
+  it('falls back to opaque for a multi-segment qualified name', () => {
+    const result = parseTypeExprText('ns.inner.Deep');
+    assert.equal(result.typeExpr.kind, 'opaque');
+    if (result.typeExpr.kind === 'opaque') {
+      assert.equal(result.typeExpr.text, 'ns.inner.Deep');
+    }
+  });
+
+  it('normalizes Array<T> to the array kind, spelling: generic (lead ruling on review finding B3)', () => {
+    const result = parseTypeExprText('Array<string>');
+    assert.deepEqual(result.typeExpr, {
+      kind: 'array',
+      element: { kind: 'named', name: 'string', span: { start: { line: 1, column: 7 }, end: { line: 1, column: 13 } } },
+      readonly: false,
+      spelling: 'generic',
+      span: { start: { line: 1, column: 1 }, end: { line: 1, column: 14 } },
+    });
+  });
+
+  it('does not normalize other generic bases (Pick, Record) — only Array (doc §2)', () => {
+    const pickResult = parseTypeExprText('Pick<S3Client, "send">');
+    assert.equal(pickResult.typeExpr.kind, 'generic');
+    const recordResult = parseTypeExprText('Record<string, number>');
+    assert.equal(recordResult.typeExpr.kind, 'generic');
+  });
+
+  it('array-of-array assigns each nesting level a distinct end span, not one shared span (review finding B2 parity check)', () => {
+    const result = parseTypeExprText('number[][]');
+    assert.equal(result.typeExpr.kind, 'array');
+    if (result.typeExpr.kind === 'array') {
+      const inner = result.typeExpr.element;
+      assert.equal(inner.kind, 'array');
+      if (inner.kind === 'array') {
+        // Inner array (number[]) ends right after its own ']' (index 8,
+        // 1-based column 9); outer array (number[][]) ends after its OWN
+        // ']' (index 10, column 11) — the two spans must differ.
+        assert.equal(inner.span.end.column, 9);
+        assert.equal(result.typeExpr.span.end.column, 11);
+        assert.notDeepEqual(inner.span, result.typeExpr.span);
+      }
+    }
+  });
 });

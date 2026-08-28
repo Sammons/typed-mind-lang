@@ -45,12 +45,16 @@ export const spanCoversLine = (span: Span, line: number): boolean => {
 // extraction in the tokenSpanOf style, for the type-expression sub-grammar's
 // recursive children. type_expr's productions carry no _indent/_line_end
 // wrapping the way a top-level line does, so no leading/trailing whitespace
-// trim is normally needed — but the readonly-array compound-token children
-// (readonly_kw carries "readonly " + one consumed character, readonly_name_rest/
-// readonly_paren_rest carry only the REST of the element's text) mean a
-// reconstructed element span must be built from the enclosing
-// type_readonly_array node's own extent, not naively from a single child.
-// This helper stays a thin, trimmed wrapper (tokenSpanOf's own trim logic)
-// so every TypeExprNode carries the span of exactly its own tokens, matching
-// what X-TYPE-4's future per-part findings (Q2) attach to.
+// trim is normally needed. A thin, trimmed wrapper (tokenSpanOf's own trim
+// logic) so every TypeExprNode carries the span of exactly its own tokens,
+// matching what X-TYPE-4's future per-part findings (Q2) attach to.
+//
+// The readonly-array compound-token reassembly (readonly_kw carries
+// "readonly " + one consumed character; readonly_name_rest/
+// readonly_paren_rest/readonly_brace_rest carry only the REST of the
+// element's text) does NOT go through this helper — that reconstruction
+// lives entirely in type-expr-from-cst.ts's typeReadonlyArrayFromCst, which
+// computes the element's base offset from readonly_kw's own end position and
+// hands it to parseTypeExprText directly (review finding, non-blocking:
+// this comment previously implied the reassembly happened here).
 export const typeSpanOf = tokenSpanOf;

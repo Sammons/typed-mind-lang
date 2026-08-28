@@ -24,6 +24,7 @@ import type {
   CstTypeReadonlyArray,
   CstTypeUnion,
 } from '../ast/gen/cst-nodes.ts';
+import type { Span } from '../ast/span.ts';
 import type { TypeExprNode, TypeNamedNode } from '../ast/type-expr-node.ts';
 import { typeSpanOf } from './spans.ts';
 // Lazy dependency on the string-based type parser (doc §1's "shared
@@ -102,14 +103,36 @@ const typeAtomFromCst = (wrapped: CstTypeAtom): TypeExprNode => {
   throw new Error(`type_atom: no recognized child in "${wrapped.text}"`);
 };
 
-const typeGenericFromCst = (wrapped: CstTypeGeneric) => {
+// Review finding B3 / lead ruling: the Diamond Doc's X-TYPE-2 section names
+// exactly one normalization — `Array<T>` (base name literally "Array", one
+// argument) normalizes to the array kind, recorded as `spelling: 'generic'`
+// so the emitter reproduces the source form. No other generic base (Pick,
+// Record, ReadonlyArray, ...) normalizes — the doc names Array only.
+const normalizeArrayGeneric = (baseName: string, args: readonly TypeExprNode[], span: Span): TypeExprNode | undefined => {
+  if (baseName !== 'Array' || args.length !== 1) {
+    return undefined;
+  }
+  const [element] = args;
+  if (element === undefined) {
+    return undefined;
+  }
+  return { kind: 'array', element, readonly: false, spelling: 'generic', span };
+};
+
+const typeGenericFromCst = (wrapped: CstTypeGeneric): TypeExprNode => {
   const base = wrapped.baseField();
   const args = wrapped.typeExprChildren().map((child) => typeExprFromCst(child));
+  const baseNode = base === undefined ? { kind: 'named' as const, name: '', span: typeSpanOf(wrapped.syntaxNode) } : typeNamedFromCst(base);
+  const span = typeSpanOf(wrapped.syntaxNode);
+  const normalized = normalizeArrayGeneric(baseNode.name, args, span);
+  if (normalized !== undefined) {
+    return normalized;
+  }
   return {
-    kind: 'generic' as const,
-    base: base === undefined ? { kind: 'named' as const, name: '', span: typeSpanOf(wrapped.syntaxNode) } : typeNamedFromCst(base),
+    kind: 'generic',
+    base: baseNode,
     args,
-    span: typeSpanOf(wrapped.syntaxNode),
+    span,
   };
 };
 

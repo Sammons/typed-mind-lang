@@ -246,7 +246,15 @@ const parseAtom = (cursor: TextCursor): TypeExprNode => {
       if (cursor.startsWith('>')) {
         cursor.index += 1;
       }
-      return { kind: 'generic', base: named, args, span: spanFrom(cursor, namedStartIndex, cursor.index) };
+      const genericSpan = spanFrom(cursor, namedStartIndex, cursor.index);
+      // Review finding B3 / lead ruling: mirror type-expr-from-cst.ts's
+      // Array<T> normalization (doc §2 — Array only, one argument, base
+      // name literally "Array"; no other generic base normalizes).
+      const [onlyArg] = args;
+      if (named.name === 'Array' && args.length === 1 && onlyArg !== undefined) {
+        return { kind: 'array', element: onlyArg, readonly: false, spelling: 'generic', span: genericSpan };
+      }
+      return { kind: 'generic', base: named, args, span: genericSpan };
     }
     return named;
   }
