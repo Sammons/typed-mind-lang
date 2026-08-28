@@ -15,6 +15,7 @@ import type {
   ParsedParameter,
   ParsedProperty,
   ParsedTypeAlias,
+  RecognizerName,
   TypeScriptProjectAnalysis,
 } from './types.ts';
 import { createFilePath, isClass, isExportDeclaration, isFunction, isInterface, isTypeAlias, isVariableStatement } from './types.ts';
@@ -61,10 +62,15 @@ export class TypeScriptAnalyzer {
 
   private readonly projectPath: string;
   private readonly configPath?: string;
+  // X-AN-10 — the CLI's --recognize flags, opt-in per RFC §6. Empty by
+  // default: with no flag, recognizer scanning does not run at all, and
+  // behavior is byte-identical to before this Quantum.
+  private readonly recognizers: ReadonlySet<RecognizerName>;
 
-  constructor(projectPath: string, configPath?: string) {
+  constructor(projectPath: string, configPath?: string, recognizers: readonly RecognizerName[] = []) {
     this.projectPath = projectPath;
     this.configPath = configPath;
+    this.recognizers = new Set(recognizers);
     const configFilePath = this.resolveConfigPath();
     const { config, error } = this.loadTsConfig(configFilePath);
 
@@ -179,6 +185,7 @@ export class TypeScriptAnalyzer {
       projectConfig: this.program.getCompilerOptions(),
       diagnostics: this.diagnostics,
       moduleGraph: this.moduleGraph,
+      projectRoot: path.resolve(this.projectPath),
     } as const;
   }
 
@@ -235,6 +242,13 @@ export class TypeScriptAnalyzer {
       // Analyze this module
       const module = this.analyzeModule(sourceFile);
       modules.push(module);
+
+      // X-AN-10 — opt-in recognizer scan. No-op (and no diagnostic
+      // surface) when --recognize was not passed for this convention name,
+      // matching the doc's "without the flag, behavior is unchanged."
+      if (this.recognizers.has('sst-handler')) {
+        this.scanSstHandlerStrings(sourceFile, currentPath);
+      }
 
       // Add imported modules to the traversal queue
       for (const importSpec of module.imports) {
@@ -310,7 +324,162 @@ export class TypeScriptAnalyzer {
       projectConfig: this.program.getCompilerOptions(),
       diagnostics: this.diagnostics,
       moduleGraph: this.moduleGraph,
+      // X-CONV-3 — the target project's root (absolute), so the converter
+      // can relativize every emitted path against it instead of
+      // `process.cwd()`.
+      projectRoot: path.resolve(this.projectPath),
     } as const;
+  }
+
+  // X-AN-10 — the SST/Lambda `handler: "path/to/file.member"` convention.
+  // Data-driven, one entry: a property literally named `handler` whose
+  // initializer is a string literal. Algorithm per RFC-TM-9 §6: join the
+  // string's path segment against the target project root; split at the
+  // LAST `.` to separate the file path from the member name (the string
+  // names the emitted JS artifact, e.g. `index.handler` compiles from
+  // `index.ts`'s exported `handler`, not a literal `index.handler.ts`);
+  // probe for the source file by appending `.ts`/`.tsx`/`.mts` to the path
+  // segment. A probe that finds no file — or, once found, a member absent
+  // from that module's own exports — surfaces an X-DIAG-1 warning naming
+  // the string and the failed path; never silence. The resolved edge folds
+  // into the SAME `moduleGraph` array the module-graph.json golden diffs,
+  // per the doc's Q2 check line ("appears in that fixture's module-graph
+  // golden").
+  private scanSstHandlerStrings(sourceFile: ts.SourceFile, currentPath: string): void {
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isPropertyAssignment(node) &&
+        ts.isIdentifier(node.name) &&
+        node.name.text === 'handler' &&
+        ts.isStringLiteralLike(node.initializer)
+      ) {
+        this.resolveSstHandlerString(node.initializer.text, currentPath);
+      }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(sourceFile, visit);
+  }
+
+  private resolveSstHandlerString(rawValue: string, currentPath: string): void {
+    const lastDot = rawValue.lastIndexOf('.');
+    if (lastDot <= 0 || lastDot === rawValue.length - 1) {
+      // No `.member` suffix to split on — not the recognized shape at all;
+      // this is not a failure of the convention, just a non-match, so no
+      // diagnostic (a bare `handler: "foo"` with no member segment is not
+      // an SST handler string).
+      return;
+    }
+
+    const filePathSegment = rawValue.slice(0, lastDot);
+    const memberName = rawValue.slice(lastDot + 1);
+    const joinedPath = path.join(this.projectPath, filePathSegment);
+
+    const candidateExtensions = ['.ts', '.tsx', '.mts'];
+    let resolvedAbsolutePath: string | undefined;
+    for (const ext of candidateExtensions) {
+      const candidate = `${joinedPath}${ext}`;
+      if (fs.existsSync(candidate)) {
+        resolvedAbsolutePath = candidate;
+        break;
+      }
+    }
+
+    if (resolvedAbsolutePath === undefined) {
+      this.diagnostics.push({
+        severity: 'warning',
+        category: 'recognizer-not-found',
+        message: `sst-handler recognizer: no source file found for handler string '${rawValue}' (probed ${candidateExtensions.map((ext) => `${filePathSegment}${ext}`).join(', ')})`,
+        filePath: currentPath,
+        specifier: rawValue,
+      });
+      this.moduleGraph.push({
+        sourceModule: path.relative(this.projectPath, currentPath),
+        specifier: rawValue,
+        resolvedTarget: undefined,
+        classification: 'unresolved',
+      });
+      return;
+    }
+
+    // The resolved target is not necessarily part of this.program's file
+    // set — the whole point of the recognizer is following a reference the
+    // TS program's own module graph never sees (a different package/build
+    // target, e.g. `packages/functions` when the root tsconfig excludes
+    // `packages/` entirely, per the real webhookstorage clone's shape).
+    // Parse it standalone rather than relying on `this.program.getSourceFile`.
+    const resolvedSourceFile = this.parseFileForExportCheck(resolvedAbsolutePath);
+    const memberIsExported = resolvedSourceFile !== undefined && this.sourceFileExportsMember(resolvedSourceFile, memberName);
+
+    if (!memberIsExported) {
+      this.diagnostics.push({
+        severity: 'warning',
+        category: 'recognizer-not-found',
+        message: `sst-handler recognizer: '${memberName}' is not exported by ${path.relative(this.projectPath, resolvedAbsolutePath)} (from handler string '${rawValue}')`,
+        filePath: currentPath,
+        specifier: rawValue,
+      });
+      this.moduleGraph.push({
+        sourceModule: path.relative(this.projectPath, currentPath),
+        specifier: rawValue,
+        resolvedTarget: undefined,
+        classification: 'unresolved',
+      });
+      return;
+    }
+
+    this.moduleGraph.push({
+      sourceModule: path.relative(this.projectPath, currentPath),
+      specifier: rawValue,
+      resolvedTarget: path.relative(this.projectPath, resolvedAbsolutePath),
+      classification: 'internal',
+    });
+  }
+
+  // Parses a resolved handler-string target standalone (not via
+  // `this.program`), since the target commonly lives outside the analyzed
+  // program's own file set — that is the exact shape the recognizer exists
+  // to cover (a sibling package/build target the root tsconfig excludes).
+  private parseFileForExportCheck(absolutePath: string): ts.SourceFile | undefined {
+    let text: string;
+    try {
+      text = fs.readFileSync(absolutePath, 'utf-8');
+    } catch {
+      return undefined;
+    }
+    return ts.createSourceFile(absolutePath, text, ts.ScriptTarget.Latest, true);
+  }
+
+  // Checks whether `memberName` is exported (named or default) by
+  // `sourceFile`, without pulling in the full `ParsedModule` machinery —
+  // the recognizer only needs a yes/no existence check, not a parsed
+  // export registry entry.
+  private sourceFileExportsMember(sourceFile: ts.SourceFile, memberName: string): boolean {
+    let found = false;
+    const visit = (node: ts.Node): void => {
+      if (found) {
+        return;
+      }
+      if (this.hasExportModifier(node)) {
+        if (isFunction(node) && node.name?.text === memberName) {
+          found = true;
+          return;
+        }
+        if (isClass(node) && node.name?.text === memberName) {
+          found = true;
+          return;
+        }
+        if (
+          isVariableStatement(node) &&
+          node.declarationList.declarations.some((decl) => ts.isIdentifier(decl.name) && decl.name.text === memberName)
+        ) {
+          found = true;
+          return;
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(sourceFile, visit);
+    return found;
   }
 
   private recordModuleGraphEdge(sourceModule: string, specifier: string, outcome: ResolutionOutcome): void {
@@ -408,6 +577,7 @@ export class TypeScriptAnalyzer {
     const types: ParsedTypeAlias[] = [];
     const constants: ParsedConstant[] = [];
     const dynamicImportSpecifiers: string[] = [];
+    const selfInvokedFunctionNames: string[] = [];
 
     const visit = (node: ts.Node) => {
       if (ts.isImportDeclaration(node)) {
@@ -530,6 +700,21 @@ export class TypeScriptAnalyzer {
             source: undefined,
           } as const);
         }
+      } else if (ts.isIfStatement(node)) {
+        // X-AN-11 — the `import.meta.url` self-invocation guard: `if
+        // (import.meta.url === ...) { runWorker(); }`. Any `if` whose test
+        // expression's source text mentions `import.meta.url` is treated as
+        // this pattern; the function name(s) called in its `then` branch
+        // are recorded as self-invoked graph roots. This is a syntactic
+        // match on the well-known Node ESM idiom, not a semantic guarantee
+        // — the doc's mechanism is "mark the invoked function as a root,"
+        // which tolerates a false-positive match costing nothing (an
+        // already-reachable function simply gains a redundant root marking).
+        if (node.expression.getText(sourceFile).includes('import.meta.url')) {
+          for (const calledName of this.collectCalledFunctionNames(node.thenStatement)) {
+            selfInvokedFunctionNames.push(calledName);
+          }
+        }
       }
 
       ts.forEachChild(node, visit);
@@ -552,7 +737,25 @@ export class TypeScriptAnalyzer {
       types,
       constants,
       dynamicImportSpecifiers,
+      selfInvokedFunctionNames,
     } as const;
+  }
+
+  // X-AN-11 — collects bare-identifier call targets (`runWorker()`, not
+  // `obj.method()`) within a guard's `then` branch. A self-invocation guard
+  // calls its entrypoint function directly by name; method-call targets are
+  // out of scope for this pattern (the doc's mechanism is a Program.exports
+  // entry, which names top-level functions, not class methods).
+  private collectCalledFunctionNames(node: ts.Node): string[] {
+    const names: string[] = [];
+    const visit = (current: ts.Node): void => {
+      if (ts.isCallExpression(current) && ts.isIdentifier(current.expression)) {
+        names.push(current.expression.text);
+      }
+      ts.forEachChild(current, visit);
+    };
+    visit(node);
+    return names;
   }
 
   private lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
@@ -800,12 +1003,12 @@ export class TypeScriptAnalyzer {
   }
 
   private parseAccessor(node: ts.GetAccessorDeclaration | ts.SetAccessorDeclaration): ParsedMethod {
-    const name = (node.name as ts.Identifier).text;
+    const name = ts.isPrivateIdentifier(node.name) ? node.name.text : (node.name as ts.Identifier).text;
     const isGet = ts.isGetAccessorDeclaration(node);
     const parameters = this.parseParameters(node.parameters);
     const returnType = isGet ? this.getTypeString(node.type) : 'void';
     const isStatic = this.hasStaticModifier(node);
-    const isPrivate = this.hasPrivateModifier(node);
+    const isPrivate = this.hasPrivateModifier(node) || this.isPrivateIdentifierName(node.name);
     const isProtected = this.hasProtectedModifier(node);
     const signature = this.buildFunctionSignature(name, parameters, returnType, false);
 
@@ -926,11 +1129,11 @@ export class TypeScriptAnalyzer {
   }
 
   private parseMethod(node: ts.MethodDeclaration): ParsedMethod {
-    const name = (node.name as ts.Identifier).text;
+    const name = ts.isPrivateIdentifier(node.name) ? node.name.text : (node.name as ts.Identifier).text;
     const parameters = this.parseParameters(node.parameters);
     const returnType = this.getTypeString(node.type);
     const isStatic = this.hasStaticModifier(node);
-    const isPrivate = this.hasPrivateModifier(node);
+    const isPrivate = this.hasPrivateModifier(node) || this.isPrivateIdentifierName(node.name);
     const isProtected = this.hasProtectedModifier(node);
     const isAbstract = this.hasAbstractModifier(node);
     const isAsync = this.hasAsyncModifier(node);
@@ -951,7 +1154,7 @@ export class TypeScriptAnalyzer {
   }
 
   private parseProperty(node: ts.PropertyDeclaration): { property: ParsedProperty | undefined; arrowMethod: ParsedMethod | undefined } {
-    const name = (node.name as ts.Identifier).text;
+    const name = ts.isPrivateIdentifier(node.name) ? node.name.text : (node.name as ts.Identifier).text;
     const initializer = node.initializer;
 
     // X-AN-5 (site two) — a class-property arrow (`handleClick = () => {}`)
@@ -963,7 +1166,7 @@ export class TypeScriptAnalyzer {
       const parameters = this.parseParameters(initializer.parameters);
       const returnType = this.getTypeString(initializer.type);
       const isStatic = this.hasStaticModifier(node);
-      const isPrivate = this.hasPrivateModifier(node);
+      const isPrivate = this.hasPrivateModifier(node) || this.isPrivateIdentifierName(node.name);
       const isProtected = this.hasProtectedModifier(node);
       const isAsync = this.hasAsyncModifier(initializer);
       const signature = this.buildFunctionSignature(name, parameters, returnType, isAsync);
@@ -988,7 +1191,7 @@ export class TypeScriptAnalyzer {
     const type = this.getTypeString(node.type);
     const isReadonly = this.hasReadonlyModifier(node);
     const isStatic = this.hasStaticModifier(node);
-    const isPrivate = this.hasPrivateModifier(node);
+    const isPrivate = this.hasPrivateModifier(node) || this.isPrivateIdentifierName(node.name);
     const isProtected = this.hasProtectedModifier(node);
     const isOptional = !!node.questionToken;
 
@@ -1096,6 +1299,16 @@ export class TypeScriptAnalyzer {
 
   private hasPrivateModifier(node: ts.Node): boolean {
     return this.hasModifier(node, ts.SyntaxKind.PrivateKeyword);
+  }
+
+  // X-CONV-1 — ES2022 hard-private members (`#getTypedMind`) carry no
+  // `private` keyword modifier at all; their privacy is expressed entirely
+  // by the `#`-prefixed `PrivateIdentifier` name. `hasPrivateModifier` only
+  // recognizes the keyword form, so every call site that classifies a class
+  // member's privacy also checks this — a member is private if either the
+  // keyword is present OR its name is a PrivateIdentifier.
+  private isPrivateIdentifierName(name: ts.PropertyName | ts.BindingName | undefined): boolean {
+    return name !== undefined && ts.isPrivateIdentifier(name);
   }
 
   private hasProtectedModifier(node: ts.Node): boolean {

@@ -1,13 +1,13 @@
-MainApp -> MainFile v1.0.0
+Main__App -> MainFile v1.0.0
   -> [mainFn]
 
 UtilsFormat ^ "format library"
 
-MainFile @ tests/ladder/repros-analyzer/12-tsconfig-paths/src/main.ts:
+MainFile @ src/main.ts:
   <- [UtilsFormat]
   -> [mainFn]
 
-FormatFile @ tests/ladder/repros-analyzer/12-tsconfig-paths/src/utils/format.ts:
+FormatFile @ src/utils/format.ts:
   -> [formatIt]
 
 mainFn :: mainFn() => string

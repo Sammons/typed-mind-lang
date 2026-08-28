@@ -202,6 +202,15 @@ const createMockAnalysis = (): TypeScriptProjectAnalysis => ({
     target: 99, // ScriptTarget.ES2020
     module: 1, // ModuleKind.CommonJS
   },
+  diagnostics: [],
+  moduleGraph: [],
+  // X-CONV-3 (RFC-TM-9 Q2) — every mock module's filePath is rooted at
+  // /project, so /project is this mock's project root. Required field:
+  // omitting it previously produced `path.relative(undefined, ...)` at
+  // runtime (this file is excluded from tsconfig's typecheck via
+  // **/*.test.ts, so a missing required property here is a RUNTIME
+  // failure, not a caught compile error).
+  projectRoot: '/project',
 });
 
 describe('TypeScriptToTypedMindConverter', () => {

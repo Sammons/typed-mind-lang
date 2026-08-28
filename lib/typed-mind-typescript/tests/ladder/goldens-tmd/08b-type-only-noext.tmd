@@ -1,7 +1,7 @@
-MainApp -> MainFile v1.0.0
+Main__App -> MainFile v1.0.0
   -> [describe]
 
-MainFile @ tests/ladder/repros-analyzer/08b-type-only-noext/src/main.ts:
+MainFile @ src/main.ts:
   <- [Widget]
   -> [describe]
 

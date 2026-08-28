@@ -1,11 +1,11 @@
-MainApp -> MainFile v1.0.0
+Main__App -> MainFile v1.0.0
   -> [mainFn]
 
-MainFile @ tests/ladder/repros-analyzer/16-arrow-const-fn/src/main.ts:
+MainFile @ src/main.ts:
   <- [helperFn]
   -> [mainFn]
 
-HelperFile @ tests/ladder/repros-analyzer/16-arrow-const-fn/src/helper.ts:
+HelperFile @ src/helper.ts:
   -> [helperFn]
 
 mainFn :: mainFn() => string

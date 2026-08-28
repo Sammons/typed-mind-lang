@@ -74,6 +74,15 @@ export interface ParsedModule {
   // X-AN-2 — literal specifiers found in dynamic `import(...)` calls in this
   // module. Followed by the traversal queue the same way static imports are.
   readonly dynamicImportSpecifiers: readonly string[];
+  // X-AN-11 — function names invoked inside an `import.meta.url`
+  // self-invocation guard (`if (import.meta.url === ...) { runWorker(); }`).
+  // The analyzer marks these as real graph roots; the converter pushes each
+  // name into the entrypoint's generated ProgramNode.exports (an existing,
+  // language-optional field) so the checker's orphan rule — which unions
+  // Program.exports into its referenced-names set — sees an honest edge
+  // instead of a false "orphaned" finding on a function that IS the
+  // program's own entry action.
+  readonly selfInvokedFunctionNames: readonly string[];
 }
 
 export interface ParsedImport {
@@ -122,12 +131,21 @@ export interface TypeScriptProjectAnalysis {
   // X-AN-1 leaf check (module-graph.json golden): the exact resolved edge
   // list for this analysis run, one record per resolved import/re-export.
   readonly moduleGraph: readonly ModuleGraphEdge[];
+  // X-CONV-3: the target project's root directory (the tsconfig's
+  // directory), absolute. The converter's `getRelativePath` relativizes
+  // every emitted entity path against this field, never `process.cwd()` —
+  // so extraction produces the same paths whether the CLI runs from inside
+  // or outside the target project.
+  readonly projectRoot: string;
 }
 
 // X-DIAG-1 — analyzer-level diagnostics. Every silence mode named in the
 // Diamond Doc §7 produces one of these instead of a bare `continue`/`return
 // null`: unresolvable imports, non-literal dynamic imports, skipped
-// modules, and (Q1) the entrypoint-outside-file-set case.
+// modules, and (Q1) the entrypoint-outside-file-set case. Q2 adds
+// 'recognizer-not-found' for X-AN-10's convention-table recognizer: a
+// probe that finds no source file, or a member absent from the resolved
+// module's exports, surfaces this instead of silence (RFC §6).
 export interface AnalyzerDiagnostic {
   readonly severity: 'error' | 'warning';
   readonly category:
@@ -135,11 +153,20 @@ export interface AnalyzerDiagnostic {
     | 'unresolvable-import'
     | 'non-literal-dynamic-import'
     | 'skipped-module'
-    | 'zero-entities';
+    | 'zero-entities'
+    | 'recognizer-not-found';
   readonly message: string;
   readonly filePath: string | undefined;
   readonly specifier: string | undefined;
 }
+
+// X-AN-10 — the CLI's --recognize flag names, one per convention-table
+// entry. This mission ships exactly one: 'sst-handler' recognizes a
+// `handler: "path/to/file.member"` property (the SST/Lambda convention).
+// The table is the containment boundary per the Diamond Doc §6 — a second
+// convention name requires its own review and its own fixture, not an
+// addition to this union in isolation.
+export type RecognizerName = 'sst-handler';
 
 // X-AN-1 — one record per resolved import/re-export edge. `target` is
 // project-root-relative when internal, and the raw resolved

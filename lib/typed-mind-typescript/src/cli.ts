@@ -5,7 +5,7 @@ import { dirname, extname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { TypedMind } from '@sammons/typed-mind';
 import { AssertionEngine } from './assertion-engine.ts';
-import type { ConversionOptions } from './types.ts';
+import type { ConversionOptions, RecognizerName } from './types.ts';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
 
@@ -57,6 +57,11 @@ const options = {
     short: 'v',
     description: 'Verbose output',
   },
+  recognize: {
+    type: 'string' as const,
+    multiple: true,
+    description: "Enable a string-path recognizer convention (repeatable). Currently supported: 'sst-handler'",
+  },
 };
 
 function showHelp(): void {
@@ -86,6 +91,7 @@ General Options:
   --no-programs          Do not generate Program entities
   --version <version>    Version for generated programs (default: 1.0.0)
   -v, --verbose          Verbose output
+  --recognize <name>     Enable a string-path recognizer (repeatable). Supported: sst-handler
 
 Examples:
   # Export project to TypedMind DSL
@@ -232,6 +238,24 @@ function resolveEntrypoint(projectPath: string, entrypointParam: string): string
   throw new Error(errorMessage);
 }
 
+// X-AN-10 — validates and narrows the repeatable `--recognize` flag to the
+// convention table's known names. An unrecognized name is a usage error
+// (fails fast, consistent with the doc's containment-boundary framing: the
+// table is fixed, and a typo'd flag value should not silently no-op).
+const KNOWN_RECOGNIZER_NAMES: readonly RecognizerName[] = ['sst-handler'];
+
+function parseRecognizers(values: { recognize?: readonly string[] }): RecognizerName[] {
+  const raw = values.recognize ?? [];
+  const recognizers: RecognizerName[] = [];
+  for (const name of raw) {
+    if (!(KNOWN_RECOGNIZER_NAMES as readonly string[]).includes(name)) {
+      throw new Error(`Unknown --recognize value '${name}'. Supported: ${KNOWN_RECOGNIZER_NAMES.join(', ')}`);
+    }
+    recognizers.push(name as RecognizerName);
+  }
+  return recognizers;
+}
+
 async function handleExport(values: any): Promise<void> {
   const { projectPath, configPath } = resolveProjectPath(values.project as string);
   const resolvedEntrypoint = resolveEntrypoint(projectPath, values.entrypoint as string);
@@ -243,7 +267,7 @@ async function handleExport(values: any): Promise<void> {
   }
 
   // Analyze TypeScript project starting from entrypoint
-  const analyzer = new TypeScriptAnalyzer(projectPath, configPath || (values.config as string | undefined));
+  const analyzer = new TypeScriptAnalyzer(projectPath, configPath || (values.config as string | undefined), parseRecognizers(values));
   const analysis = analyzer.analyzeFromEntrypoint(resolvedEntrypoint);
 
   if (values.verbose) {
@@ -282,6 +306,22 @@ async function handleExport(values: any): Promise<void> {
         console.error(`    File: ${error.filePath}`);
       }
     }
+
+    // I-13 — degrade, never discard: the converter still returns whatever
+    // partial entities/`.tmd` content it collected before the failure (see
+    // TypeScriptToTypedMindConverter.convert's catch branch). Writing that
+    // partial output — instead of exiting before any `writeFileSync` call,
+    // the prior behavior that destroyed a whole graph on a single error —
+    // is what makes a Program-name collision or any other mid-conversion
+    // failure survivable: the operator gets a partial `.tmd` file to
+    // inspect plus a nonzero exit signaling it is not a clean result.
+    if (outputPath) {
+      writeFileSync(outputPath, result.tmdContent);
+      console.error(`\nWrote partial output (${result.entities.length} entities) to ${outputPath}`);
+    } else if (result.tmdContent.length > 0) {
+      console.log(`\n${result.tmdContent}`);
+    }
+
     process.exit(1);
   }
 
@@ -327,7 +367,7 @@ async function handleAssert(values: any): Promise<void> {
   const tmdContent = readFileSync(tmdFilePath, 'utf-8');
 
   // Analyze TypeScript project starting from entrypoint
-  const analyzer = new TypeScriptAnalyzer(projectPath, configPath || (values.config as string | undefined));
+  const analyzer = new TypeScriptAnalyzer(projectPath, configPath || (values.config as string | undefined), parseRecognizers(values));
   const analysis = analyzer.analyzeFromEntrypoint(resolvedEntrypoint);
 
   // Convert to TypedMind
@@ -412,7 +452,7 @@ async function handleCheck(values: any): Promise<void> {
   }
 
   // Analyze TypeScript project starting from entrypoint
-  const analyzer = new TypeScriptAnalyzer(projectPath, configPath || (values.config as string | undefined));
+  const analyzer = new TypeScriptAnalyzer(projectPath, configPath || (values.config as string | undefined), parseRecognizers(values));
   const analysis = analyzer.analyzeFromEntrypoint(resolvedEntrypoint);
 
   // Convert to TypedMind
