@@ -6,6 +6,7 @@ import type {
   ModuleGraphEdge,
   ParsedClass,
   ParsedConstant,
+  ParsedEnum,
   ParsedExport,
   ParsedFunction,
   ParsedImport,
@@ -576,6 +577,7 @@ export class TypeScriptAnalyzer {
     const interfaces: ParsedInterface[] = [];
     const types: ParsedTypeAlias[] = [];
     const constants: ParsedConstant[] = [];
+    const enums: ParsedEnum[] = [];
     const dynamicImportSpecifiers: string[] = [];
     const selfInvokedFunctionNames: string[] = [];
 
@@ -677,26 +679,20 @@ export class TypeScriptAnalyzer {
           }
         }
       } else if (ts.isEnumDeclaration(node)) {
-        // Handle enums as constants
-        const enumName = node.name.text;
-        constants.push({
-          name: enumName,
-          type: 'enum',
-          value: undefined,
-          isEnum: true,
-          enumValues: node.members.map((member) => {
-            const name = member.name?.getText() || 'unknown';
-            const value = member.initializer?.getText();
-            return { name, value };
-          }),
-          isConst: false,
-        });
+        // X-AN-7 — a real TS enum gets its own ParsedEnum shape (see
+        // types.ts), not a ParsedConstant with bolted-on isEnum/enumValues
+        // fields the converter never read (A-g9's analyzer half). The
+        // export type is 'type' (matching parseTypeAlias's registration),
+        // not 'constant' — X-CONV-2 emits enums as TM-8's TypeDef entity
+        // kind, the same converter-registry lane a type alias uses.
+        const parsedEnum = this.parseEnum(node);
+        enums.push(parsedEnum);
 
         if (this.hasExportModifier(node)) {
           exports.push({
-            name: enumName,
+            name: parsedEnum.name,
             isDefault: false,
-            type: 'constant',
+            type: 'type',
             source: undefined,
           } as const);
         }
@@ -736,6 +732,7 @@ export class TypeScriptAnalyzer {
       interfaces,
       types,
       constants,
+      enums,
       dynamicImportSpecifiers,
       selfInvokedFunctionNames,
     } as const;
@@ -1072,6 +1069,22 @@ export class TypeScriptAnalyzer {
     } as const;
   }
 
+  // X-AN-7 (rfc-tm-9-diamond.md §4) — member-name list only, in declaration
+  // order; member initializer expressions are dropped by design (see
+  // ParsedEnum's doc comment in types.ts — TypeDefNode.members carries
+  // names, not name/value pairs).
+  private parseEnum(node: ts.EnumDeclaration): ParsedEnum {
+    const name = node.name.text;
+    const members = node.members.map((member) => member.name?.getText() ?? 'unknown');
+    const description = this.extractJSDocDescription(node.name);
+
+    return {
+      name,
+      members,
+      description: description || undefined,
+    } as const;
+  }
+
   private parseVariableStatement(node: ts.VariableStatement): { functions: ParsedFunction[]; constants: ParsedConstant[] } {
     const functions: ParsedFunction[] = [];
     const constants: ParsedConstant[] = [];
@@ -1090,15 +1103,12 @@ export class TypeScriptAnalyzer {
 
       const type = this.getTypeString(declaration.type) || this.inferTypeFromInitializer(initializer);
       const value = initializer?.getText();
-      const isEnum = false; // Will be handled separately for actual enums
       const isConst = !!(node.declarationList.flags & ts.NodeFlags.Const);
 
       constants.push({
         name,
         type,
         value: value || undefined,
-        isEnum,
-        enumValues: undefined,
         isConst,
       } as const);
     }

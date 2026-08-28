@@ -26,7 +26,25 @@
 //     as every other fixture here (see above) — Q2 owns converter
 //     correctness, not the `lib/typed-mind` emitter/grammar (TM-8's
 //     surface, out of scope per the header parallel-safety paragraph).
-//   - X-AN-7/X-CONV-2 (enum modeling, 14-enum) is Q3 (TM-8-dependent).
+//   - X-AN-7/X-CONV-2 (enum modeling, 14-enum; type-alias modeling,
+//     24-type-alias) landed in Q3, after TM-8 merged the TypeDef entity
+//     kind: the golden delta for 14-enum is `Status ! src/status.ts :
+//     enum` (self-referential Constants, member list dropped) ->
+//     `Status = enum [Active, Inactive]` (TypeDef, full member list) —
+//     cause-linked to TM-8's X-TYPE-7 (TypeDef entity) plus this
+//     Quantum's X-CONV-2 (converter emission). 24-type-alias is a NEW
+//     fixture this Quantum authors (no prior golden to diff against).
+//     Checker verdict stays `false` for both — same pre-existing
+//     shortform-Program-exports emitter defect PLUS a second pre-existing
+//     defect this Quantum's own investigation surfaced and disclosed
+//     (never introduced by X-CONV-2 itself): `check-orphans.ts`'s
+//     `collectReferencedNames` never walks DTO field types for ANY entity
+//     kind, so an entity referenced only via a DTO field's `type:` value
+//     always orphans, TypeDef or not — confirmed with an isolated
+//     DTO-referencing-DTO control fixture carrying zero TypeDef content.
+//     See tests/ladder/q3-language-adoption.test.ts's header for the full
+//     disclosure. `25-generated-single-file` is a NEW X-SUPP-6 fixture
+//     (converter-emitted suppression), also authored fresh this Quantum.
 //   - Census gap 7 (`import = require`/`export =`, 11-commonjs) is not an
 //     owned X-AN item in RFC-TM-9 at all — out of mission scope entirely.
 // Recording the actual verdict (rather than asserting a false green) is
@@ -83,8 +101,20 @@ const cases: readonly FixtureCase[] = [
   // defect as every other fixture above (see file header) — not owned by
   // this Quantum.
   { fixture: '03-app-collision', entrySegments: ['src', 'App.tsx'], expectConversionSuccess: true, recordedCheckerValid: false },
-  // Known-pending (Q3 scope, see file header).
+  // X-AN-7/X-CONV-2 landed in Q3 (see file header for the cause-linked
+  // delta). Checker verdict stays `false` — pre-existing DTO-field-
+  // reference orphan gap plus the shortform-Program-exports defect.
   { fixture: '14-enum', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  // NEW in Q3 — a union type alias and a simple named-type alias, both
+  // emitting TM-8's TypeDef entity kind (X-AN-7/X-CONV-2). No prior golden
+  // to diff against; the golden IS the new baseline.
+  { fixture: '24-type-alias', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  // NEW in Q3 — X-SUPP-6: a module-private class suppressed with reason
+  // 'generated-single-file-scope'. Checker verdict `false` is the SAME
+  // pre-existing `checker/multi-exported`/DTO-field-reference-orphan-shape
+  // family (here `checker/class-not-exported`, a genuinely separate,
+  // un-suppressed finding — see q3-language-adoption.test.ts).
+  { fixture: '25-generated-single-file', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
 ];
 
 describe('RFC-TM-9 Q1 — .tmd goldens against the current language (per-fixture, RFC §8 golden discipline)', () => {

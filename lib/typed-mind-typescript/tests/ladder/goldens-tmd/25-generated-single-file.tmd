@@ -1,0 +1,12 @@
+Main__App -> MainFile v1.0.0
+  -> [describe]
+
+MainFile @ src/main.ts:
+  -> [describe]
+
+InternalRegistryEntry <:
+  => [describe]
+
+describe :: describe(label: string) => string
+
+suppress InternalRegistryEntry checker/orphaned-entity "generated-single-file-scope"

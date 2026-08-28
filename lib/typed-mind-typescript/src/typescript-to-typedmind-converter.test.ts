@@ -527,7 +527,11 @@ describe('TypeScriptToTypedMindConverter', () => {
 
     const publicType = result.entities.find((e) => e.name === 'PublicType');
     assert.notEqual(publicType, undefined);
-    assert.equal(publicType?.kind, 'Constants'); // Type aliases become Constants
+    // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — a non-object-like type
+    // alias (here a union, `string | number`) now emits as TM-8's TypeDef
+    // entity kind (variant: 'alias'), replacing the deleted converter path
+    // that emitted a self-referential Constants schema.
+    assert.equal(publicType?.kind, 'TypeDef');
 
     // Should NOT create DTOs for non-exported interface and type
     const internalInterface = result.entities.find((e) => e.name === 'InternalInterface');
