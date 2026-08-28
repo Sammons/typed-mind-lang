@@ -218,17 +218,15 @@ export interface ConversionOptions {
 //     imported by any OTHER traced module. The converter can detect this
 //     deterministically from its own cross-file import graph (the same
 //     fact `checker/orphaned-entity` computes).
-//   - 'test-only-consumer': the census's non-goal disposition — a symbol
-//     whose only real-world consumer is a test file. NOTE: the analyzer's
-//     traversal never visits test files at all (they are excluded by
-//     `ignorePatterns` before traversal starts, per `filterModules`/the
-//     analyzer's own file discovery), so no converter-visible signal exists
-//     today to trigger this reason. The enum member and emission plumbing
-//     exist end-to-end per the doc's contract; zero suppressions carry this
-//     reason until an analyzer capability that scans excluded test files
-//     for cross-references is scoped as its own item (out of this
-//     Quantum's frozen X-AN-7/X-CONV-2/X-SUPP-6 set).
-export type SuppressionReason = 'test-only-consumer' | 'generated-single-file-scope';
+//
+// 'test-only-consumer' REMOVED per RFC-TM-10 §9 (D-LEG-9, lead ruling): PR
+// #58 (RFC-TM-9 Q3) disclosed zero live trigger conditions — the analyzer's
+// `ignorePatterns` excludes test files from traversal before it starts, so
+// the converter never observes a "consumed only by a test" signal. I-17 (no
+// dead suppression reasons) requires either a live trigger or removal; the
+// lead ruling chose removal over growing a new excluded-file-scan analyzer
+// capability. Re-add only when a real trigger exists.
+export type SuppressionReason = 'generated-single-file-scope';
 
 export interface ConversionResult {
   readonly success: boolean;

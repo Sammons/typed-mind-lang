@@ -230,15 +230,10 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private emptySuppressionCounts(): Record<SuppressionReason, number> {
-    // RFC-TM-9 §9 — 'test-only-consumer' is enumerated per the doc's frozen
-    // reason set but currently unreachable: the analyzer's traversal never
-    // visits test files (`ignorePatterns` excludes `**/*.test.ts`/
-    // `**/*.spec.ts` before traversal starts), so the converter has no
-    // signal that a symbol's only real-world consumer is a test file. Kept
-    // at 0 pending an analyzer capability to scan excluded test files for
-    // cross-references — that capability is new X-AN scope this Quantum
-    // does not own (see PR body: disclosed, not silently absorbed).
-    return { 'test-only-consumer': 0, 'generated-single-file-scope': 0 };
+    // RFC-TM-10 §9 (D-LEG-9) — 'test-only-consumer' removed from
+    // SuppressionReason (types.ts); see that type's comment for the
+    // removal rationale.
+    return { 'generated-single-file-scope': 0 };
   }
 
   private countSuppressionsByReason(suppressions: readonly SuppressionNode[]): Record<SuppressionReason, number> {
