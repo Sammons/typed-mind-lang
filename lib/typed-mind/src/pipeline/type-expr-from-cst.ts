@@ -158,24 +158,29 @@ const typePostfixFromCst = (wrapped: CstTypePostfix): TypeExprNode => {
     throw new Error(`type_postfix: no type_atom child in "${wrapped.text}"`);
   }
   const element = typeAtomFromCst(atom);
-  // Count '[' anonymous-token siblings to know how many array suffixes were
-  // applied — the CST does not name them (bare literal tokens), so the
-  // anonymous-token walk mirrors attachment-rules.ts's hasQuestionSigil.
-  let suffixCount = 0;
+  // Collect each ']' anonymous-token sibling's end position so every array
+  // suffix carries the span of exactly its own tokens (review finding B2):
+  // number[][]'s INNER array (number[]) must span only up to its own ']',
+  // not the outer node's full extent. The CST does not name '['/']' (bare
+  // literal tokens), so the anonymous-token walk mirrors attachment-rules.ts's
+  // hasQuestionSigil; the walk is ordered left-to-right, so closingPositions[i]
+  // is the i-th (from the element outward) closing bracket in source order.
+  const elementStart = element.span.start;
+  const closingPositions: Array<{ line: number; column: number }> = [];
   for (let childIndex = 0; childIndex < wrapped.syntaxNode.childCount; childIndex++) {
     const child = wrapped.syntaxNode.child(childIndex);
-    if (child !== null && !child.isNamed && child.type === '[') {
-      suffixCount += 1;
+    if (child !== null && !child.isNamed && child.type === ']') {
+      closingPositions.push({ line: child.endPosition.row + 1, column: child.endPosition.column });
     }
   }
   let result = element;
-  for (let depth = 0; depth < suffixCount; depth++) {
+  for (const closingPosition of closingPositions) {
     result = {
       kind: 'array',
       element: result,
       readonly: false,
       spelling: 'suffix',
-      span: typeSpanOf(wrapped.syntaxNode),
+      span: { start: elementStart, end: closingPosition },
     };
   }
   return result;
