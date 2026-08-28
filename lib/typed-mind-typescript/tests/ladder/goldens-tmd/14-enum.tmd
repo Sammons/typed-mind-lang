@@ -2,7 +2,6 @@ Main__App -> MainFile v1.0.0
   -> [Job, describe]
 
 MainFile @ src/main.ts:
-  <- [Status]
   -> [Job, describe]
 
 describe :: describe(j: Job) => string
@@ -12,4 +11,4 @@ Job %
   - id: string
   - status: Status
 
-Status ! src/status.ts : enum
+Status = enum [Active, Inactive]

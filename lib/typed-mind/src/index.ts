@@ -38,7 +38,11 @@ export type { Span } from './ast/span.ts';
 // annotation or construct one directly. TM-9's language-dependent Quantums
 // are the first out-of-package consumer of this surface (Q4's frozen-surface
 // handoff); export follows the established TypeDefNode/DtoFieldNode
-// precedent rather than inventing a new visibility rule.
+// precedent rather than inventing a new visibility rule. RFC-TM-9 §9
+// (rfc-tm-9-diamond.md, X-SUPP-6) is exactly that consumer: the converter
+// builds SuppressionNode instances directly (same synthetic-construction
+// posture as every other entity class above) to pass to SyntaxEmitter's
+// `suppressions` field.
 export { SuppressionNode } from './ast/suppression-node.ts';
 // RFC-TM-8 §5 (rfc-tm-8-diamond.md, X-TYPE-7) — TypeDefNode joins the other
 // ten semantic classes on the public surface, same rationale as every other

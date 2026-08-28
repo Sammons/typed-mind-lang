@@ -298,6 +298,19 @@ async function handleExport(values: any): Promise<void> {
     }
   }
 
+  // X-SUPP-6 (rfc-tm-9-diamond.md §9) — "the CLI prints the emitted-
+  // suppression count." Printed per enumerated reason so the operator sees
+  // exactly what was excused and why, never a blanket total.
+  const suppressionTotal = Object.values(result.suppressionCounts).reduce((sum, count) => sum + count, 0);
+  if (suppressionTotal > 0) {
+    console.log(`\nSuppressions (${suppressionTotal}):`);
+    for (const [reason, count] of Object.entries(result.suppressionCounts)) {
+      if (count > 0) {
+        console.log(`  ${reason}: ${count}`);
+      }
+    }
+  }
+
   if (!result.success) {
     console.error(`\nConversion failed with ${result.errors.length} error(s):`);
     for (const error of result.errors) {

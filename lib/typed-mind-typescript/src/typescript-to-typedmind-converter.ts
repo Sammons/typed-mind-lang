@@ -14,7 +14,9 @@ import {
   ProgramNode,
   parseTypeExprText,
   type Span,
+  SuppressionNode,
   SyntaxEmitter,
+  TypeDefNode,
 } from '@sammons/typed-mind';
 import type {
   ConversionError,
@@ -26,6 +28,7 @@ import type {
   ParsedFunction,
   ParsedInterface,
   ParsedModule,
+  SuppressionReason,
   TypeScriptProjectAnalysis,
 } from './types.ts';
 import { createEntityName } from './types.ts';
@@ -97,6 +100,19 @@ export class TypeScriptToTypedMindConverter {
   // exactly one stub, following the existing Node-builtins purpose-map
   // precedent (`derivePurpose`'s `nodeBuiltins` table).
   private readonly builtinExtendsStubNames = new Set<string>();
+  // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — predicts, at Phase 1
+  // registration time, whether a `types`-registry name will end up a
+  // DtoNode (object-like type alias, `imports.to`-legal) or a TypeDefNode
+  // (enum, or non-object-like alias, `imports.to`-ILLEGAL per TM-8's frozen
+  // scope — "No other reference verb changes" beyond `schema.to`,
+  // rfc-tm-8-diamond.md §5). `resolveImportToEntity` consults this so a
+  // File's `imports`/`exports` list never names a TypeDef, which the
+  // checker rejects outright (`checker/reference-to-illegal`). The
+  // prediction reuses `isObjectLikeType` — the SAME pure function Phase 2's
+  // `convertTypeAliasToDTO` branches on — so it cannot diverge from the
+  // actual emitted kind. Enums always predict TypeDef (X-CONV-2 never
+  // routes an enum to DTO).
+  private readonly typesRegistryPredictedKind = new Map<string, 'DTO' | 'TypeDef'>();
   // X-CONV-3 — the target project's root, supplied by the analysis this
   // convert() call is processing. `getRelativePath`/`filterModules`
   // relativize against this, never `process.cwd()`, so extraction produces
@@ -155,7 +171,16 @@ export class TypeScriptToTypedMindConverter {
       // accepted EMITTER-STRUCTURE regression — SyntaxEmitter has no
       // comment-synthesis surface, per the RFC's Rejected Alternatives).
       const sortedEntities = sortIntoLegacySectionOrder(this.entities);
-      const tmdContent = this.emitter.emitShortform({ entities: sortedEntities, imports: [], suppressions: [], diagnostics: [] });
+      // X-SUPP-6 — computed after every entity exists (the detection walks
+      // the FULL cross-file import graph, so it must run after
+      // convertModules/generatePrograms, not per-module).
+      const suppressions = this.computeSuppressions(sortedEntities);
+      const tmdContent = this.emitter.emitShortform({
+        entities: sortedEntities,
+        imports: [],
+        suppressions,
+        diagnostics: [],
+      });
 
       return {
         success: this.errors.length === 0,
@@ -163,6 +188,7 @@ export class TypeScriptToTypedMindConverter {
         tmdContent,
         errors: [...this.errors],
         warnings: [...this.warnings],
+        suppressionCounts: this.countSuppressionsByReason(suppressions),
       } as const;
     } catch (error) {
       this.addError(`Conversion failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -193,8 +219,94 @@ export class TypeScriptToTypedMindConverter {
         tmdContent,
         errors: [...this.errors],
         warnings: [...this.warnings],
+        // X-SUPP-6 — a degraded/partial conversion emits zero suppressions:
+        // the cross-file import graph a suppression's absence-of-reference
+        // claim depends on is exactly what a mid-conversion failure leaves
+        // incomplete, so asserting "unmodelable but correct" here would be
+        // unfounded rather than degraded.
+        suppressionCounts: this.emptySuppressionCounts(),
       } as const;
     }
+  }
+
+  private emptySuppressionCounts(): Record<SuppressionReason, number> {
+    // RFC-TM-9 §9 — 'test-only-consumer' is enumerated per the doc's frozen
+    // reason set but currently unreachable: the analyzer's traversal never
+    // visits test files (`ignorePatterns` excludes `**/*.test.ts`/
+    // `**/*.spec.ts` before traversal starts), so the converter has no
+    // signal that a symbol's only real-world consumer is a test file. Kept
+    // at 0 pending an analyzer capability to scan excluded test files for
+    // cross-references — that capability is new X-AN scope this Quantum
+    // does not own (see PR body: disclosed, not silently absorbed).
+    return { 'test-only-consumer': 0, 'generated-single-file-scope': 0 };
+  }
+
+  private countSuppressionsByReason(suppressions: readonly SuppressionNode[]): Record<SuppressionReason, number> {
+    const counts = this.emptySuppressionCounts();
+    for (const suppression of suppressions) {
+      // SuppressionNode.reason is a bare `string` (lib/typed-mind's
+      // ast/suppression-node.ts — no enumerated reason type exists at that
+      // layer). The cast is safe here because this converter is the ONLY
+      // producer of every suppression it counts: `computeSuppressions`
+      // (below) never constructs a SuppressionNode with a reason outside
+      // `SuppressionReason`'s two members, so every value flowing into this
+      // loop is provably one of them.
+      const reason = suppression.reason as SuppressionReason;
+      counts[reason] = (counts[reason] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  // RFC-TM-9 §9 (rfc-tm-9-diamond.md, X-SUPP-6) — "the extractor emits a
+  // suppression only for enumerated graph shapes that are correct in source
+  // but unmodelable." The one reason this Quantum can trigger deterministically
+  // is 'generated-single-file-scope' (the census's CstBlockKw class): "only
+  // self-references inside its own generated file... no cross-file import
+  // exists anywhere" (extraction-gap-census-language.md). The converter's
+  // OWN Phase-1 registry (`entityRegistry.classes`, populated in
+  // `collectModuleEntities` from `module.exports`) already records whether a
+  // class was ever exported from its declaring module — a non-exported
+  // TypeScript symbol is, by the language's own scoping rules, categorically
+  // unreachable from any other file, so it cannot have a real cross-file
+  // consumer for the checker's orphan rule to find. `convertToSeparateEntities`
+  // (unlike the function/interface/type/enum/constant lanes, which all gate
+  // on export status before converting) unconditionally promotes EVERY class
+  // to a top-level entity regardless of export — this is what puts a
+  // module-private class in the graph as a real, checker-visible orphan
+  // candidate while carrying the same "used only within its own file" shape
+  // the census adjudicated as checker-right-but-suppressible.
+  //
+  // Scope discipline: only 'Class'-kind entities are checked against this
+  // signal (the one lane with the unconditional-conversion gap); every other
+  // kind already gates on export before an entity is created at all, so a
+  // non-exported symbol of those kinds never reaches `entities` in the first
+  // place — there is nothing here for them to match. Program/Dependency/
+  // File/ClassFile are never suppression targets (orphan-file has its own
+  // code the checker uses; Program/Dependency are exempt orphan candidates
+  // by the checker's own rule). X-AN-10/X-AN-11 shapes are excluded by
+  // design (they are modelable via real edges, never suppressed — doc §6/§9).
+  private computeSuppressions(entities: readonly EntityNode[]): SuppressionNode[] {
+    const suppressions: SuppressionNode[] = [];
+    for (const entity of entities) {
+      if (entity.kind !== 'Class') {
+        continue;
+      }
+      const registryEntry = this.entityRegistry.classes.get(entity.name);
+      if (registryEntry === undefined || registryEntry.exported) {
+        continue;
+      }
+      const reason: SuppressionReason = 'generated-single-file-scope';
+      suppressions.push(
+        new SuppressionNode({
+          target: entity.name,
+          code: 'checker/orphaned-entity',
+          reason,
+          span: SYNTHETIC_SPAN,
+          raw: `suppress ${entity.name} checker/orphaned-entity "${reason}"`,
+        }),
+      );
+    }
+    return suppressions;
   }
 
   private reset(): void {
@@ -206,6 +318,7 @@ export class TypeScriptToTypedMindConverter {
     this.externalTypeToPackage.clear();
     this.entryPoints.clear();
     this.builtinExtendsStubNames.clear();
+    this.typesRegistryPredictedKind.clear();
 
     // Clear two-pass registries
     Object.keys(this.exportRegistry).forEach((key) => delete this.exportRegistry[key]);
@@ -479,6 +592,28 @@ export class TypeScriptToTypedMindConverter {
         exported: module.exports.some((exp) => exp.name === type.name),
       };
       this.entityRegistry.types.set(type.name, entityInfo);
+      // See `typesRegistryPredictedKind`'s field comment.
+      this.typesRegistryPredictedKind.set(type.name, this.isObjectLikeType(type.type) ? 'DTO' : 'TypeDef');
+    }
+
+    // X-AN-7/X-CONV-2 — collect real TS enums into the SAME registry bucket
+    // as type aliases (they share the 'type' export lane; see the analyzer's
+    // export-registration comment). Without this, `resolveImportToEntity`'s
+    // registry membership check (functions/classes/interfaces/types/
+    // constants) never finds an enum name, so an import of an enum-typed
+    // symbol silently drops from the importing File's `imports` list —
+    // exactly the dropped-import-edge shape the census's gap 1/A-g1 family
+    // catalogs, and precisely what would make `checkOrphans` misreport an
+    // actually-consumed TypeDef as orphaned.
+    for (const enumDef of module.enums ?? []) {
+      const entityInfo: EntityInfo = {
+        name: enumDef.name,
+        type: 'type',
+        sourceFile,
+        exported: module.exports.some((exp) => exp.name === enumDef.name),
+      };
+      this.entityRegistry.types.set(enumDef.name, entityInfo);
+      this.typesRegistryPredictedKind.set(enumDef.name, 'TypeDef');
     }
 
     // Collect all constants
@@ -633,19 +768,34 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private isPureTypesFile(module: ParsedModule): boolean {
-    // A file is considered "pure types" if it only exports types, interfaces, and constants
-    // and doesn't have any classes or functions (except type-only exports)
+    // A file is considered "pure types" if it only exports types, interfaces,
+    // enums, and constants and doesn't have any classes or functions (except
+    // type-only exports). X-AN-7/X-CONV-2 — a file containing ONLY a real TS
+    // `enum` (e.g. `export enum Status { ... }`, no classes/functions) must
+    // classify as pure-types the same way a type-alias-only file already
+    // does; without `module.enums` here, 14-enum's `src/status.ts` would
+    // fall through to `convertToSeparateEntities` and gain a redundant File
+    // entity a types-only source file should not have.
     const hasRealCode = module.classes.length > 0 || module.functions.length > 0;
-    const hasTypesOrConstants = module.types.length > 0 || module.interfaces.length > 0 || module.constants.length > 0;
+    const hasTypesOrConstants =
+      module.types.length > 0 || module.interfaces.length > 0 || module.constants.length > 0 || (module.enums?.length ?? 0) > 0;
 
     return !hasRealCode && hasTypesOrConstants;
   }
 
   private convertTypesAndConstants(module: ParsedModule): void {
-    // Convert all type aliases FIRST (they become Constants entities with their exact names)
+    // Convert all type aliases FIRST (they become TypeDef/DTO entities with their exact names)
     for (const typeAlias of module.types) {
       if (this.isTypeAliasExported(typeAlias, module)) {
         this.convertTypeAliasToDTO(typeAlias);
+      }
+    }
+
+    // X-AN-7/X-CONV-2 — enums emit as TM-8's TypeDef entity kind (variant:
+    // 'enum'), the same lane as type aliases, not the Constants lane.
+    for (const enumDef of module.enums ?? []) {
+      if (this.isEnumExported(enumDef, module)) {
+        this.convertEnumToTypeDef(enumDef);
       }
     }
 
@@ -670,6 +820,13 @@ export class TypeScriptToTypedMindConverter {
 
   private isTypeAliasExported(typeAlias: { name: string }, module: ParsedModule): boolean {
     return module.exports.some((exp) => exp.name === typeAlias.name && exp.type === 'type');
+  }
+
+  // X-AN-7 registers a real enum's export as `type: 'type'` (typescript-
+  // analyzer.ts), matching the type-alias export lane — see that change's
+  // comment for why 'type' rather than 'constant'.
+  private isEnumExported(enumDef: { name: string }, module: ParsedModule): boolean {
+    return module.exports.some((exp) => exp.name === enumDef.name && exp.type === 'type');
   }
 
   // X-CONV-5 — a class extending a global ambient builtin (`class
@@ -846,6 +1003,13 @@ export class TypeScriptToTypedMindConverter {
       }
     }
 
+    // X-AN-7/X-CONV-2 — enums emit as TM-8's TypeDef entity kind.
+    for (const enumDef of module.enums ?? []) {
+      if (this.isEnumExported(enumDef, module)) {
+        this.convertEnumToTypeDef(enumDef);
+      }
+    }
+
     // Convert constants - create individual entities for exported constants
     this.convertConstants(module);
   }
@@ -903,6 +1067,13 @@ export class TypeScriptToTypedMindConverter {
     for (const typeAlias of module.types) {
       if (this.isTypeAliasExported(typeAlias, module)) {
         this.convertTypeAliasToDTO(typeAlias);
+      }
+    }
+
+    // X-AN-7/X-CONV-2 — enums emit as TM-8's TypeDef entity kind.
+    for (const enumDef of module.enums ?? []) {
+      if (this.isEnumExported(enumDef, module)) {
+        this.convertEnumToTypeDef(enumDef);
       }
     }
 
@@ -1019,14 +1190,8 @@ export class TypeScriptToTypedMindConverter {
       return;
     }
 
-    // Handle union type aliases (like EntityType)
-    if (typeAlias.type.includes('|')) {
-      // Convert union type to Constants entity since it's like an enum
-      this.convertTypeAliasToConstants(typeAlias);
-      return;
-    }
-
-    // Convert object-like type aliases to DTOs
+    // Convert object-like type aliases to DTOs (unchanged by X-CONV-2 —
+    // this shape stays a DTO regardless of the TM-8 TypeDef surface).
     if (this.isObjectLikeType(typeAlias.type)) {
       this.addEntityName(entityName, 'convertTypeAliasToDTO-objectLike');
 
@@ -1043,8 +1208,60 @@ export class TypeScriptToTypedMindConverter {
       return;
     }
 
-    // For simple type aliases, create a Constants entity
-    this.convertTypeAliasToConstants(typeAlias);
+    // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — every other shape (union
+    // type aliases like `EntityType`, and simple aliases to a named type or
+    // primitive) is TM-8's TypeDef entity kind, `variant: 'alias'`, replacing
+    // the deleted converter path that emitted a self-referential Constants
+    // schema (`Name ! path : Name`, which the checker rejected by the
+    // language's own design — L-g3/A-g9). The aliased type becomes a real
+    // TypeExprNode via
+    // the same hand-rolled parser DtoFieldNode construction already uses
+    // (parseTypeExprText), so a DTO field typed by this alias resolves
+    // through the checker's schema-position rules (valid-references.ts
+    // `schema.to` includes 'TypeDef') instead of tripping
+    // `Cannot use 'schema' to reference <kind>`.
+    this.addEntityName(entityName, 'convertTypeAliasToDTO-alias');
+
+    const typeDefEntity = new TypeDefNode({
+      name: entityName,
+      span: SYNTHETIC_SPAN,
+      raw: `${entityName} = ${typeAlias.type}`,
+      sourceForm: 'shortform',
+      variant: 'alias',
+      aliasType: parseTypeExprText(typeAlias.type).typeExpr,
+      purpose: typeAlias.description || undefined,
+    });
+
+    this.entities.push(typeDefEntity);
+  }
+
+  // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — a real TS `enum` emits as
+  // TM-8's TypeDef entity kind, `variant: 'enum'`, carrying the member-name
+  // list from X-AN-7's ParsedEnum. Replaces the pre-TM-9 path where an enum
+  // fell through to the generic Constants lane with its member list dropped
+  // entirely (the analyzer captured `isEnum`/`enumValues` but the converter
+  // never read them — confirmed zero references before this Quantum).
+  private convertEnumToTypeDef(enumDef: { name: string; members: readonly string[]; description?: string }): void {
+    const entityName = createEntityName(enumDef.name);
+
+    if (this.entityNames.has(entityName)) {
+      this.addError(`Duplicate entity name: ${entityName}`);
+      return;
+    }
+
+    this.addEntityName(entityName, 'convertEnumToTypeDef');
+
+    const typeDefEntity = new TypeDefNode({
+      name: entityName,
+      span: SYNTHETIC_SPAN,
+      raw: `${entityName} = enum [${enumDef.members.join(', ')}]`,
+      sourceForm: 'shortform',
+      variant: 'enum',
+      members: enumDef.members,
+      purpose: enumDef.description || undefined,
+    });
+
+    this.entities.push(typeDefEntity);
   }
 
   private convertConstants(module: ParsedModule): void {
@@ -1081,29 +1298,6 @@ export class TypeScriptToTypedMindConverter {
       path: realPath,
       // Add schema information if we can infer it from the type
       schema: constant.type && constant.type !== 'any' ? this.convertTypeToSchema(constant.type) : undefined,
-    });
-
-    this.entities.push(constantsEntity);
-  }
-
-  private convertTypeAliasToConstants(typeAlias: { name: string; type: string; description?: string }): void {
-    const entityName = createEntityName(typeAlias.name);
-    if (this.entityNames.has(entityName)) {
-      return;
-    }
-
-    this.addEntityName(entityName, 'convertTypeAliasToConstants');
-
-    // Use the real path - multiple constants can share the same file path
-    const realPath = `src/types.ts`;
-    const constantsEntity = new ConstantsNode({
-      name: entityName,
-      span: SYNTHETIC_SPAN,
-      raw: `${entityName} ! ${realPath} : ${typeAlias.name}`,
-      sourceForm: 'shortform',
-      path: realPath,
-      schema: typeAlias.name,
-      purpose: typeAlias.description || undefined,
     });
 
     this.entities.push(constantsEntity);
@@ -1298,6 +1492,18 @@ export class TypeScriptToTypedMindConverter {
 
     // Now check if we have the entity in our registry
     const entityName = createEntityName(importName);
+
+    // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — a `types`-registry name
+    // predicted to become a TypeDef is EXCLUDED from import/export
+    // resolution: TM-8 froze `imports.to`/`exports.to` without TypeDef
+    // ("no other reference verb changes" beyond `schema.to` —
+    // rfc-tm-8-diamond.md §5), so naming a TypeDef in a File's `imports` or
+    // `exports` list is `checker/reference-to-illegal` by design. A
+    // predicted-DTO type alias (object-like shape) is unaffected — DTO IS
+    // `imports.to`-legal, matching its pre-existing behavior.
+    if (this.typesRegistryPredictedKind.get(importName) === 'TypeDef') {
+      return undefined;
+    }
 
     // Check all entity types for this name
     const foundInFunctions = this.entityRegistry.functions.has(importName);

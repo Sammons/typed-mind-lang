@@ -1,0 +1,16 @@
+Main__App -> MainFile v1.0.0
+  -> [Member, describe]
+
+MainFile @ src/main.ts:
+  -> [Member, describe]
+
+describe :: describe(m: Member) => string
+  <- Member
+
+Member %
+  - id: RoleId
+  - role: Role
+
+Role = 'admin' | 'member'
+
+RoleId = string

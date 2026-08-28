@@ -71,6 +71,9 @@ export interface ParsedModule {
   readonly interfaces: readonly ParsedInterface[];
   readonly types: readonly ParsedTypeAlias[];
   readonly constants: readonly ParsedConstant[];
+  // X-AN-7 — real TS `enum` declarations, kept separate from `constants`
+  // (see ParsedEnum above).
+  readonly enums: readonly ParsedEnum[];
   // X-AN-2 — literal specifiers found in dynamic `import(...)` calls in this
   // module. Followed by the traversal queue the same way static imports are.
   readonly dynamicImportSpecifiers: readonly string[];
@@ -115,9 +118,24 @@ export interface ParsedConstant {
   readonly name: string;
   readonly type: string;
   readonly value: string | undefined;
-  readonly isEnum: boolean;
-  readonly enumValues: readonly { name: string; value?: string }[] | undefined;
   readonly isConst?: boolean;
+}
+
+// RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-AN-7) — a real TS `enum` declaration
+// gets its own analyzer shape, distinct from `ParsedConstant`. Previously a
+// `ts.EnumDeclaration` was pushed onto `ParsedModule.constants` carrying
+// `isEnum`/`enumValues` fields the converter never read (A-g9's analyzer
+// half) — the member list was captured then silently dropped downstream.
+// `ParsedEnum` is the converter's (X-CONV-2) single source for TM-8's
+// `TypeDefNode` enum variant: `members` here is the ordered member-name
+// list only (no values) because `TypeDefNode.members` (type-def-node.ts) is
+// `readonly string[]`, not a name/value pair — member initializer
+// expressions (`Active = 'active'`) are not part of the frozen TypeDef
+// shape and are intentionally not carried past this analyzer boundary.
+export interface ParsedEnum {
+  readonly name: string;
+  readonly members: readonly string[];
+  readonly description: string | undefined;
 }
 
 export interface TypeScriptProjectAnalysis {
@@ -189,12 +207,38 @@ export interface ConversionOptions {
   readonly ignorePatterns: readonly string[];
 }
 
+// RFC-TM-9 §9 (rfc-tm-9-diamond.md, X-SUPP-6) — the enumerated set of
+// machine-readable suppression reasons the converter is allowed to emit.
+// Closed by design ("unlimited auto-suppression is forbidden — a reason
+// outside the enumerated list is a converter error"): a new reason class
+// requires its own RFC review and its own fixture, the same containment
+// discipline X-AN-10's recognizer table already uses (RecognizerName).
+//   - 'generated-single-file-scope': the census's one true-dead adjudication
+//     class (`CstBlockKw`-shaped) — an exported entity whose export is never
+//     imported by any OTHER traced module. The converter can detect this
+//     deterministically from its own cross-file import graph (the same
+//     fact `checker/orphaned-entity` computes).
+//   - 'test-only-consumer': the census's non-goal disposition — a symbol
+//     whose only real-world consumer is a test file. NOTE: the analyzer's
+//     traversal never visits test files at all (they are excluded by
+//     `ignorePatterns` before traversal starts, per `filterModules`/the
+//     analyzer's own file discovery), so no converter-visible signal exists
+//     today to trigger this reason. The enum member and emission plumbing
+//     exist end-to-end per the doc's contract; zero suppressions carry this
+//     reason until an analyzer capability that scans excluded test files
+//     for cross-references is scoped as its own item (out of this
+//     Quantum's frozen X-AN-7/X-CONV-2/X-SUPP-6 set).
+export type SuppressionReason = 'test-only-consumer' | 'generated-single-file-scope';
+
 export interface ConversionResult {
   readonly success: boolean;
   readonly entities: readonly EntityNode[];
   readonly tmdContent: string;
   readonly errors: readonly ConversionError[];
   readonly warnings: readonly ConversionWarning[];
+  // X-SUPP-6 — the exact count of suppressions this conversion emitted, by
+  // reason. The CLI prints this; ladder fixtures assert exact counts.
+  readonly suppressionCounts: Readonly<Record<SuppressionReason, number>>;
 }
 
 export interface ConversionError {
