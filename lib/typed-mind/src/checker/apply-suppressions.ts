@@ -32,11 +32,21 @@
 // suppressible. An entry naming one is rejected with its own dedicated
 // finding rather than silently accepted or silently dropped — the doc's
 // "closing the meta-suppression loop."
+//
+// Rename-aware matching (doc §9, X-SUPP-7): a suppression's code is resolved
+// through the check-codes.ts RECORDED_RENAMES ladder before matching against
+// diagnostics — a suppression naming a code with a recorded rename to `X`
+// matches `X`'s findings, so a code rename does not instantly convert every
+// document suppressing the old spelling into a stale-suppression failure.
+// isMetaSuppressionCode below checks the RESOLVED code (post-rename), because
+// the meta-suppression rejection is about which code is actually live today,
+// not which spelling the document author used.
 
 import type { Diagnostic } from '../ast/diagnostic.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import type { Span } from '../ast/span.ts';
 import type { SuppressionNode } from '../ast/suppression-node.ts';
+import { resolveSuppressionCode } from './check-codes.ts';
 
 const NOT_SUPPRESSIBLE_CODE_PREFIX = 'checker/suppression-';
 const STALE_SUPPRESSION_CODE = 'checker/stale-suppression';
@@ -77,10 +87,11 @@ export interface ApplySuppressionsResult {
 }
 
 // One suppression's match set: every diagnostic whose code equals the
-// suppression's code AND whose span sits inside the resolved target entity's
-// span. A suppression whose target does not resolve to any entity has an
-// empty match set by construction (undefined byName lookup), which is
-// exactly the "absent target" stale case the grain ruling calls out.
+// suppression's code — resolved through the rename ladder first — AND whose
+// span sits inside the resolved target entity's span. A suppression whose
+// target does not resolve to any entity has an empty match set by
+// construction (undefined byName lookup), which is exactly the "absent
+// target" stale case the grain ruling calls out.
 const matchesFor = (
   suppression: SuppressionNode,
   diagnostics: readonly Diagnostic[],
@@ -90,7 +101,8 @@ const matchesFor = (
   if (target === undefined) {
     return [];
   }
-  return diagnostics.filter((diagnostic) => diagnostic.code === suppression.code && spanContains(target.span, diagnostic.span));
+  const resolvedCode = resolveSuppressionCode(suppression.code);
+  return diagnostics.filter((diagnostic) => diagnostic.code === resolvedCode && spanContains(target.span, diagnostic.span));
 };
 
 export const applySuppressions = (
@@ -103,7 +115,7 @@ export const applySuppressions = (
   const suppressionByDiagnostic = new Map<Diagnostic, SuppressionNode>();
 
   for (const suppression of suppressions) {
-    if (isMetaSuppressionCode(suppression.code)) {
+    if (isMetaSuppressionCode(resolveSuppressionCode(suppression.code))) {
       // Meta-suppression: reject the entry with its own dedicated finding.
       // The rejected entry is NOT applied (its named code/target pair is
       // never treated as a live suppression) — closing the loop means a

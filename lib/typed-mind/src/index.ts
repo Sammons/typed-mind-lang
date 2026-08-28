@@ -28,6 +28,18 @@ export { ImportStatementNode } from './ast/import-statement-node.ts';
 export { ProgramNode } from './ast/program-node.ts';
 export { RunParameterNode } from './ast/run-parameter-node.ts';
 export type { Span } from './ast/span.ts';
+// RFC-TM-8 §7/Q4 (rfc-tm-8-diamond.md, X-SUPP-2) — SuppressionNode joins the
+// public surface for the same reason TypeDefNode does above:
+// `ParseOutcome.suppressions` is already a typed, exported field
+// (pipeline/parse-outcome.ts), but until now the ELEMENT type had no path
+// out of this package (no `exports` map, no ast/ barrel, per the no-barrel
+// house rule) — a sibling package consuming `outcome.suppressions` could
+// read the values structurally but could not name `SuppressionNode` in an
+// annotation or construct one directly. TM-9's language-dependent Quantums
+// are the first out-of-package consumer of this surface (Q4's frozen-surface
+// handoff); export follows the established TypeDefNode/DtoFieldNode
+// precedent rather than inventing a new visibility rule.
+export { SuppressionNode } from './ast/suppression-node.ts';
 // RFC-TM-8 §5 (rfc-tm-8-diamond.md, X-TYPE-7) — TypeDefNode joins the other
 // ten semantic classes on the public surface, same rationale as every other
 // entity class re-export above: sibling workspace packages (LSP, converter)
