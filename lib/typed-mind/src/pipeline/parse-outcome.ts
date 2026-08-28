@@ -5,13 +5,21 @@
 // the legacy parser's cross-kind-shortform-only conflict channel
 // (parser.ts:108-121). `diagnostics` is always present (S-PARSE-3:
 // always-tolerant, parsing never throws).
+//
+// `suppressions` (RFC-TM-8 §7, X-SUPP-2): a flat, document-level list of
+// SuppressionNode values, one per (code, target) pair (the grain ruling) —
+// NOT attached to `entities` for the same reason ImportStatementNode isn't:
+// the target entity may be absent, and that absence is exactly what
+// checker/stale-suppression must observe.
 
 import type { Diagnostic } from '../ast/diagnostic.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import type { ImportStatementNode } from '../ast/import-statement-node.ts';
+import type { SuppressionNode } from '../ast/suppression-node.ts';
 
 export interface ParseOutcome {
   readonly entities: readonly EntityNode[];
   readonly imports: readonly ImportStatementNode[];
+  readonly suppressions: readonly SuppressionNode[];
   readonly diagnostics: readonly Diagnostic[];
 }

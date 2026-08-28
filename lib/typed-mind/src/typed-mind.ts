@@ -10,6 +10,7 @@ import { dirname } from 'node:path';
 import type { Diagnostic } from './ast/diagnostic.ts';
 import type { EntityNode } from './ast/entity-node.ts';
 import type { CstSourceFile } from './ast/gen/cst-nodes.ts';
+import { applySuppressions } from './checker/apply-suppressions.ts';
 import { AstValidator } from './checker/ast-validator.ts';
 import { toDiagnostics } from './checker/finding.ts';
 import { detectFormat, type FormatDetectionResult } from './emitter/detect-format.ts';
@@ -26,6 +27,12 @@ export interface TypedMindOptions extends TypedMindParserOptions {
 export interface CheckOutcome {
   readonly valid: boolean;
   readonly diagnostics: readonly Diagnostic[];
+  // RFC-TM-8 §8 (rfc-tm-8-diamond.md, I-10): suppressions are visible and
+  // counted in output. Counts findings this run silenced-but-kept — NOT
+  // stale-suppression/meta-suppression-rejected findings, which stay
+  // ordinary error-severity diagnostics in `diagnostics` and drive `valid`
+  // to false like any other error.
+  readonly suppressedCount: number;
 }
 
 export type ParseOutput = ParseOutcome & { readonly links: LinkIndex };
@@ -60,7 +67,7 @@ const resolveImportsInto = (parser: TypedMindParser, outcome: ParseOutcome, file
   const { resolvedEntities, diagnostics: importDiagnostics } = resolver.resolveImports(outcome.imports, dirname(filePath));
   const entities: readonly EntityNode[] = [...outcome.entities, ...resolvedEntities.values()];
   const diagnostics: readonly Diagnostic[] = [...outcome.diagnostics, ...importDiagnostics];
-  return { entities, imports: outcome.imports, diagnostics };
+  return { entities, imports: outcome.imports, suppressions: outcome.suppressions, diagnostics };
 };
 
 export class TypedMind {
@@ -105,9 +112,21 @@ export class TypedMind {
     const outcome = resolveImportsInto(this.#parser, this.#parser.parse(source), filePath);
     const links = computeLinks(outcome.entities);
     const { findings } = this.#validator.validate(outcome, links);
-    const diagnostics = [...outcome.diagnostics, ...toDiagnostics(findings)];
-    const valid = diagnostics.every((diagnostic) => diagnostic.severity !== 'error');
-    return { valid, diagnostics };
+    const rawDiagnostics = [...outcome.diagnostics, ...toDiagnostics(findings)];
+    // RFC-TM-8 §8 (rfc-tm-8-diamond.md, X-SUPP-3): suppression is a
+    // post-processing partition over the finding list, applied after every
+    // check has run — the same seam skipOrphanCheck uses, one level up, so
+    // no check-*.ts module needs to know suppressions exist.
+    const byName = new Map<string, EntityNode>();
+    for (const entity of outcome.entities) {
+      byName.set(entity.name, entity);
+    }
+    const { diagnostics, suppressedCount } = applySuppressions(rawDiagnostics, outcome.suppressions, byName);
+    // I-10 / doc §8: a suppressed finding keeps its severity and stays in
+    // `diagnostics`, but is excluded from the error count that drives
+    // `valid` — "suppressed-not-silenced," not "suppressed-and-hidden."
+    const valid = diagnostics.every((diagnostic) => diagnostic.severity !== 'error' || diagnostic.suppression !== undefined);
+    return { valid, diagnostics, suppressedCount };
   }
 
   emitShortform(source: string): string {

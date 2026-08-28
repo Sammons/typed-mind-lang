@@ -19,9 +19,17 @@
 import type { Node as SyntaxNode } from 'web-tree-sitter';
 import type { Diagnostic } from '../ast/diagnostic.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
-import { CstClassfileBlockSigil, CstImportStatement, CstLongformBlock, type CstSourceFile } from '../ast/gen/cst-nodes.ts';
+import {
+  CstClassfileBlockSigil,
+  CstImportStatement,
+  CstLongformBlock,
+  type CstSourceFile,
+  CstSuppressionBlock,
+  CstSuppressLine,
+} from '../ast/gen/cst-nodes.ts';
 import { ImportStatementNode } from '../ast/import-statement-node.ts';
 import type { Span } from '../ast/span.ts';
+import { SuppressionNode } from '../ast/suppression-node.ts';
 import { attachmentRules, illegalContinuationDiagnostic, orphanContinuationDiagnostic } from './attachment-rules.ts';
 import {
   openAsset,
@@ -91,6 +99,7 @@ export class CstToAstWalker {
   readonly #sourceLines: readonly string[];
   readonly #entities: EntityNode[] = [];
   readonly #imports: ImportStatementNode[] = [];
+  readonly #suppressions: SuppressionNode[] = [];
   readonly #diagnostics: Diagnostic[] = [];
   readonly #attachments: AttachmentSpan[] = [];
   #open: EntityAccumulator | null = null;
@@ -107,7 +116,7 @@ export class CstToAstWalker {
     this.#closeOpenEntity();
     const diagnostics = [...collectSyntaxDiagnostics(this.#root.syntaxNode), ...this.#diagnostics].sort(compareDiagnosticsBySpan);
     return {
-      outcome: { entities: this.#entities, imports: this.#imports, diagnostics },
+      outcome: { entities: this.#entities, imports: this.#imports, suppressions: this.#suppressions, diagnostics },
       attachments: this.#attachments,
     };
   }
@@ -126,6 +135,14 @@ export class CstToAstWalker {
     }
     if (logicalType === 'import_statement') {
       this.#handleImport(lineNode);
+      return;
+    }
+    if (logicalType === 'suppress_line') {
+      this.#handleSuppressLine(lineNode);
+      return;
+    }
+    if (logicalType === 'suppression_block') {
+      this.#handleSuppressionBlock(lineNode);
       return;
     }
     if (logicalType === 'longform_block') {
@@ -192,6 +209,55 @@ export class CstToAstWalker {
         raw: lineNode.text.trimEnd(),
       }),
     );
+  }
+
+  // RFC-TM-8 §7 (rfc-tm-8-diamond.md) — suppression is document-level like
+  // import_statement: it does NOT close the open entity (a suppress line has
+  // no attachment relationship to whatever entity happens to be under
+  // construction — mirroring #handleImport's precedent, not #handleLongform's
+  // close-on-block precedent, since a suppression is not itself a
+  // declaration).
+  #handleSuppressLine(lineNode: SyntaxNode): void {
+    const suppress = new CstSuppressLine(lineNode);
+    const keywordText = suppress.suppressKwChildren().at(0)?.text ?? '';
+    const lastKeywordCharacter = keywordText.slice(-1);
+    const restText = suppress.targetField()?.text ?? '';
+    const target = lastKeywordCharacter + restText;
+    const code = suppress.codeField()?.text ?? '';
+    const reason = suppress.reasonField()?.text ?? '';
+    this.#suppressions.push(
+      new SuppressionNode({
+        target,
+        code,
+        // Strip the surrounding quotes the same way every other consumer of
+        // $.string does (the token's raw text includes them).
+        reason: reason.length >= 2 ? reason.slice(1, -1) : reason,
+        span: tokenSpanOf(lineNode),
+        raw: lineNode.text.trimEnd(),
+      }),
+    );
+  }
+
+  // Longform `suppress { ... }` — one SuppressionNode PER ENTRY (the grain
+  // ruling, doc §7): a block with N entries produces N flat SuppressionNode
+  // values, not one node holding N entries, so each entry's staleness is
+  // independently checkable.
+  #handleSuppressionBlock(lineNode: SyntaxNode): void {
+    const block = new CstSuppressionBlock(lineNode);
+    for (const entry of block.suppressionEntryChildren()) {
+      const target = entry.targetField()?.text ?? '';
+      const code = entry.codeField()?.text ?? '';
+      const reason = entry.reasonField()?.text ?? '';
+      this.#suppressions.push(
+        new SuppressionNode({
+          target,
+          code,
+          reason: reason.length >= 2 ? reason.slice(1, -1) : reason,
+          span: entry.span(),
+          raw: entry.syntaxNode.text.trimEnd(),
+        }),
+      );
+    }
   }
 
   #handleLongform(lineNode: SyntaxNode): void {

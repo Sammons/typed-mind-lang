@@ -191,7 +191,7 @@ export class CodeGenerationEngine {
         consumedBy: new Map(),
         importedBy: new Map(),
       });
-      const emptyGraph: ParseOutput = { entities: [], imports: [], diagnostics: [], links: emptyLinks };
+      const emptyGraph: ParseOutput = { entities: [], imports: [], suppressions: [], diagnostics: [], links: emptyLinks };
       const generated = await this.generateEntity(entity, fullConfig, emptyGraph);
 
       return {

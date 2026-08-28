@@ -1,0 +1,11 @@
+App -> Main v1.0.0
+Main @ src/main.ts:
+  <- [helper]
+  -> [helper]
+helper :: () => void
+LegacyHelperDTO % "kept for a downstream integration test, not referenced here"
+OtherLegacyDTO % "same situation, demonstrating the longform block form"
+suppress LegacyHelperDTO checker/orphaned-entity "consumed only by an external integration test suite"
+suppress {
+  OtherLegacyDTO checker/orphaned-entity "also covered by the external suite"
+}

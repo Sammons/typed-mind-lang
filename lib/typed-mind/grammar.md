@@ -17,8 +17,9 @@ consumed by another entity to avoid dead code. The TypedMind checker will valida
 2. [Continuation Operators](#continuation-operators)
 3. [Longform Block Declarations](#longform-block-declarations)
 4. [DTO Field Syntax](#dto-field-syntax)
-5. [Quick Reference Example](#quick-reference-example)
-6. [Longform Example](#longform-example)
+5. [Suppression](#suppression)
+6. [Quick Reference Example](#quick-reference-example)
+7. [Longform Example](#longform-example)
 
 ## Shortform Declarations
 
@@ -120,6 +121,29 @@ UserDTO %
   - role: "admin" | "member" | "guest" "Account role, a string-literal union"
   - tags: string[] "Array of classification tags"
   - permissions: readonly string[] "Immutable permission list"
+```
+
+## Suppression
+
+A suppression silences exactly one (check code, target entity) finding for the checker run — the finding stays visible in output, labeled with its reason, and is counted in a suppressed-summary line (not hidden). A suppression matching zero findings this run is itself flagged (`checker/stale-suppression`); the suppression-machinery codes are not suppressible. A reasonless suppression line is a parse error — the reason is mandatory.
+
+| Form | Syntax |
+|---|---|
+| Shortform line | `suppress <target> <code> "<reason>"` |
+| Longform block entry | `<target> <code> "<reason>"` (inside `suppress { ... }`) |
+
+```tmd
+App -> Main v1.0.0
+Main @ src/main.ts:
+  <- [helper]
+  -> [helper]
+helper :: () => void
+LegacyHelperDTO % "kept for a downstream integration test, not referenced here"
+OtherLegacyDTO % "same situation, demonstrating the longform block form"
+suppress LegacyHelperDTO checker/orphaned-entity "consumed only by an external integration test suite"
+suppress {
+  OtherLegacyDTO checker/orphaned-entity "also covered by the external suite"
+}
 ```
 
 ## Quick Reference Example

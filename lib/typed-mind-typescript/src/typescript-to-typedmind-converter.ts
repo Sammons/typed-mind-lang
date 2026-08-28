@@ -138,7 +138,7 @@ export class TypeScriptToTypedMindConverter {
       // accepted EMITTER-STRUCTURE regression — SyntaxEmitter has no
       // comment-synthesis surface, per the RFC's Rejected Alternatives).
       const sortedEntities = sortIntoLegacySectionOrder(this.entities);
-      const tmdContent = this.emitter.emitShortform({ entities: sortedEntities, imports: [], diagnostics: [] });
+      const tmdContent = this.emitter.emitShortform({ entities: sortedEntities, imports: [], suppressions: [], diagnostics: [] });
 
       return {
         success: this.errors.length === 0,

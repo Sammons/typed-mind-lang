@@ -48,6 +48,15 @@
     "D2_inline_comment": ["inline_comment"],
     "D3_import_statement": ["import_statement", "import_statement_final", "import_head"],
     "D4_blank_lines": [],
+    "X_SUPP_1_suppression": [
+      "suppress_line",
+      "suppress_line_final",
+      "suppress_kw",
+      "suppression_block",
+      "suppress_block_kw",
+      "suppression_entry",
+      "check_code"
+    ],
     "H1_H11_keyword_headers": ["block_header", "block_kw", "header_name_rest"],
     "H10_quoted_dependency_header": ["header_quoted_name"],
     "H12_classfile_sigil_brace": ["classfile_block_sigil"],
