@@ -1,0 +1,8 @@
+[
+  {
+    "sourceModule": "infra/api.ts",
+    "specifier": "packages/functions/src/api/index.handler",
+    "resolvedTarget": "packages/functions/src/api/index.ts",
+    "classification": "internal"
+  }
+]

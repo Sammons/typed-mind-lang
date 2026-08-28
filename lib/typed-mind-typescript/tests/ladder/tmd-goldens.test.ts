@@ -18,7 +18,14 @@
 //     known non-regression). This makes the checker see the Program with
 //     no exports, so every entity looks unreachable ("orphaned") even
 //     though the analyzer/converter correctly discovered and wired them.
-//   - X-CONV-4 (Program-naming collision fix, 03-app-collision) is Q2.
+//   - X-CONV-4 (Program-naming collision fix, 03-app-collision) landed in
+//     Q2: conversion now succeeds (`<Base>__App` naming is collision-proof,
+//     per RFC-TM-9 §5) — the case table below reflects the flip Q1's
+//     comment anticipated. The checker verdict is still `false` because it
+//     hits the SAME pre-existing shortform-Program-exports emitter defect
+//     as every other fixture here (see above) — Q2 owns converter
+//     correctness, not the `lib/typed-mind` emitter/grammar (TM-8's
+//     surface, out of scope per the header parallel-safety paragraph).
 //   - X-AN-7/X-CONV-2 (enum modeling, 14-enum) is Q3 (TM-8-dependent).
 //   - Census gap 7 (`import = require`/`export =`, 11-commonjs) is not an
 //     owned X-AN item in RFC-TM-9 at all — out of mission scope entirely.
@@ -70,8 +77,13 @@ const cases: readonly FixtureCase[] = [
   { fixture: '09-namespace-import', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '09b-namespace-noext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '17-default-export', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
-  // Known-pending (Q2/Q3 scope, see file header).
-  { fixture: '03-app-collision', entrySegments: ['src', 'App.tsx'], expectConversionSuccess: false, recordedCheckerValid: 'unchecked' },
+  // Q2 landed (X-CONV-4): conversion now succeeds — the naming collision
+  // that used to crash this fixture no longer exists. Checker verdict is
+  // still `false`, same pre-existing shortform-Program-exports emitter
+  // defect as every other fixture above (see file header) — not owned by
+  // this Quantum.
+  { fixture: '03-app-collision', entrySegments: ['src', 'App.tsx'], expectConversionSuccess: true, recordedCheckerValid: false },
+  // Known-pending (Q3 scope, see file header).
   { fixture: '14-enum', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
 ];
 

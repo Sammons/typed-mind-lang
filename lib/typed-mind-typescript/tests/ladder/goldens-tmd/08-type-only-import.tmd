@@ -1,7 +1,7 @@
-MainApp -> MainFile v1.0.0
+Main__App -> MainFile v1.0.0
   -> [describe]
 
-MainFile @ tests/ladder/repros-analyzer/08-type-only-import/src/main.ts:
+MainFile @ src/main.ts:
   -> [describe]
 
 describe :: describe(w: Widget) => string

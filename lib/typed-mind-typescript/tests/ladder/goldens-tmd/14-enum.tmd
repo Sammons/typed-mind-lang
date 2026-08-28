@@ -1,7 +1,7 @@
-MainApp -> MainFile v1.0.0
+Main__App -> MainFile v1.0.0
   -> [Job, describe]
 
-MainFile @ tests/ladder/repros-analyzer/14-enum/src/main.ts:
+MainFile @ src/main.ts:
   <- [Status]
   -> [Job, describe]
 
@@ -12,4 +12,4 @@ Job %
   - id: string
   - status: Status
 
-Status ! tests/ladder/repros-analyzer/14-enum/src/status.ts : enum
+Status ! src/status.ts : enum

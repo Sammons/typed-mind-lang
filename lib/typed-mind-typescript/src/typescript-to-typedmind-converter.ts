@@ -90,6 +90,20 @@ export class TypeScriptToTypedMindConverter {
   private readonly dependencies = new Map<string, DependencyNode>();
   private readonly externalTypeToPackage = new Map<string, string>(); // Maps external types to their package
   private entryPoints = new Set<string>();
+  // X-CONV-5 — builtin `extends` targets (`Error`, `Map`, `EventEmitter`,
+  // ...) synthesized as stub ClassNode entities on demand. Keyed by
+  // entity name so a target referenced from multiple classes/modules gets
+  // exactly one stub, following the existing Node-builtins purpose-map
+  // precedent (`derivePurpose`'s `nodeBuiltins` table).
+  private readonly builtinExtendsStubNames = new Set<string>();
+  // X-CONV-3 — the target project's root, supplied by the analysis this
+  // convert() call is processing. `getRelativePath`/`filterModules`
+  // relativize against this, never `process.cwd()`, so extraction produces
+  // identical paths whether the CLI runs from inside or outside the target
+  // project. Set at the top of `convert()`; a fresh `TypeScriptAnalyzer`
+  // property per analysis, matching the rest of this class's per-conversion
+  // reset discipline.
+  private projectRoot: string = process.cwd();
 
   // Two-pass architecture registries
   private readonly exportRegistry: ExportRegistry = {};
@@ -115,6 +129,9 @@ export class TypeScriptToTypedMindConverter {
 
   convert(analysis: TypeScriptProjectAnalysis): ConversionResult {
     this.reset();
+    // X-CONV-3 — every relativization this conversion performs targets the
+    // analysis's own project root, not this process's cwd.
+    this.projectRoot = analysis.projectRoot;
 
     try {
       // Filter modules based on ignore patterns
@@ -149,10 +166,30 @@ export class TypeScriptToTypedMindConverter {
     } catch (error) {
       this.addError(`Conversion failed: ${error instanceof Error ? error.message : String(error)}`);
 
+      // X-CONV-4/I-13 — degrade, never discard. Whatever entities were
+      // collected onto `this.entities` before the exception are still real,
+      // still-valid partial output; emitting them (instead of the prior
+      // `entities: [], tmdContent: ''` total discard) is what makes a
+      // mid-conversion failure survivable — the operator gets a partial
+      // `.tmd` plus the error, not nothing. `success: false` and a nonzero
+      // CLI exit still apply (see cli.ts) so a partial result can never be
+      // mistaken for a clean one. The emit itself is defensively guarded:
+      // a second failure while degrading must not re-throw past this
+      // method — that would turn "degrade" back into "discard".
+      let sortedEntities: readonly EntityNode[] = [];
+      let tmdContent = '';
+      try {
+        sortedEntities = sortIntoLegacySectionOrder(this.entities);
+        tmdContent = this.emitter.emitShortform({ entities: sortedEntities, imports: [], diagnostics: [] });
+      } catch (emitError) {
+        this.addError(`Partial-output emission also failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`);
+        sortedEntities = [...this.entities];
+      }
+
       return {
         success: false,
-        entities: [],
-        tmdContent: '',
+        entities: sortedEntities,
+        tmdContent,
         errors: [...this.errors],
         warnings: [...this.warnings],
       } as const;
@@ -167,6 +204,7 @@ export class TypeScriptToTypedMindConverter {
     this.dependencies.clear();
     this.externalTypeToPackage.clear();
     this.entryPoints.clear();
+    this.builtinExtendsStubNames.clear();
 
     // Clear two-pass registries
     Object.keys(this.exportRegistry).forEach((key) => delete this.exportRegistry[key]);
@@ -184,7 +222,7 @@ export class TypeScriptToTypedMindConverter {
 
   private filterModules(modules: readonly ParsedModule[]): ParsedModule[] {
     return modules.filter((module) => {
-      const relativePath = path.relative(process.cwd(), module.filePath);
+      const relativePath = this.getRelativePath(module.filePath);
       return !this.options.ignorePatterns.some((pattern) => this.matchesPattern(relativePath, pattern));
     });
   }
@@ -216,12 +254,21 @@ export class TypeScriptToTypedMindConverter {
 
     // PHASE 2: Processing with Complete Knowledge
 
-    // Separate pure types files from regular files for proper ordering
+    // Separate pure types files from regular files for proper ordering.
+    // X-CONV-3 — a declared entry point is NEVER routed through the
+    // pure-types path, even when its own module shape (e.g. `export const
+    // app = new Hono()`, a plain constant with no classes/functions) would
+    // otherwise qualify as "pure types". `isPureTypesFile` only inspects the
+    // module's own shape and has no entry-point awareness; entry points are
+    // forced to `convertToSeparateEntities` below (`isModuleEntryPoint`
+    // already gates the ClassFile-fusion branch inside `processModule` the
+    // same way — this is that same forcing rule applied one level up, where
+    // the pure-types/regular split happens before `processModule` runs).
     const pureTypesFiles: ParsedModule[] = [];
     const regularFiles: ParsedModule[] = [];
 
     for (const module of modules) {
-      if (this.isPureTypesFile(module)) {
+      if (this.isPureTypesFile(module) && !this.isModuleEntryPoint(module)) {
         pureTypesFiles.push(module);
       } else {
         regularFiles.push(module);
@@ -455,8 +502,12 @@ export class TypeScriptToTypedMindConverter {
     // Check if this module is an entry point that needs special handling
     const isEntryPoint = this.isModuleEntryPoint(module);
 
-    // Check if this is a pure types/constants file
-    const isPureTypesFile = this.isPureTypesFile(module);
+    // Check if this is a pure types/constants file. X-CONV-3 — an entry
+    // point is never treated as pure-types here either, so a script-shaped
+    // entrypoint (a plain constant initializer, no classes/functions) still
+    // gets its File entity even if this method is reached directly instead
+    // of through `convertModules`'s pre-partitioned `regularFiles` list.
+    const isPureTypesFile = this.isPureTypesFile(module) && !isEntryPoint;
 
     // Decide whether to create separate entities or use ClassFile fusion
     const hasClasses = module.classes.length > 0;
@@ -620,6 +671,103 @@ export class TypeScriptToTypedMindConverter {
     return module.exports.some((exp) => exp.name === typeAlias.name && exp.type === 'type');
   }
 
+  // X-CONV-5 — a class extending a global ambient builtin (`class
+  // NotionApiError extends Error`) has no declared entity for the checker's
+  // every-reference-resolves rule to find; `checkInheritanceChains` rejects
+  // any `extends` target `context.byName` doesn't contain, and `extends.to`
+  // (valid-references.ts) only admits `['Class', 'ClassFile']` — a
+  // Dependency-kind stub fails that check (verified: `Cannot use 'extends'
+  // to reference Dependency`), so the stub must be a ClassNode. Zero
+  // checker change: this only ever adds a declared entity the existing
+  // reference-legality rule already accepts.
+  //
+  // Scope discipline: the doc names this a fix for "ambient-global `extends`
+  // targets (`Error`, `Map`, `EventEmitter`, ...)" — a curated allowlist,
+  // the same shape as `derivePurpose`'s `nodeBuiltins` table, NOT a catch-all
+  // for every unresolvable extends target. A class extending a genuinely
+  // undeclared, non-builtin base (a real bug in the source, or an
+  // intentionally-incomplete test fixture) must still fail the checker's
+  // `unknown-base-class` finding exactly as before this Quantum — silently
+  // stubbing arbitrary unresolved names would mask that real error class,
+  // which is not what the census gap or the doc's Solution ask for.
+  private static readonly KNOWN_AMBIENT_EXTENDS_TARGETS: ReadonlyMap<string, string> = new Map([
+    ['Error', 'Ambient global error type'],
+    ['Map', 'Ambient global keyed-collection type'],
+    ['Set', 'Ambient global unique-value collection type'],
+    ['Array', 'Ambient global indexed-collection type'],
+    ['EventEmitter', 'Ambient Node.js event-emitter type'],
+    ['Promise', 'Ambient global asynchronous-value type'],
+  ]);
+
+  // Returns the stub's entity name when `extendsTarget` is a KNOWN ambient
+  // builtin that needed one synthesized (idempotent — a target referenced
+  // by multiple classes shares one stub), or undefined when the target
+  // already resolves to a real declared entity, or is not in the known
+  // ambient-builtins allowlist (in which case no stub is created and the
+  // checker's existing unresolved-extends error stands).
+  private ensureBuiltinExtendsStub(extendsTarget: string | undefined): string | undefined {
+    if (extendsTarget === undefined || extendsTarget.length === 0) {
+      return undefined;
+    }
+
+    const purpose = TypeScriptToTypedMindConverter.KNOWN_AMBIENT_EXTENDS_TARGETS.get(extendsTarget);
+    if (purpose === undefined) {
+      return undefined;
+    }
+
+    const entityName = createEntityName(extendsTarget);
+    if (this.entityRegistry.classes.has(extendsTarget) || this.entityRegistry.interfaces.has(extendsTarget)) {
+      // A real class/interface in the analyzed source happens to share a
+      // name with a known ambient builtin (e.g. a project defines its own
+      // `Error` class) — the real declared entity wins, no stub needed.
+      return undefined;
+    }
+
+    if (!this.builtinExtendsStubNames.has(entityName)) {
+      this.builtinExtendsStubNames.add(entityName);
+      this.entityNames.add(entityName);
+
+      // No methods list: the stub represents an opaque ambient type, not a
+      // modeled API surface — `classToShortform` omits the `=> [...]` line
+      // entirely when `methods` is empty, so this emits as a bare `<:`
+      // declaration with no unparsable empty-bracket continuation.
+      const stubEntity = new ClassNode({
+        name: entityName,
+        span: SYNTHETIC_SPAN,
+        raw: `${entityName} <:`,
+        sourceForm: 'shortform',
+        extends: undefined,
+        implements: [],
+        methods: [],
+        purpose,
+      });
+
+      this.entities.push(stubEntity);
+    }
+
+    return entityName;
+  }
+
+  // Collects the builtin-extends stub names newly needed by a module's own
+  // classes, so the caller can fold them into that module's File/ClassFile
+  // `imports` list. A stub is otherwise unreferenced by any import edge
+  // (nothing in source literally imports `Error`), which would leave it
+  // orphaned by the checker's orphan rule (`extends`/`implements` are never
+  // counted as references, per check-orphans.ts) — folding the stub into
+  // the owning file's declared imports is what gives the checker's
+  // reachability computation an honest edge to find, mirroring how a real
+  // TS `extends Error` clause is itself a live reference to the global.
+  private collectBuiltinExtendsStubImports(classes: readonly ParsedClass[]): string[] {
+    const stubNames: string[] = [];
+    for (const cls of classes) {
+      const stubName = this.ensureBuiltinExtendsStub(cls.extends[0]);
+      if (stubName !== undefined) {
+        stubNames.push(stubName);
+      }
+    }
+    return stubNames;
+  }
+
   private convertToClassFile(module: ParsedModule, baseName: string): void {
     // Find the primary class (usually the one that matches the filename)
     const primaryClass = module.classes.find((cls) => cls.name.toLowerCase() === baseName.toLowerCase()) || module.classes[0];
@@ -639,6 +787,20 @@ export class TypeScriptToTypedMindConverter {
 
     this.entityNames.add(entityName);
 
+    // X-CONV-5 — synthesize a stub for the primary class's own extends
+    // target (if it's an unmodelled builtin) plus any other class in this
+    // module, before building this ClassFile's imports/exports lists. The
+    // stub needs to appear in SOME file's `exports` (checkClassAndFunction
+    // Exports requires every ClassNode to be exported by a file — ClassFile
+    // is exempt via self-export, but a builtin stub is a plain ClassNode)
+    // and in an import list somewhere so the orphan check sees a real
+    // reference edge (extends is never counted as one). This ClassFile is
+    // the only entity in this module with an honest claim to the ambient
+    // global its source references, so it both imports and exports it.
+    const primaryStubName = this.ensureBuiltinExtendsStub(primaryClass.extends[0]);
+    const otherStubNames = this.collectBuiltinExtendsStubImports(module.classes.filter((cls) => cls !== primaryClass));
+    const stubNames = primaryStubName !== undefined ? [primaryStubName, ...otherStubNames] : otherStubNames;
+
     const classFileEntity = new ClassFileNode({
       name: entityName,
       span: SYNTHETIC_SPAN,
@@ -648,8 +810,8 @@ export class TypeScriptToTypedMindConverter {
       extends: primaryClass.extends[0] || undefined, // TypedMind supports single inheritance
       implements: [...primaryClass.extends.slice(1), ...primaryClass.implements],
       methods: this.convertMethods(primaryClass),
-      imports: this.convertImports(module.imports, module.exports),
-      exports: this.convertExports(module, entityName),
+      imports: [...this.convertImports(module.imports, module.exports), ...stubNames],
+      exports: [...this.convertExports(module, entityName), ...stubNames],
       purpose: primaryClass.description || undefined,
     });
 
@@ -694,14 +856,25 @@ export class TypeScriptToTypedMindConverter {
     if (!this.entityNames.has(fileEntityName)) {
       this.entityNames.add(fileEntityName);
 
+      // X-CONV-5 — synthesize stubs for any of this module's classes that
+      // extend an unmodelled builtin. `checkClassAndFunctionExports`
+      // requires every ClassNode to appear in SOME file's `exports`
+      // (check-exports.ts), and the orphan check needs a real import edge
+      // to avoid flagging the stub (check-orphans.ts never counts
+      // `extends`). The owning file both exports and imports its own
+      // stub — it is the file that vouches for the ambient global its
+      // source references (the stub isn't a member of this module, but
+      // this module is the only place with an honest claim to it).
+      const stubNames = this.collectBuiltinExtendsStubImports(module.classes);
+
       const fileEntity = new FileNode({
         name: fileEntityName,
         span: SYNTHETIC_SPAN,
         raw: `${fileEntityName} @ ${this.getRelativePath(module.filePath)}:`,
         sourceForm: 'shortform',
         path: this.getRelativePath(module.filePath),
-        imports: this.convertImports(module.imports, module.exports),
-        exports: this.convertExports(module),
+        imports: [...this.convertImports(module.imports, module.exports), ...stubNames],
+        exports: [...this.convertExports(module), ...stubNames],
       });
 
       this.entities.push(fileEntity);
@@ -937,7 +1110,7 @@ export class TypeScriptToTypedMindConverter {
       if (modules.length > 0) {
         const firstModule = modules[0];
         if (firstModule) {
-          this.createProgramEntity('DefaultApp', firstModule.filePath);
+          this.createProgramEntity('DefaultApp', firstModule.filePath, firstModule.selfInvokedFunctionNames);
         }
       }
       return;
@@ -946,11 +1119,12 @@ export class TypeScriptToTypedMindConverter {
     for (const entryPoint of entryPoints) {
       const fileName = path.basename(entryPoint, path.extname(entryPoint));
       const programName = this.deriveProgramName(fileName);
-      this.createProgramEntity(programName, entryPoint);
+      const entryModule = modules.find((module) => module.filePath === entryPoint);
+      this.createProgramEntity(programName, entryPoint, entryModule?.selfInvokedFunctionNames ?? []);
     }
   }
 
-  private createProgramEntity(programName: string, entryFilePath: string): void {
+  private createProgramEntity(programName: string, entryFilePath: string, selfInvokedFunctionNames: readonly string[] = []): void {
     const entityName = createEntityName(programName);
 
     if (this.entityNames.has(entityName)) {
@@ -966,6 +1140,15 @@ export class TypeScriptToTypedMindConverter {
     // Extract public exports from the entry point for library support
     const publicExports = this.extractPublicExportsFromEntrypoint(entryFilePath);
 
+    // X-AN-11 — fold the entrypoint's self-invoked function names (from the
+    // `import.meta.url` guard) into the same Program.exports list. This is
+    // the honest-fact fix: the guarded function IS a real graph root, and
+    // Program.exports is the existing, language-optional field the checker's
+    // orphan rule already unions into its referenced-names set
+    // (check-orphans.ts's `collectReferencedNames`) — no FileNode change,
+    // no checker change, per the doc's negative check.
+    const allPublicExports = Array.from(new Set([...publicExports, ...selfInvokedFunctionNames]));
+
     const programEntity = new ProgramNode({
       name: entityName,
       span: SYNTHETIC_SPAN,
@@ -973,7 +1156,7 @@ export class TypeScriptToTypedMindConverter {
       sourceForm: 'shortform',
       entry: entryEntityName,
       version: this.options.programVersion,
-      exports: publicExports.length > 0 ? publicExports : undefined,
+      exports: allPublicExports.length > 0 ? allPublicExports : undefined,
     });
 
     this.entities.push(programEntity);
@@ -1316,7 +1499,13 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private getRelativePath(filePath: string): string {
-    return path.relative(process.cwd(), filePath);
+    // X-CONV-3 — relativize against the target project root (the tsconfig's
+    // directory), never `process.cwd()`. The prior `process.cwd()`-based
+    // implementation produced different emitted paths depending on where
+    // the CLI happened to be invoked from — a correctness bug, since the
+    // extracted `.tmd`'s paths are meant to describe the target project's
+    // own layout, not the operator's shell location.
+    return path.relative(this.projectRoot, filePath);
   }
 
   private sanitizeEntityName(name: string): string {
@@ -1336,8 +1525,21 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private deriveProgramName(fileName: string): string {
+    // X-CONV-4 — collision-proof naming. The prior `endsWith('App') ? base :
+    // `${base}App`` scheme produces bare `App` for `App.tsx`, colliding with
+    // the real exported `App` component (census gap 6, issue #45's crash
+    // case). `<Base>__App` is provably outside `sanitizeEntityName`'s
+    // codomain: that function collapses every run of underscores to a
+    // single one and never re-inserts a separator when joining
+    // PascalCase-cased parts (`'_+' -> '_'` then `split('_').join('')` —
+    // see its own comment), so no sanitized identifier can ever contain
+    // `__`. A literal `__` separator therefore cannot collide with any real
+    // entity name derived from source, without needing a runtime collision
+    // probe or a nondeterministic suffix (both rejected in the Diamond
+    // Doc's Rejected Alternatives — `App2`/`AppProgram` are not
+    // collision-proof against adversarial real names).
     const base = this.sanitizeEntityName(fileName);
-    return base.endsWith('App') ? base : `${base}App`;
+    return `${base}__App`;
   }
 
   private addError(message: string, filePath?: string): void {

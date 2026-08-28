@@ -1,4 +1,4 @@
-IndexApp -> IndexFile v1.0.0
+Index__App -> IndexFile v1.0.0
   -> [main]
 
 IndexFile @ project/src/index.ts:

@@ -1,0 +1,7 @@
+App__App -> AppFile v1.0.0
+  -> [App]
+
+AppFile @ src/App.tsx:
+  -> [App]
+
+App :: App() => string

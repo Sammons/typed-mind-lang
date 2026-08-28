@@ -1,7 +1,7 @@
-MainApp -> MainFile v1.0.0
+Main__App -> MainFile v1.0.0
   -> [addNums]
 
-MainFile @ tests/ladder/repros-analyzer/13-jsdoc-desc/src/main.ts:
+MainFile @ src/main.ts:
   -> [addNums]
 
 addNums :: addNums(a: number, b: number) => number
