@@ -1865,11 +1865,192 @@
           "named": true
         },
         {
+          "type": "suppress_line",
+          "named": true
+        },
+        {
+          "type": "suppress_line_final",
+          "named": true
+        },
+        {
+          "type": "suppression_block",
+          "named": true
+        },
+        {
           "type": "uicomponent_declaration",
           "named": true
         },
         {
           "type": "uicomponent_declaration_final",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "suppress_line",
+    "named": true,
+    "fields": {
+      "code": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "check_code",
+            "named": true
+          }
+        ]
+      },
+      "reason": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "target": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "header_name_rest",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "inline_comment",
+          "named": true
+        },
+        {
+          "type": "suppress_kw",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "suppress_line_final",
+    "named": true,
+    "fields": {
+      "code": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "check_code",
+            "named": true
+          }
+        ]
+      },
+      "reason": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "target": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "header_name_rest",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "inline_comment",
+          "named": true
+        },
+        {
+          "type": "suppress_kw",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "suppression_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "block_comment_line",
+          "named": true
+        },
+        {
+          "type": "suppress_block_kw",
+          "named": true
+        },
+        {
+          "type": "suppression_entry",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "suppression_entry",
+    "named": true,
+    "fields": {
+      "code": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "check_code",
+            "named": true
+          }
+        ]
+      },
+      "reason": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "target": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "entity_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "inline_comment",
           "named": true
         }
       ]
@@ -2228,6 +2409,10 @@
     "named": true
   },
   {
+    "type": "check_code",
+    "named": true
+  },
+  {
     "type": "comment",
     "named": true
   },
@@ -2281,6 +2466,14 @@
   },
   {
     "type": "string",
+    "named": true
+  },
+  {
+    "type": "suppress_block_kw",
+    "named": true
+  },
+  {
+    "type": "suppress_kw",
     "named": true
   },
   {

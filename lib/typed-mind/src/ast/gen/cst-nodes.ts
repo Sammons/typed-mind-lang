@@ -1,16 +1,16 @@
 // GENERATED FILE — DO NOT EDIT.
 // Emitted by lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs (RFC-TM-3 §2.1)
-// from lib/typed-mind/grammar/src/node-types.json: 110 named nodes,
-// 28 `_final` twins → 82 wrapper classes (one per logical production).
+// from lib/typed-mind/grammar/src/node-types.json: 117 named nodes,
+// 29 `_final` twins → 88 wrapper classes (one per logical production).
 // Regenerate: node lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs
 // CI diff-gates this file via scripts/check-generated.mjs step 2b.
 
 import type { Node as SyntaxNode } from 'web-tree-sitter';
 import type { Span } from '../span.ts';
 
-export const CST_NAMED_NODE_TYPE_COUNT = 110;
-export const CST_FINAL_TWIN_COUNT = 28;
-export const CST_LOGICAL_CLASS_COUNT = 82;
+export const CST_NAMED_NODE_TYPE_COUNT = 117;
+export const CST_FINAL_TWIN_COUNT = 29;
+export const CST_LOGICAL_CLASS_COUNT = 88;
 
 const spanOf = (syntaxNode: SyntaxNode): Span => ({
   start: { line: syntaxNode.startPosition.row + 1, column: syntaxNode.startPosition.column + 1 },
@@ -195,6 +195,13 @@ export class CstCallsList extends CstNode {
   }
   nameListChildren(): CstNameList[] {
     return this.childrenOfTypes(['name_list'], CstNameList);
+  }
+}
+
+export class CstCheckCode extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['check_code'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstCheckCode.nodeTypes);
   }
 }
 
@@ -1027,6 +1034,12 @@ export class CstSourceFile extends CstNode {
   runparameterDeclarationChildren(): CstRunparameterDeclaration[] {
     return this.childrenOfTypes(['runparameter_declaration', 'runparameter_declaration_final'], CstRunparameterDeclaration);
   }
+  suppressLineChildren(): CstSuppressLine[] {
+    return this.childrenOfTypes(['suppress_line', 'suppress_line_final'], CstSuppressLine);
+  }
+  suppressionBlockChildren(): CstSuppressionBlock[] {
+    return this.childrenOfTypes(['suppression_block'], CstSuppressionBlock);
+  }
   uicomponentDeclarationChildren(): CstUicomponentDeclaration[] {
     return this.childrenOfTypes(['uicomponent_declaration', 'uicomponent_declaration_final'], CstUicomponentDeclaration);
   }
@@ -1036,6 +1049,119 @@ export class CstString extends CstNode {
   static readonly nodeTypes: readonly string[] = ['string'];
   constructor(syntaxNode: SyntaxNode) {
     super(syntaxNode, CstString.nodeTypes);
+  }
+}
+
+export class CstSuppressBlockKw extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['suppress_block_kw'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstSuppressBlockKw.nodeTypes);
+  }
+}
+
+export class CstSuppressKw extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['suppress_kw'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstSuppressKw.nodeTypes);
+  }
+}
+
+export class CstSuppressLine extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['suppress_line', 'suppress_line_final'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstSuppressLine.nodeTypes);
+  }
+  codeField(): CstCheckCode | undefined {
+    const fieldNode = this.syntaxNode.childForFieldName('code');
+    if (fieldNode === null) {
+      return undefined;
+    }
+    if (fieldNode.type === 'check_code') {
+      return new CstCheckCode(fieldNode);
+    }
+    return undefined;
+  }
+  reasonField(): CstString | undefined {
+    const fieldNode = this.syntaxNode.childForFieldName('reason');
+    if (fieldNode === null) {
+      return undefined;
+    }
+    if (fieldNode.type === 'string') {
+      return new CstString(fieldNode);
+    }
+    return undefined;
+  }
+  targetField(): CstHeaderNameRest | undefined {
+    const fieldNode = this.syntaxNode.childForFieldName('target');
+    if (fieldNode === null) {
+      return undefined;
+    }
+    if (fieldNode.type === 'header_name_rest') {
+      return new CstHeaderNameRest(fieldNode);
+    }
+    return undefined;
+  }
+  inlineCommentChildren(): CstInlineComment[] {
+    return this.childrenOfTypes(['inline_comment'], CstInlineComment);
+  }
+  suppressKwChildren(): CstSuppressKw[] {
+    return this.childrenOfTypes(['suppress_kw'], CstSuppressKw);
+  }
+}
+
+export class CstSuppressionBlock extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['suppression_block'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstSuppressionBlock.nodeTypes);
+  }
+  blockCommentLineChildren(): CstBlockCommentLine[] {
+    return this.childrenOfTypes(['block_comment_line'], CstBlockCommentLine);
+  }
+  suppressBlockKwChildren(): CstSuppressBlockKw[] {
+    return this.childrenOfTypes(['suppress_block_kw'], CstSuppressBlockKw);
+  }
+  suppressionEntryChildren(): CstSuppressionEntry[] {
+    return this.childrenOfTypes(['suppression_entry'], CstSuppressionEntry);
+  }
+}
+
+export class CstSuppressionEntry extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['suppression_entry'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstSuppressionEntry.nodeTypes);
+  }
+  codeField(): CstCheckCode | undefined {
+    const fieldNode = this.syntaxNode.childForFieldName('code');
+    if (fieldNode === null) {
+      return undefined;
+    }
+    if (fieldNode.type === 'check_code') {
+      return new CstCheckCode(fieldNode);
+    }
+    return undefined;
+  }
+  reasonField(): CstString | undefined {
+    const fieldNode = this.syntaxNode.childForFieldName('reason');
+    if (fieldNode === null) {
+      return undefined;
+    }
+    if (fieldNode.type === 'string') {
+      return new CstString(fieldNode);
+    }
+    return undefined;
+  }
+  targetField(): CstEntityName | undefined {
+    const fieldNode = this.syntaxNode.childForFieldName('target');
+    if (fieldNode === null) {
+      return undefined;
+    }
+    if (fieldNode.type === 'entity_name') {
+      return new CstEntityName(fieldNode);
+    }
+    return undefined;
+  }
+  inlineCommentChildren(): CstInlineComment[] {
+    return this.childrenOfTypes(['inline_comment'], CstInlineComment);
   }
 }
 
@@ -1219,6 +1345,7 @@ export type CstNamedNode =
   | CstBlockProperty
   | CstBoolLiteral
   | CstCallsList
+  | CstCheckCode
   | CstClassDeclaration
   | CstClassfileBlockSigil
   | CstClassfileDeclaration
@@ -1280,6 +1407,11 @@ export type CstNamedNode =
   | CstSignature
   | CstSourceFile
   | CstString
+  | CstSuppressBlockKw
+  | CstSuppressKw
+  | CstSuppressLine
+  | CstSuppressionBlock
+  | CstSuppressionEntry
   | CstTypeAtom
   | CstTypeExpr
   | CstTypeGeneric
@@ -1311,6 +1443,7 @@ export const cstNodeClassByType: ReadonlyMap<string, new (syntaxNode: SyntaxNode
   ['bool_literal', CstBoolLiteral],
   ['calls_list', CstCallsList],
   ['calls_list_final', CstCallsList],
+  ['check_code', CstCheckCode],
   ['class_declaration', CstClassDeclaration],
   ['class_declaration_final', CstClassDeclaration],
   ['classfile_block_sigil', CstClassfileBlockSigil],
@@ -1396,6 +1529,12 @@ export const cstNodeClassByType: ReadonlyMap<string, new (syntaxNode: SyntaxNode
   ['signature', CstSignature],
   ['source_file', CstSourceFile],
   ['string', CstString],
+  ['suppress_block_kw', CstSuppressBlockKw],
+  ['suppress_kw', CstSuppressKw],
+  ['suppress_line', CstSuppressLine],
+  ['suppress_line_final', CstSuppressLine],
+  ['suppression_block', CstSuppressionBlock],
+  ['suppression_entry', CstSuppressionEntry],
   ['type_atom', CstTypeAtom],
   ['type_expr', CstTypeExpr],
   ['type_generic', CstTypeGeneric],

@@ -125,6 +125,6 @@ export class TypedMindParser {
     const entities = [...walked.entities];
     const semanticDiagnostics = distributeForwardSemantics(entities);
     const diagnostics = [...walked.diagnostics, ...semanticDiagnostics].sort(compareDiagnosticsBySpan);
-    return { entities, imports: walked.imports, diagnostics };
+    return { entities, imports: walked.imports, suppressions: walked.suppressions, diagnostics };
   }
 }
