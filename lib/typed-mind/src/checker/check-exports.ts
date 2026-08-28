@@ -72,6 +72,28 @@ export const checkClassAndFunctionExports = (context: CheckContext): void => {
   }
 };
 
+// RFC-TM-10 §7 (rfc-tm-10-diamond.md, D-LEG-7) — the ONE sound, narrow
+// exclusion: a pair (A, B) in a name's exporter set is excluded ONLY when one
+// of the pair is a ProgramNode whose `entry` field names the OTHER member of
+// the pair BY ENTITY. This is a direct field comparison, no import-provenance
+// reasoning at all — two prior drafts of a general "an exporter that imports
+// the name is excluded" signal were both falsified by the committed,
+// currently-passing `ast-validator.test.ts:366-380` test (an import-then-export
+// exporter must still flag against an independent declarer). The
+// File/ClassFile barrel-re-export shape (e.g. DetectFormatFile/SyntaxEmitter)
+// has no sound signal without new AST surface (a per-import provenance
+// field) and is NOT excluded here — it stays a live, honestly-disposed
+// residual (doc §7, §14).
+const isProgramEntryPair = (left: EntityNode, right: EntityNode): boolean => {
+  if (left instanceof ProgramNode && left.entry === right.name) {
+    return true;
+  }
+  if (right instanceof ProgramNode && right.entry === left.name) {
+    return true;
+  }
+  return false;
+};
+
 export const checkDuplicateExports = (context: CheckContext): void => {
   const exportMap = new Map<string, EntityNode[]>();
 
@@ -84,6 +106,19 @@ export const checkDuplicateExports = (context: CheckContext): void => {
   }
 
   for (const [exportName, exporters] of exportMap) {
+    // The Program/entry-File exclusion: when exactly two exporters claim this
+    // name and one is the Program whose `entry` names the other, this is a
+    // converter-emission redundancy (the Program's exports list re-derives
+    // from its own entry's export registry), not two independent
+    // declarations — no finding. Any additional exporter beyond the pair, or
+    // an exporter pair with no Program/entry relationship, still flags in
+    // full per the unmodified general rule below.
+    if (exporters.length === 2) {
+      const [a, b] = exporters as [EntityNode, EntityNode];
+      if (isProgramEntryPair(a, b)) {
+        continue;
+      }
+    }
     if (exporters.length > 1) {
       const isEntity = context.byName.has(exportName);
       const first = exporters[0];

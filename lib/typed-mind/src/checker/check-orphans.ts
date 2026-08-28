@@ -12,10 +12,12 @@
 import { AssetNode } from '../ast/asset-node.ts';
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
+import { DtoNode } from '../ast/dto-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
+import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 import type { CheckContext } from './check-context.ts';
 
@@ -24,6 +26,40 @@ const importsOf = (entity: EntityNode): readonly string[] | undefined => {
     return entity.imports;
   }
   return undefined;
+};
+
+// RFC-TM-10 §8 (rfc-tm-10-diamond.md, D-LEG-8) — a referenced-name collector
+// over the COMPLETE TypeExprNode shape, structurally mirroring (but
+// independent of — this file collects, check-dto-fields.ts's walkTypeExpr
+// validates; neither calls the other) check-dto-fields.ts's per-kind walk.
+// Every non-terminal kind recurses; `literal` and `opaque` are terminal
+// leaves that carry no reference (matching walkTypeExpr's own no-op/no-finding
+// treatment of those two kinds).
+const collectTypeExprReferences = (node: TypeExprNode, referenced: Set<string>): void => {
+  switch (node.kind) {
+    case 'named':
+      referenced.add(node.name);
+      return;
+    case 'generic':
+      referenced.add(node.base.name);
+      for (const arg of node.args) {
+        collectTypeExprReferences(arg, referenced);
+      }
+      return;
+    case 'union':
+    case 'intersection':
+      for (const member of node.members) {
+        collectTypeExprReferences(member, referenced);
+      }
+      return;
+    case 'array':
+      collectTypeExprReferences(node.element, referenced);
+      return;
+    case 'literal':
+      return; // terminal, no reference
+    case 'opaque':
+      return; // unvalidated leaf, no structured reference (RFC-TM-8 §4)
+  }
 };
 
 const collectReferencedNames = (context: CheckContext): Set<string> => {
@@ -66,6 +102,11 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
     }
     if (entity instanceof AssetNode && entity.containsProgram !== undefined) {
       referenced.add(entity.containsProgram);
+    }
+    if (entity instanceof DtoNode) {
+      for (const field of entity.fields) {
+        collectTypeExprReferences(field.typeExpr, referenced);
+      }
     }
   }
   return referenced;

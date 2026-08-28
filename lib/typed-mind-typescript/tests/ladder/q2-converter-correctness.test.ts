@@ -10,21 +10,25 @@
 //   - self-invoking-root fixture: zero orphan flags, function present in
 //     Program's exports, zero FileNode/checker changes (X-AN-11)
 //
-// Golden-discipline note shared with tmd-goldens.test.ts (Q1): this repo has
-// a PRE-EXISTING, Q2-unrelated converter defect where `ProgramNode.exports`
-// (the entrypoint's public re-export list) always duplicates names its own
-// File entity already exports, tripping `checker/multi-exported` on any
-// fixture with a Program and ANY exported entrypoint symbol — present on
-// `main` before this Quantum's changes, confirmed via a control fixture with
-// no builtin-extends/recognizer/self-invocation content at all. It is not
-// named anywhere in RFC-TM-9's scope (not X-CONV-1/3/4/5, not X-AN-10/11),
-// so this Quantum does not fix it — flagged for a follow-up issue instead.
-// Checks below assert the diagnostics actually owned by each X-item
-// (unknown-base-class, orphaned-entity, class-not-exported,
-// recognizer-not-found) rather than a blanket `valid: true`, exactly
-// mirroring tmd-goldens.test.ts's "record the achieved verdict" precedent —
-// and separately pin the full diagnostic-code list so a regression on the
-// unrelated defect's shape is still caught.
+// Golden-discipline note shared with tmd-goldens.test.ts (Q1): this repo HAD
+// a PRE-EXISTING, Q2-unrelated converter/checker defect where
+// `ProgramNode.exports` (the entrypoint's public re-export list) always
+// duplicates names its own File entity already exports, tripping
+// `checker/multi-exported` on any fixture with a Program and ANY exported
+// entrypoint symbol — present on `main` before this Quantum's changes,
+// confirmed via a control fixture with no builtin-extends/recognizer/
+// self-invocation content at all. It was not named anywhere in RFC-TM-9's
+// scope (not X-CONV-1/3/4/5, not X-AN-10/11), so that Quantum did not fix it
+// — filed as issue #62, fixed by RFC-TM-10 Q4 (rfc-tm-10-diamond.md §7,
+// D-LEG-7): a narrow `ProgramNode.entry`-to-co-exporter-name field
+// comparison excludes exactly this Program/entry-File duplication shape,
+// with no import-provenance reasoning. The fixtures below now assert zero
+// diagnostics for this class specifically. Checks below assert the
+// diagnostics actually owned by each X-item (unknown-base-class,
+// orphaned-entity, class-not-exported, recognizer-not-found) rather than a
+// blanket `valid: true`, exactly mirroring tmd-goldens.test.ts's "record the
+// achieved verdict" precedent — and separately pin the full diagnostic-code
+// list so a regression on either class is still caught.
 //
 // Emission note: RFC-TM-9 Q1's tmd-goldens.test.ts documents that
 // `ProgramNode.exports` is emitted in a shortform continuation
@@ -196,12 +200,11 @@ describe('RFC-TM-9 Q2 check — X-CONV-5: builtin-extends stub entities', () => 
     assert.equal(codes.includes('checker/unknown-base-class'), false, 'the extends target must resolve');
     assert.equal(codes.includes('checker/orphaned-entity'), false, 'neither the stub nor the extending class may be orphaned');
     assert.equal(codes.includes('checker/class-not-exported'), false, 'the stub must be exported by some file');
-    // Known pre-existing, Q2-unrelated defect (see file header): a Program
-    // always duplicates its entry File's exports, tripping multi-exported
-    // on any fixture with an exported entrypoint symbol. Pinned explicitly
-    // so a NEW diagnostic class regresses this test, while the known one
-    // does not block it.
-    assert.deepEqual(codes, ['checker/multi-exported']);
+    // RFC-TM-10 §7 (rfc-tm-10-diamond.md, D-LEG-7) fixed the Program/entry
+    // dual-export defect this test used to pin as a known pre-existing
+    // false-positive (a direct ProgramNode.entry-to-co-exporter-name field
+    // comparison excludes exactly this shape). Zero diagnostics now.
+    assert.deepEqual(codes, []);
   });
 });
 
@@ -270,8 +273,9 @@ describe('RFC-TM-9 Q2 check — X-AN-11: import.meta.url self-invocation guard m
     const codes = checkResult.diagnostics.map((d) => d.code);
     assert.equal(codes.includes('checker/orphaned-entity'), false, 'runWorker must not be flagged orphaned');
     assert.equal(codes.includes('checker/orphaned-file'), false);
-    // Same known pre-existing Q2-unrelated defect as the X-CONV-5 case
-    // above (Program always duplicates its entry File's exports).
-    assert.deepEqual(codes, ['checker/multi-exported']);
+    // RFC-TM-10 §7 (rfc-tm-10-diamond.md, D-LEG-7) fixed the same
+    // Program/entry dual-export defect the X-CONV-5 case above used to pin.
+    // Zero diagnostics now.
+    assert.deepEqual(codes, []);
   });
 });
