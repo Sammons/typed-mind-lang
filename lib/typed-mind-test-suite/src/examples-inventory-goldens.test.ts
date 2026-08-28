@@ -23,6 +23,29 @@
 // the same pattern S-TEST-1 uses (typed-mind-with-imports.ts) and the
 // shadow-verdict harness uses (lib/typed-mind/scripts/shadow-verdict-harness.mjs).
 // No lib/typed-mind source changes.
+//
+// RFC-TM-8 Q4 amendment-table closure (rfc-tm-8-diamond.md §9/Diamond DAG
+// Q4, X-TYPE-6 slice — RFC-TM-4 §4 precedent): this golden file IS the
+// checked-in amendment table's functional equivalent for TM-8's corpus
+// movements. Two Quanta touched the corpus:
+//   - Q1 (X-TYPE-6 parse-slice): the type-expression grammar (X-TYPE-1)
+//     flips 'quoted-literal-union-field-type' from expected-error to
+//     expected-parse (manifest-quoted-literal-union-field-type.tmd) and the
+//     lone-string description-disambiguation class (attested-zero census,
+//     doc §1) — both cause-linked in-repo at
+//     lib/typed-mind/src/pipeline/syntax-diagnostics.test.ts:10-19 and
+//     lib/typed-mind/src/pipeline/type-expr-from-cst.test.ts:8-9,316.
+//   - Q2 (X-TYPE-6 checker-slice, commit d438d3f): the per-part TypeExprNode
+//     walk (X-TYPE-4) moves 3 real-project .tmd files' findings off
+//     entity.span onto the failing part's own span, and the structured walk
+//     fixes two genuine legacy-regex bugs the old string-splitting checker
+//     carried: a false positive on `Promise<UserDTO>` (mis-extracted
+//     generic argument) and a false negative on `readonly AnyEntity[]`
+//     (regex missed the readonly prefix) — both landed in this file's
+//     checked-in expectations in the same commit as the source change.
+// Closure (Q4): this suite is green — 31/31 documents match their checked-in
+// expectation with zero drift — confirming every Q1/Q2 corpus movement is
+// accounted for and no unlisted delta survives to this Quantum.
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

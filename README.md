@@ -106,7 +106,7 @@ if (valid) {
 
 ## DSL Syntax
 
-> **Note**: For comprehensive grammar documentation and examples, see the [TypedMind Grammar Documentation](https://github.com/Sammons/typed-mind-lang/blob/main/lib/typed-mind/generated-grammar.md). This is especially useful for LLMs learning to write TypedMind syntax.
+> **Note**: For comprehensive grammar documentation and examples, see the [TypedMind Grammar Documentation](https://github.com/Sammons/typed-mind-lang/blob/main/lib/typed-mind/grammar.md). This is especially useful for LLMs learning to write TypedMind syntax.
 
 ### Short Form Example
 
@@ -149,6 +149,113 @@ Config ! src/config.ts : EnvSchema
 - `<:` : Extends/implements
 - `!` : Constants marker
 - `=>` : Contains methods
+
+## Type System and Suppression
+
+TypedMind holds every `.tmd` document — hand-authored or generated — to one
+strict checker bar. There is no separate lenient mode for generated output.
+Two mechanisms make that bar workable: structured DTO field types, which
+catch more errors at finer grain, and suppressions, which let a document
+carry a known, reasoned exception without failing `--check`.
+
+### DTO field types
+
+A DTO field's type is a real expression, not opaque text. The grammar parses
+unions, intersections, generics, arrays, and string/number literals:
+
+```tmd
+UserDTO %
+  - id: string
+  - role: "admin" | "member" | "guest"
+  - permissions: readonly string[]
+  - config: Pick<S3Client, "send">
+  - tags: (string | number)[]
+```
+
+The checker walks this structure part by part. A union with one bad variant
+flags only that variant — not the whole field, not the whole entity:
+
+```tmd
+BadDTO %
+  - status: "active" | UnknownType
+```
+
+`UnknownType` fails `checker/dto-field-unknown-type` at its own span; `"active"`
+passes. This is the precision a flat opaque string cannot offer: the old
+checker validated the field's raw text as one unit and could not point at the
+one bad member of an otherwise-good union.
+
+Shapes the six structured productions do not cover — object literals
+(including index signatures), tuples, function types, conditional types —
+fall through to an **opaque leaf**. The checker records no finding for an
+opaque leaf; it is trusted the same way today's unrecognized text is trusted.
+Narrowing the grammar to reject these shapes outright would break currently
+valid hand-authored documents, which is the one-strict-bar rule working in
+the other direction: the language must not retroactively break documents
+that parse today.
+
+Named types join the reference graph too. `typedef` declares an enum or a
+type alias as a first-class entity:
+
+```tmd
+Role = enum [admin, member, guest]
+UserSummary = Pick<UserDTO, "id" | "role">
+```
+
+A DTO field can reference either kind. Referencing an enum inside a
+string-literal union checks the literals against the enum's declared
+members — a literal absent from the set is flagged.
+
+### MANDATORY ASYMMETRY: DTO fields vs. function signatures
+
+**DTO field types get per-part structural checking. Function signatures stay
+opaque strings, in this mission.** A function's `:: (args) => ReturnType`
+signature is a quoted string the grammar accepts and the checker does not
+walk part by part — unlike a DTO field's type, no union member, generic
+argument, or array element inside a function signature gets its own
+finding.
+
+This is not an oversight. It is the same trust boundary as the opaque type
+leaf, applied at a coarser grain: a function signature and an untyped chunk
+of a DTO field type are both spans of text the checker declines to validate
+structurally, because doing so is out of this mission's scope. A future
+mission may extend structural checking to function signatures; until then,
+treat a signature's internal shape as unchecked, the same way you would treat
+an opaque-leaf DTO field.
+
+### Suppression
+
+A suppression silences exactly one `(check code, target entity)` finding for
+one checker run. The finding stays in the output, labeled with its reason,
+and is counted — suppression hides nothing from a reader of the report.
+
+```tmd
+LegacyHelperDTO % "kept for a downstream integration test, not referenced here"
+suppress LegacyHelperDTO checker/orphaned-entity "consumed only by an external integration test suite"
+```
+
+The longform block form groups multiple entries:
+
+```tmd
+suppress {
+  OtherLegacyDTO checker/orphaned-entity "also covered by the external suite"
+  LegacyField checker/dto-field-unknown-type "tracked in TICKET-42"
+}
+```
+
+A suppression that matches zero findings this run is itself an error
+(`checker/stale-suppression`) — under one strict bar, an outlived suppression
+is exactly the kind of rot the checker exists to catch. Fix the underlying
+issue or delete the suppression; leaving it in place fails the document. The
+suppression-machinery codes (`checker/stale-suppression`,
+`checker/meta-suppression-rejected`) cannot themselves be suppressed — that
+would let a document hide the very mechanism that keeps suppressions honest.
+
+Checker codes are a frozen public surface (`lib/typed-mind/src/checker/check-codes.ts`).
+Renaming one requires updating the registry and recording the rename in the
+same diff; a suppression naming the old spelling keeps matching through a
+recorded rename, so a rename does not silently turn every document that
+suppresses the old code into a failure.
 
 ## Development
 
