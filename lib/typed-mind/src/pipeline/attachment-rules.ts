@@ -56,6 +56,7 @@ import {
 } from '../ast/gen/cst-nodes.ts';
 import type { Span } from '../ast/span.ts';
 import type { EntityAccumulator } from './entity-accumulator.ts';
+import { typeExprFromCst } from './type-expr-from-cst.ts';
 
 export interface AttachmentRule {
   readonly group: string;
@@ -90,6 +91,21 @@ const hasQuestionSigil = (wrapped: CstDtoField): boolean => {
   return false;
 };
 
+// X-TYPE-2 (rfc-tm-8-diamond.md §2): field_type wraps type_expr (grammar.js),
+// so the fieldType CST child always carries exactly one type_expr child once
+// the document parses cleanly. A missing type_expr (a MISSING-token recovery
+// case) falls back to an empty opaque leaf rather than throwing — parsing
+// stays tolerant end to end (doc §3.3 precedent), and a malformed field_type
+// already surfaces its own syntax/* diagnostic from the CST walk.
+const typeExprOf = (wrapped: CstDtoField, span: Span) => {
+  const fieldType = wrapped.fieldTypeChildren().at(0);
+  const typeExprCst = fieldType?.typeExprChildren().at(0);
+  if (typeExprCst === undefined) {
+    return { kind: 'opaque' as const, text: '', span };
+  }
+  return typeExprFromCst(typeExprCst);
+};
+
 export const dtoFieldFromCst = (wrapped: CstDtoField, span: Span): DtoFieldNode => {
   const description = wrapped.stringChildren().at(0)?.text;
   const parenthesized = wrapped.optionalMarkerChildren().length > 0;
@@ -98,6 +114,7 @@ export const dtoFieldFromCst = (wrapped: CstDtoField, span: Span): DtoFieldNode 
   return new DtoFieldNode({
     name: wrapped.fieldNameChildren().at(0)?.text ?? '',
     type: (wrapped.fieldTypeChildren().at(0)?.text ?? '').trim(),
+    typeExpr: typeExprOf(wrapped, span),
     optionalityMarker,
     ...(description !== undefined ? { description: unquote(description) } : {}),
     span,

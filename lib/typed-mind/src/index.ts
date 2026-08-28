@@ -28,6 +28,17 @@ export { ImportStatementNode } from './ast/import-statement-node.ts';
 export { ProgramNode } from './ast/program-node.ts';
 export { RunParameterNode } from './ast/run-parameter-node.ts';
 export type { Span } from './ast/span.ts';
+// RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2) — DtoFieldNode's new required
+// typeExpr construction argument means every out-of-package DtoFieldNode
+// builder (the TM-6/TM-9 TypeScript-to-TypedMind converter,
+// typescript-to-typedmind-converter.ts) needs a way to produce a TypeExprNode
+// from the plain type STRING it already computes, without depending on
+// tree-sitter/wasm. parseTypeExprText is exactly that — the same hand-rolled
+// parser the longform `type:` quoted-string value and the readonly-array's
+// parenthesized element already reuse internally — re-exported here per the
+// no-barrel house rule's targeted-export precedent (index.ts is the only path
+// into lib/typed-mind/src for sibling workspace packages).
+export type { TypeExprNode } from './ast/type-expr-node.ts';
 export { UiComponentNode } from './ast/ui-component-node.ts';
 // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — the TypeScript converter builds a
 // synthetic ParseOutcome directly (it never runs source through the parser),
@@ -43,6 +54,7 @@ export { type EmitOptions, SyntaxEmitter } from './emitter/syntax-emitter.ts';
 // `LinkReference` for call-site stability.
 export { LinkIndex, type Reference as LinkReference } from './pipeline/link-index.ts';
 export type { ParseOutcome } from './pipeline/parse-outcome.ts';
+export { type ParseTypeExprTextOptions, type ParseTypeExprTextResult, parseTypeExprText } from './pipeline/type-expr-from-text.ts';
 // RFC-TM-4 §3 (rfc-tm-4-diamond.md) — the new primary surface (the flip's
 // original new export). This is the only checker/parser entry point left —
 // the legacy bridge and its DSLCheckerOptions (skipOrphanCheck/

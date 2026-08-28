@@ -32,6 +32,7 @@ import type { Span } from '../ast/span.ts';
 import { illegalContinuationDiagnostic } from './attachment-rules.ts';
 import { EntityAccumulator } from './entity-accumulator.ts';
 import { tokenSpanOf } from './spans.ts';
+import { parseTypeExprText } from './type-expr-from-text.ts';
 
 export interface LongformAttachment {
   readonly entityName: string;
@@ -93,13 +94,15 @@ interface FieldsProperty {
 
 type LongformProperty = ScalarProperty | ListProperty | BoolProperty | FieldsProperty;
 
-const fieldPropsOf = (properties: LongformProperty[]): { type?: string; description?: string; optional: boolean } => {
+const fieldPropsOf = (properties: LongformProperty[]): { type?: string; typeSpan?: Span; description?: string; optional: boolean } => {
   let typeText: string | undefined;
+  let typeSpan: Span | undefined;
   let descriptionText: string | undefined;
   let optional = false;
   for (const property of properties) {
     if (property.key === 'type' && property.kind === 'scalar') {
       typeText = property.value;
+      typeSpan = property.span;
     }
     if (property.key === 'description' && property.kind === 'scalar') {
       descriptionText = property.value;
@@ -110,6 +113,7 @@ const fieldPropsOf = (properties: LongformProperty[]): { type?: string; descript
   }
   return {
     ...(typeText !== undefined ? { type: typeText } : {}),
+    ...(typeSpan !== undefined ? { typeSpan } : {}),
     ...(descriptionText !== undefined ? { description: descriptionText } : {}),
     optional,
   };
@@ -151,11 +155,25 @@ const dtoFieldOf = (fieldBlock: CstDtoFieldBlock): DtoFieldNode => {
       .filter((property) => property !== undefined);
   }
   const props = fieldPropsOf(properties);
+  const typeText = props.type ?? 'any';
+  // X-TYPE-2 (rfc-tm-8-diamond.md §2/§6): the longform `type:` value is a
+  // QUOTED STRING at the grammar level (corpus: every longform fixture's
+  // `type: "string[]"` spelling) — its inner text is opaque to tree-sitter,
+  // so typeExpr comes from the shared string-based parser (type-expr-from-
+  // text.ts) rather than a CST walk. baseLine/baseColumn anchor the parsed
+  // structure's spans at the type property's own span start — an
+  // approximation (the property span covers `type: "..."` as a whole, not
+  // just the string's inner text) that is good enough for Q1's "populate the
+  // structure" bar; per-part span precision for the checker's findings is
+  // Q2's X-TYPE-4 concern, scoped to the shortform CST-derived path.
+  const typeSpanStart = (props.typeSpan ?? span).start;
+  const typeExpr = parseTypeExprText(typeText, { baseLine: typeSpanStart.line, baseColumn: typeSpanStart.column }).typeExpr;
   return new DtoFieldNode({
     name: fieldName,
     // 'any' is the legacy default for a longform field with no type key
     // (longform-parser.ts:249) — a data value, not a TypeScript type.
-    type: props.type ?? 'any',
+    type: typeText,
+    typeExpr,
     // Longform spells optionality as `optional: true`; the marker maps to the
     // 'parenthesized' variant (both spell the word `optional` explicitly; the
     // 'question' variant is reserved for the shortform `?` sigil, doc §2.2).

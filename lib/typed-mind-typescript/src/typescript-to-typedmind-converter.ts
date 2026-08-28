@@ -12,6 +12,7 @@ import {
   FileNode,
   FunctionNode,
   ProgramNode,
+  parseTypeExprText,
   type Span,
   SyntaxEmitter,
 } from '@sammons/typed-mind';
@@ -809,15 +810,21 @@ export class TypeScriptToTypedMindConverter {
 
     this.addEntityName(entityName, 'convertInterfaceToDTO');
 
-    const fields = iface.properties.map(
-      (prop) =>
-        new DtoFieldNode({
-          name: prop.name,
-          type: this.sanitizeFieldType(prop.type),
-          optionalityMarker: prop.isOptional ? 'question' : 'none',
-          span: SYNTHETIC_SPAN,
-        }),
-    );
+    const fields = iface.properties.map((prop) => {
+      const type = this.sanitizeFieldType(prop.type);
+      return new DtoFieldNode({
+        name: prop.name,
+        type,
+        // RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2): the converter builds a
+        // synthetic DtoFieldNode from an already-sanitized type string, not a
+        // parsed CST subtree — parseTypeExprText (the same hand-rolled parser
+        // the longform `type:` quoted-string value reuses) gives it a real
+        // TypeExprNode instead of leaving the field's structure unpopulated.
+        typeExpr: parseTypeExprText(type).typeExpr,
+        optionalityMarker: prop.isOptional ? 'question' : 'none',
+        span: SYNTHETIC_SPAN,
+      });
+    });
 
     const dtoEntity = new DtoNode({
       name: entityName,
@@ -1240,10 +1247,14 @@ export class TypeScriptToTypedMindConverter {
       const properties = this.parseObjectProperties(content);
 
       for (const prop of properties) {
+        const propType = this.sanitizeFieldType(prop.type);
         fields.push(
           new DtoFieldNode({
             name: prop.name,
-            type: this.sanitizeFieldType(prop.type),
+            type: propType,
+            // See the convertInterfaceToDTO construction site's comment
+            // (rfc-tm-8-diamond.md §2, X-TYPE-2) for why parseTypeExprText.
+            typeExpr: parseTypeExprText(propType).typeExpr,
             optionalityMarker: prop.optional ? 'question' : 'none',
             span: SYNTHETIC_SPAN,
           }),

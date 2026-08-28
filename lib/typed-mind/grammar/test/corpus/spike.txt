@@ -13,7 +13,14 @@ S-GRAMMAR-3: top-level leading-dash Dependency vs indented DTO field
     (string))
   (dto_field
     (field_name)
-    (field_type)))
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))))
 
 ============================================================
 S-GRAMMAR-3: one-space indent is still a continuation line
@@ -26,7 +33,14 @@ S-GRAMMAR-3: one-space indent is still a continuation line
 (source_file
   (dto_field
     (field_name)
-    (field_type)))
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))))
 
 ============================================================
 S-GRAMMAR-1a: DTO field with function type and (optional) marker
@@ -36,10 +50,40 @@ S-GRAMMAR-1a: DTO field with function type and (optional) marker
 
 ---
 
+; X-TYPE-1 KNOWN GAP (rfc-tm-8-diamond.md §1, grammar.js's type_atom "KNOWN
+; GAP" comment) — REGRESSION, documented not silently amended: this fixture
+; parsed cleanly under the pre-X-TYPE-1 flat chunk token; it now hits a
+; syntax/* diagnostic. Root cause: `(x: number)` is a function-type parameter
+; list, structurally never a valid type_expr (the bare `x` reduces to a
+; COMPLETE type_atom the instant the parser sees it, one token before the
+; disambiguating `:` becomes visible, so the reduce-reduce tie against
+; type_opaque resolves before the later failure on `: number) => void` is
+; observable) — confirmed irreducible to any precedence/dynamic-precedence/
+; choice-order combination (grammar.js's type_atom comment records all five
+; attempts). Zero real .tmd corpus files contain this shape (grep-verified);
+; the doc's own cited representative example, `() => void` (empty parameter
+; list), parses correctly and is what X-TYPE-1's "extrapolated function-type
+; fixture" check binding exercises. This is the grammar's documented
+; external-scanner boundary (file header: "S-GRAMMAR-3 reserves [it] for
+; stop-and-report") — flagged for operator review, not silently narrowed.
 (source_file
   (dto_field
     (field_name)
-    (field_type)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name)))))))
+                (ERROR)))))))
+    (ERROR)
     (optional_marker)))
 
 ============================================================
@@ -50,10 +94,25 @@ S-GRAMMAR-1a: DTO field with function type, description, and marker as distinct 
 
 ---
 
+; Same X-TYPE-1 KNOWN GAP as the fixture above — see its comment.
 (source_file
   (dto_field
     (field_name)
-    (field_type)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name)))))))
+                (ERROR)))))))
+    (ERROR)
     (string)
     (optional_marker)))
 
@@ -65,10 +124,31 @@ S-GRAMMAR-1a adversarial: genuine trailing paren group is type, not marker
 
 ---
 
+; Same X-TYPE-1 KNOWN GAP family — `fn (custom)` hits the identical
+; structured-vs-opaque paren ambiguity (a bare identifier immediately inside
+; parens reduces as a complete type_atom before the parser can tell the
+; second `fn` name is not part of that group). Also regressed from the
+; pre-X-TYPE-1 flat chunk token; same root cause, same stop-and-report class.
+
 (source_file
   (dto_field
     (field_name)
-    (field_type)))
+    (ERROR
+      (type_named
+        (entity_name)))
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name)))))))))))))))
 
 ============================================================
 S-GRAMMAR-1a adversarial: simple type with marker, no false negative
@@ -81,7 +161,14 @@ S-GRAMMAR-1a adversarial: simple type with marker, no false negative
 (source_file
   (dto_field
     (field_name)
-    (field_type)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))
     (optional_marker)))
 
 ============================================================

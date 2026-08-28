@@ -270,6 +270,37 @@ describe('TypeScriptToTypedMindConverter', () => {
     assert.equal(createdAtField.isOptional, true);
   });
 
+  it('falls back to opaque for a qualified/dotted property type, not a silently-truncated named type (review finding B1)', () => {
+    const converter = new TypeScriptToTypedMindConverter();
+    const analysis = createMockAnalysis();
+    // biome-ignore lint/suspicious/noExplicitAny: matches this file's existing convention for mutating a readonly test fixture (see "should skip private members by default")
+    const userInterface = (analysis.modules as any[]).flatMap((module) => module.interfaces).find((iface: any) => iface.name === 'UserDTO');
+    userInterface.properties.push({
+      name: 'projectConfig',
+      type: 'ts.CompilerOptions',
+      isReadonly: false,
+      isStatic: false,
+      isPrivate: false,
+      isProtected: false,
+      isOptional: false,
+    });
+
+    const result = converter.convert(analysis);
+    const userDTO = result.entities.find((e) => e.name === 'UserDTO');
+    // biome-ignore lint/suspicious/noExplicitAny: DtoNode's fields are not part of the narrow EntityNode result type this test suite already casts through elsewhere
+    const dto = userDTO as any;
+    // biome-ignore lint/suspicious/noExplicitAny: matches the file's existing find-callback typing convention
+    const projectConfigField = dto.fields.find((field: any) => field.name === 'projectConfig');
+    assert.notEqual(projectConfigField, undefined);
+    // The raw `type` string is preserved verbatim regardless of structure.
+    assert.equal(projectConfigField.type, 'ts.CompilerOptions');
+    // typeExpr must NOT silently truncate to { kind: 'named', name: 'ts' } —
+    // a dotted/qualified reference has no structured production and must
+    // fall to opaque, carrying the full text.
+    assert.equal(projectConfigField.typeExpr.kind, 'opaque');
+    assert.equal(projectConfigField.typeExpr.text, 'ts.CompilerOptions');
+  });
+
   it('should generate programs by default', () => {
     const converter = new TypeScriptToTypedMindConverter({ generatePrograms: true });
     const analysis = createMockAnalysis();

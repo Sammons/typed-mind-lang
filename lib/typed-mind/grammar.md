@@ -117,6 +117,9 @@ UserDTO %
   - name: string "User name"
   - email?: string "Email"
   - nickname: string "Display name" (optional)
+  - role: "admin" | "member" | "guest" "Account role, a string-literal union"
+  - tags: string[] "Array of classification tags"
+  - permissions: readonly string[] "Immutable permission list"
 ```
 
 ## Quick Reference Example

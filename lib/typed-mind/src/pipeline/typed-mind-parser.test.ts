@@ -32,7 +32,7 @@ const createParser = async () => {
 };
 
 describe('generated CST wrapper layer', () => {
-  it('emits one class per logical production (67 = 95 named nodes - 28 twins), self-consistent with node-types.json', () => {
+  it('emits one class per logical production (named nodes - twins), self-consistent with node-types.json', () => {
     const nodeTypesPath = join(packageDir, 'grammar', 'src', 'node-types.json');
     const nodeTypes: { type: string; named: boolean }[] = JSON.parse(readFileSync(nodeTypesPath, 'utf8'));
     const namedTypeNames = nodeTypes.filter((entry) => entry.named).map((entry) => entry.type);
@@ -49,7 +49,15 @@ describe('generated CST wrapper layer', () => {
       {
         namedNodeCount: namedTypeNames.length,
         twinCount,
-        logicalClassCount: 67,
+        // RFC-TM-8 §1 (rfc-tm-8-diamond.md, X-TYPE-1/X-TYPE-2): was a
+        // hardcoded 67 pinned to the pre-existing node-types set; the type-
+        // expression sub-grammar adds new logical productions
+        // (type_expr/type_union/type_intersection/type_postfix/type_atom/
+        // type_named/type_generic/type_literal_string/type_literal_number/
+        // type_readonly_array/type_opaque/readonly_kw/readonly_name_rest/
+        // readonly_paren_rest), so this derives from the live count instead
+        // of re-pinning a second magic number every time the grammar grows.
+        logicalClassCount: namedTypeNames.length - twinCount,
         mapKeyCount: namedTypeNames.length,
         distinctClassCount: namedTypeNames.length - twinCount,
       },

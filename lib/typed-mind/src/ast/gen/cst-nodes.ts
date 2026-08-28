@@ -1,16 +1,16 @@
 // GENERATED FILE — DO NOT EDIT.
 // Emitted by lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs (RFC-TM-3 §2.1)
-// from lib/typed-mind/grammar/src/node-types.json: 95 named nodes,
-// 28 `_final` twins → 67 wrapper classes (one per logical production).
+// from lib/typed-mind/grammar/src/node-types.json: 110 named nodes,
+// 28 `_final` twins → 82 wrapper classes (one per logical production).
 // Regenerate: node lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs
 // CI diff-gates this file via scripts/check-generated.mjs step 2b.
 
 import type { Node as SyntaxNode } from 'web-tree-sitter';
 import type { Span } from '../span.ts';
 
-export const CST_NAMED_NODE_TYPE_COUNT = 95;
+export const CST_NAMED_NODE_TYPE_COUNT = 110;
 export const CST_FINAL_TWIN_COUNT = 28;
-export const CST_LOGICAL_CLASS_COUNT = 67;
+export const CST_LOGICAL_CLASS_COUNT = 82;
 
 const spanOf = (syntaxNode: SyntaxNode): Span => ({
   start: { line: syntaxNode.startPosition.row + 1, column: syntaxNode.startPosition.column + 1 },
@@ -526,6 +526,9 @@ export class CstFieldType extends CstNode {
   constructor(syntaxNode: SyntaxNode) {
     super(syntaxNode, CstFieldType.nodeTypes);
   }
+  typeExprChildren(): CstTypeExpr[] {
+    return this.childrenOfTypes(['type_expr'], CstTypeExpr);
+  }
 }
 
 export class CstFileDeclaration extends CstNode {
@@ -872,6 +875,34 @@ export class CstPropertyString extends CstNode {
   }
 }
 
+export class CstReadonlyBraceRest extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['readonly_brace_rest'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstReadonlyBraceRest.nodeTypes);
+  }
+}
+
+export class CstReadonlyKw extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['readonly_kw'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstReadonlyKw.nodeTypes);
+  }
+}
+
+export class CstReadonlyNameRest extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['readonly_name_rest'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstReadonlyNameRest.nodeTypes);
+  }
+}
+
+export class CstReadonlyParenRest extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['readonly_paren_rest'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstReadonlyParenRest.nodeTypes);
+  }
+}
+
 export class CstRunparameterDeclaration extends CstNode {
   static readonly nodeTypes: readonly string[] = ['runparameter_declaration', 'runparameter_declaration_final'];
   constructor(syntaxNode: SyntaxNode) {
@@ -1008,6 +1039,154 @@ export class CstString extends CstNode {
   }
 }
 
+export class CstTypeAtom extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_atom'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeAtom.nodeTypes);
+  }
+  typeExprChildren(): CstTypeExpr[] {
+    return this.childrenOfTypes(['type_expr'], CstTypeExpr);
+  }
+  typeGenericChildren(): CstTypeGeneric[] {
+    return this.childrenOfTypes(['type_generic'], CstTypeGeneric);
+  }
+  typeLiteralNumberChildren(): CstTypeLiteralNumber[] {
+    return this.childrenOfTypes(['type_literal_number'], CstTypeLiteralNumber);
+  }
+  typeLiteralStringChildren(): CstTypeLiteralString[] {
+    return this.childrenOfTypes(['type_literal_string'], CstTypeLiteralString);
+  }
+  typeNamedChildren(): CstTypeNamed[] {
+    return this.childrenOfTypes(['type_named'], CstTypeNamed);
+  }
+  typeOpaqueChildren(): CstTypeOpaque[] {
+    return this.childrenOfTypes(['type_opaque'], CstTypeOpaque);
+  }
+  typeReadonlyArrayChildren(): CstTypeReadonlyArray[] {
+    return this.childrenOfTypes(['type_readonly_array'], CstTypeReadonlyArray);
+  }
+}
+
+export class CstTypeExpr extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_expr'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeExpr.nodeTypes);
+  }
+  typeUnionChildren(): CstTypeUnion[] {
+    return this.childrenOfTypes(['type_union'], CstTypeUnion);
+  }
+}
+
+export class CstTypeGeneric extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_generic'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeGeneric.nodeTypes);
+  }
+  baseField(): CstTypeNamed | undefined {
+    const fieldNode = this.syntaxNode.childForFieldName('base');
+    if (fieldNode === null) {
+      return undefined;
+    }
+    if (fieldNode.type === 'type_named') {
+      return new CstTypeNamed(fieldNode);
+    }
+    return undefined;
+  }
+  typeExprChildren(): CstTypeExpr[] {
+    return this.childrenOfTypes(['type_expr'], CstTypeExpr);
+  }
+}
+
+export class CstTypeIntersection extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_intersection'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeIntersection.nodeTypes);
+  }
+  typePostfixChildren(): CstTypePostfix[] {
+    return this.childrenOfTypes(['type_postfix'], CstTypePostfix);
+  }
+}
+
+export class CstTypeLiteralNumber extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_literal_number'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeLiteralNumber.nodeTypes);
+  }
+}
+
+export class CstTypeLiteralString extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_literal_string'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeLiteralString.nodeTypes);
+  }
+  stringChildren(): CstString[] {
+    return this.childrenOfTypes(['string'], CstString);
+  }
+}
+
+export class CstTypeNamed extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_named'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeNamed.nodeTypes);
+  }
+  entityNameChildren(): CstEntityName[] {
+    return this.childrenOfTypes(['entity_name'], CstEntityName);
+  }
+}
+
+export class CstTypeOpaque extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_opaque'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeOpaque.nodeTypes);
+  }
+}
+
+export class CstTypePostfix extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_postfix'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypePostfix.nodeTypes);
+  }
+  typeAtomChildren(): CstTypeAtom[] {
+    return this.childrenOfTypes(['type_atom'], CstTypeAtom);
+  }
+}
+
+export class CstTypeReadonlyArray extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_readonly_array'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeReadonlyArray.nodeTypes);
+  }
+  elementField(): CstReadonlyBraceRest | CstReadonlyNameRest | CstReadonlyParenRest | undefined {
+    const fieldNode = this.syntaxNode.childForFieldName('element');
+    if (fieldNode === null) {
+      return undefined;
+    }
+    if (fieldNode.type === 'readonly_brace_rest') {
+      return new CstReadonlyBraceRest(fieldNode);
+    }
+    if (fieldNode.type === 'readonly_name_rest') {
+      return new CstReadonlyNameRest(fieldNode);
+    }
+    if (fieldNode.type === 'readonly_paren_rest') {
+      return new CstReadonlyParenRest(fieldNode);
+    }
+    return undefined;
+  }
+  readonlyKwChildren(): CstReadonlyKw[] {
+    return this.childrenOfTypes(['readonly_kw'], CstReadonlyKw);
+  }
+}
+
+export class CstTypeUnion extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_union'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeUnion.nodeTypes);
+  }
+  typeIntersectionChildren(): CstTypeIntersection[] {
+    return this.childrenOfTypes(['type_intersection'], CstTypeIntersection);
+  }
+}
+
 export class CstUicomponentDeclaration extends CstNode {
   static readonly nodeTypes: readonly string[] = ['uicomponent_declaration', 'uicomponent_declaration_final'];
   constructor(syntaxNode: SyntaxNode) {
@@ -1093,10 +1272,25 @@ export type CstNamedNode =
   | CstPropertyList
   | CstPropertyNestedBlock
   | CstPropertyString
+  | CstReadonlyBraceRest
+  | CstReadonlyKw
+  | CstReadonlyNameRest
+  | CstReadonlyParenRest
   | CstRunparameterDeclaration
   | CstSignature
   | CstSourceFile
   | CstString
+  | CstTypeAtom
+  | CstTypeExpr
+  | CstTypeGeneric
+  | CstTypeIntersection
+  | CstTypeLiteralNumber
+  | CstTypeLiteralString
+  | CstTypeNamed
+  | CstTypeOpaque
+  | CstTypePostfix
+  | CstTypeReadonlyArray
+  | CstTypeUnion
   | CstUicomponentDeclaration
   | CstVersion;
 
@@ -1193,11 +1387,26 @@ export const cstNodeClassByType: ReadonlyMap<string, new (syntaxNode: SyntaxNode
   ['property_list', CstPropertyList],
   ['property_nested_block', CstPropertyNestedBlock],
   ['property_string', CstPropertyString],
+  ['readonly_brace_rest', CstReadonlyBraceRest],
+  ['readonly_kw', CstReadonlyKw],
+  ['readonly_name_rest', CstReadonlyNameRest],
+  ['readonly_paren_rest', CstReadonlyParenRest],
   ['runparameter_declaration', CstRunparameterDeclaration],
   ['runparameter_declaration_final', CstRunparameterDeclaration],
   ['signature', CstSignature],
   ['source_file', CstSourceFile],
   ['string', CstString],
+  ['type_atom', CstTypeAtom],
+  ['type_expr', CstTypeExpr],
+  ['type_generic', CstTypeGeneric],
+  ['type_intersection', CstTypeIntersection],
+  ['type_literal_number', CstTypeLiteralNumber],
+  ['type_literal_string', CstTypeLiteralString],
+  ['type_named', CstTypeNamed],
+  ['type_opaque', CstTypeOpaque],
+  ['type_postfix', CstTypePostfix],
+  ['type_readonly_array', CstTypeReadonlyArray],
+  ['type_union', CstTypeUnion],
   ['uicomponent_declaration', CstUicomponentDeclaration],
   ['uicomponent_declaration_final', CstUicomponentDeclaration],
   ['version', CstVersion],

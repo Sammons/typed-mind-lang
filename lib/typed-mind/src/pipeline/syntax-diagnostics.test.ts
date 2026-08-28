@@ -6,6 +6,17 @@
 // mechanical at pipeline level. Plus the doc-named near-miss check:
 // naming-edge-cases-example.tmd:49 (`<= [...]`) yields exactly ONE diagnostic
 // at the real span, not a recovery cascade.
+//
+// RFC-TM-4 §4 amendment (RFC-TM-8 §1, rfc-tm-8-diamond.md X-TYPE-6 parse-
+// slice): the 'quoted-literal-union-field-type' class MOVES from the
+// six-class inventory below to its own describe block at the end of this
+// file. X-TYPE-1's type-expression sub-grammar admits `type_literal_string`
+// (reuses $.string, grammar.js), so a field type of `"a" | "b"` is no longer
+// a syntax error — it is the exact shape the union production exists to
+// parse. This is the class the doc's §1 "Description disambiguation" section
+// names as the intended additive/behavior-change split; the manifest fixture
+// (manifest-quoted-literal-union-field-type.tmd) is unchanged, only its
+// expected verdict flips from expected-error to expected-parse.
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -28,7 +39,6 @@ const MANIFEST_CLASS_FIXTURES = [
   { defectClass: 'multiline-bracket-list', fixtureName: 'manifest-multiline-bracket-list.tmd', offendingLines: [3, 4] },
   { defectClass: 'array-suffix-bare-name', fixtureName: 'manifest-array-suffix-bare-name.tmd', offendingLines: [3, 5] },
   { defectClass: 'classfile-trailing-colon', fixtureName: 'manifest-classfile-trailing-colon.tmd', offendingLines: [2] },
-  { defectClass: 'quoted-literal-union-field-type', fixtureName: 'manifest-quoted-literal-union-field-type.tmd', offendingLines: [3] },
   { defectClass: 'unrecognized-form', fixtureName: 'manifest-unrecognized-form.tmd', offendingLines: [2] },
 ];
 
@@ -95,6 +105,33 @@ describe('syntax/* diagnostics for the six corpus-manifest defect classes', () =
           // The stray `=` of the `<=` near-miss sigil on line 49.
           span: { start: { line: 49, column: 4 }, end: { line: 49, column: 5 } },
         },
+      ],
+    );
+  });
+});
+
+// RFC-TM-8 §1 (rfc-tm-8-diamond.md, X-TYPE-6 parse-slice) — the amendment
+// landing for the class moved out of MANIFEST_CLASS_FIXTURES above.
+describe('quoted-literal-union-field-type: expected-error → expected-parse (RFC-TM-4 §4 amendment)', () => {
+  it('manifest-quoted-literal-union-field-type.tmd parses with zero syntax/* diagnostics and a real union structure', async () => {
+    const parser = await TypedMindParser.create({ wasmPath });
+    const outcome = parser.parse(readFileSync(join(fixturesDir, 'manifest-quoted-literal-union-field-type.tmd'), 'utf8'));
+    const syntaxDiagnostics = outcome.diagnostics.filter((diagnostic) => diagnostic.code.startsWith('syntax/'));
+    assert.deepEqual(syntaxDiagnostics, []);
+    const dto = outcome.entities.find((entity) => entity.kind === 'DTO' && entity.name === 'ThemeDTO');
+    assert.notEqual(dto, undefined);
+    const field = dto !== undefined && dto.kind === 'DTO' ? dto.fields.at(0) : undefined;
+    assert.notEqual(field, undefined);
+    assert.deepEqual(
+      field !== undefined && field.typeExpr.kind === 'union'
+        ? field.typeExpr.members.map((member) =>
+            member.kind === 'literal' ? { literalKind: member.literalKind, value: member.value } : member,
+          )
+        : undefined,
+      [
+        { literalKind: 'string', value: 'light' },
+        { literalKind: 'string', value: 'dark' },
+        { literalKind: 'string', value: 'system' },
       ],
     );
   });
