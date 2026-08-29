@@ -212,6 +212,66 @@ describe('issue #72 check — collision of two identical-shaped inline types in 
       'no DTO ever claims the bare name CraftInvoiceInput — a function entity of that exact name already owns it',
     );
   });
+
+  it('adversarial-review blocker #1 (PR #84): a same-module hand-authored interface wins the name over a synthesized DTO', () => {
+    // `archiveOrder`'s inline-object parameter would synthesize
+    // `ArchiveOrderInput`, but a hand-authored `interface ArchiveOrderInput`
+    // is declared in the SAME module. Functions convert before interfaces
+    // in this converter's fixed pass order (unrelated to source
+    // declaration order), so without `reserveNamedTypeEntityNames`'s
+    // pre-pass, the synthesized DTO would claim the bare name first and the
+    // hand-authored interface would then hit "Duplicate entity name" and be
+    // silently dropped. The correct direction: the hand-authored name wins.
+    const result = convert();
+    assert.equal(result.success, true, 'conversion must succeed — the interface must not be dropped as a duplicate');
+
+    const fn = findFunction(result.entities, 'archiveOrder');
+    assert.notEqual(fn, undefined, 'the archiveOrder function entity must exist');
+    assert.equal(
+      fn?.input,
+      'ArchiveOrderInput__2',
+      'ArchiveOrderInput is claimed by the hand-authored interface — the synthesized DTO must disambiguate',
+    );
+
+    const handAuthored = findDTO(result.entities, 'ArchiveOrderInput');
+    assert.notEqual(handAuthored, undefined, 'the hand-authored ArchiveOrderInput interface-turned-DTO must exist, unrenamed');
+    assert.deepEqual(
+      handAuthored?.fields.map((f) => f.name),
+      ['reason'],
+      'the hand-authored entity keeps its own original fields, unmodified by the collision',
+    );
+
+    const synthesized = findDTO(result.entities, 'ArchiveOrderInput__2');
+    assert.notEqual(synthesized, undefined, 'the disambiguated synthesized DTO must exist as its own entity');
+    assert.deepEqual(
+      synthesized?.fields.map((f) => f.name),
+      ['orderId', 'note'],
+    );
+  });
+
+  it('adversarial-review blocker #2 (PR #84): an arrow-typed field does not corrupt the property splitter and swallow a sibling field', () => {
+    // `splitObjectLiteralProperties`'s depth tracker must not treat `=>`'s
+    // unmatched `>` as closing a `<...>` pair — doing so previously drove
+    // the shared depth counter permanently negative and merged every
+    // subsequent field into the arrow-typed field's own type text.
+    const result = convert();
+    const fn = findFunction(result.entities, 'subscribe');
+    assert.notEqual(fn, undefined, 'the subscribe function entity must exist');
+    assert.equal(fn?.input, 'SubscribeInput');
+
+    const dto = findDTO(result.entities, 'SubscribeInput');
+    assert.notEqual(dto, undefined);
+    assert.deepEqual(
+      dto?.fields.map((f) => f.name),
+      ['onDone', 'label'],
+      "both fields must be independent DtoFieldNodes — label must not be swallowed into onDone's arrow-typed text",
+    );
+    const onDoneField = dto?.fields.find((f) => f.name === 'onDone');
+    assert.ok(
+      onDoneField?.type.includes('=>') && !onDoneField.type.includes('label'),
+      "onDone must carry only its own arrow-function type text, not label's type merged in",
+    );
+  });
 });
 
 describe('issue #72 check — control case: named-interface parameter is unaffected', () => {

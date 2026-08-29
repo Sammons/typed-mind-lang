@@ -135,6 +135,19 @@ export class TypeScriptToTypedMindConverter {
   private readonly warnings: ConversionWarning[] = [];
   private readonly entities: EntityNode[] = [];
   private readonly entityNames = new Set<string>();
+  // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) — names
+  // reserved by `reserveNamedTypeEntityNames` for a module's own
+  // interface/type-alias/enum declarations, held SEPARATELY from
+  // `entityNames`. These names are NOT yet real entities (unlike
+  // `entityNames`, which means "an entity with this name already exists in
+  // `this.entities`"), so the later `convertInterfaceToDTO`/
+  // `convertTypeAliasToDTO`/`convertEnumToTypeDef` call that actually
+  // claims the name must not treat its OWN reservation as a collision.
+  // `reserveSynthesizedDTOName` still consults this set (in addition to
+  // `entityNames`) so a synthesized DTO correctly avoids a name a
+  // same-module interface/type-alias/enum has reserved but not yet
+  // converted into a real entity.
+  private readonly reservedNamedTypeNames = new Set<string>();
   // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) — a
   // top-level function that collided on its bare name and was renamed to
   // `<baseName>__<name>` by `convertFunction`. `convertExports` consults
@@ -378,6 +391,7 @@ export class TypeScriptToTypedMindConverter {
     this.warnings.length = 0;
     this.entities.length = 0;
     this.entityNames.clear();
+    this.reservedNamedTypeNames.clear();
     this.functionNameRemap.clear();
     this.dependencies.clear();
     this.externalTypeToPackage.clear();
@@ -725,6 +739,26 @@ export class TypeScriptToTypedMindConverter {
     // (`isPureTypesFile`), so this is a no-op for that branch.
     if (!isPureTypesFile) {
       this.reserveFunctionEntityNames(module, entityName);
+      // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) — a
+      // synthesized inline-DTO name (`${functionEntityName}Input`/`Output`)
+      // must never win a name-collision race against a HAND-AUTHORED
+      // interface/type-alias/enum declared in the SAME module, just
+      // because `convertToSeparateEntities`/`convertToClassFile` happen to
+      // convert functions before interfaces/type-aliases/enums (both
+      // paths' own fixed loop order, unchanged by this reservation).
+      // Without this reservation, `synthesizeInlineDTO` sees an empty slot
+      // in `entityNames` for a name like `CreateOrderInput`, claims it, and
+      // the LATER-converting `interface CreateOrderInput` then hits the
+      // pre-existing `Duplicate entity name` hard error and is silently
+      // dropped from the entity list — the wrong direction: an
+      // author-provided name must not be evicted by a converter-invented
+      // one. Reserving every exported interface/type-alias/enum's bare
+      // name up front (mirroring `reserveFunctionEntityNames`'s own
+      // pre-pass shape) closes this: `synthesizeInlineDTO`'s later
+      // `reserveSynthesizedDTOName` collision check sees the name already
+      // taken and disambiguates via `__2`, exactly as it already does for
+      // a same-module function-name collision.
+      this.reserveNamedTypeEntityNames(module);
     }
 
     if (isPureTypesFile) {
@@ -1309,6 +1343,47 @@ export class TypeScriptToTypedMindConverter {
       const finalName = this.entityNames.has(bareName) ? createEntityName(`${baseName}__${func.name}`) : bareName;
       this.functionNameRemap.set(remapKey, finalName);
       this.entityNames.add(finalName);
+    }
+  }
+
+  // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) — see
+  // this method's call site in `processModule` for the full rationale.
+  // Reserves this module's exported interface/type-alias/enum bare names
+  // in `entityNames` BEFORE any function in the module converts (and
+  // therefore before any inline-DTO synthesis can run), so a
+  // hand-authored name always wins a collision against a
+  // converter-synthesized one, regardless of the fixed pass order
+  // (`convertToSeparateEntities`/`convertToClassFile` always convert
+  // functions before interfaces/type-aliases/enums). This is a
+  // reservation only — it does not create entities, does not run
+  // `sanitizeEntityName` (interfaces/type-aliases/enums all resolve their
+  // final name via the identity `createEntityName`, per
+  // `convertInterfaceToDTO`/`convertTypeAliasToDTO`/`convertEnumToTypeDef`,
+  // so reserving that exact bare name here is provably the same name
+  // those methods will later look up), and does not touch classes (which
+  // already convert before functions in both call paths, so they are
+  // already safely registered by the time this method's caller runs).
+  // A collision AMONG interfaces/type-aliases/enums themselves is invalid
+  // TypeScript (a duplicate top-level declaration) and cannot occur from
+  // real source; this loop does not attempt to disambiguate that case —
+  // if it were ever reached, the later `convertInterfaceToDTO`-family
+  // call's own pre-existing `Duplicate entity name` guard reports it,
+  // unchanged by this reservation.
+  private reserveNamedTypeEntityNames(module: ParsedModule): void {
+    for (const iface of module.interfaces) {
+      if (this.isInterfaceExported(iface, module)) {
+        this.reservedNamedTypeNames.add(createEntityName(iface.name));
+      }
+    }
+    for (const typeAlias of module.types) {
+      if (this.isTypeAliasExported(typeAlias, module)) {
+        this.reservedNamedTypeNames.add(createEntityName(typeAlias.name));
+      }
+    }
+    for (const enumDef of module.enums ?? []) {
+      if (this.isEnumExported(enumDef, module)) {
+        this.reservedNamedTypeNames.add(createEntityName(enumDef.name));
+      }
     }
   }
 
@@ -2076,11 +2151,21 @@ export class TypeScriptToTypedMindConverter {
   // `reserveFunctionEntityNames`'s own `<baseName>__<disambiguator>` shape
   // (X-CONV-4) rather than inventing a second collision convention.
   private reserveSynthesizedDTOName(baseName: string): string {
-    if (!this.entityNames.has(baseName)) {
+    // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) —
+    // `reservedNamedTypeNames` holds this module's own
+    // interface/type-alias/enum names, reserved ahead of function
+    // conversion but not yet real entities (see that set's own doc
+    // comment). A synthesized name must avoid BOTH `entityNames` (real
+    // entities already converted) and this reservation set (entities that
+    // WILL exist once this module's own interface/type-alias/enum loop
+    // runs) — checking only `entityNames` is exactly the gap that let a
+    // synthesized DTO evict a same-module hand-authored interface.
+    const isTaken = (name: string): boolean => this.entityNames.has(name) || this.reservedNamedTypeNames.has(name);
+    if (!isTaken(baseName)) {
       return baseName;
     }
     let attempt = 2;
-    while (this.entityNames.has(`${baseName}__${attempt}`)) {
+    while (isTaken(`${baseName}__${attempt}`)) {
       attempt += 1;
     }
     return `${baseName}__${attempt}`;
@@ -2096,17 +2181,72 @@ export class TypeScriptToTypedMindConverter {
   // exercised against a nested shape before this item (zero nested-object
   // test coverage existed), so this is a new, correct splitter for the new
   // call site rather than a behavior change to the existing one.
+  //
+  // Adversarial review (PR #84) found two real defects in an earlier
+  // version of this scanner, both fixed here:
+  //   (1) treating bare `<`/`>` as a matched bracket pair breaks on an
+  //       arrow-function-typed field (`onDone: (result: string) => void`)
+  //       — the `=>` arrow's `>` has no matching `<`, driving `angleDepth`
+  //       permanently negative and suppressing every later `;`/`,` split
+  //       for the rest of the string (repro: `label` silently merges into
+  //       `onDone`'s type text). Fixed by tracking angle-bracket depth
+  //       SEPARATELY from brace/paren/bracket depth and clamping it at
+  //       zero (never negative) — an unmatched `>` from `=>`/`>=`/`<=` is
+  //       simply ignored rather than corrupting the running depth count.
+  //   (2) a quoted string-literal type (a literal-union member,
+  //       `kind: 'a,b' | 'c;d'`) contains `,`/`;` characters that are NOT
+  //       field delimiters — fixed by skipping over `'...'`/`"...'`
+  //       string-literal spans entirely (delimiter chars inside a string
+  //       never reach the split/depth logic).
   private splitObjectLiteralProperties(content: string): string[] {
     const properties: string[] = [];
-    let depth = 0;
+    let braceDepth = 0;
+    let angleDepth = 0;
     let current = '';
-    for (const char of content) {
-      if (char === '{' || char === '<' || char === '(' || char === '[') {
-        depth += 1;
-      } else if (char === '}' || char === '>' || char === ')' || char === ']') {
-        depth -= 1;
+    let quoteChar: string | undefined;
+
+    for (let i = 0; i < content.length; i += 1) {
+      const char = content[i];
+
+      if (quoteChar !== undefined) {
+        current += char;
+        if (char === '\\') {
+          // Consume the escaped character verbatim so an escaped quote
+          // (`\'` or `\"`) does not end the string span early.
+          i += 1;
+          if (i < content.length) {
+            current += content[i];
+          }
+          continue;
+        }
+        if (char === quoteChar) {
+          quoteChar = undefined;
+        }
+        continue;
       }
-      if ((char === ';' || char === ',' || char === '\n') && depth === 0) {
+
+      if (char === "'" || char === '"') {
+        quoteChar = char;
+        current += char;
+        continue;
+      }
+
+      if (char === '{' || char === '(' || char === '[') {
+        braceDepth += 1;
+      } else if (char === '}' || char === ')' || char === ']') {
+        braceDepth -= 1;
+      } else if (char === '<') {
+        angleDepth += 1;
+      } else if (char === '>') {
+        // Clamp at zero: an unmatched `>` (from `=>`, `>=`, or a stray
+        // comparison-shaped token in a type position) must never drive
+        // angleDepth negative — a negative depth would never return to
+        // zero and would suppress every subsequent split for the rest of
+        // the string, per this function's own doc comment above.
+        angleDepth = Math.max(0, angleDepth - 1);
+      }
+
+      if ((char === ';' || char === ',' || char === '\n') && braceDepth === 0 && angleDepth === 0) {
         if (current.trim()) {
           properties.push(current.trim());
         }

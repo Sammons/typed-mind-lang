@@ -85,3 +85,37 @@ export function craftInvoice(payload: { orderId: string; note: string }): void {
 export function CraftInvoiceInput(id: string): void {
   console.log(id);
 }
+
+// Collision (adversarial-review blocker #1, PR #84): `archiveOrder`'s
+// synthesized input DTO name would be `ArchiveOrderInput`. A HAND-AUTHORED
+// interface of that EXACT name is declared in the SAME module, AFTER
+// `archiveOrder` in source order — `convertToSeparateEntities` always
+// converts functions before interfaces (its own fixed loop order,
+// unrelated to source declaration order), so without
+// `reserveNamedTypeEntityNames`'s pre-pass, `archiveOrder`'s synthesis
+// would see an empty slot, claim `ArchiveOrderInput`, and the
+// hand-authored interface would then hit the pre-existing "Duplicate
+// entity name" hard error and be SILENTLY DROPPED from the entity list —
+// exactly backwards: an author-provided name must win over a
+// converter-invented one. The hand-authored interface must keep the clean
+// bare name; `archiveOrder`'s synthesized DTO must disambiguate to
+// `ArchiveOrderInput__2`.
+export function archiveOrder(request: { orderId: string; note: string }): void {
+  console.log(request.orderId, request.note);
+}
+
+export interface ArchiveOrderInput {
+  reason: string;
+}
+
+// Arrow-typed field (adversarial-review blocker #2, PR #84):
+// `splitObjectLiteralProperties` must not corrupt its running depth count
+// on an arrow function type's `=>` — an EARLIER version of this splitter
+// treated bare `<`/`>` as a matched bracket pair, and `=>`'s unmatched `>`
+// drove that shared depth counter permanently negative, silently merging
+// every subsequent field into the arrow-typed field's own type text
+// (`label` would vanish into `onDone`'s type here). Both fields below
+// must appear as independent DtoFieldNodes.
+export function subscribe(options: { onDone: (result: string) => void; label: string }): void {
+  options.onDone(options.label);
+}
