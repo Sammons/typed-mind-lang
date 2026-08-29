@@ -1777,9 +1777,35 @@ export class TypeScriptToTypedMindConverter {
       }
     }
 
+    // RFC-TM-10 §5 amendment (rfc-tm-10-diamond.md, D-LEG-5, issue #66) — a
+    // THIRD false-positive face of the original `charAt(0).toUpperCase()`
+    // heuristic, found by D-LEG-5's own fixture after D-LEG-1 landed: an
+    // inline object-literal type (`{ current?: string }`, no enclosing
+    // Class/Interface name to resolve) starts with `{`, which is not a
+    // letter — `'{'.toUpperCase() === '{'` is trivially true, the same
+    // vacuous-pass shape D-LEG-1 already fixed for `"`. Routing this text
+    // through `input`/`output` is worse than the disclosed-loss cases above:
+    // the grammar's `input_name`/`output_name` productions
+    // (`grammar.js:811-812` et al.) accept only a bare `entity_name` token
+    // ([A-Za-z_]\w*), so an inline object-literal type in that position is
+    // UNPARSABLE, not merely duplicated (confirmed:
+    // `tests/ladder/q2-destructured-params.test.ts` reproduces
+    // `syntax/error: unparsable text` on this exact shape). Leaving
+    // input/output undefined is the same accepted trade D-LEG-1 already made
+    // for Class-kind and literal-union types — the type stays visible in the
+    // signature TEXT (`entity.signature` always emits verbatim), only the
+    // machine-checked edge is gone. The richer fix (synthesize a named
+    // inline-DTO stub for an object-literal parameter/return type, mirroring
+    // D-LEG-2's external-stub mechanism) is out of this item's scope — see
+    // issue #72.
+    if (cleaned.startsWith('{')) {
+      return false;
+    }
+
     // DTO-like by elimination: not a primitive, not a known Class, not a
-    // literal/literal-union — matches the heuristic's original fallback,
-    // gated by classification instead of a surface-character guess.
+    // literal/literal-union, not an inline object-literal — matches the
+    // heuristic's original fallback, gated by classification instead of a
+    // surface-character guess.
     return cleaned.charAt(0).toUpperCase() === cleaned.charAt(0);
   }
 

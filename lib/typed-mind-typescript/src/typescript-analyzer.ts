@@ -1256,13 +1256,53 @@ export class TypeScriptAnalyzer {
     } as const;
   }
 
+  // RFC-TM-10 §5 (rfc-tm-10-diamond.md, D-LEG-5, issue #66) — REPLACES the
+  // prior blind `(param.name as ts.Identifier).text` cast, which returns
+  // `undefined` at runtime for a destructured parameter (an
+  // ObjectBindingPattern/ArrayBindingPattern has no `.text`), and gets
+  // stringified into the literal parameter name "undefined" by
+  // buildFunctionSignature's template-string interpolation.
+  //
+  // Real destructuring branches now run BEFORE the identifier cast, so the
+  // cast is provably safe at its remaining call site:
+  //   - ObjectBindingPattern with 1-3 bound elements: join the elements' own
+  //     bound property names (`e.propertyName ?? e.name`) with `_`
+  //     (`{ current }` -> "current", `{ current, label }` ->
+  //     "current_label") — short and stable.
+  //   - ObjectBindingPattern with 4+ elements, or any ArrayBindingPattern
+  //     (which carries no stable property-name signal): a positional
+  //     synthetic name (`arg0`, `arg1`, ...) keyed by the parameter's own
+  //     index in `parameters`.
+  //   - Plain ts.Identifier: unchanged, the existing cast.
   private parseParameters(parameters: ts.NodeArray<ts.ParameterDeclaration>): ParsedParameter[] {
-    return parameters.map((param) => ({
-      name: (param.name as ts.Identifier).text,
+    return parameters.map((param, index) => ({
+      name: this.getParameterName(param, index),
       type: this.getTypeString(param.type),
       isOptional: !!param.questionToken,
       hasDefaultValue: !!param.initializer,
     }));
+  }
+
+  private getParameterName(param: ts.ParameterDeclaration, index: number): string {
+    if (ts.isObjectBindingPattern(param.name)) {
+      const elements = param.name.elements.filter((element) => !ts.isOmittedExpression(element));
+      const isSimple =
+        elements.length >= 1 &&
+        elements.length <= 3 &&
+        elements.every(
+          (element) => !element.dotDotDotToken && !ts.isObjectBindingPattern(element.name) && !ts.isArrayBindingPattern(element.name),
+        );
+      if (isSimple) {
+        return elements.map((element) => (element.propertyName ?? element.name).getText()).join('_');
+      }
+      return `arg${index}`;
+    }
+
+    if (ts.isArrayBindingPattern(param.name)) {
+      return `arg${index}`;
+    }
+
+    return (param.name as ts.Identifier).text;
   }
 
   private parseDecorators(node: ts.Node): string[] {
