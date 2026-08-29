@@ -23,7 +23,10 @@ describe('scenario-12-valid-complete', () => {
     assert.equal(result.diagnostics.length, 1); // was 0
 
     const diagnostic = result.diagnostics[0];
-    assert.equal(diagnostic?.message, 'unparsable text: `-> []`');
+    // RFC-TM-10 §12 (D-LEG-12, Q7): `syntax/error`'s message gained an initial
+    // capital and a trailing suggestion clause (folded into `message` — the
+    // pipeline-level `Diagnostic` type carries no `suggestion` field).
+    assert.equal(diagnostic?.message, 'Unparsable text: `-> []` — check this line against the grammar and fix or remove it');
     assert.equal(diagnostic?.span.start.line, 5);
     assert.equal(diagnostic?.severity, 'error');
   });

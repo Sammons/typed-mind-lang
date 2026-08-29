@@ -35,6 +35,7 @@ export const checkImports = (context: CheckContext): void => {
             severity: 'error',
             span: entity.span,
             message: `No entities match import pattern '${imported}'`,
+            suggestion: `Check the pattern's glob syntax or the target module's actual export names`,
           });
         }
       } else if (!context.byName.has(imported)) {

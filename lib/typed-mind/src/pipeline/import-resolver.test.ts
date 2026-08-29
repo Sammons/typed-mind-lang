@@ -142,9 +142,15 @@ describe('ImportResolver (§3.7 port)', () => {
         // The diagnostic sits on module-b.tmd's `@import "./module-a.tmd"`
         // statement (line 2), with a real token span (§3.2).
         spanStart: circular?.span.start,
+        // RFC-TM-10 §12 (D-LEG-12, Q7): the message gained a trailing
+        // suggestion clause (no `suggestion` field exists on the
+        // pipeline-level `Diagnostic` type, so clause 3 folds into `message`),
+        // so the anchor moved from end-of-string ($) to the clause boundary.
         chainShape:
           circular !== undefined &&
-          /^Circular import detected: .*module-a\.tmd -> .*module-b\.tmd -> .*module-a\.tmd$/.test(circular.message),
+          /^Circular import detected: .*module-a\.tmd -> .*module-b\.tmd -> .*module-a\.tmd — break the cycle by removing one of these imports$/.test(
+            circular.message,
+          ),
         names: [...result.resolvedEntities.keys()].sort(),
       },
       {

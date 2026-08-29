@@ -30,9 +30,15 @@ describe('scenario-17-multiple-programs', () => {
     assert.equal(result.diagnostics.length, 14);
     const illegalContinuationDiagnostics = result.diagnostics.filter((diagnostic) => diagnostic.code === 'semantics/illegal-continuation');
     assert.equal(illegalContinuationDiagnostics.length, 1);
+    // RFC-TM-10 §12 (D-LEG-12, Q7): `semantics/illegal-continuation`'s message
+    // was rewritten — the leading "illegal continuation:" log-tag phrasing
+    // read as internal terminology, not prose a `.tmd` author would parse as a
+    // sentence — and gained a trailing suggestion clause (folded into
+    // `message`, since the pipeline-level `Diagnostic` type carries no
+    // `suggestion` field).
     assert.equal(
       illegalContinuationDiagnostics.at(0)?.message,
-      'illegal continuation: exports list (`-> [...]`) cannot attach to a Asset entity',
+      'This exports list (`-> [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it',
     );
 
     // Check for entry point validation errors

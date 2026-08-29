@@ -93,9 +93,11 @@ a maintained denylist of internal-identifier-shaped tokens.
 The denylist has two parts:
 
 - An explicit list, seeded from this mission's own audit: `isDTOLikeType`,
-  `traverseQueue`, `sanitizeEntityName`, `collectReferencedNames`. A future
-  audit (RFC-TM-10's D-LEG-12) may append further names it finds to this same
-  list.
+  `traverseQueue`, `sanitizeEntityName`, `collectReferencedNames`. RFC-TM-10's
+  D-LEG-12 full registry audit (`diagnostic-code-audit.md`) ran against all 62
+  registered codes and found no further token that needed adding — see that
+  document's "Grading notes" for the one leak the lint itself caught and
+  self-corrected mid-audit. A future audit may still append names here.
 - A general heuristic: a multi-word camelCase or snake_case token of 2+ words
   that does not appear in an explicit allowlist of public-API names
   (`entity_name`, `TypeExprNode`'s `kind` values, and similar DSL-surface

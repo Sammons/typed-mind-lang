@@ -23,7 +23,12 @@ describe('scenario-16-complete-ui-example', () => {
     // now diagnosed as syntax/error instead of silently dropped — one new
     // diagnostic on top of the legacy 16.
     assert.equal(result.diagnostics.length, 17);
-    const emptyListErrors = result.diagnostics.filter((diagnostic) => diagnostic.message === 'unparsable text: `-> []`');
+    // RFC-TM-10 §12 (D-LEG-12, Q7): `syntax/error`'s message gained an initial
+    // capital and a trailing suggestion clause (no `suggestion` field exists on
+    // the pipeline-level `Diagnostic` type, so clause 3 folds into `message`).
+    const emptyListErrors = result.diagnostics.filter(
+      (diagnostic) => diagnostic.message === 'Unparsable text: `-> []` — check this line against the grammar and fix or remove it',
+    );
     assert.equal(emptyListErrors.length, 1);
 
     // Check for orphaned file entities

@@ -124,7 +124,7 @@ export const applySuppressions = (
         code: META_SUPPRESSION_CODE,
         severity: 'error',
         span: suppression.span,
-        message: `Suppression of '${suppression.code}' is rejected: suppression-machinery codes are not suppressible`,
+        message: `Suppression of '${suppression.code}' is rejected: suppression-machinery codes are not suppressible — remove this suppression entry`,
       });
       continue;
     }
@@ -134,7 +134,7 @@ export const applySuppressions = (
         code: STALE_SUPPRESSION_CODE,
         severity: 'error',
         span: suppression.span,
-        message: `Stale suppression: '${suppression.code}' on '${suppression.target}' matches no finding this run`,
+        message: `Stale suppression: '${suppression.code}' on '${suppression.target}' matches no finding this run — remove this suppression entry`,
       });
       continue;
     }

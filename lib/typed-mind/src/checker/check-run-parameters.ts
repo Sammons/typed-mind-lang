@@ -28,6 +28,7 @@ export const checkRunParameterConsumedBy = (context: CheckContext): void => {
           severity: 'error',
           span: entity.span,
           message: `RunParameter '${entity.name}' claims to be consumed by unknown function '${funcName}'`,
+          suggestion: `Define '${funcName}' as a Function entity that consumes '${entity.name}'`,
         });
       } else if (!(funcEntity instanceof FunctionNode)) {
         context.addFinding({
@@ -35,6 +36,7 @@ export const checkRunParameterConsumedBy = (context: CheckContext): void => {
           severity: 'error',
           span: entity.span,
           message: `RunParameter '${entity.name}' claims to be consumed by '${funcName}' which is not a Function`,
+          suggestion: `Change '${funcName}' to a Function entity that consumes '${entity.name}'`,
         });
       } else if (!(funcEntity.consumes ?? []).includes(entity.name)) {
         context.addFinding({

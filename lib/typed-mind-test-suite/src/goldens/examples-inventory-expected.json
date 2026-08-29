@@ -171,7 +171,7 @@
         "column": 18,
         "endLine": 167,
         "endColumn": 26,
-        "message": "unparsable text: `{ theme:`"
+        "message": "Unparsable text: `{ theme:` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -180,7 +180,7 @@
         "column": 43,
         "endLine": 167,
         "endColumn": 63,
-        "message": "unparsable text: `, language: string }`"
+        "message": "Unparsable text: `, language: string }` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -401,7 +401,7 @@
         "column": 89,
         "endLine": 47,
         "endColumn": 89,
-        "message": "unparsable text: `,`"
+        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/function-not-exported",
@@ -446,7 +446,7 @@
         "column": 69,
         "endLine": 71,
         "endColumn": 63,
-        "message": "unparsable text: `,`"
+        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -464,7 +464,7 @@
         "column": 86,
         "endLine": 87,
         "endColumn": 29,
-        "message": "unparsable text: `,`"
+        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -482,7 +482,7 @@
         "column": 3,
         "endLine": 99,
         "endColumn": 15,
-        "message": "illegal continuation: exports list (`-> [...]`) cannot attach to a Function entity"
+        "message": "This exports list (`-> [...]`) cannot attach to a Function entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -491,7 +491,7 @@
         "column": 79,
         "endLine": 103,
         "endColumn": 39,
-        "message": "unparsable text: `,`"
+        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -527,7 +527,7 @@
         "column": 81,
         "endLine": 118,
         "endColumn": 39,
-        "message": "unparsable text: `,`"
+        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -572,7 +572,7 @@
         "column": 78,
         "endLine": 135,
         "endColumn": 62,
-        "message": "unparsable text: `,`"
+        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -590,7 +590,7 @@
         "column": 81,
         "endLine": 149,
         "endColumn": 74,
-        "message": "unparsable text: `,`"
+        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1054,7 +1054,7 @@
         "column": 3,
         "endLine": 27,
         "endColumn": 23,
-        "message": "unparsable text: `>> [TypedMindParser]`"
+        "message": "Unparsable text: `>> [TypedMindParser]` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -1063,7 +1063,7 @@
         "column": 3,
         "endLine": 30,
         "endColumn": 18,
-        "message": "unparsable text: `>> [CLIProgram]`"
+        "message": "Unparsable text: `>> [CLIProgram]` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1072,7 +1072,7 @@
         "column": 3,
         "endLine": 31,
         "endColumn": 73,
-        "message": "illegal continuation: imports list (`<- [...]`) cannot attach to a Asset entity"
+        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -1081,7 +1081,7 @@
         "column": 3,
         "endLine": 34,
         "endColumn": 18,
-        "message": "unparsable text: `>> [LSPProgram]`"
+        "message": "Unparsable text: `>> [LSPProgram]` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1090,7 +1090,7 @@
         "column": 3,
         "endLine": 35,
         "endColumn": 54,
-        "message": "illegal continuation: imports list (`<- [...]`) cannot attach to a Asset entity"
+        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -1099,7 +1099,7 @@
         "column": 3,
         "endLine": 38,
         "endColumn": 23,
-        "message": "unparsable text: `>> [RendererProgram]`"
+        "message": "Unparsable text: `>> [RendererProgram]` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1108,7 +1108,7 @@
         "column": 3,
         "endLine": 39,
         "endColumn": 54,
-        "message": "illegal continuation: imports list (`<- [...]`) cannot attach to a Asset entity"
+        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -1117,7 +1117,7 @@
         "column": 3,
         "endLine": 42,
         "endColumn": 21,
-        "message": "unparsable text: `>> [VSCodeProgram]`"
+        "message": "Unparsable text: `>> [VSCodeProgram]` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1126,7 +1126,7 @@
         "column": 3,
         "endLine": 43,
         "endColumn": 53,
-        "message": "illegal continuation: imports list (`<- [...]`) cannot attach to a Asset entity"
+        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -1135,7 +1135,7 @@
         "column": 3,
         "endLine": 46,
         "endColumn": 22,
-        "message": "unparsable text: `>> [WebsiteProgram]`"
+        "message": "Unparsable text: `>> [WebsiteProgram]` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -1144,7 +1144,7 @@
         "column": 3,
         "endLine": 49,
         "endColumn": 19,
-        "message": "unparsable text: `>> [TestProgram]`"
+        "message": "Unparsable text: `>> [TestProgram]` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1153,7 +1153,7 @@
         "column": 3,
         "endLine": 50,
         "endColumn": 54,
-        "message": "illegal continuation: imports list (`<- [...]`) cannot attach to a Asset entity"
+        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1369,7 +1369,7 @@
         "column": 3,
         "endLine": 332,
         "endColumn": 19,
-        "message": "illegal continuation: exports list (`-> [...]`) cannot attach to a Function entity"
+        "message": "This exports list (`-> [...]`) cannot attach to a Function entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1387,7 +1387,7 @@
         "column": 3,
         "endLine": 337,
         "endColumn": 19,
-        "message": "illegal continuation: exports list (`-> [...]`) cannot attach to a Function entity"
+        "message": "This exports list (`-> [...]`) cannot attach to a Function entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1405,7 +1405,7 @@
         "column": 3,
         "endLine": 347,
         "endColumn": 38,
-        "message": "illegal continuation: exports list (`-> [...]`) cannot attach to a Function entity"
+        "message": "This exports list (`-> [...]`) cannot attach to a Function entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1477,7 +1477,7 @@
         "column": 3,
         "endLine": 383,
         "endColumn": 20,
-        "message": "illegal continuation: exports list (`-> [...]`) cannot attach to a Function entity"
+        "message": "This exports list (`-> [...]`) cannot attach to a Function entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/extra-input-dto",
@@ -1545,7 +1545,7 @@
         "column": 3,
         "endLine": 20,
         "endColumn": 69,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1554,7 +1554,7 @@
         "column": 3,
         "endLine": 27,
         "endColumn": 64,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1563,7 +1563,7 @@
         "column": 3,
         "endLine": 34,
         "endColumn": 77,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1572,7 +1572,7 @@
         "column": 3,
         "endLine": 41,
         "endColumn": 57,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1581,7 +1581,7 @@
         "column": 3,
         "endLine": 48,
         "endColumn": 53,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -1590,7 +1590,7 @@
         "column": 4,
         "endLine": 49,
         "endColumn": 5,
-        "message": "unparsable text: `=`"
+        "message": "Unparsable text: `=` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1599,7 +1599,7 @@
         "column": 3,
         "endLine": 54,
         "endColumn": 59,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1608,7 +1608,7 @@
         "column": 3,
         "endLine": 60,
         "endColumn": 61,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1626,7 +1626,7 @@
         "column": 3,
         "endLine": 66,
         "endColumn": 65,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1644,7 +1644,7 @@
         "column": 3,
         "endLine": 70,
         "endColumn": 49,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1662,7 +1662,7 @@
         "column": 3,
         "endLine": 74,
         "endColumn": 35,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1680,7 +1680,7 @@
         "column": 3,
         "endLine": 78,
         "endColumn": 31,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1689,7 +1689,7 @@
         "column": 3,
         "endLine": 83,
         "endColumn": 34,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1698,7 +1698,7 @@
         "column": 3,
         "endLine": 89,
         "endColumn": 64,
-        "message": "illegal continuation: description line (`\"...\"`) cannot attach to a ClassFile entity"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/reference-to-illegal",
@@ -2389,7 +2389,7 @@
         "column": 27,
         "endLine": 10,
         "endColumn": 28,
-        "message": "unparsable text: `*`"
+        "message": "Unparsable text: `*` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/undefined-export",
@@ -2641,7 +2641,7 @@
         "column": 15,
         "endLine": 73,
         "endColumn": 28,
-        "message": "unparsable text: `, ./schemas/*`"
+        "message": "Unparsable text: `, ./schemas/*` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/multi-exported",
@@ -3378,7 +3378,7 @@
         "column": 14,
         "endLine": 19,
         "endColumn": 32,
-        "message": "unparsable text: `<void> | undefined`"
+        "message": "Unparsable text: `<void> | undefined` — check this line against the grammar and fix or remove it"
       }
     ]
   },
@@ -3856,7 +3856,7 @@
         "column": 1,
         "endLine": 154,
         "endColumn": 29,
-        "message": "unparsable text: `名前Service @ src/japanese.ts:`"
+        "message": "Unparsable text: `名前Service @ src/japanese.ts:` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -3865,7 +3865,7 @@
         "column": 3,
         "endLine": 155,
         "endColumn": 14,
-        "message": "unparsable text: `=> [作成, 更新]`"
+        "message": "Unparsable text: `=> [作成, 更新]` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/function-not-exported",
@@ -4081,7 +4081,7 @@
         "column": 1,
         "endLine": 181,
         "endColumn": 40,
-        "message": "unparsable text: `<- [imports]                  # Imports`"
+        "message": "Unparsable text: `<- [imports]                  # Imports` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4090,7 +4090,7 @@
         "column": 1,
         "endLine": 190,
         "endColumn": 46,
-        "message": "unparsable text: `-> [exports]                  # Exports`"
+        "message": "Unparsable text: `-> [exports]                  # Exports` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -4190,7 +4190,7 @@
         "column": 3,
         "endLine": 4,
         "endColumn": 8,
-        "message": "unparsable text: `-> []`"
+        "message": "Unparsable text: `-> []` — check this line against the grammar and fix or remove it"
       }
     ]
   },
@@ -4222,7 +4222,7 @@
         "column": 30,
         "endLine": 45,
         "endColumn": 30,
-        "message": "unparsable text: ``"
+        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4231,7 +4231,7 @@
         "column": 18,
         "endLine": 46,
         "endColumn": 18,
-        "message": "unparsable text: ``"
+        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4240,7 +4240,7 @@
         "column": 31,
         "endLine": 47,
         "endColumn": 31,
-        "message": "unparsable text: ``"
+        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4249,7 +4249,7 @@
         "column": 26,
         "endLine": 48,
         "endColumn": 26,
-        "message": "unparsable text: ``"
+        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4258,7 +4258,7 @@
         "column": 28,
         "endLine": 50,
         "endColumn": 28,
-        "message": "unparsable text: ``"
+        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4267,7 +4267,7 @@
         "column": 20,
         "endLine": 51,
         "endColumn": 20,
-        "message": "unparsable text: ``"
+        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4276,7 +4276,7 @@
         "column": 18,
         "endLine": 52,
         "endColumn": 18,
-        "message": "unparsable text: ``"
+        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4285,7 +4285,7 @@
         "column": 19,
         "endLine": 53,
         "endColumn": 19,
-        "message": "unparsable text: ``"
+        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4294,7 +4294,7 @@
         "column": 21,
         "endLine": 54,
         "endColumn": 21,
-        "message": "unparsable text: ``"
+        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4670,7 +4670,7 @@
         "column": 3,
         "endLine": 9,
         "endColumn": 19,
-        "message": "unparsable text: `:: port?: number`"
+        "message": "Unparsable text: `:: port?: number` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4679,7 +4679,7 @@
         "column": 3,
         "endLine": 10,
         "endColumn": 19,
-        "message": "unparsable text: `:: host?: string`"
+        "message": "Unparsable text: `:: host?: string` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4688,7 +4688,7 @@
         "column": 3,
         "endLine": 11,
         "endColumn": 27,
-        "message": "unparsable text: `:: openBrowser?: boolean`"
+        "message": "Unparsable text: `:: openBrowser?: boolean` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4706,7 +4706,7 @@
         "column": 3,
         "endLine": 16,
         "endColumn": 110,
-        "message": "unparsable text: `-- [programGraph: ProgramGraph | null, validationResult: Val…`"
+        "message": "Unparsable text: `-- [programGraph: ProgramGraph | null, validationResult: Val…` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4778,7 +4778,7 @@
         "column": 14,
         "endLine": 104,
         "endColumn": 19,
-        "message": "unparsable text: `@ \"/\"`"
+        "message": "Unparsable text: `@ \"/\"` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4796,7 +4796,7 @@
         "column": 20,
         "endLine": 106,
         "endColumn": 36,
-        "message": "unparsable text: `@ \"/renderer.js\"`"
+        "message": "Unparsable text: `@ \"/renderer.js\"` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4814,7 +4814,7 @@
         "column": 18,
         "endLine": 108,
         "endColumn": 32,
-        "message": "unparsable text: `@ \"/api/graph\"`"
+        "message": "Unparsable text: `@ \"/api/graph\"` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4869,7 +4869,7 @@
         "column": 51,
         "endLine": 8,
         "endColumn": 53,
-        "message": "unparsable text: `:*`"
+        "message": "Unparsable text: `:*` — check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",

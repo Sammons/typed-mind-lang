@@ -29,7 +29,12 @@ describe('scenario-03-circular-dependency', () => {
     assert.equal(diagnostic.span.start.column, 1);
     assert.equal(diagnostic.severity, 'error');
 
-    // Check that the diagnostic message describes the circular dependency
+    // Check that the diagnostic message describes the circular dependency.
+    // This exercises `checker/circular-import` (check-cycles.ts), which
+    // already carries a `suggestion` field and graded PASS in RFC-TM-10 §12
+    // (D-LEG-12, Q7) — not `imports/circular` (import-resolver.ts, a
+    // DIFFERENT code with a near-identical message prefix), which Q7 DID
+    // change. Message text here is unmodified by Q7.
     assert.equal(diagnostic.message, 'Circular import detected: ServiceA -> ServiceB -> ServiceC -> ServiceA');
   });
 });

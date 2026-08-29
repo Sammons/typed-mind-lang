@@ -54,7 +54,8 @@ export const checkSingleReference = (context: CheckContext, from: EntityNode, re
       code: 'checker/reference-unknown-type',
       severity: 'error',
       span: from.span,
-      message: `Unknown reference type '${referenceKind}'`,
+      message: `Unknown reference type '${referenceKind}' on '${from.name}'`,
+      suggestion: `File a bug report — this reference kind should never reach the checker`,
     });
     return;
   }
