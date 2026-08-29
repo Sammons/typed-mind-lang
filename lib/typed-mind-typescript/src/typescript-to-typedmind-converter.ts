@@ -446,6 +446,34 @@ export class TypeScriptToTypedMindConverter {
       this.collectModuleEntities(module);
     }
 
+    // issue #72 (tm10-inc2), adversarial-review blocker fix (2nd round,
+    // PR #84 comment 19118) — the per-module reservation in `processModule`
+    // (`reserveNamedTypeEntityNames`) is not enough on its own: it only
+    // protects a hand-authored interface/type-alias/enum from a
+    // same-MODULE synthesized DTO. `regularFiles` (any module with a
+    // function, hence any module inline-DTO synthesis can fire from)
+    // ALWAYS process before `pureTypesFiles` below (X-CONV-3's own fixed
+    // ordering, unrelated to and unchanged by this fix) — so a
+    // hand-authored interface/type-alias/enum living in a DIFFERENT
+    // module that happens to be classified pure-types (a conventional
+    // `types.ts`) could still be silently evicted by a same-named
+    // synthesized DTO from a function in an EARLIER-processing regular
+    // module. Reserving every module's named-type entity names — across
+    // the WHOLE `modules` list, not just the current module — before ANY
+    // module's functions convert closes this for good, the same
+    // "reserve everything up front" shape `reserveFunctionEntityNames`
+    // already uses within one module, now applied at the run's full
+    // conservation boundary. `processModule`'s own per-module call to
+    // `reserveNamedTypeEntityNames` becomes redundant once this runs (the
+    // set is additive and idempotent — re-adding an already-reserved name
+    // is a no-op) but is left in place rather than removed: it costs
+    // nothing extra and keeps `processModule` correct in isolation for any
+    // future caller that invokes it without first running this whole-run
+    // pass.
+    for (const module of modules) {
+      this.reserveNamedTypeEntityNames(module);
+    }
+
     // PHASE 2: Processing with Complete Knowledge
 
     // Separate pure types files from regular files for proper ordering.
@@ -758,6 +786,16 @@ export class TypeScriptToTypedMindConverter {
       // `reserveSynthesizedDTOName` collision check sees the name already
       // taken and disambiguates via `__2`, exactly as it already does for
       // a same-module function-name collision.
+      //
+      // NOTE (2nd adversarial-review round, PR #84 comment 19118): a
+      // same-module reservation alone does not close the CROSS-module
+      // case (a hand-authored interface in a different, pure-types-
+      // classified file) — `convertModules` now also runs this same
+      // method over EVERY module up front, before either the
+      // `regularFiles` or `pureTypesFiles` loop starts (see that call
+      // site's own doc comment). This per-module call is additive/
+      // idempotent with that whole-run pass and is kept so
+      // `processModule` stays correct in isolation.
       this.reserveNamedTypeEntityNames(module);
     }
 

@@ -272,6 +272,41 @@ describe('issue #72 check — collision of two identical-shaped inline types in 
       "onDone must carry only its own arrow-function type text, not label's type merged in",
     );
   });
+
+  it('adversarial-review blocker #3 (PR #84, 2nd round): a hand-authored interface in a DIFFERENT (pure-types) module wins over a synthesized DTO', () => {
+    // `convertModules` always processes `regularFiles` (any module with a
+    // function) before `pureTypesFiles` (a conventional `types.ts`) — a
+    // same-module reservation alone does not protect a hand-authored
+    // interface living in a SEPARATE, later-processing module. The fix is
+    // a whole-run reservation pass over every module's named types before
+    // ANY module's functions convert (see `convertModules`'s own doc
+    // comment). `types.ts`'s `ProcessBatchInput` interface must keep its
+    // bare name; `processBatch`'s synthesized input DTO must disambiguate.
+    const result = convert();
+
+    const fn = findFunction(result.entities, 'processBatch');
+    assert.notEqual(fn, undefined, 'the processBatch function entity must exist');
+    assert.equal(
+      fn?.input,
+      'ProcessBatchInput__2',
+      "ProcessBatchInput is claimed by types.ts's hand-authored interface — the synthesized DTO must disambiguate",
+    );
+
+    const handAuthored = findDTO(result.entities, 'ProcessBatchInput');
+    assert.notEqual(handAuthored, undefined, "types.ts's hand-authored ProcessBatchInput interface-turned-DTO must exist, unrenamed");
+    assert.deepEqual(
+      handAuthored?.fields.map((f) => f.name),
+      ['reason'],
+      'the hand-authored entity keeps its own original fields, unmodified by the cross-module collision',
+    );
+
+    const synthesized = findDTO(result.entities, 'ProcessBatchInput__2');
+    assert.notEqual(synthesized, undefined, 'the disambiguated synthesized DTO must exist as its own entity');
+    assert.deepEqual(
+      synthesized?.fields.map((f) => f.name),
+      ['batchId', 'count'],
+    );
+  });
 });
 
 describe('issue #72 check — control case: named-interface parameter is unaffected', () => {

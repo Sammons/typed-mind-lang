@@ -119,3 +119,20 @@ export interface ArchiveOrderInput {
 export function subscribe(options: { onDone: (result: string) => void; label: string }): void {
   options.onDone(options.label);
 }
+
+// Collision (adversarial-review blocker #3, PR #84, 2nd review round):
+// `processBatch`'s synthesized input DTO name would be
+// `ProcessBatchInput`. A hand-authored `interface ProcessBatchInput` lives
+// in `./types.ts`, a SEPARATE module classified `isPureTypesFile` —
+// `convertModules` always processes `regularFiles` (this module, which has
+// functions) BEFORE `pureTypesFiles` (`types.ts`), so without a whole-run
+// reservation pass over every module's named types, `processBatch`'s
+// synthesis would claim `ProcessBatchInput` first and `types.ts`'s
+// hand-authored interface would then hit "Duplicate entity name" and be
+// silently dropped — the cross-module variant of the same bug the
+// same-module `archiveOrder`/`ArchiveOrderInput` fixture above exercises.
+export { type ProcessBatchInput } from './types.ts';
+
+export function processBatch(request: { batchId: string; count: number }): void {
+  console.log(request.batchId, request.count);
+}
