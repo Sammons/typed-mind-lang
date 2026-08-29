@@ -67,6 +67,17 @@ export class TypeScriptAnalyzer {
   // default: with no flag, recognizer scanning does not run at all, and
   // behavior is byte-identical to before this Quantum.
   private readonly recognizers: ReadonlySet<RecognizerName>;
+  // RFC-TM-10 Q3 (D-LEG-6) — absolute paths the recognizer itself resolved
+  // and pushed into `traverseQueue`. This is the STRICT tag the traversal
+  // loop's standalone-parse fallback keys off of: only a path that reached
+  // the queue THROUGH the recognizer gets the fallback. An ordinary
+  // unresolvable import path is never added here, so it still falls through
+  // to the existing `skipped-module` diagnostic unchanged — the fallback
+  // does not weaken I-11's degrade-never-discard guarantee for the general
+  // import-resolution path, it only extends reach for the one recognizer
+  // that already proved (via `resolveSstHandlerString`'s own standalone
+  // parse) that its target exists on disk outside `this.program`.
+  private readonly recognizerResolvedPaths = new Set<string>();
 
   constructor(projectPath: string, configPath?: string, recognizers: readonly RecognizerName[] = []) {
     this.projectPath = projectPath;
@@ -226,7 +237,27 @@ export class TypeScriptAnalyzer {
       visitedModules.add(currentPath);
 
       // Get the source file from the TypeScript program
-      const sourceFile = this.program.getSourceFile(currentPath);
+      let sourceFile = this.program.getSourceFile(currentPath);
+      let standaloneParsed = false;
+
+      // RFC-TM-10 Q3 (D-LEG-6) — a path the recognizer itself resolved
+      // (`recognizerResolvedPaths`) is known-good on disk (the recognizer's
+      // own `fs.existsSync` probe already confirmed it) but commonly lives
+      // OUTSIDE `this.program`'s file set by design (a sibling
+      // package/build target the root tsconfig excludes — the exact
+      // webhookstorage `packages/functions` shape). `this.program` cannot
+      // grow a new file post-construction, so this module is parsed
+      // standalone, mirroring `resolveSstHandlerString`'s own
+      // `parseFileForExportCheck` mechanism, and fed through the same
+      // `analyzeModule` path every program-backed module uses. This branch
+      // is STRICTLY gated on `recognizerResolvedPaths` membership — an
+      // ordinary unresolvable import path is never in that set, so it still
+      // falls through to the unchanged `skipped-module` diagnostic below.
+      if ((!sourceFile || sourceFile.isDeclarationFile) && this.recognizerResolvedPaths.has(currentPath)) {
+        sourceFile = this.parseFileForExportCheck(currentPath);
+        standaloneParsed = sourceFile !== undefined;
+      }
+
       if (!sourceFile || sourceFile.isDeclarationFile) {
         if (currentPath !== absoluteEntryPath) {
           this.diagnostics.push({
@@ -241,14 +272,37 @@ export class TypeScriptAnalyzer {
       }
 
       // Analyze this module
+      if (standaloneParsed) {
+        // Disclose the fidelity loss (lead-mandated guardrail, RFC-TM-10
+        // Q3): a standalone-parsed module has no binding into
+        // `this.checker`'s program, so `extractJSDocDescription`'s
+        // `getSymbolAtLocation` call cannot resolve a symbol for ANY node in
+        // this file — it always falls back to the checker-free
+        // `ts.getJSDocCommentsAndTags` path (X-AN-6). That fallback still
+        // finds a JSDoc comment when one is textually present, so this is
+        // an informational disclosure of a narrowed extraction path, not a
+        // functional failure.
+        this.diagnostics.push({
+          severity: 'warning',
+          category: 'recognizer-module-standalone-parsed',
+          message: `Module resolved by a recognizer is outside the TypeScript program's file set and was parsed standalone: ${currentPath}. Type-checker-backed JSDoc symbol resolution is unavailable for this module; JSDoc extraction falls back to a text-only scan.`,
+          filePath: currentPath,
+          specifier: undefined,
+        });
+      }
       const module = this.analyzeModule(sourceFile);
       modules.push(module);
 
       // X-AN-10 — opt-in recognizer scan. No-op (and no diagnostic
       // surface) when --recognize was not passed for this convention name,
       // matching the doc's "without the flag, behavior is unchanged."
+      // RFC-TM-10 Q3 (D-LEG-6, lead ruling: traversal-enqueue) — a
+      // successful resolution now also joins `traverseQueue`, under the
+      // SAME `visitedModules` guard every other enqueue site in this loop
+      // uses, so a handler string pointing at an already-traversed or
+      // already-queued module never double-enqueues.
       if (this.recognizers.has('sst-handler')) {
-        this.scanSstHandlerStrings(sourceFile, currentPath);
+        this.scanSstHandlerStrings(sourceFile, currentPath, traverseQueue, visitedModules);
       }
 
       // Add imported modules to the traversal queue
@@ -345,8 +399,13 @@ export class TypeScriptAnalyzer {
   // the string and the failed path; never silence. The resolved edge folds
   // into the SAME `moduleGraph` array the module-graph.json golden diffs,
   // per the doc's Q2 check line ("appears in that fixture's module-graph
-  // golden").
-  private scanSstHandlerStrings(sourceFile: ts.SourceFile, currentPath: string): void {
+  // golden"). RFC-TM-10 Q3 (D-LEG-6, lead ruling: traversal-enqueue) — a
+  // successful resolution is ALSO pushed into `traverseQueue`, under the
+  // same `visitedModules` guard the loop's other enqueue sites use, and
+  // recorded in `recognizerResolvedPaths` so the traversal loop knows this
+  // specific path is permitted to fall back to a standalone parse when
+  // `this.program` does not contain it.
+  private scanSstHandlerStrings(sourceFile: ts.SourceFile, currentPath: string, traverseQueue: string[], visitedModules: ReadonlySet<string>): void {
     const visit = (node: ts.Node): void => {
       if (
         ts.isPropertyAssignment(node) &&
@@ -354,21 +413,33 @@ export class TypeScriptAnalyzer {
         node.name.text === 'handler' &&
         ts.isStringLiteralLike(node.initializer)
       ) {
-        this.resolveSstHandlerString(node.initializer.text, currentPath);
+        const resolvedPath = this.resolveSstHandlerString(node.initializer.text, currentPath);
+        if (resolvedPath !== undefined) {
+          this.recognizerResolvedPaths.add(resolvedPath);
+          if (!visitedModules.has(resolvedPath)) {
+            traverseQueue.push(resolvedPath);
+          }
+        }
       }
       ts.forEachChild(node, visit);
     };
     ts.forEachChild(sourceFile, visit);
   }
 
-  private resolveSstHandlerString(rawValue: string, currentPath: string): void {
+  // Returns the resolved absolute path on success, `undefined` on either
+  // failure branch (no source file found; member not exported) or a
+  // non-match (no `.member` suffix). RFC-TM-10 Q3 widened this from `void`
+  // so `scanSstHandlerStrings` can enqueue the resolution for real
+  // traversal (D-LEG-6, lead ruling) instead of only recording it in
+  // `moduleGraph`.
+  private resolveSstHandlerString(rawValue: string, currentPath: string): string | undefined {
     const lastDot = rawValue.lastIndexOf('.');
     if (lastDot <= 0 || lastDot === rawValue.length - 1) {
       // No `.member` suffix to split on — not the recognized shape at all;
       // this is not a failure of the convention, just a non-match, so no
       // diagnostic (a bare `handler: "foo"` with no member segment is not
       // an SST handler string).
-      return;
+      return undefined;
     }
 
     const filePathSegment = rawValue.slice(0, lastDot);
@@ -399,7 +470,7 @@ export class TypeScriptAnalyzer {
         resolvedTarget: undefined,
         classification: 'unresolved',
       });
-      return;
+      return undefined;
     }
 
     // The resolved target is not necessarily part of this.program's file
@@ -425,7 +496,7 @@ export class TypeScriptAnalyzer {
         resolvedTarget: undefined,
         classification: 'unresolved',
       });
-      return;
+      return undefined;
     }
 
     this.moduleGraph.push({
@@ -434,6 +505,8 @@ export class TypeScriptAnalyzer {
       resolvedTarget: path.relative(this.projectPath, resolvedAbsolutePath),
       classification: 'internal',
     });
+
+    return resolvedAbsolutePath;
   }
 
   // Parses a resolved handler-string target standalone (not via
