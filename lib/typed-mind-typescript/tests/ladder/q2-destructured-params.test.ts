@@ -22,6 +22,11 @@
 //     Class-kind/literal-union types. The richer fix (a synthesized named
 //     inline-DTO stub, mirroring D-LEG-2's external-stub mechanism) is
 //     tracked as issue #72, out of this item's scope.
+//   - SUPERSEDED (tm10-inc2, issue #72 closed): the richer fix landed.
+//     `extractInputDTO`/`extractOutputDTO` now synthesize a real DTO for an
+//     inline object-literal type instead of leaving `input`/`output`
+//     `undefined` — this file's second describe block below asserts the new
+//     behavior directly rather than the disclosed-loss trade.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -97,22 +102,45 @@ describe('RFC-TM-10 Q2 check — D-LEG-5: destructured-parameter synthesized nam
   });
 });
 
-describe('RFC-TM-10 Q2 check — D-LEG-5 amendment (issue #72): inline object-literal input/output stays undefined, never unparsable', () => {
+describe('RFC-TM-10 Q2 check — D-LEG-5 amendment (issue #72, SUPERSEDED by tm10-inc2): inline object-literal input/output now synthesizes a real DTO', () => {
   // The Diamond's §5 claim that the duplication half is "resolved as a
   // CONSEQUENCE of D-LEG-1" was only partially true — see this file's header
-  // comment and the fixture's own D-LEG-5-amendment comment. isDTOLikeType
-  // gained a 4th classification branch (this PR, alongside the naming fix)
-  // excluding any type text starting with `{`, the same disclosed-loss trade
-  // D-LEG-1 already made for Class-kind and literal-union types.
-
-  it('previously-unparsable shape now parses: web-main-shaped PublicHeader leaves input undefined, signature text intact', () => {
+  // comment and the fixture's own D-LEG-5-amendment comment. D-LEG-5's own PR
+  // (Q2) added `isDTOLikeType`'s 4th classification branch excluding any type
+  // text starting with `{`, accepting the disclosed loss of the graph edge
+  // (same trade D-LEG-1 made for Class-kind and literal-union types).
+  //
+  // tm10-inc2 (issue #72's own fix, landed after this file's original
+  // authoring) REPLACES that disclosed-loss trade with synthesis:
+  // `extractInputDTO`/`extractOutputDTO` now detect an inline object-literal
+  // type BEFORE `isDTOLikeType` runs and route it through
+  // `synthesizeInlineDTO`, so `input`/`output` resolve to a real synthesized
+  // DTO entity instead of staying `undefined`. The assertion below is
+  // UPDATED (not merely re-verified) to assert the new, richer behavior —
+  // the `isDTOLikeType` `{`-prefix branch this describe block's title used to
+  // exercise is now unreachable from these two call sites in practice (see
+  // that branch's own updated comment in the converter).
+  it('previously-unparsable shape now parses AND synthesizes a real DTO: web-main-shaped PublicHeader resolves input to PublicHeaderInput', () => {
     const result = convert();
     const fn = result.entities.find((e) => e.kind === 'Function' && e.name === 'PublicHeader') as
       | { input: string | undefined; signature: string }
       | undefined;
     assert.notEqual(fn, undefined);
-    assert.equal(fn?.input, undefined, 'an inline object-literal type is not a known Class/Interface — input stays undefined');
+    assert.equal(
+      fn?.input,
+      'PublicHeaderInput',
+      'issue #72 (tm10-inc2) — an inline object-literal type now synthesizes a real DTO, no longer left undefined',
+    );
     assert.ok(fn?.signature.includes('{ current?: string }'), 'the inline object type stays visible in the signature TEXT');
+
+    const dto = result.entities.find((e) => e.kind === 'DTO' && e.name === 'PublicHeaderInput') as
+      | { fields: readonly { name: string }[] }
+      | undefined;
+    assert.notEqual(dto, undefined, 'the synthesized PublicHeaderInput DTO must exist as a real entity');
+    assert.deepEqual(
+      dto?.fields.map((f) => f.name),
+      ['current'],
+    );
   });
 
   it('previously-unparsable shape now parses: App.tsx-shaped NavLink and Toolbar emit zero syntax diagnostics', async () => {

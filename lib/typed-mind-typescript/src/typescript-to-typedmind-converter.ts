@@ -88,6 +88,18 @@ const collapseDescription = (raw: string): string => {
 // emission, not re-derived heuristically.
 const isBareEntityName = (type: string): boolean => /^[A-Za-z_]\w*$/.test(type);
 
+// issue #72 (rfc-tm-10-diamond.md §5's tracked follow-up) — an inline
+// object-literal type (`{ current?: string }`) has no enclosing
+// Class/Interface name to resolve against, so D-LEG-1's `isDTOLikeType`
+// excludes it from `input`/`output` (a disclosed loss: the type stays
+// visible in `entity.signature` text, but the machine-checked graph edge is
+// gone). This predicate identifies that exact shape BEFORE `isDTOLikeType`
+// runs, so `extractInputDTO`/`extractOutputDTO` can route it through
+// `synthesizeInlineDTO` (below) instead of the exclusion — the same
+// "detect the special shape ahead of the general classifier" pattern
+// `isDTOLikeType`'s own `"`-prefix / `{`-prefix branches already use.
+const isInlineObjectLiteralType = (type: string): boolean => type.trim().startsWith('{') && type.trim().endsWith('}');
+
 // Two-pass architecture data structures
 interface ExportRegistry {
   [moduleSpecifier: string]: {
@@ -123,6 +135,19 @@ export class TypeScriptToTypedMindConverter {
   private readonly warnings: ConversionWarning[] = [];
   private readonly entities: EntityNode[] = [];
   private readonly entityNames = new Set<string>();
+  // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) — names
+  // reserved by `reserveNamedTypeEntityNames` for a module's own
+  // interface/type-alias/enum declarations, held SEPARATELY from
+  // `entityNames`. These names are NOT yet real entities (unlike
+  // `entityNames`, which means "an entity with this name already exists in
+  // `this.entities`"), so the later `convertInterfaceToDTO`/
+  // `convertTypeAliasToDTO`/`convertEnumToTypeDef` call that actually
+  // claims the name must not treat its OWN reservation as a collision.
+  // `reserveSynthesizedDTOName` still consults this set (in addition to
+  // `entityNames`) so a synthesized DTO correctly avoids a name a
+  // same-module interface/type-alias/enum has reserved but not yet
+  // converted into a real entity.
+  private readonly reservedNamedTypeNames = new Set<string>();
   // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) — a
   // top-level function that collided on its bare name and was renamed to
   // `<baseName>__<name>` by `convertFunction`. `convertExports` consults
@@ -366,6 +391,7 @@ export class TypeScriptToTypedMindConverter {
     this.warnings.length = 0;
     this.entities.length = 0;
     this.entityNames.clear();
+    this.reservedNamedTypeNames.clear();
     this.functionNameRemap.clear();
     this.dependencies.clear();
     this.externalTypeToPackage.clear();
@@ -418,6 +444,34 @@ export class TypeScriptToTypedMindConverter {
     // 1.3: Collect all entities information without processing imports
     for (const module of modules) {
       this.collectModuleEntities(module);
+    }
+
+    // issue #72 (tm10-inc2), adversarial-review blocker fix (2nd round,
+    // PR #84 comment 19118) — the per-module reservation in `processModule`
+    // (`reserveNamedTypeEntityNames`) is not enough on its own: it only
+    // protects a hand-authored interface/type-alias/enum from a
+    // same-MODULE synthesized DTO. `regularFiles` (any module with a
+    // function, hence any module inline-DTO synthesis can fire from)
+    // ALWAYS process before `pureTypesFiles` below (X-CONV-3's own fixed
+    // ordering, unrelated to and unchanged by this fix) — so a
+    // hand-authored interface/type-alias/enum living in a DIFFERENT
+    // module that happens to be classified pure-types (a conventional
+    // `types.ts`) could still be silently evicted by a same-named
+    // synthesized DTO from a function in an EARLIER-processing regular
+    // module. Reserving every module's named-type entity names — across
+    // the WHOLE `modules` list, not just the current module — before ANY
+    // module's functions convert closes this for good, the same
+    // "reserve everything up front" shape `reserveFunctionEntityNames`
+    // already uses within one module, now applied at the run's full
+    // conservation boundary. `processModule`'s own per-module call to
+    // `reserveNamedTypeEntityNames` becomes redundant once this runs (the
+    // set is additive and idempotent — re-adding an already-reserved name
+    // is a no-op) but is left in place rather than removed: it costs
+    // nothing extra and keeps `processModule` correct in isolation for any
+    // future caller that invokes it without first running this whole-run
+    // pass.
+    for (const module of modules) {
+      this.reserveNamedTypeEntityNames(module);
     }
 
     // PHASE 2: Processing with Complete Knowledge
@@ -713,6 +767,36 @@ export class TypeScriptToTypedMindConverter {
     // (`isPureTypesFile`), so this is a no-op for that branch.
     if (!isPureTypesFile) {
       this.reserveFunctionEntityNames(module, entityName);
+      // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) — a
+      // synthesized inline-DTO name (`${functionEntityName}Input`/`Output`)
+      // must never win a name-collision race against a HAND-AUTHORED
+      // interface/type-alias/enum declared in the SAME module, just
+      // because `convertToSeparateEntities`/`convertToClassFile` happen to
+      // convert functions before interfaces/type-aliases/enums (both
+      // paths' own fixed loop order, unchanged by this reservation).
+      // Without this reservation, `synthesizeInlineDTO` sees an empty slot
+      // in `entityNames` for a name like `CreateOrderInput`, claims it, and
+      // the LATER-converting `interface CreateOrderInput` then hits the
+      // pre-existing `Duplicate entity name` hard error and is silently
+      // dropped from the entity list — the wrong direction: an
+      // author-provided name must not be evicted by a converter-invented
+      // one. Reserving every exported interface/type-alias/enum's bare
+      // name up front (mirroring `reserveFunctionEntityNames`'s own
+      // pre-pass shape) closes this: `synthesizeInlineDTO`'s later
+      // `reserveSynthesizedDTOName` collision check sees the name already
+      // taken and disambiguates via `__2`, exactly as it already does for
+      // a same-module function-name collision.
+      //
+      // NOTE (2nd adversarial-review round, PR #84 comment 19118): a
+      // same-module reservation alone does not close the CROSS-module
+      // case (a hand-authored interface in a different, pure-types-
+      // classified file) — `convertModules` now also runs this same
+      // method over EVERY module up front, before either the
+      // `regularFiles` or `pureTypesFiles` loop starts (see that call
+      // site's own doc comment). This per-module call is additive/
+      // idempotent with that whole-run pass and is kept so
+      // `processModule` stays correct in isolation.
+      this.reserveNamedTypeEntityNames(module);
     }
 
     if (isPureTypesFile) {
@@ -1300,6 +1384,47 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
+  // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) — see
+  // this method's call site in `processModule` for the full rationale.
+  // Reserves this module's exported interface/type-alias/enum bare names
+  // in `entityNames` BEFORE any function in the module converts (and
+  // therefore before any inline-DTO synthesis can run), so a
+  // hand-authored name always wins a collision against a
+  // converter-synthesized one, regardless of the fixed pass order
+  // (`convertToSeparateEntities`/`convertToClassFile` always convert
+  // functions before interfaces/type-aliases/enums). This is a
+  // reservation only — it does not create entities, does not run
+  // `sanitizeEntityName` (interfaces/type-aliases/enums all resolve their
+  // final name via the identity `createEntityName`, per
+  // `convertInterfaceToDTO`/`convertTypeAliasToDTO`/`convertEnumToTypeDef`,
+  // so reserving that exact bare name here is provably the same name
+  // those methods will later look up), and does not touch classes (which
+  // already convert before functions in both call paths, so they are
+  // already safely registered by the time this method's caller runs).
+  // A collision AMONG interfaces/type-aliases/enums themselves is invalid
+  // TypeScript (a duplicate top-level declaration) and cannot occur from
+  // real source; this loop does not attempt to disambiguate that case —
+  // if it were ever reached, the later `convertInterfaceToDTO`-family
+  // call's own pre-existing `Duplicate entity name` guard reports it,
+  // unchanged by this reservation.
+  private reserveNamedTypeEntityNames(module: ParsedModule): void {
+    for (const iface of module.interfaces) {
+      if (this.isInterfaceExported(iface, module)) {
+        this.reservedNamedTypeNames.add(createEntityName(iface.name));
+      }
+    }
+    for (const typeAlias of module.types) {
+      if (this.isTypeAliasExported(typeAlias, module)) {
+        this.reservedNamedTypeNames.add(createEntityName(typeAlias.name));
+      }
+    }
+    for (const enumDef of module.enums ?? []) {
+      if (this.isEnumExported(enumDef, module)) {
+        this.reservedNamedTypeNames.add(createEntityName(enumDef.name));
+      }
+    }
+  }
+
   private convertFunction(func: ParsedFunction, moduleFilePath: string): void {
     const remapKey = `${moduleFilePath}::${func.name}`;
     const entityName = this.functionNameRemap.get(remapKey);
@@ -1316,9 +1441,12 @@ export class TypeScriptToTypedMindConverter {
       return;
     }
 
-    // Extract input/output DTOs from signature
-    const inputDTO = this.extractInputDTO(func);
-    const outputDTO = this.extractOutputDTO(func);
+    // Extract input/output DTOs from signature. `entityName` (the
+    // converter's own collision-resolved function name, X-CONV-4) seeds
+    // issue #72's inline-DTO synthesis naming — see
+    // `synthesizeInlineDTO`'s doc comment.
+    const inputDTO = this.extractInputDTO(func, entityName);
+    const outputDTO = this.extractOutputDTO(func, entityName);
 
     const functionEntity = new FunctionNode({
       name: entityName,
@@ -1773,10 +1901,18 @@ export class TypeScriptToTypedMindConverter {
     return module.exports.some((exp) => exp.name === constant.name && exp.type === 'constant');
   }
 
-  private extractInputDTO(func: ParsedFunction): string | undefined {
+  private extractInputDTO(func: ParsedFunction, functionEntityName: string): string | undefined {
     // Look for single parameter that looks like a DTO
     if (func.parameters.length === 1) {
       const param = func.parameters[0];
+      if (param && isInlineObjectLiteralType(param.type)) {
+        // issue #72 — synthesize a named DTO instead of D-LEG-1's
+        // `isDTOLikeType` `{`-prefix exclusion (checked BEFORE that
+        // classifier runs, since the classifier's job here is now moot:
+        // an inline object-literal parameter type is unconditionally
+        // DTO-shaped by construction, no elimination heuristic needed).
+        return this.synthesizeInlineDTO(param.type, `${functionEntityName}Input`);
+      }
       if (param && this.isDTOLikeType(param.type)) {
         // If this is an external type, add it to the dependency's exports
         this.addExternalTypeToDepExports(param.type);
@@ -1804,8 +1940,16 @@ export class TypeScriptToTypedMindConverter {
     return undefined;
   }
 
-  private extractOutputDTO(func: ParsedFunction): string | undefined {
+  private extractOutputDTO(func: ParsedFunction, functionEntityName: string): string | undefined {
     const returnType = func.returnType.replace(/^Promise<(.+)>$/, '$1');
+    if (isInlineObjectLiteralType(returnType)) {
+      // issue #72 — same synthesis path as `extractInputDTO`, applied to
+      // the return-type position. `Output` is the codomain-disambiguation
+      // suffix so a function whose parameter AND return type are both
+      // inline object literals gets two distinct synthesized DTOs, never
+      // one name serving both.
+      return this.synthesizeInlineDTO(returnType, `${functionEntityName}Output`);
+    }
     if (this.isDTOLikeType(returnType)) {
       // If this is an external type, add it to the dependency's exports
       this.addExternalTypeToDepExports(returnType);
@@ -1903,10 +2047,19 @@ export class TypeScriptToTypedMindConverter {
     // input/output undefined is the same accepted trade D-LEG-1 already made
     // for Class-kind and literal-union types — the type stays visible in the
     // signature TEXT (`entity.signature` always emits verbatim), only the
-    // machine-checked edge is gone. The richer fix (synthesize a named
-    // inline-DTO stub for an object-literal parameter/return type, mirroring
-    // D-LEG-2's external-stub mechanism) is out of this item's scope — see
-    // issue #72.
+    // machine-checked edge is gone.
+    //
+    // issue #72 (rfc-tm-10-diamond.md §5's tracked follow-up, CLOSED) — the
+    // richer fix landed: `extractInputDTO`/`extractOutputDTO` now detect an
+    // inline object-literal type via `isInlineObjectLiteralType` and route
+    // it through `synthesizeInlineDTO` BEFORE calling `isDTOLikeType` at
+    // all, so this branch is no longer reached by either call site for that
+    // shape in practice. It stays as a defensive fallback — `isDTOLikeType`
+    // is a general classifier callers besides the two current ones could
+    // reasonably add in the future, and a `{`-prefixed type reaching it
+    // directly (bypassing the synthesis-aware call sites) must still be
+    // excluded rather than misclassified as DTO-like-by-elimination text
+    // the grammar cannot parse.
     if (cleaned.startsWith('{')) {
       return false;
     }
@@ -1961,6 +2114,258 @@ export class TypeScriptToTypedMindConverter {
         return;
       }
     }
+  }
+
+  // issue #72 (rfc-tm-10-diamond.md §5's tracked follow-up) — synthesizes a
+  // named DTO entity from an inline object-literal function
+  // parameter/return type, mirroring D-LEG-2's external-stub synthesis
+  // mechanism (`walkGenericArgsForExternalStubs`/`addExternalTypeToDepExports`,
+  // RFC-TM-10 §2): rather than dropping the type from the graph
+  // (`isDTOLikeType`'s `{`-prefix exclusion, D-LEG-1/§5), give it a real
+  // bare `entity_name` and real `DtoFieldNode`s, so `input`/`output`
+  // resolve to an actual DTO instead of staying `undefined`.
+  //
+  // Naming: deterministic and collision-safe. The caller passes
+  // `${functionEntityName}${suffix}` (`suffix` is `'Input'` or `'Output'`,
+  // the same codomain-disambiguation convention `walkGenericArgsForExternalStubs`'s
+  // sibling mechanisms use for input-vs-output distinction) — collision-free
+  // ACROSS FUNCTIONS because `functionEntityName` is already the
+  // converter's own collision-resolved function name (`functionNameRemap`,
+  // X-CONV-4). This function runs that candidate through
+  // `sanitizeEntityName` first (the same PascalCasing sanitizer every other
+  // DTO-shaped entity name in this converter already passes through —
+  // `convertInterfaceToDTO`/`convertTypeAliasToDTO` use `createEntityName`,
+  // which is identity, but D-LEG-3's namespace-qualified-implements stub
+  // uses this exact sanitizer for the same "derive a name, not author one"
+  // reason), so `updateProfileInput` becomes `UpdateProfileInput` —
+  // matching the PascalCase convention every hand-authored DTO in this
+  // codebase's fixtures already follows, and ensuring a collision against a
+  // hand-authored `interface FooInput` is detected (both names normalize to
+  // the same PascalCase form). A collision can still occur AGAINST AN
+  // UNRELATED entity that happens to share the derived name (e.g. a
+  // hand-named `DTO FooInput %` already exists) or between the input DTO
+  // and output DTO for the SAME function if the caller derived the same
+  // suffix twice — resolved by appending the same `__2`, `__3`, ...
+  // double-underscore disambiguator `reserveFunctionEntityNames` already
+  // uses for function-name collisions, walked upward until a free name is
+  // found.
+  //
+  // Nesting: a field whose own type is ALSO an inline object literal
+  // recurses into its own synthesized DTO, named by running
+  // `${dtoName}_${fieldName}` through `sanitizeEntityName` (the same
+  // sanitizer D-LEG-3's namespace-qualified-`implements` stub uses) — which
+  // PascalCases each underscore-delimited segment and JOINS THEM WITH NO
+  // SEPARATOR (`createOrderInput_shipping` -> `CreateOrderInputShipping`,
+  // not `CreateOrderInput_Shipping`), rather than falling to an `opaque`
+  // TypeExprNode leaf. This
+  // is a stronger restoration than TM-8's own `TypeExprNode` grammar
+  // supports for an UNNAMED nested shape (there is no `'struct'`/`'object'`
+  // TypeExprNode kind — `named | literal | generic | array | union |
+  // intersection | opaque` is the complete set, `ast/type-expr-node.ts`),
+  // but a NAMED nested DTO with a `named`-kind field reference IS fully
+  // supported (`check-dto-fields.ts`'s `PRIMITIVES`-gated resolution accepts
+  // DTO/Class/TypeDef kinds) — so recursing preserves strictly more
+  // information than an opaque leaf would, at zero grammar cost.
+  private synthesizeInlineDTO(objectLiteralType: string, baseName: string): string {
+    const dtoName = this.reserveSynthesizedDTOName(this.sanitizeEntityName(baseName));
+    this.addEntityName(dtoName, 'synthesizeInlineDTO');
+
+    const dtoEntity = new DtoNode({
+      name: dtoName,
+      span: SYNTHETIC_SPAN,
+      raw: `${dtoName} %`,
+      sourceForm: 'shortform',
+      fields: this.parseInlineObjectLiteralToFields(objectLiteralType, dtoName),
+      purpose: 'Synthesized from an inline object-literal parameter/return type (issue #72).',
+    });
+
+    this.entities.push(dtoEntity);
+    return dtoName;
+  }
+
+  // Collision resolution shared by `synthesizeInlineDTO`'s two call sites
+  // (an input DTO and an output DTO for the same function, or a synthesized
+  // name colliding with an unrelated pre-existing entity). Mirrors
+  // `reserveFunctionEntityNames`'s own `<baseName>__<disambiguator>` shape
+  // (X-CONV-4) rather than inventing a second collision convention.
+  private reserveSynthesizedDTOName(baseName: string): string {
+    // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) —
+    // `reservedNamedTypeNames` holds this module's own
+    // interface/type-alias/enum names, reserved ahead of function
+    // conversion but not yet real entities (see that set's own doc
+    // comment). A synthesized name must avoid BOTH `entityNames` (real
+    // entities already converted) and this reservation set (entities that
+    // WILL exist once this module's own interface/type-alias/enum loop
+    // runs) — checking only `entityNames` is exactly the gap that let a
+    // synthesized DTO evict a same-module hand-authored interface.
+    const isTaken = (name: string): boolean => this.entityNames.has(name) || this.reservedNamedTypeNames.has(name);
+    if (!isTaken(baseName)) {
+      return baseName;
+    }
+    let attempt = 2;
+    while (isTaken(`${baseName}__${attempt}`)) {
+      attempt += 1;
+    }
+    return `${baseName}__${attempt}`;
+  }
+
+  // Brace-depth-aware property split for an inline object-literal type's
+  // body — REPLACES `parseObjectProperties`'s naive `content.split(/[;,\n]/)`
+  // for this synthesis path specifically. That split is unsound the moment
+  // a field's own type contains a nested `{`/`}`, `<`/`>`, or `(`/`)` pair
+  // (a nested object literal, a generic argument list, or a function-type
+  // parameter list each contain the SAME `;`/`,` delimiters the naive split
+  // treats as field boundaries) — `parseObjectProperties` was never
+  // exercised against a nested shape before this item (zero nested-object
+  // test coverage existed), so this is a new, correct splitter for the new
+  // call site rather than a behavior change to the existing one.
+  //
+  // Adversarial review (PR #84) found two real defects in an earlier
+  // version of this scanner, both fixed here:
+  //   (1) treating bare `<`/`>` as a matched bracket pair breaks on an
+  //       arrow-function-typed field (`onDone: (result: string) => void`)
+  //       — the `=>` arrow's `>` has no matching `<`, driving `angleDepth`
+  //       permanently negative and suppressing every later `;`/`,` split
+  //       for the rest of the string (repro: `label` silently merges into
+  //       `onDone`'s type text). Fixed by tracking angle-bracket depth
+  //       SEPARATELY from brace/paren/bracket depth and clamping it at
+  //       zero (never negative) — an unmatched `>` from `=>`/`>=`/`<=` is
+  //       simply ignored rather than corrupting the running depth count.
+  //   (2) a quoted string-literal type (a literal-union member,
+  //       `kind: 'a,b' | 'c;d'`) contains `,`/`;` characters that are NOT
+  //       field delimiters — fixed by skipping over `'...'`/`"...'`
+  //       string-literal spans entirely (delimiter chars inside a string
+  //       never reach the split/depth logic).
+  private splitObjectLiteralProperties(content: string): string[] {
+    const properties: string[] = [];
+    let braceDepth = 0;
+    let angleDepth = 0;
+    let current = '';
+    let quoteChar: string | undefined;
+
+    for (let i = 0; i < content.length; i += 1) {
+      const char = content[i];
+
+      if (quoteChar !== undefined) {
+        current += char;
+        if (char === '\\') {
+          // Consume the escaped character verbatim so an escaped quote
+          // (`\'` or `\"`) does not end the string span early.
+          i += 1;
+          if (i < content.length) {
+            current += content[i];
+          }
+          continue;
+        }
+        if (char === quoteChar) {
+          quoteChar = undefined;
+        }
+        continue;
+      }
+
+      if (char === "'" || char === '"') {
+        quoteChar = char;
+        current += char;
+        continue;
+      }
+
+      if (char === '{' || char === '(' || char === '[') {
+        braceDepth += 1;
+      } else if (char === '}' || char === ')' || char === ']') {
+        braceDepth -= 1;
+      } else if (char === '<') {
+        angleDepth += 1;
+      } else if (char === '>') {
+        // Clamp at zero: an unmatched `>` (from `=>`, `>=`, or a stray
+        // comparison-shaped token in a type position) must never drive
+        // angleDepth negative — a negative depth would never return to
+        // zero and would suppress every subsequent split for the rest of
+        // the string, per this function's own doc comment above.
+        angleDepth = Math.max(0, angleDepth - 1);
+      }
+
+      if ((char === ';' || char === ',' || char === '\n') && braceDepth === 0 && angleDepth === 0) {
+        if (current.trim()) {
+          properties.push(current.trim());
+        }
+        current = '';
+        continue;
+      }
+      current += char;
+    }
+    if (current.trim()) {
+      properties.push(current.trim());
+    }
+    return properties;
+  }
+
+  // Parses one property line (`name?: Type` or `name: Type`) from an inline
+  // object-literal's body into its name/type/optionality — the same
+  // `^(\w+)(\?)?\s*:\s*(.+)$` shape `parseObjectProperties` uses, applied to
+  // one brace-depth-correct property string instead of a naively-split line.
+  private parseObjectLiteralProperty(propertyText: string): { name: string; type: string; optional: boolean } | undefined {
+    const match = propertyText.match(/^(\w+)(\?)?\s*:\s*(.+)$/s);
+    if (!match?.[1] || !match[3]) {
+      return undefined;
+    }
+    return { name: match[1], type: match[3].trim(), optional: !!match[2] };
+  }
+
+  private parseInlineObjectLiteralToFields(objectLiteralType: string, dtoName: string): DtoFieldNode[] {
+    const trimmed = objectLiteralType.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+      return [];
+    }
+    const content = trimmed.slice(1, -1);
+    const propertyTexts = this.splitObjectLiteralProperties(content);
+    const fields: DtoFieldNode[] = [];
+
+    for (const propertyText of propertyTexts) {
+      const prop = this.parseObjectLiteralProperty(propertyText);
+      if (!prop) {
+        continue;
+      }
+
+      // A nested inline object-literal field type recurses into its own
+      // synthesized DTO (see `synthesizeInlineDTO`'s doc comment above for
+      // why this beats an `opaque` leaf). The nested DTO's name is derived
+      // from the PARENT DTO's name plus the field name, sanitized and
+      // PascalCased with `sanitizeEntityName` — the same sanitizer
+      // D-LEG-3's namespace-qualified-`implements` stub mechanism uses,
+      // reused rather than re-derived.
+      if (isInlineObjectLiteralType(prop.type)) {
+        const nestedBaseName = this.sanitizeEntityName(`${dtoName}_${prop.name}`);
+        const nestedDtoName = this.synthesizeInlineDTO(prop.type, nestedBaseName);
+        const typeExpr = parseTypeExprText(nestedDtoName).typeExpr;
+        fields.push(
+          new DtoFieldNode({
+            name: prop.name,
+            type: nestedDtoName,
+            typeExpr,
+            optionalityMarker: prop.optional ? 'question' : 'none',
+            span: SYNTHETIC_SPAN,
+          }),
+        );
+        continue;
+      }
+
+      const propType = this.sanitizeFieldType(prop.type);
+      const typeExpr = parseTypeExprText(propType).typeExpr;
+      // D-LEG-2 (issue #65) — same generic-argument external-stub walk
+      // every other field-synthesis call site applies.
+      this.walkGenericArgsForExternalStubs(typeExpr);
+      fields.push(
+        new DtoFieldNode({
+          name: prop.name,
+          type: propType,
+          typeExpr,
+          optionalityMarker: prop.optional ? 'question' : 'none',
+          span: SYNTHETIC_SPAN,
+        }),
+      );
+    }
+
+    return fields;
   }
 
   private addExternalTypeToDepExports(typeName: string): void {
