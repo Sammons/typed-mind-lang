@@ -244,8 +244,8 @@ export class TypeScriptToTypedMindConverter {
       // layer). The cast is safe here because this converter is the ONLY
       // producer of every suppression it counts: `computeSuppressions`
       // (below) never constructs a SuppressionNode with a reason outside
-      // `SuppressionReason`'s two members, so every value flowing into this
-      // loop is provably one of them.
+      // `SuppressionReason`'s sole member (narrowed from two per RFC-TM-10
+      // §9, D-LEG-9), so every value flowing into this loop is provably it.
       const reason = suppression.reason as SuppressionReason;
       counts[reason] = (counts[reason] ?? 0) + 1;
     }
