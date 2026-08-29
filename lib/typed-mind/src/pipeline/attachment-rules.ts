@@ -270,7 +270,7 @@ export const orphanContinuationDiagnostic = (label: string, span: Span): Diagnos
     code: 'semantics/orphan-continuation',
     severity: 'warning',
     span,
-    message: `orphan continuation: ${label} has no open entity declaration to attach to`,
+    message: `This ${label} has no preceding entity declaration to attach to — move it directly under an entity declaration, or remove it`,
   };
 };
 
@@ -279,6 +279,6 @@ export const illegalContinuationDiagnostic = (label: string, kind: string, span:
     code: 'semantics/illegal-continuation',
     severity: 'warning',
     span,
-    message: `illegal continuation: ${label} cannot attach to a ${kind} entity`,
+    message: `This ${label} cannot attach to a ${kind} entity — move it under an entity kind that accepts it, or remove it`,
   };
 };

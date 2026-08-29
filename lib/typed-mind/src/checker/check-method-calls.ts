@@ -26,6 +26,7 @@ export const checkMethodCalls = (context: CheckContext): void => {
           severity: 'error',
           span: entity.span,
           message: `Call to '${call}' references unknown entity '${objectName}'`,
+          suggestion: `Define '${objectName}' before calling '${call}' on it, or fix the typo`,
         });
       } else if (!(targetEntity instanceof ClassNode || targetEntity instanceof ClassFileNode)) {
         context.addFinding({

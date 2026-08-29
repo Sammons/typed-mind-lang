@@ -26,7 +26,7 @@ const visit = (syntaxNode: SyntaxNode, diagnostics: Diagnostic[]): void => {
       code: 'syntax/error',
       severity: 'error',
       span: tokenSpanOf(syntaxNode),
-      message: `unparsable text: \`${errorSnippet(syntaxNode)}\``,
+      message: `Unparsable text: \`${errorSnippet(syntaxNode)}\` — check this line against the grammar and fix or remove it`,
     });
     return;
   }
@@ -35,7 +35,7 @@ const visit = (syntaxNode: SyntaxNode, diagnostics: Diagnostic[]): void => {
       code: 'syntax/missing',
       severity: 'error',
       span: tokenSpanOf(syntaxNode),
-      message: `missing ${syntaxNode.type}`,
+      message: `Missing \`${syntaxNode.type}\` — add the required token at this position`,
     });
     return;
   }

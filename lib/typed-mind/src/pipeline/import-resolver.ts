@@ -96,7 +96,7 @@ export class ImportResolver {
           code: 'imports/circular',
           severity: 'error',
           span: importStatement.span,
-          message: `Circular import detected: ${[...this.#resolutionStack, fullPath].join(' -> ')}`,
+          message: `Circular import detected: ${[...this.#resolutionStack, fullPath].join(' -> ')} — break the cycle by removing one of these imports`,
         });
         continue;
       }
@@ -163,7 +163,7 @@ export class ImportResolver {
           span: importStatement.span,
           // String(error) replicates the legacy `${error}` interpolation
           // (import-resolver.ts:127) — the message carries the fs error text.
-          message: `Failed to import '${importStatement.path}': ${String(error)}`,
+          message: `Failed to import '${importStatement.path}': ${String(error)} — check the path exists and is readable`,
         },
       };
     }

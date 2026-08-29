@@ -81,7 +81,10 @@ Every diagnostic message follows [docs/diagnostic-style-guide.md](./docs/diagnos
 three-clause rule (what, where, what to do), backtick-quotes every named
 entity, and avoids internal implementation vocabulary. A standing lint
 (`pnpm run check:diagnostic-jargon`) enforces the no-jargon half of that rule
-in CI.
+in CI. [docs/diagnostic-code-audit.md](./docs/diagnostic-code-audit.md) grades
+every registered code's current message against the guide (100% of the
+registry, checked for completeness via `pnpm run check:diagnostic-code-audit`)
+— grade a new code there when adding one.
 
 ## Requirements
 

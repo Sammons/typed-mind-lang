@@ -22,7 +22,14 @@ describe('scenario-08-multiple-programs', () => {
     assert.equal(result.valid, false); // was true
     assert.equal(result.diagnostics.length, 2); // was 0
 
-    assert.ok(result.diagnostics.every((diagnostic) => diagnostic.message === 'unparsable text: `-> []`'));
+    // RFC-TM-10 §12 (D-LEG-12, Q7): `syntax/error`'s message gained an initial
+    // capital and a trailing suggestion clause (folded into `message` — the
+    // pipeline-level `Diagnostic` type carries no `suggestion` field).
+    assert.ok(
+      result.diagnostics.every(
+        (diagnostic) => diagnostic.message === 'Unparsable text: `-> []` — check this line against the grammar and fix or remove it',
+      ),
+    );
     assert.ok(result.diagnostics.some((diagnostic) => diagnostic.span.start.line === 7));
     assert.ok(result.diagnostics.some((diagnostic) => diagnostic.span.start.line === 10));
 

@@ -206,9 +206,20 @@ describe('from-side + unknown-ref-type arms (defensive gates, exercised directly
     // unknown-ref-type guard (validator.ts:1258) is reachable only by forcing
     // a value past the type system.
     checkSingleReference(context, file, 'bogus' as ReferenceKind, 'Solo');
+    // RFC-TM-10 §12 (D-LEG-12, Q7): the message gained the referencer's own
+    // name (WHERE, per the style guide's three-clause rule) and a `suggestion`
+    // field (WHAT TO DO) — this defensive branch is unreachable through the
+    // closed `ReferenceKind` union in production, so the suggestion points a
+    // future maintainer at filing a bug rather than at a DSL-author fix.
     assert.deepEqual(
-      context.findings.map((finding) => ({ code: finding.code, message: finding.message })),
-      [{ code: 'checker/reference-unknown-type', message: "Unknown reference type 'bogus'" }],
+      context.findings.map((finding) => ({ code: finding.code, message: finding.message, suggestion: finding.suggestion })),
+      [
+        {
+          code: 'checker/reference-unknown-type',
+          message: "Unknown reference type 'bogus' on 'Solo'",
+          suggestion: 'File a bug report — this reference kind should never reach the checker',
+        },
+      ],
     );
   });
 });
