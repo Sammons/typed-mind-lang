@@ -1400,11 +1400,30 @@ export class TypeScriptAnalyzer {
     });
   }
 
+  // Issue #86 (found during tm10-inc2's live ladder re-run) — `getTypeString`
+  // embeds a parameter or return type's raw source text verbatim into the
+  // `::` shortform signature line built here. When the type is authored
+  // across multiple lines in the source TypeScript (the common style for an
+  // inline object-literal type with 3+ fields, or a multi-line literal
+  // union), the embedded newlines desync the grammar's single-line
+  // signature production — the same class of defect D-LEG-4 fixed for
+  // JSDoc descriptions via `collapseDescription`
+  // (typescript-to-typedmind-converter.ts), never extended to
+  // signature-embedded type text. This whitespace-collapses ONLY the text
+  // that lands in the signature string; it does NOT touch `p.type` /
+  // `returnType` themselves, which the converter still reads verbatim
+  // (multi-line-aware) for DTO classification and inline-object-literal
+  // synthesis (`extractInputDTO`/`extractOutputDTO`,
+  // `isInlineObjectLiteralType`/`synthesizeInlineDTO`).
+  private collapseSignatureType(raw: string): string {
+    return raw.replace(/\s+/g, ' ').trim();
+  }
+
   private buildFunctionSignature(name: string, parameters: readonly ParsedParameter[], returnType: string, isAsync: boolean): string {
-    const paramStr = parameters.map((p) => `${p.name}${p.isOptional ? '?' : ''}: ${p.type}`).join(', ');
+    const paramStr = parameters.map((p) => `${p.name}${p.isOptional ? '?' : ''}: ${this.collapseSignatureType(p.type)}`).join(', ');
 
     const asyncPrefix = isAsync ? 'async ' : '';
-    return `${asyncPrefix}${name}(${paramStr}) => ${returnType}`;
+    return `${asyncPrefix}${name}(${paramStr}) => ${this.collapseSignatureType(returnType)}`;
   }
 
   private getTypeString(typeNode: ts.TypeNode | undefined): string {
