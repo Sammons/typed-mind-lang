@@ -149,6 +149,14 @@ export interface TypeScriptProjectAnalysis {
   // X-AN-1 leaf check (module-graph.json golden): the exact resolved edge
   // list for this analysis run, one record per resolved import/re-export.
   readonly moduleGraph: readonly ModuleGraphEdge[];
+  // SST-referenced-module orphan flags (see SstHandlerReference above) —
+  // every SUCCESSFUL `--recognize sst-handler` resolution, independent of
+  // `moduleGraph` (which stores `resolvedTarget` project-relative for
+  // display; this stores the absolute path the converter needs to key
+  // `functionNameRemap`). Empty when the recognizer is not enabled or
+  // finds no handler strings — matching the doc's "without the flag,
+  // behavior is unchanged."
+  readonly sstHandlerReferences: readonly SstHandlerReference[];
   // X-CONV-3: the target project's root directory (the tsconfig's
   // directory), absolute. The converter's `getRelativePath` relativizes
   // every emitted entity path against this field, never `process.cwd()` —
@@ -204,6 +212,25 @@ export interface ModuleGraphEdge {
   readonly specifier: string;
   readonly resolvedTarget: string | undefined;
   readonly classification: 'internal' | 'external' | 'unresolved';
+}
+
+// SST-referenced-module orphan flags (RFC-TM-10 §6/issue #52's own PR #74
+// closing comment: "checker/orphaned-file and checker/orphaned-entity on
+// the traversed handler module ... deferred to a future Quantum/RFC
+// ruling") — LEAD RULING: exports-push per the X-AN-11 precedent
+// (self-invoking roots, ParsedModule.selfInvokedFunctionNames), NOT a
+// suppression. A successfully-resolved `handler: "path.member"` string is
+// a real graph root the checker's orphan rule cannot see without help —
+// the honest fix supplies the missing fact (fold the resolved function's
+// entity name into the Program's own `exports` list) rather than
+// re-labeling the finding. One record per successful resolution;
+// `resolvedAbsolutePath` matches `ParsedModule.filePath`'s absolute form
+// (NOT `ModuleGraphEdge.resolvedTarget`, which is project-relative for
+// display) so the converter can key `functionNameRemap` directly.
+export interface SstHandlerReference {
+  readonly sourceModule: string;
+  readonly resolvedAbsolutePath: string;
+  readonly memberName: string;
 }
 
 export interface ConversionOptions {

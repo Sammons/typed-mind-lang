@@ -21,6 +21,13 @@ import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
 import type { CheckContext } from './check-context.ts';
 
+const importsOf = (entity: EntityNode): readonly string[] | undefined => {
+  if (entity instanceof FileNode || entity instanceof ClassFileNode) {
+    return entity.imports;
+  }
+  return undefined;
+};
+
 const exportsOf = (entity: EntityNode): readonly string[] | undefined => {
   if (entity instanceof FileNode || entity instanceof ClassFileNode) {
     return entity.exports;
@@ -73,25 +80,73 @@ export const checkClassAndFunctionExports = (context: CheckContext): void => {
 };
 
 // RFC-TM-10 §7 (rfc-tm-10-diamond.md, D-LEG-7) — the ONE sound, narrow
-// exclusion: a pair (A, B) in a name's exporter set is excluded ONLY when one
-// of the pair is a ProgramNode whose `entry` field names the OTHER member of
-// the pair BY ENTITY. This is a direct field comparison, no import-provenance
-// reasoning at all — two prior drafts of a general "an exporter that imports
-// the name is excluded" signal were both falsified by the committed,
-// currently-passing `ast-validator.test.ts:366-380` test (an import-then-export
-// exporter must still flag against an independent declarer). The
-// File/ClassFile barrel-re-export shape (e.g. DetectFormatFile/SyntaxEmitter)
-// has no sound signal without new AST surface (a per-import provenance
-// field) and is NOT excluded here — it stays a live, honestly-disposed
-// residual (doc §7, §14).
-const isProgramEntryPair = (left: EntityNode, right: EntityNode): boolean => {
-  if (left instanceof ProgramNode && left.entry === right.name) {
-    return true;
+// exclusion, WIDENED by a lead-authorized amendment (tm10-inc3a, SST-
+// referenced-module orphan flags) from a same-entity-pair comparison to a
+// Program-scoped entry-reachability rule: a pair (A, B) in a name's
+// exporter set is excluded when one of the pair is a ProgramNode P and the
+// OTHER member of the pair is a File/ClassFile entity reachable from
+// `P.entry` via transitive File-import edges (`FileNode.imports`/
+// `ClassFileNode.imports`). D-LEG-7's original same-file case (P.entry
+// names the other member DIRECTLY) is the zero-hop instance of this same
+// reachability walk — a Program's own entry file is trivially "reachable
+// from itself" — so this is a strict widening, not a replacement rule.
+//
+// This is STILL not general import-provenance reasoning: two prior drafts
+// of a general "an exporter that imports the name is excluded" signal were
+// both falsified by the committed, currently-passing
+// `ast-validator.test.ts:366-380` test (an import-then-export exporter must
+// still flag against an independent declarer) — confirmed to keep passing
+// unmodified by this widening (that test's `Other` File is never listed in
+// `Main`'s `imports`, so it is not reachable from `Main` regardless of this
+// rule; neither exporter in that test is even a ProgramNode, so the rule
+// never applies to that pair). The widened rule is bounded to PROGRAM-scoped
+// exposure specifically: a Program whose entry transitively imports a File
+// is a re-export chain (the deployed program's public surface — e.g. an SST
+// handler-string reference recorded by the converter, tm10-inc3a's own
+// motivating case), not two independent hand-authored declarations. The
+// File/ClassFile barrel-re-export shape (e.g. DetectFormatFile/SyntaxEmitter,
+// no Program involved at all) has no sound signal without new AST surface
+// (a per-import provenance field) and is NOT excluded here — it stays a
+// live, honestly-disposed residual (doc §7, §14).
+const filesReachableFromEntry = (context: CheckContext, entryName: string): ReadonlySet<string> => {
+  const reachable = new Set<string>();
+  const queue = [entryName];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === undefined || reachable.has(current)) {
+      continue;
+    }
+    reachable.add(current);
+    const entity = context.byName.get(current);
+    if (entity === undefined) {
+      continue;
+    }
+    for (const imported of importsOf(entity) ?? []) {
+      if (imported.includes('*') || reachable.has(imported)) {
+        continue;
+      }
+      const importedEntity = context.byName.get(imported);
+      // Only follow the edge onward when the imported name resolves to
+      // another File-like entity — an individual function/class/DTO name
+      // in `imports` is a leaf for this walk, not a File to recurse into.
+      if (importedEntity instanceof FileNode || importedEntity instanceof ClassFileNode) {
+        queue.push(imported);
+      }
+    }
   }
-  if (right instanceof ProgramNode && right.entry === left.name) {
-    return true;
+  return reachable;
+};
+
+const isProgramScopedExposure = (context: CheckContext, left: EntityNode, right: EntityNode): boolean => {
+  const [program, other] =
+    left instanceof ProgramNode ? [left, right] : right instanceof ProgramNode ? [right, left] : [undefined, undefined];
+  if (program === undefined || other === undefined) {
+    return false;
   }
-  return false;
+  if (!(other instanceof FileNode || other instanceof ClassFileNode)) {
+    return false;
+  }
+  return filesReachableFromEntry(context, program.entry).has(other.name);
 };
 
 export const checkDuplicateExports = (context: CheckContext): void => {
@@ -106,16 +161,17 @@ export const checkDuplicateExports = (context: CheckContext): void => {
   }
 
   for (const [exportName, exporters] of exportMap) {
-    // The Program/entry-File exclusion: when exactly two exporters claim this
-    // name and one is the Program whose `entry` names the other, this is a
-    // converter-emission redundancy (the Program's exports list re-derives
-    // from its own entry's export registry), not two independent
-    // declarations — no finding. Any additional exporter beyond the pair, or
-    // an exporter pair with no Program/entry relationship, still flags in
-    // full per the unmodified general rule below.
+    // The Program-scoped exposure exclusion (widened D-LEG-7, see
+    // `isProgramScopedExposure`'s own doc comment above): when exactly two
+    // exporters claim this name and one is a Program whose entry
+    // transitively reaches the other exporter's File, this is a re-export
+    // chain (the deployed program's public surface), not two independent
+    // declarations — no finding. Any additional exporter beyond the pair,
+    // or an exporter pair with no such Program-scoped relationship, still
+    // flags in full per the unmodified general rule below.
     if (exporters.length === 2) {
       const [a, b] = exporters as [EntityNode, EntityNode];
-      if (isProgramEntryPair(a, b)) {
+      if (isProgramScopedExposure(context, a, b)) {
         continue;
       }
     }

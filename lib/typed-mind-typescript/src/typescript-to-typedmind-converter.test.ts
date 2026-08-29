@@ -204,6 +204,7 @@ const createMockAnalysis = (): TypeScriptProjectAnalysis => ({
   },
   diagnostics: [],
   moduleGraph: [],
+  sstHandlerReferences: [],
   // X-CONV-3 (RFC-TM-9 Q2) — every mock module's filePath is rooted at
   // /project, so /project is this mock's project root. Required field:
   // omitting it previously produced `path.relative(undefined, ...)` at

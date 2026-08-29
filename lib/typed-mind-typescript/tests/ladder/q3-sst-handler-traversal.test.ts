@@ -79,7 +79,7 @@ describe('RFC-TM-10 Q3 check — D-LEG-6: traversal-enqueue makes the handler mo
     assert.equal(golden?.resolvedTarget, 'packages/functions/src/api/index.ts');
   });
 
-  it('webhookstorage-signature: the handler function is a resolvable entity in .tmd output, not folded into Program.exports', async () => {
+  it('webhookstorage-signature: the handler function is a resolvable entity in .tmd output, exposed via Program.exports AND its own File', async () => {
     const fixtureDir = fixturePath('webhookstorage-signature');
     const analyzer = new TypeScriptAnalyzer(fixtureDir, undefined, ['sst-handler']);
     const analysis = analyzer.analyzeFromEntrypoint(join(fixtureDir, 'infra', 'api.ts'));
@@ -88,7 +88,7 @@ describe('RFC-TM-10 Q3 check — D-LEG-6: traversal-enqueue makes the handler mo
     assert.equal(result.success, true);
 
     const handlerFn = result.entities.find((e) => e.kind === 'Function' && e.name === 'handler');
-    assert.notEqual(handlerFn, undefined, 'handler must be a real Function entity, not a bare name in Program.exports');
+    assert.notEqual(handlerFn, undefined, 'handler must be a real Function entity');
 
     const functionsFile = result.entities.find(
       (e) =>
@@ -99,53 +99,52 @@ describe('RFC-TM-10 Q3 check — D-LEG-6: traversal-enqueue makes the handler mo
     );
     assert.notEqual(functionsFile, undefined, 'the handler module must surface as its own File entity inside packages/functions');
 
-    // D-LEG-6's own check binding is about the module/entity being REAL and
-    // PRESENT, not a zero-diagnostic checker run for this fixture (lead
-    // ruling, RFC-TM-10 Q3 disposition). Checking this fixture through the
-    // checker surfaces a NAMED, PRE-EXISTING set of residual diagnostics —
-    // none introduced by Q3, none owned by D-LEG-6's own fix surface. This
-    // fixture pins the KNOWN set explicitly (per the Q1/Q4 file headers'
-    // own "pin the achieved verdict, don't claim false green" precedent)
-    // rather than asserting a stronger bar D-LEG-6 does not itself deliver.
+    // tm10-inc3a (lead-authorized amendment, SST-referenced-module orphan
+    // flags) — updates this pin CAUSE-LINKED to the fix that shrank it.
+    // D-LEG-6's own check binding (module/entity real and present) is
+    // unchanged by this amendment; what changed is the residual set below.
     //
-    //   - `checker/multi-exported` — RESOLVED by RFC-TM-10 Q4/PR#68
-    //     (D-LEG-7's Program/entry-duplication exclusion), no longer fires
-    //     on this fixture as of the rebase onto main that picked up Q4.
-    //     Dropped from the pin below; if it reappears, that is a Q4
-    //     regression, not a Q3 concern.
-    //   - `checker/orphaned-file`/`checker/orphaned-entity` on
-    //     IndexFile/handler — a REAL illegitimacy (the module IS referenced,
-    //     by the SST convention string) with no fix mechanism owned by any
-    //     current D-LEG item: the SST convention string
-    //     ('packages/functions/src/api/index.handler') has no `.tmd`
-    //     grammar representation as an import/reference edge.  D-LEG-6's own
-    //     scope is traversal-enqueue (making the module real), not
-    //     synthesizing a new cross-file reference edge or suppression
-    //     reason for the convention string — the lead has this on the list
-    //     for D-LEG-14's (Q10) disposition table (a suppression reason, an
-    //     exports-push per the X-AN-11 precedent, or a future grammar-level
-    //     reference edge are the candidate mechanisms; none is Q3's to
-    //     invent). See also the PR body's future-RFC note on the missing
-    //     ApiFile -> IndexFile grammar representation.
-    //   - `syntax/error` x2 — a PRE-EXISTING, D-LEG-1-adjacent gap, still
-    //     open as of this Quantum: `isDTOLikeType` (fixed once already for
-    //     Class-kind/literal-union types, Q1/PR#70) still classifies a
-    //     generic-wrapped inline-object-literal return type
-    //     (`Promise<{ statusCode: number }>`) as DTO-like "by elimination"
-    //     and routes it through `output`, emitting the raw object-literal
-    //     text where the grammar expects a DTO type name. RFC-TM-10 Q2 (in
-    //     flight, PR #73, D-LEG-5) is landing an inline-object-literal
-    //     exclusion in `isDTOLikeType` for a related shape — on rebase after
-    //     Q2 merges, re-run this fixture: if these two `syntax/error`
-    //     entries disappear, update this pin with a cause-linked note citing
-    //     Q2/PR#73; if they persist (the Promise-unwrap ordering misses
-    //     Q2's exclusion), file a new issue scoped precisely to the
-    //     generic-wrapped case and keep the pin. Not filed yet per the lead
-    //     ruling — Q2 may already close it.
+    //   - `checker/orphaned-entity` on `handler` — RESOLVED (tm10-inc3a).
+    //     The converter now folds `handler`'s final entity name into
+    //     `Api__App`'s own `exports` (X-AN-11's mechanism, extended
+    //     cross-module: `resolveSstHandlerExportNames`), so the checker's
+    //     orphan walk sees a real reference edge instead of a false
+    //     "orphaned" finding on code that IS the deployed program's own
+    //     handler.
+    //   - `checker/orphaned-file` on `IndexFile` — RESOLVED (tm10-inc3a).
+    //     The converter now emits the truthful FILE edge: `ApiFile` (the
+    //     infra entry) gains `IndexFile` in its own `imports` list
+    //     (`foldSstHandlerImportsIntoSourceFiles`) — a true statement
+    //     (infra names that module as its deployable), which independently
+    //     clears the orphan-file finding via the SAME `imports`-union
+    //     mechanism every other import edge already uses.
+    //   - `checker/multi-exported` — did NOT fire before this amendment and
+    //     was correctly absent from the prior pin, but WOULD have appeared
+    //     as an unavoidable side effect of the exports-push above (`handler`
+    //     exported by both `Api__App` and `IndexFile`) without the paired
+    //     checker widening: `check-exports.ts`'s D-LEG-7 exclusion widened
+    //     from a same-entity Program/entry comparison to a Program-scoped
+    //     entry-reachability rule (`isProgramScopedExposure`,
+    //     `filesReachableFromEntry`) — a Program whose entry transitively
+    //     imports a File is a re-export chain, not a hand-authored
+    //     duplicate. Confirmed NOT to regress the falsifying test
+    //     (`ast-validator.test.ts:366-380`, an import-then-export exporter
+    //     with no Program involved) and bounded by a dedicated negative
+    //     fixture (`ast-validator.test.ts`, "Program-scoped exposure bound").
+    //   - `syntax/error` x2 — UNCHANGED, out of this amendment's scope: the
+    //     same pre-existing gap named in the prior pin
+    //     (`isDTOLikeType`-classified `Promise<{ statusCode: number }>`
+    //     routing an inline object-literal return type raw through
+    //     `output`). Re-confirmed live and out of scope for BOTH #86 (fixed
+    //     this same increment — that fix is the newline-collapse only, and
+    //     this shape is a single-line object-literal, unrelated) and this
+    //     amendment. Filed as a new issue alongside #86's own disclosed
+    //     residuals (see this PR's body / the vault delta note) — not fixed
+    //     here.
     const { result: checkResult } = await checkViaLongform(result.entities);
     assert.deepEqual(
       checkResult.diagnostics.map((d) => d.code).sort(),
-      ['checker/orphaned-entity', 'checker/orphaned-file', 'syntax/error', 'syntax/error'].sort(),
+      ['syntax/error', 'syntax/error'].sort(),
       'residual diagnostics are the named, pre-existing set only — a NEW code here is a regression this fixture must catch',
     );
   });

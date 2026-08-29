@@ -227,6 +227,7 @@ const createBaseAnalysis = (): TypeScriptProjectAnalysis => ({
   },
   diagnostics: [],
   moduleGraph: [],
+  sstHandlerReferences: [],
   // X-CONV-3 (RFC-TM-9 Q2) — required field. Set to '/' (not '/project')
   // to match this suite's own `beforeEach(() => process.chdir('/'))`: the
   // pinned legacy-baseline goldens below commit paths like
