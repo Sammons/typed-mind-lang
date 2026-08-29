@@ -125,7 +125,6 @@ describe('RFC-TM-9 Q3 check — X-SUPP-6: converter-emitted suppressions with en
     // counts and reasons per target").
     assert.deepEqual(result.suppressionCounts, {
       'generated-single-file-scope': 1,
-      'test-only-consumer': 0,
     });
 
     assert.ok(
@@ -165,7 +164,6 @@ describe('RFC-TM-9 Q3 check — X-SUPP-6: converter-emitted suppressions with en
     assert.equal(result.success, true);
     assert.deepEqual(result.suppressionCounts, {
       'generated-single-file-scope': 0,
-      'test-only-consumer': 0,
     });
   });
 });
