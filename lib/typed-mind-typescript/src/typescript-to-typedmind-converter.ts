@@ -72,6 +72,22 @@ const collapseDescription = (raw: string): string => {
   return (firstParagraph ?? '').replace(/\s+/g, ' ').trim();
 };
 
+// RFC-TM-10 follow-up (issue #77) — `extractInputDTO`/`extractOutputDTO`
+// classify a type as DTO-like BY KIND (`isDTOLikeType`, D-LEG-1/D-LEG-5), but
+// the grammar's `input_name`/`output_name` productions
+// (`grammar.js:811,815`) accept ONLY a bare `entity_name` token
+// (`grammar.js:1155`, `/[A-Za-z_]\w*/`). A DTO-like type is not always a
+// bare identifier: a union with `null`/`undefined`
+// (`HydratedTenantRecord | null`), an array suffix (`OrganizationApiKey[]`),
+// a generic-argument suffix (`MiddlewareHandler<IngestEnv>`,
+// `Record<string, unknown>`), or a bare function type (`() => void`) are all
+// DTO-like by `isDTOLikeType`'s elimination branch but illegal in the
+// bare-identifier-only slot. This guard is the mechanical check that
+// prevents assigning any of those shapes to `input`/`output`: exactly the
+// same regex the grammar itself uses for `entity_name`, applied before the
+// emission, not re-derived heuristically.
+const isBareEntityName = (type: string): boolean => /^[A-Za-z_]\w*$/.test(type);
+
 // Two-pass architecture data structures
 interface ExportRegistry {
   [moduleSpecifier: string]: {
@@ -1769,7 +1785,20 @@ export class TypeScriptToTypedMindConverter {
         // that also needs a Dependency-exports stub, on the same path
         // D-LEG-1 (below) proves is DTO-like.
         this.walkGenericArgsForExternalStubs(parseTypeExprText(param.type).typeExpr);
-        return param.type;
+        // issue #77 — `isDTOLikeType` proves the type is DTO-like BY KIND,
+        // but the `input` field is emitted verbatim into the grammar's
+        // bare-`entity_name`-only `input_name` slot (grammar.js:811,
+        // `/[A-Za-z_]\w*/`). A DTO-like type whose text carries a union
+        // (`| null`), an array suffix (`[]`), a generic-argument suffix
+        // (`<Args>`), or a function-type shape (`() => void`) is a real,
+        // legal TypeScript type but not a legal `entity_name` token — same
+        // disclosed-loss trade D-LEG-1/D-LEG-5 already accepted for
+        // Class-kind/literal-union/inline-object types above: leave `input`
+        // undefined rather than emit text the grammar cannot parse. The type
+        // stays visible in `entity.signature` regardless (emitted verbatim,
+        // `emit-shortform.ts`), so only the machine-checked graph edge is
+        // lost, not the DSL reader's visibility into the real type.
+        return isBareEntityName(param.type) ? param.type : undefined;
       }
     }
     return undefined;
@@ -1786,7 +1815,9 @@ export class TypeScriptToTypedMindConverter {
       // on, per the Diamond's revised §2 (the r0 draft's walk never reached
       // this call site).
       this.walkGenericArgsForExternalStubs(parseTypeExprText(returnType).typeExpr);
-      return returnType;
+      // issue #77 — same bare-`entity_name` guard as extractInputDTO above,
+      // applied to the `output_name` grammar slot (grammar.js:815).
+      return isBareEntityName(returnType) ? returnType : undefined;
     }
     return undefined;
   }

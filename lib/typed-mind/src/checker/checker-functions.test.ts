@@ -205,6 +205,29 @@ describe('DTO field type checks (validator.ts:1473-1592)', () => {
       },
     );
   });
+
+  // issue #78 — PRIMITIVES (check-dto-fields.ts) had `Required` but not
+  // `Readonly`, an asymmetric gap: a DTO field typed `Readonly<T>` raised
+  // `checker/dto-field-unknown-type` even though `Readonly` is the same
+  // class of TS-builtin generic utility type as `Required`/`Partial`/
+  // `Pick`/`Omit`, all of which were already allowlisted. Fixed by adding
+  // `Readonly` to PRIMITIVES.
+  it('does not flag Readonly<T> as an unknown type (issue #78)', async () => {
+    const { result } = await check(
+      [
+        'App -> Main v1.0.0',
+        'Main @ src/main.ts:',
+        '  <- [useDto]',
+        '  -> [useDto]',
+        'useDto :: () => void',
+        '  <- GoodDTO',
+        'GoodDTO % "readonly-generic field"',
+        '  - locked: Readonly<string> "a readonly-wrapped primitive"',
+        '',
+      ].join('\n'),
+    );
+    assert.deepEqual(messagesByCode(result, 'checker/dto-field-unknown-type'), []);
+  });
 });
 
 describe('UIComponent relationship checks (validator.ts:997-1047)', () => {

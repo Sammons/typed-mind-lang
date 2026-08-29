@@ -44,6 +44,7 @@ const PRIMITIVES = [
   'Record',
   'Partial',
   'Required',
+  'Readonly', // issue #78 — asymmetric gap: `Required` was allowlisted, `Readonly` was not.
   'Pick',
   'Omit',
 ];
