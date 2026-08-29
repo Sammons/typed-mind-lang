@@ -1139,7 +1139,10 @@ export class TypeScriptToTypedMindConverter {
       // this module is the only place with an honest claim to it).
       // D-LEG-3 — same stub-import-folding treatment for namespace-qualified
       // `implements` targets as the builtin-extends stubs above.
-      const stubNames = [...this.collectBuiltinExtendsStubImports(module.classes), ...this.collectNamespaceImplementsStubImports(module.classes)];
+      const stubNames = [
+        ...this.collectBuiltinExtendsStubImports(module.classes),
+        ...this.collectNamespaceImplementsStubImports(module.classes),
+      ];
 
       const fileEntity = new FileNode({
         name: fileEntityName,
@@ -1824,7 +1827,8 @@ export class TypeScriptToTypedMindConverter {
         return;
       default: {
         const exhaustive: never = node;
-        return exhaustive;
+        void exhaustive;
+        return;
       }
     }
   }
