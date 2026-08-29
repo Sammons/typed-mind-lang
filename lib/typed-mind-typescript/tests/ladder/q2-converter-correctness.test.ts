@@ -224,7 +224,18 @@ describe('RFC-TM-9 Q2 check — X-AN-10: --recognize sst-handler (flag-gated, on
 
     const golden = JSON.parse(readFileSync(join(fixtureDir, 'module-graph.infra.recognized.json'), 'utf8'));
     assert.deepEqual(analysis.moduleGraph, golden);
-    assert.equal(analysis.diagnostics.length, 0, 'the happy-path resolution surfaces no diagnostics');
+    // RFC-TM-10 Q3 (D-LEG-6) superseded this Q2-era "zero diagnostics"
+    // expectation: the resolved handler module now ALSO joins
+    // `traverseQueue` and is parsed standalone (it lives outside this
+    // fixture's root tsconfig, `exclude: ["packages"]`, by design), which
+    // discloses one 'recognizer-module-standalone-parsed' informational
+    // diagnostic naming the exact fidelity loss (no checker-backed JSDoc
+    // symbol resolution for that module) rather than silently degrading.
+    assert.deepEqual(
+      analysis.diagnostics.map((d) => d.category),
+      ['recognizer-module-standalone-parsed'],
+      'the happy-path resolution surfaces exactly the Q3 standalone-parse disclosure, nothing else',
+    );
   });
 
   it('recognizer not-found: a handler string pointing nowhere surfaces an X-DIAG-1 warning, never silence', () => {

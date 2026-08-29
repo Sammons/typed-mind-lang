@@ -163,7 +163,13 @@ export interface TypeScriptProjectAnalysis {
 // modules, and (Q1) the entrypoint-outside-file-set case. Q2 adds
 // 'recognizer-not-found' for X-AN-10's convention-table recognizer: a
 // probe that finds no source file, or a member absent from the resolved
-// module's exports, surfaces this instead of silence (RFC §6).
+// module's exports, surfaces this instead of silence (RFC §6). RFC-TM-10
+// Q3 (D-LEG-6) adds 'recognizer-module-standalone-parsed': the resolved
+// handler module is traversed and analyzed via a standalone parse (it lives
+// outside `this.program`'s file set by design — that's the whole reason the
+// recognizer exists), which means type-checker-backed JSDoc symbol
+// resolution is unavailable for that one module; this is disclosed here
+// rather than silently degrading, per the same X-DIAG-1 discipline.
 export interface AnalyzerDiagnostic {
   readonly severity: 'error' | 'warning';
   readonly category:
@@ -172,7 +178,8 @@ export interface AnalyzerDiagnostic {
     | 'non-literal-dynamic-import'
     | 'skipped-module'
     | 'zero-entities'
-    | 'recognizer-not-found';
+    | 'recognizer-not-found'
+    | 'recognizer-module-standalone-parsed';
   readonly message: string;
   readonly filePath: string | undefined;
   readonly specifier: string | undefined;
