@@ -238,14 +238,37 @@ describe('RFC-TM-9 Q2 check — X-AN-10: --recognize sst-handler (flag-gated, on
     );
   });
 
-  it('recognizer not-found: a handler string pointing nowhere surfaces an X-DIAG-1 warning, never silence', () => {
+  // RFC-TM-10 §11 (rfc-tm-10-diamond.md, D-LEG-11, Diamond DAG Q8) —
+  // exact-text pin for the one live X-DIAG-1 warning class §11's enumeration
+  // names. DISCLOSED SCOPE NOTE: this message is authored directly from
+  // typescript-analyzer.ts's own construction site, NOT from a
+  // diagnostic-code-audit.md row — D-LEG-12's audit (Q7) bounded itself to
+  // exactly the 62-row `CHECK_CODES` registry (checker/pipeline codes only,
+  // per §12's "Bounded scope... one per CHECK_CODES entry"), and D-LEG-10(b)'s
+  // jargon lint (Q6) likewise scans only `src/checker`/`src/pipeline`
+  // (check-diagnostic-jargon.mjs's CHECKER_DIR/PIPELINE_DIR) — neither ever
+  // covered this extractor-package warning despite the style guide's own
+  // header text nominally including "every extractor warning." Retroactively
+  // widening Q6's lint or Q7's audit to the extractor package is outside
+  // D-LEG-11's own named scope (D-LEG-10/D-LEG-12 are separate, already-landed
+  // items), so this fixture pins the text directly and is exempted from
+  // `check-fixture-audit-gating.mjs`'s cross-validation by construction — that
+  // script only reads rows keyed by a `code:`-shaped registry entry
+  // (`checker/*`/`imports/*`/`semantics/*`/`syntax/*`), and this warning's
+  // `category` field (`recognizer-not-found`) is not such a code. Recorded
+  // here rather than silently left as a substring match, matching this
+  // Diamond's own honest-disposition convention (D-LEG-7's residual, §7/§14).
+  it('recognizer not-found: a handler string pointing nowhere surfaces an X-DIAG-1 warning with pinned exact text, never silence', () => {
     const analyzer = new TypeScriptAnalyzer(fixturePath('23-recognizer-not-found'), undefined, ['sst-handler']);
     const analysis = analyzer.analyzeFromEntrypoint(fixturePath('23-recognizer-not-found', 'infra', 'api.ts'));
 
     const notFoundDiagnostics = analysis.diagnostics.filter((d) => d.category === 'recognizer-not-found');
     assert.equal(notFoundDiagnostics.length, 1);
     assert.equal(notFoundDiagnostics[0]?.severity, 'warning');
-    assert.ok(notFoundDiagnostics[0]?.message.includes('nonexistent/path.handler'));
+    assert.equal(
+      notFoundDiagnostics[0]?.message,
+      "sst-handler recognizer: no source file found for handler string 'nonexistent/path.handler' (probed nonexistent/path.ts, nonexistent/path.tsx, nonexistent/path.mts)",
+    );
 
     const edge = analysis.moduleGraph.find((e) => e.specifier === 'nonexistent/path.handler');
     assert.equal(edge?.classification, 'unresolved');
