@@ -81,4 +81,7 @@ export { type ParseTypeExprTextOptions, type ParseTypeExprTextResult, parseTypeE
 // the legacy bridge and its DSLCheckerOptions (skipOrphanCheck/
 // validateGrammar/strictMode) and checkSafe/Result box died with the facade
 // (RFC-TM-4 FAQ Q4).
+// RFC-TM-10 §13 (rfc-tm-10-diamond.md, D-LEG-13) — checkWithParseGate joins
+// TypedMind's other public methods on this surface; the CLI (a sibling
+// workspace package, @sammons/typed-mind-cli) is its only consumer today.
 export { type CheckOutcome, type ParseOutput, TypedMind, type TypedMindOptions } from './typed-mind.ts';

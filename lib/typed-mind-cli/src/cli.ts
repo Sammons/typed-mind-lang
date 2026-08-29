@@ -132,11 +132,16 @@ async function main() {
       // RFC-TM-4 \u00a73 (S-CONS-CLI-1): --check and the default-to-check path
       // adopt the new surface \u2014 main() is already async, so awaiting
       // TypedMind.create() here is the only change the flip requires.
+      // RFC-TM-10 \u00a713 (rfc-tm-10-diamond.md, D-LEG-13): --check is the CLI
+      // boundary that adopts the parse-before-check gate \u2014 checkWithParseGate
+      // skips the checker phase entirely when the extractor's output failed
+      // to parse, so a malformed emission surfaces as a parse failure instead
+      // of a checker-diagnostic storm built on top of unparsable input.
       console.log(`Checking ${filePath}...`);
       const typedMind = await TypedMind.create({
         skipOrphanCheck: values['skip-orphan-check'] as boolean,
       });
-      const result = typedMind.check(content, absolutePath);
+      const result = typedMind.checkWithParseGate(content, absolutePath);
 
       if (result.valid) {
         console.log('\u2713 No errors found!');
