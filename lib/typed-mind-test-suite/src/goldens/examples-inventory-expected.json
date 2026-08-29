@@ -77,15 +77,6 @@
       {
         "code": "checker/orphaned-entity",
         "severity": "error",
-        "line": 65,
-        "column": 1,
-        "endLine": 65,
-        "endColumn": 68,
-        "message": "Orphaned entity 'AuditRecordDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
         "line": 89,
         "column": 1,
         "endLine": 89,
@@ -122,24 +113,6 @@
       {
         "code": "checker/orphaned-entity",
         "severity": "error",
-        "line": 132,
-        "column": 1,
-        "endLine": 132,
-        "endColumn": 61,
-        "message": "Orphaned entity 'MonitoringConfigDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 139,
-        "column": 1,
-        "endLine": 139,
-        "endColumn": 71,
-        "message": "Orphaned entity 'SecurityConfigDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
         "line": 146,
         "column": 1,
         "endLine": 146,
@@ -154,15 +127,6 @@
         "endLine": 153,
         "endColumn": 71,
         "message": "Orphaned entity 'PermissionDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 161,
-        "column": 1,
-        "endLine": 161,
-        "endColumn": 55,
-        "message": "Orphaned entity 'UserDTO'"
       },
       {
         "code": "syntax/error",
@@ -708,42 +672,6 @@
         "endLine": 175,
         "endColumn": 64,
         "message": "Method 'sendOrderConfirmation' not found on classfile 'NotificationService'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 191,
-        "column": 1,
-        "endLine": 191,
-        "endColumn": 39,
-        "message": "Orphaned entity 'OrderItemDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 207,
-        "column": 1,
-        "endLine": 207,
-        "endColumn": 42,
-        "message": "Orphaned entity 'OrderTotalsDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 214,
-        "column": 1,
-        "endLine": 214,
-        "endColumn": 35,
-        "message": "Orphaned entity 'AddressDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 221,
-        "column": 1,
-        "endLine": 221,
-        "endColumn": 44,
-        "message": "Orphaned entity 'PaymentMethodDTO'"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1874,119 +1802,11 @@
       {
         "code": "checker/orphaned-entity",
         "severity": "error",
-        "line": 172,
-        "column": 1,
-        "endLine": 172,
-        "endColumn": 64,
-        "message": "Orphaned entity 'UserProfileDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 179,
-        "column": 1,
-        "endLine": 179,
-        "endColumn": 70,
-        "message": "Orphaned entity 'UserPreferencesDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 185,
-        "column": 1,
-        "endLine": 185,
-        "endColumn": 61,
-        "message": "Orphaned entity 'LocationDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 191,
-        "column": 1,
-        "endLine": 191,
-        "endColumn": 75,
-        "message": "Orphaned entity 'NotificationPrefsDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 197,
-        "column": 1,
-        "endLine": 197,
-        "endColumn": 76,
-        "message": "Orphaned entity 'PrivacySettingsDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 214,
-        "column": 1,
-        "endLine": 214,
-        "endColumn": 70,
-        "message": "Orphaned entity 'LinkedAccountDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 220,
-        "column": 1,
-        "endLine": 220,
-        "endColumn": 74,
-        "message": "Orphaned entity 'VerificationStatusDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
         "line": 232,
         "column": 1,
         "endLine": 232,
         "endColumn": 71,
         "message": "Orphaned entity 'ValidationRuleDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 252,
-        "column": 1,
-        "endLine": 252,
-        "endColumn": 76,
-        "message": "Orphaned entity 'FeatureFlags_DTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 264,
-        "column": 1,
-        "endLine": 264,
-        "endColumn": 69,
-        "message": "Orphaned entity 'DbCredentialsDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 269,
-        "column": 1,
-        "endLine": 269,
-        "endColumn": 74,
-        "message": "Orphaned entity 'ConnectionPoolDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 285,
-        "column": 1,
-        "endLine": 285,
-        "endColumn": 68,
-        "message": "Orphaned entity 'AlertThresholdsDTO'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 295,
-        "column": 1,
-        "endLine": 295,
-        "endColumn": 61,
-        "message": "Orphaned entity 'LogRotationDTO'"
       },
       {
         "code": "checker/orphaned-entity",
@@ -2908,15 +2728,6 @@
         "endLine": 89,
         "endColumn": 7,
         "message": "Orphaned entity 'app'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 112,
-        "column": 1,
-        "endLine": 112,
-        "endColumn": 47,
-        "message": "Orphaned entity 'ValidationErrorDTO'"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4333,15 +4144,6 @@
         "message": "Orphaned entity 'LongformBlock'"
       },
       {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 69,
-        "column": 1,
-        "endLine": 69,
-        "endColumn": 25,
-        "message": "Orphaned entity 'GrammarValidationError'"
-      },
-      {
         "code": "checker/dto-field-non-data-type",
         "severity": "error",
         "line": 71,
@@ -4358,15 +4160,6 @@
         "endLine": 76,
         "endColumn": 26,
         "message": "Orphaned entity 'GrammarValidationResult'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 82,
-        "column": 1,
-        "endLine": 82,
-        "endColumn": 12,
-        "message": "Orphaned entity 'Reference'"
       },
       {
         "code": "checker/dto-field-non-data-type",
@@ -4466,24 +4259,6 @@
       {
         "code": "checker/orphaned-entity",
         "severity": "error",
-        "line": 110,
-        "column": 1,
-        "endLine": 110,
-        "endColumn": 47,
-        "message": "Orphaned entity 'EntityType'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 113,
-        "column": 1,
-        "endLine": 113,
-        "endColumn": 48,
-        "message": "Orphaned entity 'Position'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
         "line": 117,
         "column": 1,
         "endLine": 117,
@@ -4538,29 +4313,11 @@
       {
         "code": "checker/orphaned-entity",
         "severity": "error",
-        "line": 155,
-        "column": 1,
-        "endLine": 155,
-        "endColumn": 34,
-        "message": "Orphaned entity 'DTOField'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
         "line": 161,
         "column": 1,
         "endLine": 161,
         "endColumn": 35,
         "message": "Orphaned entity 'DTOEntity'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 166,
-        "column": 1,
-        "endLine": 166,
-        "endColumn": 45,
-        "message": "Orphaned entity 'ValidationError'"
       },
       {
         "code": "checker/orphaned-entity",

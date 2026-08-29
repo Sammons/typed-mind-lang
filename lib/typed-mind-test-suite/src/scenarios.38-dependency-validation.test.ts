@@ -25,17 +25,22 @@ describe('scenario-38-dependency-validation', () => {
     // unparsable text: `-> []`) and AUTHORIZED[A1] (:: new :: L22 :: illegal
     // continuation: imports list (`<- [...]`) cannot attach to a Class
     // entity) are new parse-time diagnostics (outcome.diagnostics), not
-    // validator findings — this test only asserts on `validation.findings`,
-    // which stays at 5, matching the legacy validator.errors count.
-    assert.equal(validation.findings.length, 5);
+    // validator findings — this test only asserts on `validation.findings`.
+    // RFC-TM-10 Q4 (rfc-tm-10-diamond.md §8, D-LEG-8) fixed
+    // `collectReferencedNames` to walk DTO field types: `User` is
+    // referenced only via `AuthResponse`'s `user: User` field, so it no
+    // longer orphans. Count drops from 5 (legacy validator.errors count) to
+    // 4.
+    assert.equal(validation.findings.length, 4);
 
     const findingMessages = validation.findings.map((finding) => finding.message);
 
     // Should detect that 'calls' cannot reference a Dependency
     assert.ok(findingMessages.includes("Cannot use 'calls' to reference Dependency 'axios'"));
 
-    // Should detect orphaned entity
-    assert.ok(findingMessages.includes("Orphaned entity 'User'"));
+    // 'User' is no longer orphaned (D-LEG-8) — it is referenced via
+    // AuthResponse's DTO field. Negative check, not a positive assertion.
+    assert.equal(findingMessages.includes("Orphaned entity 'User'"), false);
 
     // Should detect that class is not exported by any file
     assert.ok(findingMessages.includes("Class 'AuthService' is not exported by any file"));
@@ -50,8 +55,7 @@ describe('scenario-38-dependency-validation', () => {
     assert.equal(axiosCallFinding?.span.start.line, 29);
     assert.equal(axiosCallFinding?.span.start.column, 1);
 
-    const orphanedUserFinding = validation.findings.find((finding) => finding.message.includes("Orphaned entity 'User'"));
-    assert.equal(orphanedUserFinding?.span.start.line, 43);
+    // No position assertion for 'User' — it is no longer a finding (D-LEG-8).
 
     const authServiceFinding = validation.findings.find((finding) =>
       finding.message.includes("Class 'AuthService' is not exported by any file"),

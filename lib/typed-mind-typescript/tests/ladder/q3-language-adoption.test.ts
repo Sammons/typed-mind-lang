@@ -11,26 +11,24 @@
 //     (tmd-goldens.test.ts's per-fixture header comments carry this)
 //
 // "Pass the checker" scope note (same disclosure shape as Q2's file
-// header): two PRE-EXISTING, Q3-unrelated defects are present on main and
-// confirmed via control fixtures below:
+// header): this suite ORIGINALLY documented two PRE-EXISTING,
+// Q3-unrelated defects, confirmed via the control fixtures below:
 //   1. `checker/multi-exported` — Program.exports always duplicates its
 //      entry File's exports (documented in q2-converter-correctness.test.ts's
-//      header; unowned by any X-item in this RFC).
+//      header; unowned by any X-item in RFC-TM-9). Filed as issue #62.
 //   2. `checker/orphaned-entity` on an entity referenced ONLY via a DTO
 //      field's type — `check-orphans.ts`'s `collectReferencedNames` never
-//      walks DTO/DtoField structure at all (confirmed pre-existing via an
-//      isolated DTO-to-DTO fixture with no TypeDef involved whatsoever:
-//      a DTO referenced only as a sibling DTO's field type orphans the
-//      same way). This predates both TM-8 and TM-9 — it is a `lib/typed-
-//      mind/src/checker/check-orphans.ts` gap, outside this Quantum's
-//      converter-only surface (`lib/typed-mind-typescript/`) and outside
-//      the frozen X-AN-7/X-CONV-2/X-SUPP-6 item set. Flagged for a
-//      follow-up issue, not fixed here, per this Quantum's file-
-//      disjointness boundary with TM-8/TM-9 Q4's parallel `lib/typed-mind`
-//      work.
-// Checks below pin the FULL diagnostic-code list (not a blanket
-// `valid: true`) so a NEW diagnostic class regresses these tests while the
-// two known, disclosed defects do not — the same discipline
+//      walked DTO/DtoField structure at all (confirmed pre-existing via an
+//      isolated DTO-to-DTO fixture with no TypeDef involved whatsoever: a
+//      DTO referenced only as a sibling DTO's field type orphaned the same
+//      way). This predated both TM-8 and TM-9. Filed as issue #63.
+// Both are now FIXED by RFC-TM-10 Q4 (rfc-tm-10-diamond.md §7/§8, D-LEG-7/
+// D-LEG-8): D-LEG-7 excludes the Program/entry-File duplication shape via a
+// direct field comparison (no import-provenance reasoning); D-LEG-8 walks
+// the complete TypeExprNode structure from DTO fields. The fixtures below
+// now assert zero diagnostics for both classes. Checks below still pin the
+// FULL diagnostic-code list (not a blanket `valid: true`) so a NEW
+// diagnostic class regresses these tests — the same discipline
 // q2-converter-correctness.test.ts already established.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
@@ -70,11 +68,13 @@ describe('RFC-TM-9 Q3 check — X-AN-7/X-CONV-2: real TS enum emits TM-8 TypeDef
 
     const { result: checkResult } = await checkViaLongform(result.entities);
     const codes = checkResult.diagnostics.map((d) => d.code).sort();
-    // Pre-existing, Q3-unrelated defects only (see file header): the DTO-
-    // field-reference orphan gap (Status is referenced only via Job's
-    // `status:` field type) and the Program/File dual-export defect
-    // (fires once per dual-exported entity — Job and describe).
-    assert.deepEqual(codes, ['checker/multi-exported', 'checker/multi-exported', 'checker/orphaned-entity']);
+    // RFC-TM-10 Q4 (rfc-tm-10-diamond.md §7/§8, D-LEG-7/D-LEG-8) fixed both
+    // defect classes this fixture used to pin as pre-existing (see file
+    // header): the Program/entry-File dual-export exclusion (Job and
+    // describe both cleared) and the DTO-field-reference orphan walk
+    // (Status, referenced only via Job's `status:` field type, now
+    // resolves). Zero diagnostics now.
+    assert.deepEqual(codes, []);
   });
 });
 
@@ -104,11 +104,11 @@ describe('RFC-TM-9 Q3 check — X-AN-7/X-CONV-2: type alias emits TM-8 TypeDef e
 
     const { result: checkResult } = await checkViaLongform(result.entities);
     const codes = checkResult.diagnostics.map((d) => d.code).sort();
-    // Same two pre-existing, Q3-unrelated defect FAMILIES as the enum case
-    // above — both Role and RoleId are referenced only via Member's DTO
-    // field types (one orphan finding each), and multi-exported fires once
-    // per dual-exported entity (Member and describe).
-    assert.deepEqual(codes, ['checker/multi-exported', 'checker/multi-exported', 'checker/orphaned-entity', 'checker/orphaned-entity']);
+    // RFC-TM-10 Q4 fixed the same two defect families as the enum case above
+    // — Role and RoleId (referenced only via Member's DTO field types) no
+    // longer orphan, and multi-exported no longer fires on the Program/entry
+    // pair (Member and describe). Zero diagnostics now.
+    assert.deepEqual(codes, []);
   });
 });
 
