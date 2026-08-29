@@ -118,7 +118,9 @@ describe('RFC-TM-10 Q1 check — D-LEG-3: namespace-qualified implements sanitiz
     const result = converter.convert(analysis);
     assert.equal(result.success, true);
 
-    const stub = result.entities.find((e) => e.name === 'TsParseConfigFileHost') as { kind: string; methods: readonly string[] } | undefined;
+    const stub = result.entities.find((e) => e.name === 'TsParseConfigFileHost') as
+      | { kind: string; methods: readonly string[] }
+      | undefined;
     assert.notEqual(stub, undefined, 'a sanitized stub named TsParseConfigFileHost must be synthesized');
     assert.equal(stub?.kind, 'Class');
     assert.equal(stub?.methods.length, 0, 'the stub carries zero methods, matching X-CONV-5s zero-methods shape');
@@ -135,7 +137,11 @@ describe('RFC-TM-10 Q1 check — D-LEG-3: namespace-qualified implements sanitiz
 
     const { result: checkResult } = await checkViaLongform(result.entities);
     const codes = checkResult.diagnostics.map((d) => d.code);
-    assert.equal(codes.some((c) => c.startsWith('syntax/')), false, 'zero syntax diagnostics — the dotted name must parse cleanly');
+    assert.equal(
+      codes.some((c) => c.startsWith('syntax/')),
+      false,
+      'zero syntax diagnostics — the dotted name must parse cleanly',
+    );
   });
 });
 
@@ -165,6 +171,10 @@ describe('RFC-TM-10 Q1 check — D-LEG-4: multi-paragraph JSDoc collapse', () =>
 
     const { result: checkResult } = await checkViaLongform(result.entities);
     const codes = checkResult.diagnostics.map((d) => d.code);
-    assert.equal(codes.some((c) => c.startsWith('syntax/')), false, 'zero syntax diagnostics — the blank line must never desync the parser');
+    assert.equal(
+      codes.some((c) => c.startsWith('syntax/')),
+      false,
+      'zero syntax diagnostics — the blank line must never desync the parser',
+    );
   });
 });
