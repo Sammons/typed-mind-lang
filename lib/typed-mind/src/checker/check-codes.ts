@@ -22,9 +22,16 @@
 // the renamed code's findings for as long as the record exists. Deleting the
 // record is the deliberate, breaking act (doc's closing FAQ).
 
-// The frozen baseline (60 codes, alphabetized). Grouped by producing module
+// The frozen baseline (62 codes, alphabetized). Grouped by producing module
 // with a one-line pointer so a reviewer can find the emission site; the
 // registry itself is a flat set — grouping is a comment convenience only.
+//
+// RFC-TM-10 mandatory-first-act (rfc-tm-10-diamond.md, Q1 drive-by) — this
+// comment previously understated the array's actual length as 60. A direct
+// count of CHECK_CODES below returns 62 string literals, confirmed both by
+// a deduplicated scan of the array literal and by check-codes.test.ts's own
+// stability assertion (the extracted live code set deep-equals this array
+// sorted) — 62 is both the array's length and the live emitted code count.
 export const CHECK_CODES = [
   // check-assets.ts
   'checker/asset-contains-non-program',

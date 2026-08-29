@@ -17,6 +17,7 @@ import {
   SuppressionNode,
   SyntaxEmitter,
   TypeDefNode,
+  type TypeExprNode,
 } from '@sammons/typed-mind';
 import type {
   ConversionError,
@@ -54,6 +55,21 @@ const sortIntoLegacySectionOrder = (entities: readonly EntityNode[]): EntityNode
   return [...entities].sort(
     (a, b) => (rank.get(a.kind) ?? LEGACY_SECTION_ORDER.length) - (rank.get(b.kind) ?? LEGACY_SECTION_ORDER.length),
   );
+};
+
+// RFC-TM-10 §4 (rfc-tm-10-diamond.md, D-LEG-4, issue #60, LEAD RULING:
+// collapse never truncate) — the analyzer (X-AN-6) extracts a JSDoc
+// comment's full multi-paragraph text correctly; the converter previously
+// emitted that raw multi-line text verbatim into a single-line grammar
+// production (the `string` token excludes newlines, `grammar.js:1159`),
+// desyncing the parser on the first embedded blank line. This pure
+// function collapses to the grammar's single-line shape WITHOUT truncating
+// to a sentence: split on the JSDoc paragraph boundary (a blank line), keep
+// the ENTIRE first paragraph however long, whitespace-normalize it to one
+// line. Every purpose/description assignment site routes through this.
+const collapseDescription = (raw: string): string => {
+  const [firstParagraph] = raw.split(/\n\s*\n/);
+  return (firstParagraph ?? '').replace(/\s+/g, ' ').trim();
 };
 
 // Two-pass architecture data structures
@@ -100,6 +116,18 @@ export class TypeScriptToTypedMindConverter {
   // exactly one stub, following the existing Node-builtins purpose-map
   // precedent (`derivePurpose`'s `nodeBuiltins` table).
   private readonly builtinExtendsStubNames = new Set<string>();
+  // RFC-TM-10 §3 (rfc-tm-10-diamond.md, D-LEG-3, issue #61, LEAD RULING: no
+  // new sigil). A namespace-qualified `implements` target (`ts.ParseConfigFileHost`)
+  // is unrepresentable by the grammar's `entity_name` token (no `.` accepted)
+  // — `ensureNamespaceImplementsStub` sanitizes it to a valid identifier and
+  // synthesizes a bare stub ClassNode, mirroring `builtinExtendsStubNames`'s
+  // idempotent one-stub-per-name discipline so a target referenced by
+  // multiple classes shares one stub. Deliberately UNBOUNDED (unlike the
+  // curated `KNOWN_AMBIENT_EXTENDS_TARGETS` allowlist below) because
+  // `implements` targets are structural — they can never introduce a real
+  // inheritance edge the checker's unknown-base-class/circular-inheritance
+  // rules police.
+  private readonly namespaceImplementsStubNames = new Set<string>();
   // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — predicts, at Phase 1
   // registration time, whether a `types`-registry name will end up a
   // DtoNode (object-like type alias, `imports.to`-legal) or a TypeDefNode
@@ -313,6 +341,7 @@ export class TypeScriptToTypedMindConverter {
     this.externalTypeToPackage.clear();
     this.entryPoints.clear();
     this.builtinExtendsStubNames.clear();
+    this.namespaceImplementsStubNames.clear();
     this.typesRegistryPredictedKind.clear();
 
     // Clear two-pass registries
@@ -901,6 +930,72 @@ export class TypeScriptToTypedMindConverter {
     return entityName;
   }
 
+  // RFC-TM-10 §3 (D-LEG-3, issue #61, LEAD RULING: no new sigil, `<:`
+  // mapping with representable qualified names). A namespace-qualified
+  // `implements` target's text contains a `.` (`ts.ParseConfigFileHost`) —
+  // the grammar's `entity_name` token accepts no dot, so the converter must
+  // not emit it verbatim. `sanitizeEntityName` already strips non-
+  // `[a-zA-Z0-9_]` characters (including `.`) and PascalCases the remainder
+  // (`ts.ParseConfigFileHost` -> `TsParseConfigFileHost`), the same
+  // deterministic transform X-CONV-4 already proved collision-safe. The
+  // stub is a bare ClassNode (zero methods, matching X-CONV-5's own
+  // zero-methods emission shape) so it never introduces a real inheritance
+  // edge the checker's unknown-base-class/circular-inheritance rules
+  // police — an `implements` target is structural, not a base class.
+  private ensureNamespaceImplementsStub(target: string): string {
+    const entityName = this.sanitizeEntityName(target);
+
+    if (!this.namespaceImplementsStubNames.has(entityName)) {
+      this.namespaceImplementsStubNames.add(entityName);
+      this.entityNames.add(entityName);
+
+      const stubEntity = new ClassNode({
+        name: entityName,
+        span: SYNTHETIC_SPAN,
+        raw: `${entityName} <:`,
+        sourceForm: 'shortform',
+        extends: undefined,
+        implements: [],
+        methods: [],
+        purpose: 'Ambient namespace-qualified interface (auto-stubbed)',
+      });
+
+      this.entities.push(stubEntity);
+    }
+
+    return entityName;
+  }
+
+  // Converts a class's raw `implements` target list (which may include
+  // TypedMind's own convention of folding secondary `extends` targets into
+  // `implements`, per `cls.extends.slice(1)` at the call site) into the
+  // grammar-representable list: a namespace-qualified target (contains `.`)
+  // is replaced by its sanitized stub's entity name; a bare identifier
+  // target passes through unchanged.
+  private convertImplementsList(secondaryExtends: readonly string[], implementsTargets: readonly string[]): string[] {
+    return [...secondaryExtends, ...implementsTargets].map((target) =>
+      target.includes('.') ? this.ensureNamespaceImplementsStub(target) : target,
+    );
+  }
+
+  // Collects the namespace-implements stub names newly needed by a module's
+  // own classes, so the caller (mirroring `collectBuiltinExtendsStubImports`)
+  // can fold them into that module's File/ClassFile `imports` list — a stub
+  // is otherwise unreferenced by any import edge, which would leave it
+  // orphaned by the checker's orphan rule (`implements` is never counted as
+  // a reference, per check-orphans.ts).
+  private collectNamespaceImplementsStubImports(classes: readonly ParsedClass[]): string[] {
+    const stubNames: string[] = [];
+    for (const cls of classes) {
+      for (const target of cls.implements) {
+        if (target.includes('.')) {
+          stubNames.push(this.ensureNamespaceImplementsStub(target));
+        }
+      }
+    }
+    return stubNames;
+  }
+
   // Collects the builtin-extends stub names newly needed by a module's own
   // classes, so the caller can fold them into that module's File/ClassFile
   // `imports` list. A stub is otherwise unreferenced by any import edge
@@ -952,7 +1047,19 @@ export class TypeScriptToTypedMindConverter {
     // global its source references, so it both imports and exports it.
     const primaryStubName = this.ensureBuiltinExtendsStub(primaryClass.extends[0]);
     const otherStubNames = this.collectBuiltinExtendsStubImports(module.classes.filter((cls) => cls !== primaryClass));
-    const stubNames = primaryStubName !== undefined ? [primaryStubName, ...otherStubNames] : otherStubNames;
+    // D-LEG-3 — namespace-qualified `implements` targets (`ts.Foo`) get the
+    // same stub-import-folding treatment as builtin-extends targets: a stub
+    // is otherwise unreferenced by any import edge, so it needs folding into
+    // this ClassFile's imports/exports the same way `stubNames` already does
+    // for builtin-extends stubs above.
+    const primaryImplementsStubNames = this.collectNamespaceImplementsStubImports([primaryClass]);
+    const otherImplementsStubNames = this.collectNamespaceImplementsStubImports(module.classes.filter((cls) => cls !== primaryClass));
+    const stubNames = [
+      ...(primaryStubName !== undefined ? [primaryStubName] : []),
+      ...otherStubNames,
+      ...primaryImplementsStubNames,
+      ...otherImplementsStubNames,
+    ];
 
     const classFileEntity = new ClassFileNode({
       name: entityName,
@@ -961,11 +1068,11 @@ export class TypeScriptToTypedMindConverter {
       sourceForm: 'shortform',
       path: this.getRelativePath(module.filePath),
       extends: primaryClass.extends[0] || undefined, // TypedMind supports single inheritance
-      implements: [...primaryClass.extends.slice(1), ...primaryClass.implements],
+      implements: this.convertImplementsList(primaryClass.extends.slice(1), primaryClass.implements),
       methods: this.convertMethods(primaryClass),
       imports: [...this.convertImports(module.imports, module.exports), ...stubNames],
       exports: [...this.convertExports(module, entityName), ...stubNames],
-      purpose: primaryClass.description || undefined,
+      purpose: primaryClass.description ? collapseDescription(primaryClass.description) : undefined,
     });
 
     this.entities.push(classFileEntity);
@@ -1025,7 +1132,12 @@ export class TypeScriptToTypedMindConverter {
       // stub — it is the file that vouches for the ambient global its
       // source references (the stub isn't a member of this module, but
       // this module is the only place with an honest claim to it).
-      const stubNames = this.collectBuiltinExtendsStubImports(module.classes);
+      // D-LEG-3 — same stub-import-folding treatment for namespace-qualified
+      // `implements` targets as the builtin-extends stubs above.
+      const stubNames = [
+        ...this.collectBuiltinExtendsStubImports(module.classes),
+        ...this.collectNamespaceImplementsStubImports(module.classes),
+      ];
 
       const fileEntity = new FileNode({
         name: fileEntityName,
@@ -1097,9 +1209,9 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} <: ${cls.extends.join(', ')}`,
       sourceForm: 'shortform',
       extends: cls.extends[0] || undefined, // TypedMind supports single inheritance
-      implements: [...cls.extends.slice(1), ...cls.implements],
+      implements: this.convertImplementsList(cls.extends.slice(1), cls.implements),
       methods: this.convertMethods(cls),
-      purpose: cls.description || undefined,
+      purpose: cls.description ? collapseDescription(cls.description) : undefined,
     });
 
     this.entities.push(classEntity);
@@ -1131,7 +1243,7 @@ export class TypeScriptToTypedMindConverter {
       signature: func.signature,
       calls: [], // Will be populated by analyzing function bodies if needed
       pendingDependencies: [],
-      description: func.description || undefined,
+      description: func.description ? collapseDescription(func.description) : undefined,
       input: inputDTO,
       output: outputDTO,
     });
@@ -1151,15 +1263,20 @@ export class TypeScriptToTypedMindConverter {
 
     const fields = iface.properties.map((prop) => {
       const type = this.sanitizeFieldType(prop.type);
+      // RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2): the converter builds a
+      // synthetic DtoFieldNode from an already-sanitized type string, not a
+      // parsed CST subtree — parseTypeExprText (the same hand-rolled parser
+      // the longform `type:` quoted-string value reuses) gives it a real
+      // TypeExprNode instead of leaving the field's structure unpopulated.
+      const typeExpr = parseTypeExprText(type).typeExpr;
+      // D-LEG-2 (rfc-tm-10-diamond.md §2, issue #65) — every TypeExprNode
+      // reachable from a DTO field is walked for a generic-argument
+      // external type needing a Dependency-exports stub.
+      this.walkGenericArgsForExternalStubs(typeExpr);
       return new DtoFieldNode({
         name: prop.name,
         type,
-        // RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2): the converter builds a
-        // synthetic DtoFieldNode from an already-sanitized type string, not a
-        // parsed CST subtree — parseTypeExprText (the same hand-rolled parser
-        // the longform `type:` quoted-string value reuses) gives it a real
-        // TypeExprNode instead of leaving the field's structure unpopulated.
-        typeExpr: parseTypeExprText(type).typeExpr,
+        typeExpr,
         optionalityMarker: prop.isOptional ? 'question' : 'none',
         span: SYNTHETIC_SPAN,
       });
@@ -1171,7 +1288,7 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} %`,
       sourceForm: 'shortform',
       fields,
-      purpose: iface.description || undefined,
+      purpose: iface.description ? collapseDescription(iface.description) : undefined,
     });
 
     this.entities.push(dtoEntity);
@@ -1196,7 +1313,7 @@ export class TypeScriptToTypedMindConverter {
         raw: `${entityName} %`,
         sourceForm: 'shortform',
         fields: this.parseTypeToFields(typeAlias.type),
-        purpose: typeAlias.description || undefined,
+        purpose: typeAlias.description ? collapseDescription(typeAlias.description) : undefined,
       });
 
       this.entities.push(dtoEntity);
@@ -1217,14 +1334,20 @@ export class TypeScriptToTypedMindConverter {
     // `Cannot use 'schema' to reference <kind>`.
     this.addEntityName(entityName, 'convertTypeAliasToDTO-alias');
 
+    const aliasType = parseTypeExprText(typeAlias.type).typeExpr;
+    // D-LEG-2 (rfc-tm-10-diamond.md §2, issue #65) — walk the alias's
+    // TypeExprNode for any generic-argument external type needing a
+    // Dependency-exports stub.
+    this.walkGenericArgsForExternalStubs(aliasType);
+
     const typeDefEntity = new TypeDefNode({
       name: entityName,
       span: SYNTHETIC_SPAN,
       raw: `${entityName} = ${typeAlias.type}`,
       sourceForm: 'shortform',
       variant: 'alias',
-      aliasType: parseTypeExprText(typeAlias.type).typeExpr,
-      purpose: typeAlias.description || undefined,
+      aliasType,
+      purpose: typeAlias.description ? collapseDescription(typeAlias.description) : undefined,
     });
 
     this.entities.push(typeDefEntity);
@@ -1253,7 +1376,7 @@ export class TypeScriptToTypedMindConverter {
       sourceForm: 'shortform',
       variant: 'enum',
       members: enumDef.members,
-      purpose: enumDef.description || undefined,
+      purpose: enumDef.description ? collapseDescription(enumDef.description) : undefined,
     });
 
     this.entities.push(typeDefEntity);
@@ -1563,6 +1686,11 @@ export class TypeScriptToTypedMindConverter {
       if (param && this.isDTOLikeType(param.type)) {
         // If this is an external type, add it to the dependency's exports
         this.addExternalTypeToDepExports(param.type);
+        // D-LEG-2 (issue #65) — walk the type's structured TypeExprNode for
+        // any generic-argument external type (`Pick<S3Client, "send">`)
+        // that also needs a Dependency-exports stub, on the same path
+        // D-LEG-1 (below) proves is DTO-like.
+        this.walkGenericArgsForExternalStubs(parseTypeExprText(param.type).typeExpr);
         return param.type;
       }
     }
@@ -1574,6 +1702,12 @@ export class TypeScriptToTypedMindConverter {
     if (this.isDTOLikeType(returnType)) {
       // If this is an external type, add it to the dependency's exports
       this.addExternalTypeToDepExports(returnType);
+      // D-LEG-2 (issue #65) — same generic-argument walk as extractInputDTO
+      // above; this is the FUNCTION-SIGNATURE path issue #65's evidence
+      // (`Pick<S3Client, "send">` in outbound-delivery's return type) lives
+      // on, per the Diamond's revised §2 (the r0 draft's walk never reached
+      // this call site).
+      this.walkGenericArgsForExternalStubs(parseTypeExprText(returnType).typeExpr);
       return returnType;
     }
     return undefined;
@@ -1583,11 +1717,115 @@ export class TypeScriptToTypedMindConverter {
     return type.includes('{') || type.includes('Record<') || type.includes('Map<');
   }
 
+  // RFC-TM-10 §1 (rfc-tm-10-diamond.md, D-LEG-1, issue #59) — REPLACES the
+  // prior single-heuristic `charAt(0).toUpperCase() === charAt(0)` check,
+  // which had two proven false-positive faces: a quoted-string-union-literal
+  // type (`"empty" | "processed"`) starts with `"`, trivially passing the
+  // check; a Class/ClassFile-kind reference (`CheckContext`, `LinkIndex`)
+  // also passes the uppercase check — both routed through the DTO-only
+  // `input`/`output` continuation grammar the checker correctly rejects.
+  //
+  // The fix consults classification the converter already computes instead
+  // of re-deriving semantic kind from the type string's surface characters:
+  //   - A name resolving against `entityRegistry.classes` is Class/ClassFile
+  //     kind — NOT DTO-like. `extractInputDTO`/`extractOutputDTO` then leave
+  //     `input`/`output` `undefined` (a disclosed, accepted loss of the
+  //     cross-reference EDGE — `FunctionNode` has no other reference-capable
+  //     field per `VALID_REFERENCES.input.to`/`.output.to`'s frozen
+  //     `['DTO']`-only table, RFC-TM-4 — the type stays visible in the
+  //     signature TEXT regardless, `entity.signature` always emits
+  //     verbatim).
+  //   - A name resolving against `entityRegistry.interfaces` is the
+  //     ORIGINAL true positive this heuristic exists to serve (a real
+  //     `interface CreateUserRequest` parameter/return type) — DTO-like,
+  //     unchanged from before this fix.
+  //   - A type text starting with `"` (string-literal or string-literal-
+  //     union) parses via `parseTypeExprText`; a top-level `kind` of
+  //     `'literal'` or a `'union'` of only literal members is NOT DTO-like
+  //     for the same reason as the Class-kind case (`"empty" | "processed"`
+  //     is not a DTO reference).
+  //   - Everything else that isn't a bare primitive is DTO-like by
+  //     elimination — the same fallback the heuristic approximated, now
+  //     gated by classification instead of a first-character guess.
   private isDTOLikeType(type: string): boolean {
-    // Check if type looks like a custom DTO (not primitive)
     const primitives = ['string', 'number', 'boolean', 'void', 'any', 'unknown', 'null', 'undefined'];
     const cleaned = type.replace(/\[\]$/, ''); // Remove array suffix
-    return !primitives.includes(cleaned.toLowerCase()) && cleaned.charAt(0).toUpperCase() === cleaned.charAt(0);
+    if (primitives.includes(cleaned.toLowerCase())) {
+      return false;
+    }
+
+    // Class/ClassFile-kind reference: leave input/output undefined, per
+    // this item's disclosed-loss rationale above.
+    if (this.entityRegistry.classes.has(cleaned)) {
+      return false;
+    }
+
+    // Interface-kind reference: the ORIGINAL true positive, still DTO-like.
+    if (this.entityRegistry.interfaces.has(cleaned)) {
+      return true;
+    }
+
+    // A quoted-string-literal or string-literal-union type is a structured
+    // literal/union of literals, not a DTO reference.
+    if (cleaned.startsWith('"') || cleaned.startsWith("'")) {
+      const parsed = parseTypeExprText(cleaned).typeExpr;
+      if (parsed.kind === 'literal') {
+        return false;
+      }
+      if (parsed.kind === 'union' && parsed.members.every((member) => member.kind === 'literal')) {
+        return false;
+      }
+    }
+
+    // DTO-like by elimination: not a primitive, not a known Class, not a
+    // literal/literal-union — matches the heuristic's original fallback,
+    // gated by classification instead of a surface-character guess.
+    return cleaned.charAt(0).toUpperCase() === cleaned.charAt(0);
+  }
+
+  // RFC-TM-10 §2 (rfc-tm-10-diamond.md, D-LEG-2, issue #65) — a walk
+  // distinct from `ensureBuiltinExtendsStub`'s `extends`-triggered
+  // allowlist mechanism. Once a `TypeExprNode` exists for a DTO field, a
+  // function parameter, or a return type (via `parseTypeExprText`), every
+  // `generic`-kind node's `args` is walked for a `named`-kind argument whose
+  // name resolves via `externalTypeToPackage` to an external package import
+  // — `Pick<S3Client, "send">`'s `S3Client` argument, not `Pick` itself
+  // (`Pick` is a builtin generic, matches the checker's own PRIMITIVES
+  // allowlist, check-dto-fields.ts:30-49) and not `"send"` (a literal, no
+  // stub needed). Reuses `addExternalTypeToDepExports`'s existing
+  // rebuild-and-append `DependencyNode.exports` mechanism directly — no new
+  // stub-synthesis function, closing the latent duplication risk between
+  // this item and D-LEG-1's independently-authored issue.
+  private walkGenericArgsForExternalStubs(node: TypeExprNode): void {
+    switch (node.kind) {
+      case 'generic':
+        for (const arg of node.args) {
+          if (arg.kind === 'named') {
+            this.addExternalTypeToDepExports(arg.name);
+          } else {
+            this.walkGenericArgsForExternalStubs(arg);
+          }
+        }
+        return;
+      case 'union':
+      case 'intersection':
+        for (const member of node.members) {
+          this.walkGenericArgsForExternalStubs(member);
+        }
+        return;
+      case 'array':
+        this.walkGenericArgsForExternalStubs(node.element);
+        return;
+      case 'named':
+      case 'literal':
+      case 'opaque':
+        return;
+      default: {
+        const exhaustive: never = node;
+        void exhaustive;
+        return;
+      }
+    }
   }
 
   private addExternalTypeToDepExports(typeName: string): void {
@@ -1632,13 +1870,18 @@ export class TypeScriptToTypedMindConverter {
 
       for (const prop of properties) {
         const propType = this.sanitizeFieldType(prop.type);
+        // See the convertInterfaceToDTO construction site's comment
+        // (rfc-tm-8-diamond.md §2, X-TYPE-2) for why parseTypeExprText.
+        const typeExpr = parseTypeExprText(propType).typeExpr;
+        // D-LEG-2 (rfc-tm-10-diamond.md §2, issue #65) — walk this field's
+        // TypeExprNode for any generic-argument external type needing a
+        // Dependency-exports stub.
+        this.walkGenericArgsForExternalStubs(typeExpr);
         fields.push(
           new DtoFieldNode({
             name: prop.name,
             type: propType,
-            // See the convertInterfaceToDTO construction site's comment
-            // (rfc-tm-8-diamond.md §2, X-TYPE-2) for why parseTypeExprText.
-            typeExpr: parseTypeExprText(propType).typeExpr,
+            typeExpr,
             optionalityMarker: prop.optional ? 'question' : 'none',
             span: SYNTHETIC_SPAN,
           }),
