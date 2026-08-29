@@ -75,6 +75,14 @@ ui UserListComponent {
 
 The complete TypedMind grammar is documented in [grammar.md](./grammar.md) and available in EBNF format in [grammar.ebnf](./grammar.ebnf).
 
+## Contributing a checker rule or extractor warning
+
+Every diagnostic message follows [docs/diagnostic-style-guide.md](./docs/diagnostic-style-guide.md)'s
+three-clause rule (what, where, what to do), backtick-quotes every named
+entity, and avoids internal implementation vocabulary. A standing lint
+(`pnpm run check:diagnostic-jargon`) enforces the no-jargon half of that rule
+in CI.
+
 ## Requirements
 
 - Node.js >= 22.0.0
