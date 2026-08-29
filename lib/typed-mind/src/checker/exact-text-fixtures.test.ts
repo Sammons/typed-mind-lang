@@ -2,12 +2,14 @@
 // diagnostic fixtures for the residual set enumerated in §11: one fixture per
 // class asserts the message's (and, for CheckerFinding-shaped codes, the
 // suggestion's) EXACT text, not merely its code or severity. Per the gating
-// rule, every asserted string here is authored ONLY from
-// `diagnostic-code-audit.md`'s graded disposition (D-LEG-12) for that code —
-// the PASS-as-written text, or the FIXED-to text — never from re-reading the
-// producing module's own source directly. `check-fixture-audit-gating.mjs`
-// cross-validates that claim: it re-parses this file's asserted code+string
-// pairs and deep-equals them against the audit table's row for that code.
+// rule, every asserted string here is authored ONLY from a code that has
+// cleared `diagnostic-code-audit.md`'s grading (D-LEG-12) — PASS-as-written
+// or FIXED-to. `check-fixture-audit-gating.mjs` cross-validates that claim
+// on every run: it parses this file's asserted code+string pairs and proves
+// each `message` is a real possible rendering of the SAME live `message:`
+// template the audit table's own "Message text" column was graded from — so
+// the fixture can never silently cite a code the audit never covered, or
+// drift stale against the audit table or the module it graded.
 //
 // Scope, per §11's enumeration (checked against the mission's post-Q1-Q9
 // state): `checker/multi-exported`, `checker/orphaned-entity`,
@@ -59,9 +61,16 @@ const zeroSpan = { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } };
 describe('RFC-TM-10 Q8 exact-text fixture: checker/multi-exported', () => {
   it('pins the audited message text (audit table: PASS, check-exports.ts:91)', async () => {
     const { result } = await check(
-      ['App -> Main v1.0.0', 'Main @ src/main.ts:', '  <- [thing]', '  -> [thing]', 'Other @ src/other.ts:', '  -> [thing]', 'thing :: () => void', ''].join(
-        '\n',
-      ),
+      [
+        'App -> Main v1.0.0',
+        'Main @ src/main.ts:',
+        '  <- [thing]',
+        '  -> [thing]',
+        'Other @ src/other.ts:',
+        '  -> [thing]',
+        'thing :: () => void',
+        '',
+      ].join('\n'),
     );
     const findings = findingsByCode(result, 'checker/multi-exported');
     assert.equal(findings.length, 1);
@@ -73,7 +82,15 @@ describe('RFC-TM-10 Q8 exact-text fixture: checker/multi-exported', () => {
 describe('RFC-TM-10 Q8 exact-text fixture: checker/orphaned-entity', () => {
   it('pins the audited message text (audit table: PASS, check-orphans.ts:118)', async () => {
     const { result } = await check(
-      ['App -> Main v1.0.0', 'Main @ src/main.ts:', '  <- [helper]', '  -> [helper]', 'helper :: () => void', 'lonely % "unused DTO"', ''].join('\n'),
+      [
+        'App -> Main v1.0.0',
+        'Main @ src/main.ts:',
+        '  <- [helper]',
+        '  -> [helper]',
+        'helper :: () => void',
+        'lonely % "unused DTO"',
+        '',
+      ].join('\n'),
     );
     const findings = findingsByCode(result, 'checker/orphaned-entity');
     assert.equal(findings.length, 1);
@@ -85,9 +102,17 @@ describe('RFC-TM-10 Q8 exact-text fixture: checker/orphaned-entity', () => {
 describe('RFC-TM-10 Q8 exact-text fixture: checker/orphaned-file', () => {
   it('pins the audited message text (audit table: PASS, check-orphans.ts:108)', async () => {
     const { result } = await check(
-      ['App -> Main v1.0.0', 'Main @ src/main.ts:', '  <- [helper]', '  -> [helper]', 'helper :: () => void', 'Extra @ src/extra.ts:', '  -> [extraFn]', 'extraFn :: () => void', ''].join(
-        '\n',
-      ),
+      [
+        'App -> Main v1.0.0',
+        'Main @ src/main.ts:',
+        '  <- [helper]',
+        '  -> [helper]',
+        'helper :: () => void',
+        'Extra @ src/extra.ts:',
+        '  -> [extraFn]',
+        'extraFn :: () => void',
+        '',
+      ].join('\n'),
     );
     const findings = findingsByCode(result, 'checker/orphaned-file');
     assert.equal(findings.length, 1);
@@ -168,6 +193,9 @@ describe('RFC-TM-10 Q8 exact-text fixture: checker/stale-suppression', () => {
     const result = applySuppressions([], [suppression], byName);
     const stale = result.diagnostics.find((diagnostic) => diagnostic.code === 'checker/stale-suppression');
     assert.notEqual(stale, undefined);
-    assert.equal(stale?.message, "Stale suppression: 'checker/orphaned-entity' on 'Lonely' matches no finding this run — remove this suppression entry");
+    assert.equal(
+      stale?.message,
+      "Stale suppression: 'checker/orphaned-entity' on 'Lonely' matches no finding this run — remove this suppression entry",
+    );
   });
 });

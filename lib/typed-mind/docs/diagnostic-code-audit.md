@@ -35,70 +35,81 @@ set (`lib/typed-mind/src/checker/extract-check-codes.ts`, the same extractor
 `check-codes.test.ts` uses for the registry's own stability test). 62 rows,
 100% of the registry, verified by that script — wired into `pnpm run ci`.
 
+RFC-TM-10 Q8 addendum (D-LEG-11, Diamond DAG Q8): the "Message text" column
+below was added so `check-fixture-audit-gating.mjs` has a byte-exact ground
+truth to cross-validate D-LEG-11's exact-text fixtures against — the
+PASS/FIXED disposition columns alone never carried one (a PASS row cited
+only a file:line; a FIXED row's "Fixed to" column is free-form
+change-description prose, not a stable literal). Every cell uses
+representative example values (`'MyEntity'`, `'myField'`) in place of a
+message template's `${...}` interpolation slots; a fixture's own concrete
+DSL-derived values differ from these examples by design — only the
+surrounding prose must match.
+
 ## Audit table
 
-| Code | File:line | Shape | Disposition | Fixed to |
-|---|---|---|---|---|
-| `checker/asset-contains-non-program` | check-assets.ts:22 | CheckerFinding | PASS | — |
-| `checker/asset-program-unknown` | check-assets.ts:14 | CheckerFinding | PASS | — |
-| `checker/circular-containment` | check-cycles.ts:133 | CheckerFinding | PASS | — |
-| `checker/circular-import` | check-cycles.ts:95 | CheckerFinding | PASS | — |
-| `checker/circular-inheritance` | check-cycles.ts:203 | CheckerFinding | PASS | — |
-| `checker/self-containment` | check-cycles.ts:121 | CheckerFinding | PASS | — |
-| `checker/self-inheritance` | check-cycles.ts:156 | CheckerFinding | PASS | — |
-| `checker/unknown-base-class` | check-cycles.ts:166 | CheckerFinding | PASS | — |
-| `checker/unknown-interface` | check-cycles.ts:183 | CheckerFinding | PASS | — |
-| `checker/dto-field-function-type` | check-dto-fields.ts:189 | CheckerFinding | PASS | — |
-| `checker/dto-field-non-data-type` | check-dto-fields.ts:85 | CheckerFinding | PASS | — |
-| `checker/dto-field-unknown-type` | check-dto-fields.ts:75 | CheckerFinding | PASS | — |
-| `checker/enum-literal-outside-members` | check-dto-fields.ts:167 | CheckerFinding | PASS | — |
-| `checker/duplicate-name` | check-duplicate-names.ts:44,57 | CheckerFinding | PASS | — |
-| `checker/entry-not-file` | check-entry-point.ts:47 | CheckerFinding | PASS | — |
-| `checker/entry-not-found` | check-entry-point.ts:39 | CheckerFinding | PASS | — |
-| `checker/no-entry-point` | check-entry-point.ts:27 | CheckerFinding | PASS | — |
-| `checker/class-not-exported` | check-exports.ts:56 | CheckerFinding | PASS | — |
-| `checker/function-not-exported` | check-exports.ts:64 | CheckerFinding | PASS | — |
-| `checker/multi-exported` | check-exports.ts:91 | CheckerFinding | PASS | — |
-| `checker/undefined-export` | check-exports.ts:110 | CheckerFinding | PASS | — |
-| `checker/consumes-invalid-kind` | check-function-graph.ts:116 | CheckerFinding | PASS | — |
-| `checker/consumes-unknown` | check-function-graph.ts:108 | CheckerFinding | PASS | — |
-| `checker/dependency-direct-consumption` | check-function-graph.ts:86 | CheckerFinding | PASS | — |
-| `checker/dependency-not-found` | check-function-graph.ts:75 | CheckerFinding | PASS | — |
-| `checker/input-dto-not-found` / `checker/output-dto-not-found` | check-function-graph.ts:34 (slot template) | CheckerFinding | PASS | — |
-| `checker/input-not-dto` / `checker/output-not-dto` | check-function-graph.ts:43 (slot template) | CheckerFinding | PASS | — |
-| `checker/import-not-found` | check-imports.ts:47 | CheckerFinding | PASS | — |
-| `checker/import-pattern-unmatched` | check-imports.ts:34 | CheckerFinding | **FIXED** (pre-seeded, RFC-TM-10 §12) | added `suggestion`: "Check the pattern's glob syntax or the target module's actual export names" |
-| `checker/method-call-on-non-class` | check-method-calls.ts:31 | CheckerFinding | PASS | — |
-| `checker/unknown-call-target` | check-method-calls.ts:24 | CheckerFinding | **FIXED** (pre-seeded, RFC-TM-10 §12) | added `suggestion`: "Define '${objectName}' before calling '${call}' on it, or fix the typo" |
-| `checker/unknown-method` | check-method-calls.ts:39 | CheckerFinding | PASS | — |
-| `checker/orphaned-entity` | check-orphans.ts:118 | CheckerFinding | PASS | — |
-| `checker/orphaned-file` | check-orphans.ts:108 | CheckerFinding | PASS | — |
-| `checker/reference-from-illegal` | check-reference-legality.ts:63 | CheckerFinding | PASS | — |
-| `checker/reference-to-illegal` | check-reference-legality.ts:74 | CheckerFinding | PASS | — |
-| `checker/reference-unknown-type` | check-reference-legality.ts:53 | CheckerFinding | **FIXED** | message gained the referencer's name (WHERE): "Unknown reference type '${referenceKind}' on '${from.name}'"; added `suggestion`: "File a bug report — this reference kind should never reach the checker" (defensive branch, unreachable through the closed `ReferenceKind` union in production) |
-| `checker/consumedby-disagreement` | check-run-parameters.ts:40 | CheckerFinding | PASS | — |
-| `checker/consumedby-non-function` | check-run-parameters.ts:33 | CheckerFinding | **FIXED** | added `suggestion`: "Change '${funcName}' to a Function entity that consumes '${entity.name}'" |
-| `checker/consumedby-unknown-function` | check-run-parameters.ts:26 | CheckerFinding | **FIXED** | added `suggestion`: "Define '${funcName}' as a Function entity that consumes '${entity.name}'" |
-| `checker/affectedby-disagreement` | check-ui-components.ts:110 | CheckerFinding | PASS | — |
-| `checker/affects-non-uicomponent` | check-ui-components.ts:86 | CheckerFinding | PASS | — |
-| `checker/affects-unknown` | check-ui-components.ts:78 | CheckerFinding | PASS | — |
-| `checker/containedby-non-uicomponent` | check-ui-components.ts:57 | CheckerFinding | PASS | — |
-| `checker/containedby-unknown-parent` | check-ui-components.ts:50 | CheckerFinding | PASS | — |
-| `checker/contains-non-uicomponent` | check-ui-components.ts:38 | CheckerFinding | PASS | — |
-| `checker/contains-unknown` | check-ui-components.ts:30 | CheckerFinding | PASS | — |
-| `checker/uncontained-uicomponent` | check-ui-components.ts:131 | CheckerFinding | PASS | — |
-| `checker/duplicate-path` | check-unique-paths.ts:44 | CheckerFinding | PASS | — |
-| `checker/meta-suppression-rejected` | apply-suppressions.ts:123 | Diagnostic | **FIXED** | message gained WHAT-TO-DO clause (folded — no `suggestion` field on `Diagnostic`): "...suppression-machinery codes are not suppressible — remove this suppression entry" |
-| `checker/stale-suppression` | apply-suppressions.ts:133 | Diagnostic | **FIXED** | message gained WHAT-TO-DO clause (folded): "...matches no finding this run — remove this suppression entry" |
-| `imports/circular` | pipeline/import-resolver.ts:96 | Diagnostic | **FIXED** | message gained WHAT-TO-DO clause (folded): "...— break the cycle by removing one of these imports" |
-| `imports/duplicate-name` | pipeline/import-resolver.ts:118 | Diagnostic | PASS | — (WHAT-TO-DO already folded into message: "use an alias to avoid naming conflicts") |
-| `imports/read-failure` | pipeline/import-resolver.ts:161 | Diagnostic | **FIXED** | message gained WHAT-TO-DO clause (folded): "...— check the path exists and is readable" |
-| `semantics/dependency-direct-consumption` | pipeline/forward-semantics.ts:46 | Diagnostic | PASS | — (WHAT-TO-DO already folded into message: "a File must import '${dependencyName}' first") |
-| `semantics/extra-input-dto` | pipeline/forward-semantics.ts:55 | Diagnostic | PASS | — (explains the rule inline; the extra DTO is silently ignored, not something the author must act on) |
-| `semantics/illegal-continuation` | pipeline/attachment-rules.ts:277 | Diagnostic | **FIXED** | full message rewrite — the "illegal continuation:" leading log-tag phrasing read as internal terminology rather than prose; new: "This ${label} cannot attach to a ${kind} entity — move it under an entity kind that accepts it, or remove it" |
-| `semantics/orphan-continuation` | pipeline/attachment-rules.ts:268 | Diagnostic | **FIXED** | full message rewrite, same rationale as `illegal-continuation`; new: "This ${label} has no preceding entity declaration to attach to — move it directly under an entity declaration, or remove it" |
-| `syntax/error` | pipeline/syntax-diagnostics.ts:25 | Diagnostic | **FIXED** | message capitalized + gained WHAT-TO-DO clause (folded): "Unparsable text: \`...\` — check this line against the grammar and fix or remove it" |
-| `syntax/missing` | pipeline/syntax-diagnostics.ts:34 | Diagnostic | **FIXED** | message capitalized, backticked the grammar-production-name token, gained WHAT-TO-DO clause (folded): "Missing \`${syntaxNode.type}\` — add the required token at this position" |
+| Code | File:line | Message text | Shape | Disposition | Fixed to |
+|---|---|---|---|---|---|
+| `checker/asset-contains-non-program` | check-assets.ts:22 | `Asset 'MyAsset' cannot contain 'MyProgram' (it's a Class)` | CheckerFinding | PASS | — |
+| `checker/asset-program-unknown` | check-assets.ts:14 | `Asset 'MyAsset' references unknown program 'MyProgram'` | CheckerFinding | PASS | — |
+| `checker/circular-containment` | check-cycles.ts:133 | `UIComponent 'RootView' has circular containment: RootView -> ChildView -> RootView` | CheckerFinding | PASS | — |
+| `checker/circular-import` | check-cycles.ts:95 | `Circular import detected: FileA -> FileB -> FileA` | CheckerFinding | PASS | — |
+| `checker/circular-inheritance` | check-cycles.ts:203 | `Class 'MyClass' has circular inheritance: MyClass -> BaseClass -> MyClass` | CheckerFinding | PASS | — |
+| `checker/self-containment` | check-cycles.ts:121 | `UIComponent 'RootView' contains itself` | CheckerFinding | PASS | — |
+| `checker/self-inheritance` | check-cycles.ts:156 | `Class 'MyClass' inherits from itself` | CheckerFinding | PASS | — |
+| `checker/unknown-base-class` | check-cycles.ts:166 | `Class 'MyClass' extends 'BaseClass' which does not exist` | CheckerFinding | PASS | — |
+| `checker/unknown-interface` | check-cycles.ts:183 | `Class 'MyClass' implements 'MyInterface' which does not exist` | CheckerFinding | PASS | — |
+| `checker/dto-field-function-type` | check-dto-fields.ts:189 | `DTO 'MyDto' field 'myField' cannot have Function type` | CheckerFinding | PASS | — |
+| `checker/dto-field-non-data-type` | check-dto-fields.ts:85 | `DTO 'MyDto' field 'myField' references 'MyProgram' which is a Program, not a DTO or Class` | CheckerFinding | PASS | — |
+| `checker/dto-field-unknown-type` | check-dto-fields.ts:75 | `DTO 'MyDto' field 'myField' references undefined type 'UnknownType'` | CheckerFinding | PASS | — |
+| `checker/enum-literal-outside-members` | check-dto-fields.ts:167 | `DTO 'MyDto' field 'myField' union literal 'bogus' is not a member of enum 'MyEnum'` | CheckerFinding | PASS | — |
+| `checker/duplicate-name` | check-duplicate-names.ts:44,57 | `Duplicate entity name 'MyEntity' found in multiple DTO, Class entities` (plain multi-entity case, check-duplicate-names.ts:57; the fusion-hint site at :44 instead emits `Entity name 'MyEntity' is used by both a File and a Class. Consider using the #: operator for class-file fusion.` when the colliding pair is exactly one File and one Class) | CheckerFinding | PASS | — |
+| `checker/entry-not-file` | check-entry-point.ts:47 | `Program 'MyApp' entry point 'MyEntry' must be a File entity, but found Class` | CheckerFinding | PASS | — |
+| `checker/entry-not-found` | check-entry-point.ts:39 | `Program 'MyApp' references undefined entry point 'MyEntry'` | CheckerFinding | PASS | — |
+| `checker/no-entry-point` | check-entry-point.ts:27 | `No program entry point defined` | CheckerFinding | PASS | — |
+| `checker/class-not-exported` | check-exports.ts:56 | `Class 'MyClass' is not exported by any file` | CheckerFinding | PASS | — |
+| `checker/function-not-exported` | check-exports.ts:64 | `Function 'myFunction' is not exported by any file and is not a class method` | CheckerFinding | PASS | — |
+| `checker/multi-exported` | check-exports.ts:91 | `Entity 'MyEntity' is exported by multiple files: FileA, FileB` | CheckerFinding | PASS | — |
+| `checker/undefined-export` | check-exports.ts:110 | `Export 'MyEntity' is not defined anywhere in the codebase` | CheckerFinding | PASS | — |
+| `checker/consumes-invalid-kind` | check-function-graph.ts:116 | `Function 'myFunction' cannot consume 'MyEntity' (it's a Class)` | CheckerFinding | PASS | — |
+| `checker/consumes-unknown` | check-function-graph.ts:108 | `Function 'myFunction' consumes unknown entity 'MyEntity'` | CheckerFinding | PASS | — |
+| `checker/dependency-direct-consumption` | check-function-graph.ts:86 | `Cannot directly consume dependency 'MyDependency' in function 'myFunction'` | CheckerFinding | PASS | — |
+| `checker/dependency-not-found` | check-function-graph.ts:75 | `Function dependency 'MyDependency' not found` | CheckerFinding | PASS | — |
+| `checker/input-dto-not-found` / `checker/output-dto-not-found` | check-function-graph.ts:34 (slot template) | `Function [input/output] DTO 'MyDto' not found` (slot renders as literally "input" or "output") | CheckerFinding | PASS | — |
+| `checker/input-not-dto` / `checker/output-not-dto` | check-function-graph.ts:43 (slot template) | `Function [input/output] 'MyDto' is not a DTO (it's a Class)` (slot renders as literally "input" or "output") | CheckerFinding | PASS | — |
+| `checker/import-not-found` | check-imports.ts:47 | `Import 'MyEntity' not found` | CheckerFinding | PASS | — |
+| `checker/import-pattern-unmatched` | check-imports.ts:34 | `No entities match import pattern 'MyModule.*'` | CheckerFinding | **FIXED** (pre-seeded, RFC-TM-10 §12) | added `suggestion`: "Check the pattern's glob syntax or the target module's actual export names" |
+| `checker/method-call-on-non-class` | check-method-calls.ts:31 | `Cannot call method 'myMethod' on DTO 'MyEntity'. Only Classes and ClassFiles can have methods` | CheckerFinding | PASS | — |
+| `checker/unknown-call-target` | check-method-calls.ts:24 | `Call to 'MyEntity.myMethod' references unknown entity 'MyEntity'` | CheckerFinding | **FIXED** (pre-seeded, RFC-TM-10 §12) | added `suggestion`: "Define '${objectName}' before calling '${call}' on it, or fix the typo" |
+| `checker/unknown-method` | check-method-calls.ts:39 | `Method 'myMethod' not found on class 'MyClass'` | CheckerFinding | PASS | — |
+| `checker/orphaned-entity` | check-orphans.ts:118 | `Orphaned entity 'MyEntity'` | CheckerFinding | PASS | — |
+| `checker/orphaned-file` | check-orphans.ts:108 | `Orphaned file 'MyFile' - none of its exports are imported` | CheckerFinding | PASS | — |
+| `checker/reference-from-illegal` | check-reference-legality.ts:63 | `DTO 'MyEntity' cannot have 'calls' references` | CheckerFinding | PASS | — |
+| `checker/reference-to-illegal` | check-reference-legality.ts:74 | `Cannot use 'calls' to reference DTO 'MyEntity'` | CheckerFinding | PASS | — |
+| `checker/reference-unknown-type` | check-reference-legality.ts:53 | `Unknown reference type 'bogusRef' on 'MyEntity'` | CheckerFinding | **FIXED** | message gained the referencer's name (WHERE): "Unknown reference type '${referenceKind}' on '${from.name}'"; added `suggestion`: "File a bug report — this reference kind should never reach the checker" (defensive branch, unreachable through the closed `ReferenceKind` union in production) |
+| `checker/consumedby-disagreement` | check-run-parameters.ts:40 | `RunParameter 'MyParam' claims to be consumed by 'myFunction', but that function doesn't consume it` | CheckerFinding | PASS | — |
+| `checker/consumedby-non-function` | check-run-parameters.ts:33 | `RunParameter 'MyParam' claims to be consumed by 'MyEntity' which is not a Function` | CheckerFinding | **FIXED** | added `suggestion`: "Change '${funcName}' to a Function entity that consumes '${entity.name}'" |
+| `checker/consumedby-unknown-function` | check-run-parameters.ts:26 | `RunParameter 'MyParam' claims to be consumed by unknown function 'myFunction'` | CheckerFinding | **FIXED** | added `suggestion`: "Define '${funcName}' as a Function entity that consumes '${entity.name}'" |
+| `checker/affectedby-disagreement` | check-ui-components.ts:110 | `UIComponent 'MyView' claims to be affected by 'myFunction', but that function doesn't affect it` | CheckerFinding | PASS | — |
+| `checker/affects-non-uicomponent` | check-ui-components.ts:86 | `Function 'myFunction' cannot affect 'MyEntity' (it's a Class)` | CheckerFinding | PASS | — |
+| `checker/affects-unknown` | check-ui-components.ts:78 | `Function 'myFunction' affects unknown component 'MyView'` | CheckerFinding | PASS | — |
+| `checker/containedby-non-uicomponent` | check-ui-components.ts:57 | `UIComponent 'MyView' cannot be contained by 'MyEntity' (it's a Class)` | CheckerFinding | PASS | — |
+| `checker/containedby-unknown-parent` | check-ui-components.ts:50 | `UIComponent 'MyView' references unknown parent 'ParentView'` | CheckerFinding | PASS | — |
+| `checker/contains-non-uicomponent` | check-ui-components.ts:38 | `UIComponent 'MyView' cannot contain 'MyEntity' (it's a Class)` | CheckerFinding | PASS | — |
+| `checker/contains-unknown` | check-ui-components.ts:30 | `UIComponent 'MyView' contains unknown component 'ChildView'` | CheckerFinding | PASS | — |
+| `checker/uncontained-uicomponent` | check-ui-components.ts:131 | `UIComponent 'MyView' is not contained by any other UIComponent` | CheckerFinding | PASS | — |
+| `checker/duplicate-path` | check-unique-paths.ts:44 | `Path 'src/my-file.ts' already used by File 'MyFile'` | CheckerFinding | PASS | — |
+| `checker/meta-suppression-rejected` | apply-suppressions.ts:123 | `Suppression of 'checker/stale-suppression' is rejected: suppression-machinery codes are not suppressible — remove this suppression entry` | Diagnostic | **FIXED** | message gained WHAT-TO-DO clause (folded — no `suggestion` field on `Diagnostic`): "...suppression-machinery codes are not suppressible — remove this suppression entry" |
+| `checker/stale-suppression` | apply-suppressions.ts:133 | `Stale suppression: 'checker/orphaned-entity' on 'MyEntity' matches no finding this run — remove this suppression entry` | Diagnostic | **FIXED** | message gained WHAT-TO-DO clause (folded): "...matches no finding this run — remove this suppression entry" |
+| `imports/circular` | pipeline/import-resolver.ts:96 | `Circular import detected: /abs/path/FileA.tmd -> /abs/path/FileB.tmd -> /abs/path/FileA.tmd — break the cycle by removing one of these imports` | Diagnostic | **FIXED** | message gained WHAT-TO-DO clause (folded): "...— break the cycle by removing one of these imports" |
+| `imports/duplicate-name` | pipeline/import-resolver.ts:118 | `Duplicate entity name 'MyEntity' from import; use an alias to avoid naming conflicts` | Diagnostic | PASS | — (WHAT-TO-DO already folded into message: "use an alias to avoid naming conflicts") |
+| `imports/read-failure` | pipeline/import-resolver.ts:161 | `Failed to import 'my-module.tmd': Error: ENOENT: no such file or directory — check the path exists and is readable` | Diagnostic | **FIXED** | message gained WHAT-TO-DO clause (folded): "...— check the path exists and is readable" |
+| `semantics/dependency-direct-consumption` | pipeline/forward-semantics.ts:46 | `Function 'myFunction' lists Dependency 'MyDependency' in its \`<- [...]\` dependency list; Dependencies cannot be consumed directly — a File must import 'MyDependency' first` | Diagnostic | PASS | — (WHAT-TO-DO already folded into message: "a File must import '${dependencyName}' first") |
+| `semantics/extra-input-dto` | pipeline/forward-semantics.ts:55 | `Function 'myFunction' lists extra input DTO 'ExtraDto' beyond the first ('MyDto') in its \`<- [...]\` dependency list; it is ignored — a Function takes one input DTO (\`<- Name\`)` | Diagnostic | PASS | — (explains the rule inline; the extra DTO is silently ignored, not something the author must act on) |
+| `semantics/illegal-continuation` | pipeline/attachment-rules.ts:277 | `This methods list (\`=> [...]\`) cannot attach to a DTO entity — move it under an entity kind that accepts it, or remove it` | Diagnostic | **FIXED** | full message rewrite — the "illegal continuation:" leading log-tag phrasing read as internal terminology rather than prose; new: "This ${label} cannot attach to a ${kind} entity — move it under an entity kind that accepts it, or remove it" |
+| `semantics/orphan-continuation` | pipeline/attachment-rules.ts:268 | `This methods list (\`=> [...]\`) has no preceding entity declaration to attach to — move it directly under an entity declaration, or remove it` | Diagnostic | **FIXED** | full message rewrite, same rationale as `illegal-continuation`; new: "This ${label} has no preceding entity declaration to attach to — move it directly under an entity declaration, or remove it" |
+| `syntax/error` | pipeline/syntax-diagnostics.ts:25 | `Unparsable text: \`~garbled input~\` — check this line against the grammar and fix or remove it` | Diagnostic | **FIXED** | message capitalized + gained WHAT-TO-DO clause (folded): "Unparsable text: \`...\` — check this line against the grammar and fix or remove it" |
+| `syntax/missing` | pipeline/syntax-diagnostics.ts:34 | `Missing \`entity_name\` — add the required token at this position` | Diagnostic | **FIXED** | message capitalized, backticked the grammar-production-name token, gained WHAT-TO-DO clause (folded): "Missing \`${syntaxNode.type}\` — add the required token at this position" |
 
 ## Grading notes
 
