@@ -16,6 +16,26 @@
 //   - lead-mandated guardrail 2: the standalone-parse degradation is
 //     disclosed as an informational diagnostic
 //     ('recognizer-module-standalone-parsed'), not silent
+//   - lead-authorized amendment: Function-entity collision disambiguation
+//     (X-CONV-4 extension). The live-clone run against the real
+//     webhookstorage clone (infra/api.ts, --recognize sst-handler) found
+//     that traversal-enqueue is the first mechanism that ever traverses
+//     more than one SST-handler target together, and the real clone has
+//     FOUR independently-declared functions all named `handler`
+//     (packages/functions/src/api/index.ts, .../auth/provision-tenant.ts,
+//     .../auth/teardown-tenant.ts, .../auth/deletion-verification.ts) —
+//     the converter's Function-entity naming had no file-scoping (unlike
+//     Class/ClassFile's X-CONV-4 mechanism), so export failed with
+//     "Duplicate entity name: handler" x3 (partial output written
+//     correctly, I-13 held). This amendment is lead-authorized because it
+//     BLOCKS the "fully extract, then typecheck" bar on the exact
+//     live-clone run D-LEG-6's own check binding requires — deferring it
+//     would guarantee Q10 (D-LEG-14, the terminal ladder re-run) reds on
+//     webhookstorage. Mechanism: on a bare-name collision (checked against
+//     `this.entityNames`, first-occurrence-wins), a Function entity is
+//     renamed to `<baseName>__<name>`, reusing `deriveProgramName`'s
+//     collision-proof rationale verbatim (a literal `__` is provably
+//     outside `sanitizeEntityName`'s codomain). Uncollided names stay bare.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -71,42 +91,61 @@ describe('RFC-TM-10 Q3 check — D-LEG-6: traversal-enqueue makes the handler mo
     assert.notEqual(handlerFn, undefined, 'handler must be a real Function entity, not a bare name in Program.exports');
 
     const functionsFile = result.entities.find(
-      (e) => e.kind === 'File' && 'path' in e && typeof (e as { path: unknown }).path === 'string' && (e as { path: string }).path.includes('packages/functions'),
+      (e) =>
+        e.kind === 'File' &&
+        'path' in e &&
+        typeof (e as { path: unknown }).path === 'string' &&
+        (e as { path: string }).path.includes('packages/functions'),
     );
     assert.notEqual(functionsFile, undefined, 'the handler module must surface as its own File entity inside packages/functions');
 
     // D-LEG-6's own check binding is about the module/entity being REAL and
-    // PRESENT, not a zero-diagnostic checker run for this fixture. Checking
-    // this fixture through the checker surfaces a NAMED, PRE-EXISTING set of
-    // residual diagnostics — none introduced by Q3, none owned by D-LEG-6's
-    // own fix surface:
-    //   - `checker/multi-exported` on Program/ApiFile — the D-LEG-7
-    //     Program/entry-duplication defect (RFC-TM-10 Q4, in flight
-    //     elsewhere in this repo, not this Quantum's scope).
+    // PRESENT, not a zero-diagnostic checker run for this fixture (lead
+    // ruling, RFC-TM-10 Q3 disposition). Checking this fixture through the
+    // checker surfaces a NAMED, PRE-EXISTING set of residual diagnostics —
+    // none introduced by Q3, none owned by D-LEG-6's own fix surface. This
+    // fixture pins the KNOWN set explicitly (per the Q1/Q4 file headers'
+    // own "pin the achieved verdict, don't claim false green" precedent)
+    // rather than asserting a stronger bar D-LEG-6 does not itself deliver.
+    //
+    //   - `checker/multi-exported` — RESOLVED by RFC-TM-10 Q4/PR#68
+    //     (D-LEG-7's Program/entry-duplication exclusion), no longer fires
+    //     on this fixture as of the rebase onto main that picked up Q4.
+    //     Dropped from the pin below; if it reappears, that is a Q4
+    //     regression, not a Q3 concern.
     //   - `checker/orphaned-file`/`checker/orphaned-entity` on
-    //     IndexFile/handler — the SST convention string
-    //     ('packages/functions/src/api/index.handler') has NO `.tmd`
-    //     grammar representation as an import/reference edge; D-LEG-6's own
+    //     IndexFile/handler — a REAL illegitimacy (the module IS referenced,
+    //     by the SST convention string) with no fix mechanism owned by any
+    //     current D-LEG item: the SST convention string
+    //     ('packages/functions/src/api/index.handler') has no `.tmd`
+    //     grammar representation as an import/reference edge.  D-LEG-6's own
     //     scope is traversal-enqueue (making the module real), not
-    //     synthesizing a new cross-file reference edge for the convention
-    //     string, which is a distinct, un-itemized scope item.
-    //   - `syntax/error` x2 — a PRE-EXISTING, D-LEG-1-adjacent gap:
-    //     `isDTOLikeType` (already fixed once, Q1/PR#70) still classifies a
+    //     synthesizing a new cross-file reference edge or suppression
+    //     reason for the convention string — the lead has this on the list
+    //     for D-LEG-14's (Q10) disposition table (a suppression reason, an
+    //     exports-push per the X-AN-11 precedent, or a future grammar-level
+    //     reference edge are the candidate mechanisms; none is Q3's to
+    //     invent). See also the PR body's future-RFC note on the missing
+    //     ApiFile -> IndexFile grammar representation.
+    //   - `syntax/error` x2 — a PRE-EXISTING, D-LEG-1-adjacent gap, still
+    //     open as of this Quantum: `isDTOLikeType` (fixed once already for
+    //     Class-kind/literal-union types, Q1/PR#70) still classifies a
     //     generic-wrapped inline-object-literal return type
     //     (`Promise<{ statusCode: number }>`) as DTO-like "by elimination"
     //     and routes it through `output`, emitting the raw object-literal
-    //     text where the grammar expects a DTO type name. D-LEG-1's fix only
-    //     excluded Class-kind names and literal/literal-union types, not
-    //     this shape — filed as a new, separate issue; not itemized in any
-    //     of the 14 D-LEG items, so not owned by this Quantum or Q1.
-    // This fixture pins the KNOWN set explicitly (per the Q1/Q4 file
-    // headers' own "pin the achieved verdict, don't claim false green"
-    // precedent) rather than asserting a stronger bar D-LEG-6 does not
-    // itself deliver.
+    //     text where the grammar expects a DTO type name. RFC-TM-10 Q2 (in
+    //     flight, PR #73, D-LEG-5) is landing an inline-object-literal
+    //     exclusion in `isDTOLikeType` for a related shape — on rebase after
+    //     Q2 merges, re-run this fixture: if these two `syntax/error`
+    //     entries disappear, update this pin with a cause-linked note citing
+    //     Q2/PR#73; if they persist (the Promise-unwrap ordering misses
+    //     Q2's exclusion), file a new issue scoped precisely to the
+    //     generic-wrapped case and keep the pin. Not filed yet per the lead
+    //     ruling — Q2 may already close it.
     const { result: checkResult } = await checkViaLongform(result.entities);
     assert.deepEqual(
       checkResult.diagnostics.map((d) => d.code).sort(),
-      ['checker/multi-exported', 'checker/orphaned-entity', 'checker/orphaned-file', 'syntax/error', 'syntax/error'].sort(),
+      ['checker/orphaned-entity', 'checker/orphaned-file', 'syntax/error', 'syntax/error'].sort(),
       'residual diagnostics are the named, pre-existing set only — a NEW code here is a regression this fixture must catch',
     );
   });
@@ -175,9 +214,65 @@ describe('RFC-TM-10 Q3 check — lead guardrail 1: fallback is strictly recogniz
     const analysis = analyzer.analyzeFromEntrypoint(join(fixtureDir, 'src', 'main.ts'));
 
     const unresolvable = analysis.diagnostics.filter((d) => d.category === 'unresolvable-import');
-    assert.equal(unresolvable.length, 1, 'enabling the recognizer flag must not change the outcome for a path the recognizer never resolved');
+    assert.equal(
+      unresolvable.length,
+      1,
+      'enabling the recognizer flag must not change the outcome for a path the recognizer never resolved',
+    );
 
     const standaloneParsed = analysis.diagnostics.filter((d) => d.category === 'recognizer-module-standalone-parsed');
     assert.equal(standaloneParsed.length, 0);
+  });
+});
+
+describe('RFC-TM-10 Q3 check — lead-authorized amendment: Function-entity collision disambiguation (X-CONV-4 extension)', () => {
+  it('two independently-traversed SST-handler targets both exporting `handler` disambiguate deterministically, zero duplicate-entity errors', async () => {
+    const fixtureDir = fixturePath('32-function-name-collision');
+    const analyzer = new TypeScriptAnalyzer(fixtureDir, undefined, ['sst-handler']);
+    const analysis = analyzer.analyzeFromEntrypoint(join(fixtureDir, 'infra', 'api.ts'));
+    const converter = new TypeScriptToTypedMindConverter();
+    const result = converter.convert(analysis);
+
+    assert.equal(result.success, true, 'conversion must succeed — this is the exact failure mode the live-clone run hit');
+    assert.deepEqual(result.errors, [], 'zero duplicate-entity-name errors');
+
+    const functionNames = result.entities
+      .filter((e) => e.kind === 'Function')
+      .map((e) => e.name)
+      .sort();
+    // api.ts's own handler target (packages/functions/src/api/index.ts) is
+    // traversed FIRST (api.ts is the entrypoint, its own handler string is
+    // scanned before the import to auth.ts is followed), so it keeps the
+    // bare name; auth.ts's handler target collides and is disambiguated.
+    assert.deepEqual(functionNames, ['ProvisionTenant__handler', 'handler']);
+
+    // The disambiguated name must be the one actually referenced by its
+    // owning File's exports list — not the stale bare name, which would be
+    // a dangling reference no entity carries.
+    const provisionFile = result.entities.find(
+      (e) => e.kind === 'File' && 'path' in e && (e as { path: string }).path.includes('provision-tenant'),
+    ) as { exports: readonly string[] } | undefined;
+    assert.notEqual(provisionFile, undefined);
+    assert.ok(provisionFile?.exports.includes('ProvisionTenant__handler'));
+    assert.ok(!provisionFile?.exports.includes('handler'), 'the stale bare name must not appear in the export list');
+
+    const { result: checkResult } = await checkViaLongform(result.entities);
+    const danglingReference = checkResult.diagnostics.some((d) => d.code === 'checker/unresolved-reference');
+    assert.equal(danglingReference, false, 'the renamed function must resolve cleanly — no dangling reference from the rename');
+  });
+
+  it('an uncollided function name is completely unaffected — stays bare', () => {
+    // Reuses the webhookstorage-signature fixture: its lone handler target
+    // has no naming collision (nothing else in that fixture is also named
+    // `handler`), so it must emit as the bare name, unchanged from before
+    // this amendment.
+    const fixtureDir = fixturePath('webhookstorage-signature');
+    const analyzer = new TypeScriptAnalyzer(fixtureDir, undefined, ['sst-handler']);
+    const analysis = analyzer.analyzeFromEntrypoint(join(fixtureDir, 'infra', 'api.ts'));
+    const converter = new TypeScriptToTypedMindConverter();
+    const result = converter.convert(analysis);
+
+    const handlerFn = result.entities.find((e) => e.kind === 'Function' && e.name === 'handler');
+    assert.notEqual(handlerFn, undefined, 'an uncollided function name stays bare — the amendment only fires on a detected collision');
   });
 });

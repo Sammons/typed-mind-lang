@@ -405,7 +405,12 @@ export class TypeScriptAnalyzer {
   // recorded in `recognizerResolvedPaths` so the traversal loop knows this
   // specific path is permitted to fall back to a standalone parse when
   // `this.program` does not contain it.
-  private scanSstHandlerStrings(sourceFile: ts.SourceFile, currentPath: string, traverseQueue: string[], visitedModules: ReadonlySet<string>): void {
+  private scanSstHandlerStrings(
+    sourceFile: ts.SourceFile,
+    currentPath: string,
+    traverseQueue: string[],
+    visitedModules: ReadonlySet<string>,
+  ): void {
     const visit = (node: ts.Node): void => {
       if (
         ts.isPropertyAssignment(node) &&

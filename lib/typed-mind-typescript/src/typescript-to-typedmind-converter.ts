@@ -107,6 +107,19 @@ export class TypeScriptToTypedMindConverter {
   private readonly warnings: ConversionWarning[] = [];
   private readonly entities: EntityNode[] = [];
   private readonly entityNames = new Set<string>();
+  // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) — a
+  // top-level function that collided on its bare name and was renamed to
+  // `<baseName>__<name>` by `convertFunction`. `convertExports` consults
+  // this so a File/ClassFile's `exports:` list names the FUNCTION'S ACTUAL
+  // emitted entity name, not its raw source name — otherwise the export
+  // list would reference a name no entity carries, producing a dangling
+  // reference the checker would flag. Keyed by `${modulePath}::${rawName}`
+  // (NOT bare raw name alone — the live webhookstorage clone has four
+  // different modules each independently exporting a function named
+  // `handler`, so a bare-name key would collide across modules the same
+  // way the entity names themselves did). Scoped to the current `convert()`
+  // call, cleared in `reset()` like every other per-run map here.
+  private readonly functionNameRemap = new Map<string, string>();
   private readonly dependencies = new Map<string, DependencyNode>();
   private readonly externalTypeToPackage = new Map<string, string>(); // Maps external types to their package
   private entryPoints = new Set<string>();
@@ -337,6 +350,7 @@ export class TypeScriptToTypedMindConverter {
     this.warnings.length = 0;
     this.entities.length = 0;
     this.entityNames.clear();
+    this.functionNameRemap.clear();
     this.dependencies.clear();
     this.externalTypeToPackage.clear();
     this.entryPoints.clear();
@@ -673,6 +687,17 @@ export class TypeScriptToTypedMindConverter {
     const hasClasses = module.classes.length > 0;
     const hasFunctions = module.functions.length > 0;
     const hasExports = module.exports.length > 0;
+
+    // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) —
+    // reserve this module's function entity names exactly once here, before
+    // EITHER downstream path (`convertToClassFile`, which may itself
+    // fall back to `convertToSeparateEntities`) builds an entity whose
+    // `exports:` list needs the final, possibly-disambiguated name. `pure
+    // types/constants` files have no functions by definition
+    // (`isPureTypesFile`), so this is a no-op for that branch.
+    if (!isPureTypesFile) {
+      this.reserveFunctionEntityNames(module, entityName);
+    }
 
     if (isPureTypesFile) {
       // For pure types/constants files, only create the individual type/constant entities
@@ -1087,7 +1112,7 @@ export class TypeScriptToTypedMindConverter {
     // Only convert functions that are exported
     for (const func of module.functions) {
       if (this.isFunctionExported(func, module)) {
-        this.convertFunction(func, this.getRelativePath(module.filePath));
+        this.convertFunction(func, module.filePath);
       }
     }
 
@@ -1160,7 +1185,7 @@ export class TypeScriptToTypedMindConverter {
     // Only convert functions that are exported
     for (const func of module.functions) {
       if (this.isFunctionExported(func, module)) {
-        this.convertFunction(func, this.getRelativePath(module.filePath));
+        this.convertFunction(func, module.filePath);
       }
     }
 
@@ -1217,19 +1242,63 @@ export class TypeScriptToTypedMindConverter {
     this.entities.push(classEntity);
   }
 
-  private convertFunction(func: ParsedFunction, sourceFile?: string): void {
-    const entityName = createEntityName(func.name);
+  // RFC-TM-10 Q3 amendment (lead-authorized, D-LEG-6's live-clone check
+  // binding): a real multi-target SST-handler codebase (the webhookstorage
+  // clone) has multiple modules independently exporting a function literally
+  // named `handler` (`packages/functions/src/api/index.ts`,
+  // `.../auth/provision-tenant.ts`, `.../auth/teardown-tenant.ts`,
+  // `.../auth/deletion-verification.ts`) — traversal-enqueue is the first
+  // mechanism that ever traverses more than one of these together, so this
+  // bare-name collision was latent, never triggered, before Q3. Called as a
+  // PRE-PASS before either module-conversion path (`convertToClassFile`/
+  // `convertToSeparateEntities`) builds its File/ClassFile entity — the
+  // export list needs the FINAL emitted name before it can be built, so the
+  // remap must exist before that point, not after `convertFunction` runs.
+  // `baseName` is the module's own sanitized name (the same value used to
+  // derive `<baseName>File`). On the FIRST occurrence of a name (globally,
+  // across the whole conversion — `this.entityNames` is checked, not a
+  // per-module set), the name stays BARE: this is the narrow half of the
+  // guardrail, an uncollided function name is unaffected. Only on a
+  // DETECTED collision is `<baseName>__<name>` recorded, reusing
+  // `deriveProgramName`'s exact collision-proof rationale (X-CONV-4,
+  // RFC-TM-9 §4): `sanitizeEntityName` collapses every run of underscores to
+  // one and never re-inserts a separator when joining PascalCase parts, so
+  // no sanitized identifier can ever contain `__` — a literal `__` separator
+  // is provably outside `sanitizeEntityName`'s codomain and cannot collide
+  // with any real entity name derived from source. Deterministic, no
+  // runtime probe, no nondeterministic suffix (both rejected for the
+  // identical reason in RFC-TM-9's own Rejected Alternatives for the Class
+  // case). This pre-pass only RESERVES names in `this.entityNames` for
+  // functions that will actually be converted (mirrors
+  // `isFunctionExported`'s own filter) — it does not create entities.
+  private reserveFunctionEntityNames(module: ParsedModule, baseName: string): void {
+    for (const func of module.functions) {
+      if (!this.isFunctionExported(func, module)) {
+        continue;
+      }
+      const remapKey = `${module.filePath}::${func.name}`;
+      const bareName = createEntityName(func.name);
+      const finalName = this.entityNames.has(bareName) ? createEntityName(`${baseName}__${func.name}`) : bareName;
+      this.functionNameRemap.set(remapKey, finalName);
+      this.entityNames.add(finalName);
+    }
+  }
 
-    if (this.entityNames.has(entityName)) {
-      this.addError(`Duplicate entity name: ${entityName}`);
+  private convertFunction(func: ParsedFunction, moduleFilePath: string): void {
+    const remapKey = `${moduleFilePath}::${func.name}`;
+    const entityName = this.functionNameRemap.get(remapKey);
+
+    // `reserveFunctionEntityNames` runs as a pre-pass before every call site
+    // that reaches `convertFunction` (`convertToClassFile`,
+    // `convertToSeparateEntities`), reserving this exact key. A missing
+    // entry means a call path that skipped the pre-pass — defensive, not
+    // expected to fire: report it the same way every other name collision
+    // in this converter reports, rather than silently emitting a bare,
+    // possibly-colliding name.
+    if (entityName === undefined) {
+      this.addError(`Duplicate entity name: ${createEntityName(func.name)}`);
       return;
     }
-
-    this.entityNames.add(entityName);
-
-    // sourceFile is not carried on FunctionNode: RFC-TM-3 §2.2 drops the
-    // legacy `container` field for Function (dead).
-    void sourceFile;
 
     // Extract input/output DTOs from signature
     const inputDTO = this.extractInputDTO(func);
@@ -1662,7 +1731,16 @@ export class TypeScriptToTypedMindConverter {
 
     for (const exp of module.exports) {
       if (exp.name !== excludeName && this.isValidEntityName(exp.name) && !seenNames.has(exp.name) && !this.isReExport(exp)) {
-        exportNames.push(exp.name);
+        // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) — a
+        // top-level function renamed by `reserveFunctionEntityNames`/
+        // `convertFunction` on a bare-name collision must be named by its
+        // ACTUAL emitted entity name here too, or this File/ClassFile's
+        // `exports:` list would reference a name no entity carries.
+        // `functionNameRemap` returns `undefined` for every export that
+        // isn't a renamed function (constants, classes, interfaces, ...),
+        // which is exactly when the raw `exp.name` is already correct.
+        const remapped = this.functionNameRemap.get(`${module.filePath}::${exp.name}`);
+        exportNames.push(remapped ?? exp.name);
         seenNames.add(exp.name);
       }
     }
