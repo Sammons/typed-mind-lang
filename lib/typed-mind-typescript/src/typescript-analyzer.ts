@@ -36,7 +36,14 @@ interface ResolutionOutcome {
 // diagnostics into an accumulator rather than to stderr, since a broken
 // referenced tsconfig should surface as an AnalyzerDiagnostic, not a
 // console line the caller can't see.
-class CollectingParseConfigHost implements ts.ParseConfigFileHost {
+//
+// Exported (issue #80) so the extraction ladder's own `checker/class-not-exported`
+// rule (RFC-TM-4, frozen) is satisfied truthfully rather than by a checker
+// exemption: this class carries no internal-only invariant that exporting it
+// would break, and TypeScript's `implements` structural typing means the
+// export costs nothing at the call site (`new CollectingParseConfigHost()`
+// below is unaffected).
+export class CollectingParseConfigHost implements ts.ParseConfigFileHost {
   useCaseSensitiveFileNames = ts.sys.useCaseSensitiveFileNames;
   readonly diagnostics: ts.Diagnostic[] = [];
 
