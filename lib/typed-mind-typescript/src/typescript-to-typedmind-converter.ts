@@ -88,6 +88,18 @@ const collapseDescription = (raw: string): string => {
 // emission, not re-derived heuristically.
 const isBareEntityName = (type: string): boolean => /^[A-Za-z_]\w*$/.test(type);
 
+// issue #72 (rfc-tm-10-diamond.md §5's tracked follow-up) — an inline
+// object-literal type (`{ current?: string }`) has no enclosing
+// Class/Interface name to resolve against, so D-LEG-1's `isDTOLikeType`
+// excludes it from `input`/`output` (a disclosed loss: the type stays
+// visible in `entity.signature` text, but the machine-checked graph edge is
+// gone). This predicate identifies that exact shape BEFORE `isDTOLikeType`
+// runs, so `extractInputDTO`/`extractOutputDTO` can route it through
+// `synthesizeInlineDTO` (below) instead of the exclusion — the same
+// "detect the special shape ahead of the general classifier" pattern
+// `isDTOLikeType`'s own `"`-prefix / `{`-prefix branches already use.
+const isInlineObjectLiteralType = (type: string): boolean => type.trim().startsWith('{') && type.trim().endsWith('}');
+
 // Two-pass architecture data structures
 interface ExportRegistry {
   [moduleSpecifier: string]: {
@@ -1316,9 +1328,12 @@ export class TypeScriptToTypedMindConverter {
       return;
     }
 
-    // Extract input/output DTOs from signature
-    const inputDTO = this.extractInputDTO(func);
-    const outputDTO = this.extractOutputDTO(func);
+    // Extract input/output DTOs from signature. `entityName` (the
+    // converter's own collision-resolved function name, X-CONV-4) seeds
+    // issue #72's inline-DTO synthesis naming — see
+    // `synthesizeInlineDTO`'s doc comment.
+    const inputDTO = this.extractInputDTO(func, entityName);
+    const outputDTO = this.extractOutputDTO(func, entityName);
 
     const functionEntity = new FunctionNode({
       name: entityName,
@@ -1773,10 +1788,18 @@ export class TypeScriptToTypedMindConverter {
     return module.exports.some((exp) => exp.name === constant.name && exp.type === 'constant');
   }
 
-  private extractInputDTO(func: ParsedFunction): string | undefined {
+  private extractInputDTO(func: ParsedFunction, functionEntityName: string): string | undefined {
     // Look for single parameter that looks like a DTO
     if (func.parameters.length === 1) {
       const param = func.parameters[0];
+      if (param && isInlineObjectLiteralType(param.type)) {
+        // issue #72 — synthesize a named DTO instead of D-LEG-1's
+        // `isDTOLikeType` `{`-prefix exclusion (checked BEFORE that
+        // classifier runs, since the classifier's job here is now moot:
+        // an inline object-literal parameter type is unconditionally
+        // DTO-shaped by construction, no elimination heuristic needed).
+        return this.synthesizeInlineDTO(param.type, `${functionEntityName}Input`);
+      }
       if (param && this.isDTOLikeType(param.type)) {
         // If this is an external type, add it to the dependency's exports
         this.addExternalTypeToDepExports(param.type);
@@ -1804,8 +1827,16 @@ export class TypeScriptToTypedMindConverter {
     return undefined;
   }
 
-  private extractOutputDTO(func: ParsedFunction): string | undefined {
+  private extractOutputDTO(func: ParsedFunction, functionEntityName: string): string | undefined {
     const returnType = func.returnType.replace(/^Promise<(.+)>$/, '$1');
+    if (isInlineObjectLiteralType(returnType)) {
+      // issue #72 — same synthesis path as `extractInputDTO`, applied to
+      // the return-type position. `Output` is the codomain-disambiguation
+      // suffix so a function whose parameter AND return type are both
+      // inline object literals gets two distinct synthesized DTOs, never
+      // one name serving both.
+      return this.synthesizeInlineDTO(returnType, `${functionEntityName}Output`);
+    }
     if (this.isDTOLikeType(returnType)) {
       // If this is an external type, add it to the dependency's exports
       this.addExternalTypeToDepExports(returnType);
@@ -1903,10 +1934,19 @@ export class TypeScriptToTypedMindConverter {
     // input/output undefined is the same accepted trade D-LEG-1 already made
     // for Class-kind and literal-union types — the type stays visible in the
     // signature TEXT (`entity.signature` always emits verbatim), only the
-    // machine-checked edge is gone. The richer fix (synthesize a named
-    // inline-DTO stub for an object-literal parameter/return type, mirroring
-    // D-LEG-2's external-stub mechanism) is out of this item's scope — see
-    // issue #72.
+    // machine-checked edge is gone.
+    //
+    // issue #72 (rfc-tm-10-diamond.md §5's tracked follow-up, CLOSED) — the
+    // richer fix landed: `extractInputDTO`/`extractOutputDTO` now detect an
+    // inline object-literal type via `isInlineObjectLiteralType` and route
+    // it through `synthesizeInlineDTO` BEFORE calling `isDTOLikeType` at
+    // all, so this branch is no longer reached by either call site for that
+    // shape in practice. It stays as a defensive fallback — `isDTOLikeType`
+    // is a general classifier callers besides the two current ones could
+    // reasonably add in the future, and a `{`-prefixed type reaching it
+    // directly (bypassing the synthesis-aware call sites) must still be
+    // excluded rather than misclassified as DTO-like-by-elimination text
+    // the grammar cannot parse.
     if (cleaned.startsWith('{')) {
       return false;
     }
@@ -1961,6 +2001,193 @@ export class TypeScriptToTypedMindConverter {
         return;
       }
     }
+  }
+
+  // issue #72 (rfc-tm-10-diamond.md §5's tracked follow-up) — synthesizes a
+  // named DTO entity from an inline object-literal function
+  // parameter/return type, mirroring D-LEG-2's external-stub synthesis
+  // mechanism (`walkGenericArgsForExternalStubs`/`addExternalTypeToDepExports`,
+  // RFC-TM-10 §2): rather than dropping the type from the graph
+  // (`isDTOLikeType`'s `{`-prefix exclusion, D-LEG-1/§5), give it a real
+  // bare `entity_name` and real `DtoFieldNode`s, so `input`/`output`
+  // resolve to an actual DTO instead of staying `undefined`.
+  //
+  // Naming: deterministic and collision-safe. The caller passes
+  // `${functionEntityName}${suffix}` (`suffix` is `'Input'` or `'Output'`,
+  // the same codomain-disambiguation convention `walkGenericArgsForExternalStubs`'s
+  // sibling mechanisms use for input-vs-output distinction) — collision-free
+  // ACROSS FUNCTIONS because `functionEntityName` is already the
+  // converter's own collision-resolved function name (`functionNameRemap`,
+  // X-CONV-4). This function runs that candidate through
+  // `sanitizeEntityName` first (the same PascalCasing sanitizer every other
+  // DTO-shaped entity name in this converter already passes through —
+  // `convertInterfaceToDTO`/`convertTypeAliasToDTO` use `createEntityName`,
+  // which is identity, but D-LEG-3's namespace-qualified-implements stub
+  // uses this exact sanitizer for the same "derive a name, not author one"
+  // reason), so `updateProfileInput` becomes `UpdateProfileInput` —
+  // matching the PascalCase convention every hand-authored DTO in this
+  // codebase's fixtures already follows, and ensuring a collision against a
+  // hand-authored `interface FooInput` is detected (both names normalize to
+  // the same PascalCase form). A collision can still occur AGAINST AN
+  // UNRELATED entity that happens to share the derived name (e.g. a
+  // hand-named `DTO FooInput %` already exists) or between the input DTO
+  // and output DTO for the SAME function if the caller derived the same
+  // suffix twice — resolved by appending the same `__2`, `__3`, ...
+  // double-underscore disambiguator `reserveFunctionEntityNames` already
+  // uses for function-name collisions, walked upward until a free name is
+  // found.
+  //
+  // Nesting: a field whose own type is ALSO an inline object literal
+  // recurses into its own synthesized DTO, named by running
+  // `${dtoName}_${fieldName}` through `sanitizeEntityName` (the same
+  // sanitizer D-LEG-3's namespace-qualified-`implements` stub uses) — which
+  // PascalCases each underscore-delimited segment and JOINS THEM WITH NO
+  // SEPARATOR (`createOrderInput_shipping` -> `CreateOrderInputShipping`,
+  // not `CreateOrderInput_Shipping`), rather than falling to an `opaque`
+  // TypeExprNode leaf. This
+  // is a stronger restoration than TM-8's own `TypeExprNode` grammar
+  // supports for an UNNAMED nested shape (there is no `'struct'`/`'object'`
+  // TypeExprNode kind — `named | literal | generic | array | union |
+  // intersection | opaque` is the complete set, `ast/type-expr-node.ts`),
+  // but a NAMED nested DTO with a `named`-kind field reference IS fully
+  // supported (`check-dto-fields.ts`'s `PRIMITIVES`-gated resolution accepts
+  // DTO/Class/TypeDef kinds) — so recursing preserves strictly more
+  // information than an opaque leaf would, at zero grammar cost.
+  private synthesizeInlineDTO(objectLiteralType: string, baseName: string): string {
+    const dtoName = this.reserveSynthesizedDTOName(this.sanitizeEntityName(baseName));
+    this.addEntityName(dtoName, 'synthesizeInlineDTO');
+
+    const dtoEntity = new DtoNode({
+      name: dtoName,
+      span: SYNTHETIC_SPAN,
+      raw: `${dtoName} %`,
+      sourceForm: 'shortform',
+      fields: this.parseInlineObjectLiteralToFields(objectLiteralType, dtoName),
+      purpose: 'Synthesized from an inline object-literal parameter/return type (issue #72).',
+    });
+
+    this.entities.push(dtoEntity);
+    return dtoName;
+  }
+
+  // Collision resolution shared by `synthesizeInlineDTO`'s two call sites
+  // (an input DTO and an output DTO for the same function, or a synthesized
+  // name colliding with an unrelated pre-existing entity). Mirrors
+  // `reserveFunctionEntityNames`'s own `<baseName>__<disambiguator>` shape
+  // (X-CONV-4) rather than inventing a second collision convention.
+  private reserveSynthesizedDTOName(baseName: string): string {
+    if (!this.entityNames.has(baseName)) {
+      return baseName;
+    }
+    let attempt = 2;
+    while (this.entityNames.has(`${baseName}__${attempt}`)) {
+      attempt += 1;
+    }
+    return `${baseName}__${attempt}`;
+  }
+
+  // Brace-depth-aware property split for an inline object-literal type's
+  // body — REPLACES `parseObjectProperties`'s naive `content.split(/[;,\n]/)`
+  // for this synthesis path specifically. That split is unsound the moment
+  // a field's own type contains a nested `{`/`}`, `<`/`>`, or `(`/`)` pair
+  // (a nested object literal, a generic argument list, or a function-type
+  // parameter list each contain the SAME `;`/`,` delimiters the naive split
+  // treats as field boundaries) — `parseObjectProperties` was never
+  // exercised against a nested shape before this item (zero nested-object
+  // test coverage existed), so this is a new, correct splitter for the new
+  // call site rather than a behavior change to the existing one.
+  private splitObjectLiteralProperties(content: string): string[] {
+    const properties: string[] = [];
+    let depth = 0;
+    let current = '';
+    for (const char of content) {
+      if (char === '{' || char === '<' || char === '(' || char === '[') {
+        depth += 1;
+      } else if (char === '}' || char === '>' || char === ')' || char === ']') {
+        depth -= 1;
+      }
+      if ((char === ';' || char === ',' || char === '\n') && depth === 0) {
+        if (current.trim()) {
+          properties.push(current.trim());
+        }
+        current = '';
+        continue;
+      }
+      current += char;
+    }
+    if (current.trim()) {
+      properties.push(current.trim());
+    }
+    return properties;
+  }
+
+  // Parses one property line (`name?: Type` or `name: Type`) from an inline
+  // object-literal's body into its name/type/optionality — the same
+  // `^(\w+)(\?)?\s*:\s*(.+)$` shape `parseObjectProperties` uses, applied to
+  // one brace-depth-correct property string instead of a naively-split line.
+  private parseObjectLiteralProperty(propertyText: string): { name: string; type: string; optional: boolean } | undefined {
+    const match = propertyText.match(/^(\w+)(\?)?\s*:\s*(.+)$/s);
+    if (!match?.[1] || !match[3]) {
+      return undefined;
+    }
+    return { name: match[1], type: match[3].trim(), optional: !!match[2] };
+  }
+
+  private parseInlineObjectLiteralToFields(objectLiteralType: string, dtoName: string): DtoFieldNode[] {
+    const trimmed = objectLiteralType.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+      return [];
+    }
+    const content = trimmed.slice(1, -1);
+    const propertyTexts = this.splitObjectLiteralProperties(content);
+    const fields: DtoFieldNode[] = [];
+
+    for (const propertyText of propertyTexts) {
+      const prop = this.parseObjectLiteralProperty(propertyText);
+      if (!prop) {
+        continue;
+      }
+
+      // A nested inline object-literal field type recurses into its own
+      // synthesized DTO (see `synthesizeInlineDTO`'s doc comment above for
+      // why this beats an `opaque` leaf). The nested DTO's name is derived
+      // from the PARENT DTO's name plus the field name, sanitized and
+      // PascalCased with `sanitizeEntityName` — the same sanitizer
+      // D-LEG-3's namespace-qualified-`implements` stub mechanism uses,
+      // reused rather than re-derived.
+      if (isInlineObjectLiteralType(prop.type)) {
+        const nestedBaseName = this.sanitizeEntityName(`${dtoName}_${prop.name}`);
+        const nestedDtoName = this.synthesizeInlineDTO(prop.type, nestedBaseName);
+        const typeExpr = parseTypeExprText(nestedDtoName).typeExpr;
+        fields.push(
+          new DtoFieldNode({
+            name: prop.name,
+            type: nestedDtoName,
+            typeExpr,
+            optionalityMarker: prop.optional ? 'question' : 'none',
+            span: SYNTHETIC_SPAN,
+          }),
+        );
+        continue;
+      }
+
+      const propType = this.sanitizeFieldType(prop.type);
+      const typeExpr = parseTypeExprText(propType).typeExpr;
+      // D-LEG-2 (issue #65) — same generic-argument external-stub walk
+      // every other field-synthesis call site applies.
+      this.walkGenericArgsForExternalStubs(typeExpr);
+      fields.push(
+        new DtoFieldNode({
+          name: prop.name,
+          type: propType,
+          typeExpr,
+          optionalityMarker: prop.optional ? 'question' : 'none',
+          span: SYNTHETIC_SPAN,
+        }),
+      );
+    }
+
+    return fields;
   }
 
   private addExternalTypeToDepExports(typeName: string): void {
