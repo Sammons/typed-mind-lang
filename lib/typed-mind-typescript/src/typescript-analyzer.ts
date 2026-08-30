@@ -845,7 +845,51 @@ export class TypeScriptAnalyzer {
       enums,
       dynamicImportSpecifiers,
       selfInvokedFunctionNames,
+      hasTopLevelCallbackRegistration: this.hasTopLevelCallbackRegistration(sourceFile),
     } as const;
+  }
+
+  // RC-F (issue #108) — `isPureTypesFile` (typescript-to-typedmind-
+  // converter.ts) classified a route/handler module whose every handler is
+  // an inline arrow callback (`accountRoutes.openapi(route, async (c) => {
+  // ...})`, the Hono OpenAPI idiom, or the equivalent Express
+  // `router.get(path, async (req, res) => {...})` shape) as "pure types,"
+  // because `hasRealCode` only ever checked `module.classes`/
+  // `module.functions` — both populated from top-level `function`/`class`
+  // DECLARATIONS only. A registration call passing a function/arrow
+  // expression as an argument has neither. Detected here (the analyzer,
+  // which has AST access `ParsedModule` does not carry) rather than in the
+  // converter: scans the module's TRUE top-level statements (not the full
+  // recursive walk `visit` performs — a registration call nested inside
+  // some OTHER function's body should not itself flip this flag; the issue
+  // names the shape as a top-level statement) for an expression statement
+  // whose call has at least one function-expression/arrow-function argument
+  // with a non-empty body. `module.constants`/`module.types`/etc. still
+  // exist alongside the registration calls in the real corpus fixture
+  // (`createRoute`/`z`-built route-schema `const`s) — this flag only feeds
+  // `hasRealCode`'s OR, it never replaces the existing checks.
+  private hasTopLevelCallbackRegistration(sourceFile: ts.SourceFile): boolean {
+    for (const statement of sourceFile.statements) {
+      if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression)) {
+        continue;
+      }
+      for (const argument of statement.expression.arguments) {
+        if (
+          (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) &&
+          ts.isBlock(argument.body) &&
+          argument.body.statements.length > 0
+        ) {
+          return true;
+        }
+        // An arrow function with a concise (non-block) body is still a real
+        // callback (`() => doSomething()`), just never empty by
+        // construction — no `.length > 0` guard needed for that shape.
+        if (ts.isArrowFunction(argument) && !ts.isBlock(argument.body)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   // X-AN-11 — collects bare-identifier call targets (`runWorker()`, not
