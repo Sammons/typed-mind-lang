@@ -740,9 +740,20 @@ export class TypeScriptToTypedMindConverter {
       }
     }
 
-    // Register this module under multiple keys for easier resolution
+    // Register this module under multiple keys for easier resolution.
+    // Adversarial review (PR #105) blocker fix — `withoutExt` used to strip
+    // only `ts|tsx|js|jsx` while `stripKnownSourceExtension` (this class's
+    // single other extension-stripping site, used on the READ side of both
+    // the RC-A moduleGraphResolution fast path and the pre-existing
+    // guessed-specifier fallback) strips 8 extensions including
+    // `mts|cts|mjs|cjs`. For a `.mts`/`.cts`/`.mjs`/`.cjs` source module the
+    // write-side key and the read-side lookup key disagreed, so the new
+    // fast path silently missed and fell through to the guessed-specifier
+    // fallback — reproducing RC-A's own import-dropping bug for exactly
+    // those four extensions. Fixed by having the write side call the SAME
+    // method the read side calls, so the two can never drift apart again.
     const relativePath = this.getRelativePath(module.filePath);
-    const withoutExt = relativePath.replace(/\.(ts|tsx|js|jsx)$/, '');
+    const withoutExt = this.stripKnownSourceExtension(relativePath);
     const fileName = path.basename(module.filePath, path.extname(module.filePath));
     const dirPath = path.dirname(withoutExt);
 
@@ -1651,12 +1662,23 @@ export class TypeScriptToTypedMindConverter {
   // outside `sanitizeEntityName`'s codomain (see `deriveProgramName`'s own
   // comment for the collision-proof argument — it applies identically
   // here). If two colliding modules ALSO share the same parent directory
-  // name (a deeper nesting, e.g. `a/x/events.ts` vs `b/x/events.ts`), the
-  // single parent-directory segment does not disambiguate them either — in
-  // that case fall back to the full sanitized directory path (still
-  // unique per module by construction, since two different modules cannot
-  // share both a basename AND their full containing directory path without
-  // being the exact same file).
+  // name (a deeper nesting, e.g. `a/x/events.ts` vs `b/x/events.ts`), fall
+  // back to the full sanitized relative directory path.
+  //
+  // Adversarial review (PR #105) blocker fix — `sanitizeEntityName` is
+  // LOSSY (it collapses `/`, `-`, `_`, and case into one alnum-only
+  // PascalCase string), so two distinct full relative directory paths that
+  // differ only in separator/case/dash-vs-underscore shape (`pkg-a/x` vs
+  // `pkg/a/x`) can still sanitize to the identical disambiguator even at
+  // the full-path fallback tier — silently clobbering the SAME way RC-B
+  // itself was filed to close, just requiring a rarer directory-name
+  // shape. Closed by tracking every disambiguated name this method has
+  // already assigned in `assignedNames` and, on a genuine post-sanitize
+  // collision, appending a deterministic `__2`, `__3`, ... suffix (the
+  // same disambiguator shape `reserveSynthesizedDTOName` already uses) —
+  // this is a last-resort, should-not-fire-in-practice tier, but it makes
+  // every name this method emits provably unique regardless of how two
+  // real directory paths happen to sanitize.
   private reserveFileEntityNames(modules: readonly ParsedModule[]): void {
     const modulesByBaseName = new Map<string, ParsedModule[]>();
     for (const module of modules) {
@@ -1669,11 +1691,23 @@ export class TypeScriptToTypedMindConverter {
       }
     }
 
+    const assignedNames = new Set<string>();
+    const assign = (modulePath: string, candidateName: string): void => {
+      let finalName = candidateName;
+      let attempt = 2;
+      while (assignedNames.has(finalName)) {
+        finalName = `${candidateName}__${attempt}`;
+        attempt += 1;
+      }
+      assignedNames.add(finalName);
+      this.reservedFileEntityNameByModulePath.set(modulePath, finalName);
+    };
+
     for (const [baseName, group] of modulesByBaseName) {
       if (group.length === 1) {
         const [onlyModule] = group;
         if (onlyModule) {
-          this.reservedFileEntityNameByModulePath.set(onlyModule.filePath, createEntityName(`${baseName}File`));
+          assign(onlyModule.filePath, createEntityName(`${baseName}File`));
         }
         continue;
       }
@@ -1683,7 +1717,10 @@ export class TypeScriptToTypedMindConverter {
       // for a sub-collision (two modules sharing BOTH basename and parent
       // directory name — only possible with a deeper, differently-rooted
       // path, since same basename + same immediate parent + same full
-      // relative path would be the same file).
+      // relative path would be the same file). `assign`'s numeric-suffix
+      // tier is the final backstop for the rare case where even the
+      // full-path fallback sanitizes to an identical string across two
+      // different real paths.
       const parentDirNames = group.map((module) => this.sanitizeEntityName(path.basename(path.dirname(module.filePath))));
       const parentDirNameCounts = new Map<string, number>();
       for (const parentDirName of parentDirNames) {
@@ -1696,7 +1733,7 @@ export class TypeScriptToTypedMindConverter {
           (parentDirNameCounts.get(parentDirName) ?? 0) > 1
             ? this.sanitizeEntityName(this.getRelativePath(path.dirname(module.filePath)))
             : parentDirName;
-        this.reservedFileEntityNameByModulePath.set(module.filePath, createEntityName(`${disambiguator}__${baseName}File`));
+        assign(module.filePath, createEntityName(`${disambiguator}__${baseName}File`));
       });
     }
   }
