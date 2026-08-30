@@ -1298,7 +1298,7 @@ export class TypeScriptToTypedMindConverter {
     // emission path always calls `emitShortform`, which forces every entity
     // to shortform per `SyntaxEmitter`'s documented `forceForm` contract —
     // per-entity `sourceForm` would be inert against that override). The
-    // emitter itself (emit-shortform.ts's `classFileNeedsLongform`) is what
+    // emitter itself (emit-shortform.ts's `shortformCannotExpress`) is what
     // detects this case and promotes the ONE entity to longform so the real
     // `purpose` data round-trips instead of being silently dropped.
     const classFileEntity = new ClassFileNode({
@@ -1931,9 +1931,9 @@ export class TypeScriptToTypedMindConverter {
     // forces every entity to shortform regardless of its own `sourceForm`).
     // SST-exports-push (issue #52/PR #94) and the self-invoked-function fold
     // (X-AN-11) both push real names into `allPublicExports`; when that list
-    // is non-empty, `emit-shortform.ts`'s `programNeedsLongform` detects it
-    // and promotes this ONE entity to longform so the exports data round-
-    // trips through the legal serialization instead of being dropped.
+    // is non-empty, `emit-shortform.ts`'s `shortformCannotExpress` detects
+    // it and promotes this ONE entity to longform so the exports data
+    // round-trips through the legal serialization instead of being dropped.
     const programEntity = new ProgramNode({
       name: entityName,
       span: SYNTHETIC_SPAN,
