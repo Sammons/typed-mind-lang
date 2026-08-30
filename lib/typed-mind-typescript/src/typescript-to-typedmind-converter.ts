@@ -1450,7 +1450,7 @@ export class TypeScriptToTypedMindConverter {
     // Only convert functions that are exported
     for (const func of module.functions) {
       if (this.isFunctionExported(func, module)) {
-        this.convertFunction(func, module.filePath);
+        this.convertFunction(func, module);
       }
     }
 
@@ -1542,7 +1542,7 @@ export class TypeScriptToTypedMindConverter {
     // Only convert functions that are exported
     for (const func of module.functions) {
       if (this.isFunctionExported(func, module)) {
-        this.convertFunction(func, module.filePath);
+        this.convertFunction(func, module);
       }
     }
 
@@ -1774,7 +1774,8 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
-  private convertFunction(func: ParsedFunction, moduleFilePath: string): void {
+  private convertFunction(func: ParsedFunction, module: ParsedModule): void {
+    const moduleFilePath = module.filePath;
     const remapKey = `${moduleFilePath}::${func.name}`;
     const entityName = this.functionNameRemap.get(remapKey);
 
@@ -1803,7 +1804,7 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} :: ${func.signature}`,
       sourceForm: 'shortform',
       signature: func.signature,
-      calls: [], // Will be populated by analyzing function bodies if needed
+      calls: this.resolveSameFileCallEdges(func, module),
       pendingDependencies: [],
       description: func.description ? collapseDescription(func.description) : undefined,
       input: inputDTO,
@@ -1811,6 +1812,74 @@ export class TypeScriptToTypedMindConverter {
     });
 
     this.entities.push(functionEntity);
+  }
+
+  // typedmind-diagnostic-legitimacy callgraph increment — resolves
+  // `ParsedFunction.calledNames` (raw identifiers found in the function's own
+  // body, per `collectSameFileCallEdges`) against SAME-FILE declared,
+  // exported entities only: a sibling exported function/arrow-const in
+  // `module.functions` (resolved through `functionNameRemap`, the converter's
+  // own collision-resolved name — the same map `convertFunction` itself uses
+  // for its own name) or a sibling exported class in `module.classes`
+  // (resolved through `createEntityName`, since `reserveFunctionEntityNames`'s
+  // own doc comment establishes classes are never touched by the function
+  // disambiguation remap and always convert before this method runs, in both
+  // `convertToClassFile` and `convertToSeparateEntities`). A name with no
+  // same-file resolution (a module-private helper, an imported/global
+  // identifier, a method-call receiver, anything `collectSameFileCallEdges`
+  // could not attribute to a same-file top-level declaration) is DROPPED,
+  // not guessed — an unresolved raw string folded into `calls` would
+  // misfire `checker/unknown-call-target`/`checker/method-call-on-non-class`
+  // (check-method-calls.ts only inspects DOTTED calls, but
+  // `checkOrphans`/`collectReferencedNames` unions every raw string
+  // regardless, so an unresolved non-dotted name is merely inert — dropping
+  // it here is a precision choice, not a soundness requirement, made to keep
+  // `calls` an honest same-file-resolved edge list rather than a bag of
+  // unresolved source text). Cross-file calls are intentionally out of scope
+  // — this increment targets the same-file-closure diagnostic family only;
+  // a cross-file call edge is a separate, larger surface (the converter's
+  // import-graph resolution, not this per-function walk) this increment does
+  // not touch.
+  private resolveSameFileCallEdges(func: ParsedFunction, module: ParsedModule): string[] {
+    if (func.calledNames.length === 0) {
+      return [];
+    }
+    const resolved = new Set<string>();
+    for (const calledName of func.calledNames) {
+      if (calledName === func.name) {
+        // Direct recursion: the function's own (not-yet-assigned) entity
+        // name is not a useful liveness edge for the orphan check (a
+        // function cannot make itself non-orphaned by calling itself), and
+        // resolving it would just re-add the function's own remap entry.
+        continue;
+      }
+      const siblingFunctionRemapKey = `${module.filePath}::${calledName}`;
+      const siblingFunctionEntityName = this.functionNameRemap.get(siblingFunctionRemapKey);
+      if (siblingFunctionEntityName !== undefined) {
+        resolved.add(siblingFunctionEntityName);
+        continue;
+      }
+      // issue #91 / X-SUPP-6 (rfc-tm-9-diamond.md §9) — a class converts to
+      // an entity REGARDLESS of export status (`convertToSeparateEntities`/
+      // `convertToClassFile` never gate on `isClassExported`, unlike
+      // functions), so `this.entityNames.has(...)` alone is not a safe
+      // "genuinely reachable" signal the way it is for the function branch
+      // above. A module-private class deliberately keeps its
+      // `checker/orphaned-entity` finding (converter-emitted,
+      // pre-suppressed with reason 'generated-single-file-scope') as a
+      // STATEMENT ABOUT NON-EXPORT, not a same-file-reachability question —
+      // crediting a same-file `new` call here would silently erase that
+      // designed-in finding (fixture 25-generated-single-file). Only an
+      // EXPORTED sibling class is a legitimate same-file call-edge target.
+      const siblingClass = module.classes.find((cls) => cls.name === calledName);
+      if (siblingClass !== undefined && module.exports.some((exp) => exp.name === siblingClass.name)) {
+        const siblingClassEntityName = createEntityName(siblingClass.name);
+        if (this.entityNames.has(siblingClassEntityName)) {
+          resolved.add(siblingClassEntityName);
+        }
+      }
+    }
+    return Array.from(resolved);
   }
 
   private convertInterfaceToDTO(iface: ParsedInterface): void {
