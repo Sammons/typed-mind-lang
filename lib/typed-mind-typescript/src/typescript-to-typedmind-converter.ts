@@ -356,6 +356,13 @@ export class TypeScriptToTypedMindConverter {
       // also runs as a post-pass rather than threaded into `convertImports`.
       this.foldDynamicImportsIntoSourceFiles(filteredModules);
 
+      // RFC-TM-11 Amendment 1, §RX-6 (rfc-tm-11-diamond.md) — issue #109
+      // (RC-G), the cross-package residual Quantum 1 left open: same
+      // ordering rationale as the two folds immediately above — a
+      // re-exporting File's `reExports` and its own entity name are only
+      // guaranteed final once `convertModules` has finished.
+      this.foldReExportedNamesIntoImporterFiles(filteredModules);
+
       // Generate program entities if requested (after other entities are created)
       if (this.options.generatePrograms) {
         this.generatePrograms(analysis.entryPoints, filteredModules, analysis.sstHandlerReferences);
@@ -2268,6 +2275,127 @@ export class TypeScriptToTypedMindConverter {
               });
       }
     }
+  }
+
+  // RFC-TM-11 Amendment 1, §RX-6 part (i) (rfc-tm-11-diamond.md) — issue
+  // #109 (RC-G): a File whose re-export TARGET resolves to no local
+  // entity (an external or workspace-package specifier, e.g.
+  // `@webhookstorage/core/client-ip`) can never have its re-exported name
+  // appear in any importer's `imports` list — `resolveImportToEntity`
+  // returns `undefined` for that name from every caller, since it never
+  // finds a locally-constructed entity to point at. Quantum 1's
+  // `isFileConsumed` (check-orphans.ts) branch that scans `file.reExports`
+  // can therefore never find a match for this shape, no matter how many
+  // real modules import through the barrel.
+  //
+  // "Importing THROUGH a barrel counts as importing the barrel file."
+  // This post-pass (same ordering rationale as `foldDynamicImportsIntoSourceFiles`
+  // immediately above — a target File's entity name is only guaranteed
+  // final once `convertModules` has finished) walks every module's OWN
+  // `ParsedImport`s (not `convertImports`'s already-built `imports:`
+  // list, which already dropped the unresolvable name): for each import
+  // whose specifier resolves to a traversed File `M`, when the imported
+  // name is present in `M.reExports`, `M`'s own File entity name is
+  // folded into the IMPORTER's `imports` list — independent of whether
+  // the imported name itself ever resolves to a local entity. This is a
+  // true statement regardless: the importer's source code literally names
+  // `M`'s path as the import specifier, so recording "this importer
+  // imports from `M`" invents nothing.
+  //
+  // Part (ii) of RX-6 is the checker side: `isFileConsumed` gains a third
+  // branch, `isEntityImported(context, file.name)`, which is what reads
+  // the name this fold writes (check-orphans.ts). Neither half alone
+  // closes the gap — see the Diamond Doc's Amendment 1 for the full
+  // worked example.
+  private foldReExportedNamesIntoImporterFiles(modules: readonly ParsedModule[]): void {
+    for (const module of modules) {
+      const importedNames = new Set<string>();
+
+      for (const imp of module.imports) {
+        if (this.isExternalPackage(imp.specifier)) {
+          continue;
+        }
+        const targetFileEntityName = this.resolveReExportingFileEntityName(module.filePath, imp.specifier, [
+          ...(imp.defaultImport !== undefined ? [imp.defaultImport] : []),
+          ...(imp.namespaceImport !== undefined ? [imp.namespaceImport] : []),
+          ...imp.namedImports,
+        ]);
+        if (targetFileEntityName !== undefined) {
+          importedNames.add(targetFileEntityName);
+        }
+      }
+
+      if (importedNames.size === 0) {
+        continue;
+      }
+
+      const importerFileEntityName = this.fileEntityNameByModulePath.get(module.filePath);
+      if (importerFileEntityName === undefined) {
+        continue;
+      }
+
+      const importerIndex = this.entities.findIndex((entity) => entity.name === importerFileEntityName);
+      const importerEntity = this.entities[importerIndex];
+      if (importerIndex === -1 || !(importerEntity instanceof FileNode)) {
+        // ClassFile is out of scope per RX-1: it always auto-self-exports
+        // and is never routed through `isFileConsumed`, so folding into a
+        // ClassFile's `imports` would have no consumption-checking
+        // consumer — matching RX-1/RX-2/RX-5's own File-only scope.
+        continue;
+      }
+
+      const newNames = [...importedNames].filter((name) => name !== importerFileEntityName && !importerEntity.imports.includes(name));
+      if (newNames.length === 0) {
+        continue;
+      }
+
+      this.entities[importerIndex] = new FileNode({
+        name: importerEntity.name,
+        span: importerEntity.span,
+        raw: importerEntity.raw,
+        comment: importerEntity.comment,
+        sourceForm: importerEntity.sourceForm,
+        path: importerEntity.path,
+        imports: [...importerEntity.imports, ...newNames],
+        exports: importerEntity.exports,
+        reExports: importerEntity.reExports,
+        purpose: importerEntity.purpose,
+      });
+    }
+  }
+
+  // Resolves `specifier` (as imported by `importerFilePath`) to a
+  // traversed File's own entity name, but ONLY when at least one of
+  // `importedNames` is present in that File's `reExports` — the bound
+  // (a) negative fixture: importing a name NOT in the target's
+  // `reExports` folds nothing, even when the specifier itself resolves to
+  // a real File. Reuses the same `moduleGraphResolution` chain
+  // `resolveImportToEntity` and `foldDynamicImportsIntoSourceFiles`
+  // already rely on.
+  private resolveReExportingFileEntityName(
+    importerFilePath: string,
+    specifier: string,
+    importedNames: readonly string[],
+  ): string | undefined {
+    if (importedNames.length === 0) {
+      return undefined;
+    }
+    const importerSourceModule = this.getRelativePath(importerFilePath);
+    const resolvedTarget = this.moduleGraphResolution.get(
+      TypeScriptToTypedMindConverter.moduleGraphResolutionKey(importerSourceModule, specifier),
+    );
+    const targetRelativePath =
+      resolvedTarget !== undefined ? this.stripKnownSourceExtension(resolvedTarget) : this.stripKnownSourceExtension(specifier);
+    const targetFileEntityName = this.fileEntityNameByRelativePath.get(targetRelativePath);
+    if (targetFileEntityName === undefined) {
+      return undefined;
+    }
+    const targetEntity = this.entities.find((entity) => entity.name === targetFileEntityName);
+    if (!(targetEntity instanceof FileNode)) {
+      return undefined;
+    }
+    const reExportsTheImportedName = importedNames.some((name) => targetEntity.reExports.includes(name));
+    return reExportsTheImportedName ? targetFileEntityName : undefined;
   }
 
   private generatePrograms(

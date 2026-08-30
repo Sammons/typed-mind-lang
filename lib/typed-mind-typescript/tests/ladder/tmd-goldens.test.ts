@@ -102,6 +102,20 @@ const cases: readonly FixtureCase[] = [
   // `.tmd` now check clean (`valid: true`, zero diagnostics).
   { fixture: '07-barrel-reexport', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   { fixture: '07b-barrel-noext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  // RFC-TM-11 Amendment 1, RX-6 (rfc-tm-11-diamond.md, issue #109 RC-G
+  // real-corpus residual) — the shape 07/07b's same-package-resolvable
+  // re-exports do NOT exercise: a barrel re-exporting from an EXTERNAL or
+  // workspace-package specifier (`@scope/core/client-ip`, matching the
+  // real `TenantBillingFile`/`ClientIpFile` corpus instances exactly).
+  // `getClientIp` never resolves to a locally-constructed entity, so only
+  // the RX-6 converter fold (folding `ClientIpFile`'s own File entity
+  // name into `MainFile.imports`) plus `isFileConsumed`'s new third
+  // branch clear `checker/orphaned-file` here — 07/07b already passed
+  // before RX-6 existed, this fixture would NOT have passed without it.
+  // Also exercises bound (a): `formatIp` (a genuine local declaration
+  // alongside the re-export, NOT in `reExports`) resolves normally and
+  // does not trigger a redundant fold.
+  { fixture: '47-crosspkg-reexport', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   { fixture: '10-export-star', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '12-tsconfig-paths', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '13-jsdoc-desc', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
