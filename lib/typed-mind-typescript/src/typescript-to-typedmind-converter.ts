@@ -2187,13 +2187,43 @@ export class TypeScriptToTypedMindConverter {
           continue;
         }
 
+        // RC-E follow-up (webhookstorage live-ladder ground-truth,
+        // 2026-08-30) — `lazy(() => import('./pages/Home.js'))` has no
+        // bound import name in source (unlike a static `import Home from
+        // './pages/Home.js'`), so folding ONLY the target's File entity
+        // name leaves the target's own DEFAULT-EXPORTED entity (`Home`,
+        // the actual rendered component) unreferenced: `checkOrphans`'s
+        // `collectReferencedNames` treats a File name in `imports:` as a
+        // reference to THAT FILE, never transitively to the symbols it
+        // exports — the same reason a real webhookstorage/web-app run
+        // still flagged `Orphaned entity 'Dashboard'` etc. even after the
+        // File-level fold. A `lazy()`-wrapped dynamic import always
+        // targets a default-exported component in real corpus usage (the
+        // preact-iso/React.lazy contract requires a module whose default
+        // export is the lazy-loaded component); resolve that default
+        // export the same way a static default import would
+        // (`resolveImportToEntity`, reusing its existing
+        // moduleGraphResolution/exportRegistry chain) and fold it in
+        // alongside the File name when present.
+        const targetModuleExports =
+          this.exportRegistry[this.stripKnownSourceExtension(resolvedTarget)] ??
+          this.exportRegistry[specifier] ??
+          this.exportRegistry[this.stripKnownSourceExtension(specifier)];
+        const targetDefaultExportEntityName =
+          targetModuleExports?.defaultExport !== undefined
+            ? this.resolveImportToEntity(module.filePath, targetModuleExports.defaultExport, specifier)
+            : undefined;
+
+        const namesToFold = [targetFileEntityName, targetDefaultExportEntityName].filter((name): name is string => name !== undefined);
+
         const sourceIndex = this.entities.findIndex((entity) => entity.name === sourceFileEntityName);
         const sourceEntity = this.entities[sourceIndex];
         if (sourceIndex === -1 || (!(sourceEntity instanceof FileNode) && !(sourceEntity instanceof ClassFileNode))) {
           continue;
         }
 
-        if (sourceEntity.imports.includes(targetFileEntityName)) {
+        const newNames = namesToFold.filter((name) => !sourceEntity.imports.includes(name));
+        if (newNames.length === 0) {
           continue;
         }
 
@@ -2206,7 +2236,7 @@ export class TypeScriptToTypedMindConverter {
                 comment: sourceEntity.comment,
                 sourceForm: sourceEntity.sourceForm,
                 path: sourceEntity.path,
-                imports: [...sourceEntity.imports, targetFileEntityName],
+                imports: [...sourceEntity.imports, ...newNames],
                 exports: sourceEntity.exports,
                 purpose: sourceEntity.purpose,
               })
@@ -2219,7 +2249,7 @@ export class TypeScriptToTypedMindConverter {
                 path: sourceEntity.path,
                 implements: sourceEntity.implements,
                 methods: sourceEntity.methods,
-                imports: [...sourceEntity.imports, targetFileEntityName],
+                imports: [...sourceEntity.imports, ...newNames],
                 exports: sourceEntity.exports,
                 extends: sourceEntity.extends,
                 purpose: sourceEntity.purpose,
