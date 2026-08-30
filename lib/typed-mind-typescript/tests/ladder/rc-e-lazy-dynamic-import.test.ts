@@ -10,6 +10,18 @@
 // `moduleGraphResolution` map RC-A's fix populates (which already covers
 // dynamic imports per X-AN-1's own doc comment) and folds the target
 // File/ClassFile entity name into the importing module's `imports:` list.
+//
+// Follow-up (post-merge live-ladder ground-truth against the real
+// webhookstorage clone, 2026-08-30): folding ONLY the target File's name
+// cleared `checker/orphaned-file` but left the target's own DEFAULT-EXPORTED
+// entity (the actual rendered component — `Dashboard`, `Endpoints`, etc. in
+// the real corpus) unreferenced, since a `lazy()` call binds no import name
+// and `checkOrphans` never treats "File X is imported" as "File X's exports
+// are transitively referenced." `pages/home.ts` here uses a DEFAULT export
+// (matching the real corpus shape exactly) so this fixture exercises that
+// gap; `foldDynamicImportsIntoSourceFiles` now also resolves and folds the
+// target's default-exported entity name via the existing
+// `resolveImportToEntity` machinery.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -49,15 +61,33 @@ describe('RC-E: a dynamic import() nested inside a call/arrow argument (lazy(() 
     );
   });
 
-  it('the lazy-loaded module and its export are real, resolvable entities', () => {
+  it('the lazy-loaded module and its default-exported entity are real, resolvable entities', () => {
     const result = convert();
     assert.equal(result.success, true);
 
     const home = result.entities.find((e) => e.kind === 'Function' && e.name === 'Home');
-    assert.notEqual(home, undefined, 'Home must be extracted as a real entity');
+    assert.notEqual(home, undefined, 'Home (the default export) must be extracted as a real entity');
   });
 
-  it('checker verdict: zero orphaned-file findings for the lazy-loaded module', async () => {
+  it("the importing module's File entity ALSO names the target's default-exported entity, not only its File", () => {
+    // The real gap this follow-up closes: `lazy()` binds no import name, so
+    // folding only the target FILE's name into `imports:` left the actual
+    // rendered component (`Home`, matching the real corpus's `Dashboard`/
+    // `Endpoints`/etc.) unreferenced — `checkOrphans` does not treat "a File
+    // is imported" as "that File's own exports are transitively referenced."
+    const result = convert();
+    assert.equal(result.success, true);
+
+    const appEntity = result.entities.find((e) => e.kind === 'File' && e.path.endsWith('App.ts')) as
+      | { imports: readonly string[] }
+      | undefined;
+    assert.ok(
+      appEntity?.imports.includes('Home'),
+      `expected 'Home' (the default export of ./pages/home.ts) in App's imports list, got: ${JSON.stringify(appEntity?.imports)}`,
+    );
+  });
+
+  it('checker verdict: zero orphaned-file/orphaned-entity findings for the lazy-loaded module or its default export', async () => {
     const result = convert();
     assert.equal(result.success, true);
 
@@ -66,11 +96,15 @@ describe('RC-E: a dynamic import() nested inside a call/arrow argument (lazy(() 
     const tm = await TypedMind.create();
     const checkResult = tm.check(longform);
 
-    const orphanFindings = checkResult.diagnostics.filter((d) => d.code === 'checker/orphaned-file' && d.message.includes('home.ts'));
+    const orphanFindings = checkResult.diagnostics.filter(
+      (d) =>
+        (d.code === 'checker/orphaned-file' && d.message.includes('home.ts')) ||
+        (d.code === 'checker/orphaned-entity' && d.message.includes('Home')),
+    );
     assert.deepEqual(
       orphanFindings,
       [],
-      `pages/home.ts must not orphan now that its lazy()-wrapped dynamic import resolves: ${JSON.stringify(orphanFindings)}`,
+      `pages/home.ts and its default export must not orphan now that its lazy()-wrapped dynamic import resolves: ${JSON.stringify(orphanFindings)}`,
     );
   });
 
