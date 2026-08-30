@@ -909,6 +909,56 @@ export class TypeScriptAnalyzer {
     return names;
   }
 
+  // typedmind-diagnostic-legitimacy callgraph increment — collects
+  // same-file call-edge targets from a function/arrow/function-expression's
+  // OWN body: bare-identifier call targets (`foo()`, the same shape X-AN-11's
+  // `collectCalledFunctionNames` already recognizes) plus `new` expression
+  // targets (`new Bar()`) whose constructor expression is a bare identifier.
+  // Deliberately conservative — recurses through every descendant (a direct
+  // call/`new` can sit inside a nested callback, matching the ops-cli
+  // `runBackfill`-inside-`.action()`-closure shape this increment targets),
+  // but only ever records a BARE identifier: `obj.method()` call targets and
+  // computed/member-expression `new` targets are out of scope by design,
+  // since the converter can only resolve a call edge to a same-file
+  // TOP-LEVEL declared function or class, never to a property access whose
+  // owner is unknown at this layer. Unlike `collectCalledFunctionNames`,
+  // this walk does not descend into a NESTED function/arrow/function-expression
+  // body — a call inside a nested closure is still lexically inside the
+  // outer function for the dispatch-table shape this increment cares about
+  // (`.action(async (opts) => { ...await runBackfill(...) })` nested inside
+  // a top-level function is unaffected either way since nested closures are
+  // still part of the outer function's own descendant tree), but this
+  // exclusion matters for the FUNCTION-declaration case: a function
+  // expression assigned to a property and passed elsewhere should not have
+  // its inner calls double-counted against the OUTER function once the
+  // inner one is independently parsed as its own `ParsedFunction`. In
+  // practice this only excludes named nested `function` declarations and
+  // class expressions (both parsed independently elsewhere); anonymous
+  // arrow/function-expression callbacks passed as call arguments (the
+  // dispatch-table idiom) are NOT independently parsed as their own
+  // top-level `ParsedFunction`, so they must stay in scope here — hence the
+  // exclusion only applies to `ts.isFunctionDeclaration`/`ts.isClassDeclaration`,
+  // never to anonymous arrow/function-expression nodes.
+  private collectSameFileCallEdges(body: ts.Node): string[] {
+    const names: string[] = [];
+    const visit = (current: ts.Node): void => {
+      if (ts.isFunctionDeclaration(current) || ts.isClassDeclaration(current)) {
+        // A nested named function/class declaration is parsed independently
+        // as its own entity elsewhere in this analyzer; do not attribute its
+        // internal calls to the outer function.
+        return;
+      }
+      if (ts.isCallExpression(current) && ts.isIdentifier(current.expression)) {
+        names.push(current.expression.text);
+      } else if (ts.isNewExpression(current) && ts.isIdentifier(current.expression)) {
+        names.push(current.expression.text);
+      }
+      ts.forEachChild(current, visit);
+    };
+    ts.forEachChild(body, visit);
+    return names;
+  }
+
   private lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
     return sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
   }
@@ -1030,6 +1080,10 @@ export class TypeScriptAnalyzer {
       isAsync,
       description: description || undefined,
       decorators,
+      // typedmind-diagnostic-legitimacy callgraph increment — `node.body` is
+      // `undefined` for an ambient/overload declaration (no implementation
+      // to collect calls from); real declarations always carry a body.
+      calledNames: node.body ? this.collectSameFileCallEdges(node.body) : [],
     } as const;
   }
 
@@ -1054,6 +1108,12 @@ export class TypeScriptAnalyzer {
       isAsync,
       description: description || undefined,
       decorators: [],
+      // typedmind-diagnostic-legitimacy callgraph increment — an arrow
+      // function's concise (non-block) body is itself a single expression,
+      // which `collectSameFileCallEdges` still walks correctly (it starts
+      // from `ts.forEachChild`, which recurses into an expression body's own
+      // descendants the same way it does a block's statements).
+      calledNames: this.collectSameFileCallEdges(node.body),
     } as const;
   }
 

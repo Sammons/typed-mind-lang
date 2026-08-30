@@ -68,9 +68,27 @@ const sortIntoLegacySectionOrder = (entities: readonly EntityNode[]): EntityNode
 // to a sentence: split on the JSDoc paragraph boundary (a blank line), keep
 // the ENTIRE first paragraph however long, whitespace-normalize it to one
 // line. Every purpose/description assignment site routes through this.
+//
+// issue #113 — the grammar's `string` token is `/"[^"\n]*"/`
+// (grammar.js:1209): a literal `"` inside the description text is
+// structurally UNREPRESENTABLE in `.tmd` — there is no escape production
+// (confirmed: no `\"` handling anywhere in grammar.js). A JSDoc comment
+// containing a quoted phrase (`/** A "needs you" item... */`) emitted
+// verbatim breaks the description's own closing quote, corrupting every
+// line after it (confirmed against the real slat-harness corpus:
+// `NeedsItem % "A "needs you" item..."` desyncs the parser at the second
+// `"`). Same fix shape as the newline case above (collapse, never
+// truncate, no grammar change): swap every embedded double quote for a
+// single quote — `'` is NOT excluded by the `string` token, unlike `"`,
+// so this is a meaning-preserving substitution the grammar can actually
+// carry, not a strip. `\n` is already handled by the paragraph-split
+// above; `"` needed its own pass because it is a grammar delimiter, not
+// whitespace.
+const escapeDescriptionQuotes = (text: string): string => text.replace(/"/g, "'");
+
 const collapseDescription = (raw: string): string => {
   const [firstParagraph] = raw.split(/\n\s*\n/);
-  return (firstParagraph ?? '').replace(/\s+/g, ' ').trim();
+  return escapeDescriptionQuotes((firstParagraph ?? '').replace(/\s+/g, ' ').trim());
 };
 
 // RFC-TM-10 follow-up (issue #77) — `extractInputDTO`/`extractOutputDTO`
@@ -1461,7 +1479,7 @@ export class TypeScriptToTypedMindConverter {
     // Only convert functions that are exported
     for (const func of module.functions) {
       if (this.isFunctionExported(func, module)) {
-        this.convertFunction(func, module.filePath);
+        this.convertFunction(func, module);
       }
     }
 
@@ -1559,7 +1577,7 @@ export class TypeScriptToTypedMindConverter {
     // Only convert functions that are exported
     for (const func of module.functions) {
       if (this.isFunctionExported(func, module)) {
-        this.convertFunction(func, module.filePath);
+        this.convertFunction(func, module);
       }
     }
 
@@ -1791,7 +1809,8 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
-  private convertFunction(func: ParsedFunction, moduleFilePath: string): void {
+  private convertFunction(func: ParsedFunction, module: ParsedModule): void {
+    const moduleFilePath = module.filePath;
     const remapKey = `${moduleFilePath}::${func.name}`;
     const entityName = this.functionNameRemap.get(remapKey);
 
@@ -1820,7 +1839,7 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} :: ${func.signature}`,
       sourceForm: 'shortform',
       signature: func.signature,
-      calls: [], // Will be populated by analyzing function bodies if needed
+      calls: this.resolveSameFileCallEdges(func, module),
       pendingDependencies: [],
       description: func.description ? collapseDescription(func.description) : undefined,
       input: inputDTO,
@@ -1828,6 +1847,85 @@ export class TypeScriptToTypedMindConverter {
     });
 
     this.entities.push(functionEntity);
+  }
+
+  // typedmind-diagnostic-legitimacy callgraph increment — resolves
+  // `ParsedFunction.calledNames` (raw identifiers found in the function's own
+  // body, per `collectSameFileCallEdges`) against SAME-FILE declared,
+  // exported entities only: a sibling exported function/arrow-const in
+  // `module.functions` (resolved through `functionNameRemap`, the converter's
+  // own collision-resolved name — the same map `convertFunction` itself uses
+  // for its own name) or a sibling exported class in `module.classes`
+  // (resolved through `createEntityName`, since `reserveFunctionEntityNames`'s
+  // own doc comment establishes classes are never touched by the function
+  // disambiguation remap and always convert before this method runs, in both
+  // `convertToClassFile` and `convertToSeparateEntities`). A name with no
+  // same-file resolution (a module-private helper, an imported/global
+  // identifier, a method-call receiver, anything `collectSameFileCallEdges`
+  // could not attribute to a same-file top-level declaration) is DROPPED,
+  // not guessed — an unresolved raw string folded into `calls` would
+  // misfire `checker/unknown-call-target`/`checker/method-call-on-non-class`
+  // (check-method-calls.ts only inspects DOTTED calls, but
+  // `checkOrphans`/`collectReferencedNames` unions every raw string
+  // regardless, so an unresolved non-dotted name is merely inert — dropping
+  // it here is a precision choice, not a soundness requirement, made to keep
+  // `calls` an honest same-file-resolved edge list rather than a bag of
+  // unresolved source text). Cross-file calls are intentionally out of scope
+  // — this increment targets the same-file-closure diagnostic family only;
+  // a cross-file call edge is a separate, larger surface (the converter's
+  // import-graph resolution, not this per-function walk) this increment does
+  // not touch.
+  private resolveSameFileCallEdges(func: ParsedFunction, module: ParsedModule): string[] {
+    if (func.calledNames.length === 0) {
+      return [];
+    }
+    const resolved = new Set<string>();
+    for (const calledName of func.calledNames) {
+      if (calledName === func.name) {
+        // Direct recursion: the function's own (not-yet-assigned) entity
+        // name is not a useful liveness edge for the orphan check (a
+        // function cannot make itself non-orphaned by calling itself), and
+        // resolving it would just re-add the function's own remap entry.
+        continue;
+      }
+      const siblingFunctionRemapKey = `${module.filePath}::${calledName}`;
+      const siblingFunctionEntityName = this.functionNameRemap.get(siblingFunctionRemapKey);
+      if (siblingFunctionEntityName !== undefined) {
+        resolved.add(siblingFunctionEntityName);
+        continue;
+      }
+      // issue #91 / X-SUPP-6 (rfc-tm-9-diamond.md §9) — a class converts to
+      // an entity REGARDLESS of export status (`convertToSeparateEntities`/
+      // `convertToClassFile` never gate on `isClassExported`, unlike
+      // functions), so `this.entityNames.has(...)` alone is not a safe
+      // "genuinely reachable" signal the way it is for the function branch
+      // above. A module-private class deliberately keeps its
+      // `checker/orphaned-entity` finding (converter-emitted,
+      // pre-suppressed with reason 'generated-single-file-scope') as a
+      // STATEMENT ABOUT NON-EXPORT, not a same-file-reachability question —
+      // crediting a same-file `new` call here would silently erase that
+      // designed-in finding (fixture 25-generated-single-file). Only an
+      // EXPORTED sibling class is a legitimate same-file call-edge target.
+      const siblingClass = module.classes.find((cls) => cls.name === calledName);
+      if (siblingClass !== undefined && module.exports.some((exp) => exp.name === siblingClass.name)) {
+        const siblingClassEntityName = createEntityName(siblingClass.name);
+        // valid-references.ts's VALID_REFERENCES table legalizes `calls.to`
+        // as `['Function', 'Class']` ONLY — a ClassFile (a File fused with
+        // its module's primary class, per `convertToClassFile`) is NOT a
+        // legal `calls` target (confirmed against the real webhookstorage
+        // corpus: an Error subclass that IS the module's own primary class,
+        // e.g. ingest's `PayloadTooLargeError extends Error` in
+        // `s3-upload.ts`, `new`'d only inside a same-file function, fired
+        // `checker/reference-to-illegal` — "Cannot use 'calls' to reference
+        // ClassFile" — before this guard). Only fold in a sibling class that
+        // actually converted as a plain ClassNode.
+        const siblingClassEntity = this.entities.find((entity) => entity.name === siblingClassEntityName);
+        if (siblingClassEntity !== undefined && siblingClassEntity.kind === 'Class') {
+          resolved.add(siblingClassEntityName);
+        }
+      }
+    }
+    return Array.from(resolved);
   }
 
   private convertInterfaceToDTO(iface: ParsedInterface): void {
@@ -2848,7 +2946,95 @@ export class TypeScriptToTypedMindConverter {
     return undefined;
   }
 
+  // issue #114 — a naive `.includes('{')` check treats a UNION of object
+  // literals (`{ tagged: false } | { tagged: true; label: string }`, a
+  // TypeScript discriminated-union idiom) as "one object literal," routing
+  // it to `parseInlineObjectLiteralToFields`. That parser's own
+  // `startsWith('{') && endsWith('}')` slice then strips only the
+  // OUTERMOST leading `{` and trailing `}` of the whole multi-member text,
+  // leaving an unbalanced middle (`tagged: false } | { tagged: true; label:
+  // string`) that `splitObjectLiteralProperties` cannot recover — the
+  // corrupted `- tagged: false } | { tagged: true` field line issue #114
+  // reports. Detected here, BEFORE the DTO/TypeDef branch decision, so a
+  // union-shaped type routes to the TypeDef/alias path instead: that path's
+  // `parseTypeExprText` already parses a top-level `|` outside any bracket
+  // depth as a real `union` TypeExprNode (confirmed empirically — each
+  // `{...}` member individually balances and falls to the grammar's own
+  // `type_opaque` leaf, per type-expr-from-text.ts's opaque-run scanner),
+  // which is a real, parseable grammar production — the "degrade honestly,
+  // anything that parses" option the issue itself names, with no new
+  // grammar surface and no field-list modeling attempted for the union.
+  // Adversarial review finding, round 1 (PR #115) — the ORIGINAL depth
+  // tracker below counted `{()[]}` only, so a union nested inside a
+  // generic (`Record<string, { a: string } | { b: string }>`) misread its
+  // `|` as top-level the instant the first `{...}` member closed, routing
+  // an alias that should stay a DTO into the TypeDef/alias path and
+  // corrupting a PREVIOUSLY-correct emission.
+  //
+  // Adversarial review finding, round 2 (PR #115) — adding `<`/`>` to the
+  // depth tracker fixed that case but was still too permissive: a union
+  // whose top-level members are THEMSELVES generics each containing their
+  // own nested union of object literals (`Record<string, {a}|{b}> |
+  // Map<string, {c}|{d}>`) still has a genuinely top-level `|` between
+  // the two generics — so the OLD "any top-level `|` plus any `{`
+  // anywhere" test still fired, routing the whole thing into
+  // `parseTypeExprText`, which has its OWN pre-existing, PR-independent
+  // bug in `scanOpaqueRun` (lib/typed-mind/src/pipeline/
+  // type-expr-from-text.ts): its bracket-depth tracker ALSO omits `<`/`>`,
+  // so it mis-nests a top-level union of generics and corrupts the
+  // output — confirmed present on `main` too (`parseTypeExprText` on this
+  // exact text already mis-parses on `main`, unrelated to this PR).
+  // Fixing that shared core parser is design work (a broader bracket-depth
+  // fix touching every `parseTypeExprText` caller) outside this
+  // increment's mechanical-fix mandate — filed as issue #118 instead of
+  // silently routing more inputs into a parser known to mishandle them.
+  //
+  // The fix: narrow the check from "any top-level `|` plus any `{`" to
+  // "every top-level-split member is ITSELF a bare object literal"
+  // (`startsWith('{') && endsWith('}')`, the exact same test
+  // `isInlineObjectLiteralType` already uses) — this is precisely the
+  // shape `parseTypeExprText`'s opaque-run scanner can safely absorb (each
+  // member independently brace-balances with no unaccounted `<`/`>`
+  // inside it), and it correctly excludes a member that is a generic
+  // (`Record<...>`, `Map<...>`) since that member does not itself start
+  // with `{`.
+  private isUnionOfObjectLiterals(type: string): boolean {
+    const trimmed = type.trim();
+    if (!trimmed.includes('{') || !trimmed.includes('|')) {
+      return false;
+    }
+    const members = this.splitTopLevelUnionMembers(trimmed);
+    return members.length > 1 && members.every((member) => isInlineObjectLiteralType(member));
+  }
+
+  // Splits `type` on every top-level `|` (outside `{()[]}`/`<>` bracket
+  // depth), mirroring the bracket-tracking discipline `isUnionOfObjectLiterals`
+  // needs — shared here so both the union-detection guard and the
+  // per-member `isInlineObjectLiteralType` check operate on the exact same
+  // split.
+  private splitTopLevelUnionMembers(type: string): string[] {
+    const members: string[] = [];
+    let depth = 0;
+    let memberStart = 0;
+    for (let i = 0; i < type.length; i += 1) {
+      const ch = type[i];
+      if (ch === '{' || ch === '(' || ch === '[' || ch === '<') {
+        depth += 1;
+      } else if (ch === '}' || ch === ')' || ch === ']' || ch === '>') {
+        depth -= 1;
+      } else if (ch === '|' && depth === 0) {
+        members.push(type.slice(memberStart, i).trim());
+        memberStart = i + 1;
+      }
+    }
+    members.push(type.slice(memberStart).trim());
+    return members;
+  }
+
   private isObjectLikeType(type: string): boolean {
+    if (this.isUnionOfObjectLiterals(type)) {
+      return false;
+    }
     return type.includes('{') || type.includes('Record<') || type.includes('Map<');
   }
 

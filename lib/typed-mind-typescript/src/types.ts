@@ -9,6 +9,14 @@ export interface ParsedFunction {
   readonly isAsync: boolean;
   readonly description: string | undefined;
   readonly decorators: readonly string[];
+  // Same-file call-edge closure (typedmind-diagnostic-legitimacy, callgraph
+  // increment) — bare-identifier call targets (`foo()`) and `new` targets
+  // (`new Bar()`) found anywhere in this function's own body, via the same
+  // `collectCalledFunctionNames`-family walk X-AN-11 already uses for the
+  // self-invocation-guard case. Raw names as written in source, unresolved:
+  // the converter decides which names resolve to a same-file declared
+  // function/class before folding any of them into `FunctionNode.calls`.
+  readonly calledNames: readonly string[];
 }
 
 export interface ParsedParameter {
