@@ -81,4 +81,23 @@ describe('issue #114: a union-of-object-literals type alias degrades honestly in
     const result = converter.convert(analysis);
     assert.equal(result.success, true);
   });
+
+  it('a union mixing a bare object literal with null (not every member is an object literal) does not trip the guard', async () => {
+    // Boundary case: isUnionOfObjectLiterals's narrowed guard requires
+    // EVERY top-level-split member to itself be a bare object literal.
+    // `null` fails that test, so this alias stays on the ORIGINAL DTO
+    // path unchanged (matching main's pre-#114 degrade), zero diagnostics.
+    const analyzer = new TypeScriptAnalyzer(fixturePath('54-object-literal-union-with-null'));
+    const analysis = analyzer.analyzeFromEntrypoint(fixturePath('54-object-literal-union-with-null', 'src', 'index.ts'));
+    const converter = new TypeScriptToTypedMindConverter();
+    const result = converter.convert(analysis);
+    assert.equal(result.success, true);
+    const entity = result.entities.find((e) => e.name === 'MaybeThing');
+    assert.equal(entity?.kind, 'DTO', `expected MaybeThing to stay a DTO, got kind: ${entity?.kind}`);
+    const emitter = new SyntaxEmitter();
+    const longform = emitter.emitLongform({ entities: result.entities as never, imports: [], suppressions: [], diagnostics: [] });
+    const tm = await TypedMind.create();
+    const checkResult = tm.check(longform);
+    assert.deepEqual(checkResult.diagnostics, [], `must have zero diagnostics: ${JSON.stringify(checkResult.diagnostics)}`);
+  });
 });

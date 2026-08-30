@@ -2811,34 +2811,71 @@ export class TypeScriptToTypedMindConverter {
   // which is a real, parseable grammar production — the "degrade honestly,
   // anything that parses" option the issue itself names, with no new
   // grammar surface and no field-list modeling attempted for the union.
-  // Adversarial review finding (PR #115) — the depth tracker below MUST
-  // also count `<`/`>` alongside `{()[]}`, or a union nested inside a
-  // generic (`Record<string, { a: string } | { b: string }>`) misreports
-  // its `|` as top-level the instant the first `{...}` member closes,
-  // routing an alias that should stay a DTO into the TypeDef/alias path
-  // and corrupting a PREVIOUSLY-correct emission (confirmed: pre-fix,
-  // `Shapes = Record<string, {...}|{...}>>` — a doubled trailing `>>` —
-  // produced `syntax/error: Unparsable text`). `<`/`>` are unambiguous
-  // generic delimiters in this context: `type` is always TYPE-POSITION
-  // text extracted from a type alias's own right-hand side (never an
-  // expression), so there is no comparison-operator ambiguity to worry
-  // about the way there would be in general TypeScript source text.
+  // Adversarial review finding, round 1 (PR #115) — the ORIGINAL depth
+  // tracker below counted `{()[]}` only, so a union nested inside a
+  // generic (`Record<string, { a: string } | { b: string }>`) misread its
+  // `|` as top-level the instant the first `{...}` member closed, routing
+  // an alias that should stay a DTO into the TypeDef/alias path and
+  // corrupting a PREVIOUSLY-correct emission.
+  //
+  // Adversarial review finding, round 2 (PR #115) — adding `<`/`>` to the
+  // depth tracker fixed that case but was still too permissive: a union
+  // whose top-level members are THEMSELVES generics each containing their
+  // own nested union of object literals (`Record<string, {a}|{b}> |
+  // Map<string, {c}|{d}>`) still has a genuinely top-level `|` between
+  // the two generics — so the OLD "any top-level `|` plus any `{`
+  // anywhere" test still fired, routing the whole thing into
+  // `parseTypeExprText`, which has its OWN pre-existing, PR-independent
+  // bug in `scanOpaqueRun` (lib/typed-mind/src/pipeline/
+  // type-expr-from-text.ts): its bracket-depth tracker ALSO omits `<`/`>`,
+  // so it mis-nests a top-level union of generics and corrupts the
+  // output — confirmed present on `main` too (`parseTypeExprText` on this
+  // exact text already mis-parses on `main`, unrelated to this PR).
+  // Fixing that shared core parser is design work (a broader bracket-depth
+  // fix touching every `parseTypeExprText` caller) outside this
+  // increment's mechanical-fix mandate — filed as issue #118 instead of
+  // silently routing more inputs into a parser known to mishandle them.
+  //
+  // The fix: narrow the check from "any top-level `|` plus any `{`" to
+  // "every top-level-split member is ITSELF a bare object literal"
+  // (`startsWith('{') && endsWith('}')`, the exact same test
+  // `isInlineObjectLiteralType` already uses) — this is precisely the
+  // shape `parseTypeExprText`'s opaque-run scanner can safely absorb (each
+  // member independently brace-balances with no unaccounted `<`/`>`
+  // inside it), and it correctly excludes a member that is a generic
+  // (`Record<...>`, `Map<...>`) since that member does not itself start
+  // with `{`.
   private isUnionOfObjectLiterals(type: string): boolean {
     const trimmed = type.trim();
     if (!trimmed.includes('{') || !trimmed.includes('|')) {
       return false;
     }
+    const members = this.splitTopLevelUnionMembers(trimmed);
+    return members.length > 1 && members.every((member) => isInlineObjectLiteralType(member));
+  }
+
+  // Splits `type` on every top-level `|` (outside `{()[]}`/`<>` bracket
+  // depth), mirroring the bracket-tracking discipline `isUnionOfObjectLiterals`
+  // needs — shared here so both the union-detection guard and the
+  // per-member `isInlineObjectLiteralType` check operate on the exact same
+  // split.
+  private splitTopLevelUnionMembers(type: string): string[] {
+    const members: string[] = [];
     let depth = 0;
-    for (const ch of trimmed) {
+    let memberStart = 0;
+    for (let i = 0; i < type.length; i += 1) {
+      const ch = type[i];
       if (ch === '{' || ch === '(' || ch === '[' || ch === '<') {
         depth += 1;
       } else if (ch === '}' || ch === ')' || ch === ']' || ch === '>') {
         depth -= 1;
       } else if (ch === '|' && depth === 0) {
-        return true;
+        members.push(type.slice(memberStart, i).trim());
+        memberStart = i + 1;
       }
     }
-    return false;
+    members.push(type.slice(memberStart).trim());
+    return members;
   }
 
   private isObjectLikeType(type: string): boolean {
