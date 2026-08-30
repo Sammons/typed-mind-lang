@@ -153,4 +153,138 @@ describe('parseTypeExprText: the shared string-based type-expression parser', ()
       }
     }
   });
+
+  describe('scanOpaqueRun bracket-depth tracker counts <>/generic delimiters (issue #118)', () => {
+    it('does not mis-nest a top-level union of two generics, each with an internal union of object literals (the issue repro)', () => {
+      const result = parseTypeExprText('Record<string, { a: string } | { b: string }> | Map<string, { c: string } | { d: string }>');
+      assert.equal(result.remainder, '', 'the parse must not leave a stray ">" as remainder');
+      assert.equal(result.typeExpr.kind, 'union', 'top level must be the union, not folded into the first generic');
+      if (result.typeExpr.kind !== 'union') {
+        return;
+      }
+      assert.equal(result.typeExpr.members.length, 2);
+      const [recordMember, mapMember] = result.typeExpr.members;
+      assert.equal(recordMember?.kind, 'generic');
+      assert.equal(mapMember?.kind, 'generic');
+      if (recordMember?.kind === 'generic' && mapMember?.kind === 'generic') {
+        assert.equal(recordMember.base.name, 'Record');
+        assert.equal(mapMember.base.name, 'Map');
+        // Map must be a SIBLING at the top-level union, not folded inside
+        // Record's own second argument.
+        assert.equal(recordMember.args.length, 2);
+        const [, recordSecondArg] = recordMember.args;
+        assert.equal(recordSecondArg?.kind, 'union');
+        if (recordSecondArg?.kind === 'union') {
+          assert.equal(recordSecondArg.members.length, 2);
+          for (const member of recordSecondArg.members) {
+            assert.equal(member.kind, 'opaque');
+            // No stray '>' leaking into an opaque leaf's own text (the
+            // issue's second symptom: "{ b: string }>").
+            if (member.kind === 'opaque') {
+              assert.ok(!member.text.includes('>'), `opaque leaf text must not carry a stray '>': ${member.text}`);
+            }
+          }
+        }
+      }
+    });
+
+    it('handles a nested generic-of-generic unaffected by the fix (Record<string, Array<number>>)', () => {
+      const result = parseTypeExprText('Record<string, Array<number>>');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'generic');
+      if (result.typeExpr.kind === 'generic') {
+        assert.equal(result.typeExpr.base.name, 'Record');
+        const [, second] = result.typeExpr.args;
+        assert.equal(second?.kind, 'array');
+        if (second?.kind === 'array') {
+          assert.equal(second.spelling, 'generic');
+          assert.equal(second.element.kind, 'named');
+        }
+      }
+    });
+
+    it('still recognizes a generic with a quoted-literal argument (Pick<S3Client, "send">)', () => {
+      const result = parseTypeExprText('Pick<S3Client, "send">');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'generic');
+      if (result.typeExpr.kind === 'generic') {
+        assert.equal(result.typeExpr.base.name, 'Pick');
+        assert.deepEqual(
+          result.typeExpr.args.map((arg) => (arg.kind === 'named' ? arg.name : arg.kind === 'literal' ? arg.value : undefined)),
+          ['S3Client', 'send'],
+        );
+      }
+    });
+
+    it('does not let a "<" or ">" inside a quoted-literal argument perturb the generic depth tracker', () => {
+      const openAngle = parseTypeExprText('Record<string, "a<b">');
+      assert.equal(openAngle.remainder, '');
+      assert.equal(openAngle.typeExpr.kind, 'generic');
+      if (openAngle.typeExpr.kind === 'generic') {
+        const [, second] = openAngle.typeExpr.args;
+        assert.deepEqual(second?.kind === 'literal' ? second.value : undefined, 'a<b');
+      }
+      const closeAngle = parseTypeExprText('Pick<S3Client, "a>b">');
+      assert.equal(closeAngle.remainder, '');
+      assert.equal(closeAngle.typeExpr.kind, 'generic');
+      if (closeAngle.typeExpr.kind === 'generic') {
+        const [, second] = closeAngle.typeExpr.args;
+        assert.deepEqual(second?.kind === 'literal' ? second.value : undefined, 'a>b');
+      }
+    });
+
+    it('still ends the opaque run at the enclosing generic\'s own ">" without swallowing it (single generic-of-union case)', () => {
+      const result = parseTypeExprText('Record<string, { a: string } | { b: string }>');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'generic');
+      if (result.typeExpr.kind === 'generic') {
+        const [, second] = result.typeExpr.args;
+        assert.equal(second?.kind, 'union');
+        if (second?.kind === 'union') {
+          for (const member of second.members) {
+            assert.equal(member.kind, 'opaque');
+            if (member.kind === 'opaque') {
+              assert.ok(!member.text.includes('>'));
+            }
+          }
+        }
+      }
+    });
+
+    it('a union of arrays of generics still parses each generic as its own sibling member', () => {
+      const result = parseTypeExprText('Record<string, number>[] | Map<string, boolean>[]');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'union');
+      if (result.typeExpr.kind === 'union') {
+        assert.equal(result.typeExpr.members.length, 2);
+        for (const member of result.typeExpr.members) {
+          assert.equal(member.kind, 'array');
+          if (member.kind === 'array') {
+            assert.equal(member.element.kind, 'generic');
+          }
+        }
+      }
+    });
+
+    it('does NOT treat a bare ">" from an arrow-function-typed opaque leaf as a generic-args terminator (top-level, not inside <>)', () => {
+      const result = parseTypeExprText('(result: string) => void');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'opaque');
+      if (result.typeExpr.kind === 'opaque') {
+        assert.equal(result.typeExpr.text, '(result: string) => void');
+      }
+    });
+
+    it('a parenthesized group inside a generic argument resets the generic-args context so its own unmatched brackets do not leak past the group', () => {
+      const result = parseTypeExprText('Pick<(A | B), "x">');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'generic');
+      if (result.typeExpr.kind === 'generic') {
+        assert.equal(result.typeExpr.base.name, 'Pick');
+        const [first, second] = result.typeExpr.args;
+        assert.equal(first?.kind, 'union');
+        assert.equal(second?.kind === 'literal' ? second.value : undefined, 'x');
+      }
+    });
+  });
 });
