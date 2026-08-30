@@ -29,7 +29,7 @@ const convert = () => {
   return converter.convert(analysis);
 };
 
-describe("RC-E: a dynamic import() nested inside a call/arrow argument (lazy(() => import(...))) resolves to a real import edge", () => {
+describe('RC-E: a dynamic import() nested inside a call/arrow argument (lazy(() => import(...))) resolves to a real import edge', () => {
   it("the importing module's File entity names the lazy-loaded target module", () => {
     const result = convert();
     assert.equal(result.success, true);
@@ -39,14 +39,13 @@ describe("RC-E: a dynamic import() nested inside a call/arrow argument (lazy(() 
       | undefined;
     assert.notEqual(appEntity, undefined, "App.ts's File entity must exist");
 
-    const homeFileEntity = result.entities.find((e) => e.kind === 'File' && e.path.endsWith('home.ts')) as
-      | { name: string }
-      | undefined;
+    const homeFileEntity = result.entities.find((e) => e.kind === 'File' && e.path.endsWith('home.ts')) as { name: string } | undefined;
     assert.notEqual(homeFileEntity, undefined, "pages/home.ts's File entity must exist");
+    const homeFileEntityName = homeFileEntity?.name ?? '';
 
     assert.ok(
-      appEntity?.imports.includes(homeFileEntity!.name),
-      `expected '${homeFileEntity!.name}' (from lazy(() => import('./pages/home.ts'))) in App's imports list, got: ${JSON.stringify(appEntity?.imports)}`,
+      appEntity?.imports.includes(homeFileEntityName),
+      `expected '${homeFileEntityName}' (from lazy(() => import('./pages/home.ts'))) in App's imports list, got: ${JSON.stringify(appEntity?.imports)}`,
     );
   });
 
@@ -67,9 +66,7 @@ describe("RC-E: a dynamic import() nested inside a call/arrow argument (lazy(() 
     const tm = await TypedMind.create();
     const checkResult = tm.check(longform);
 
-    const orphanFindings = checkResult.diagnostics.filter(
-      (d) => d.code === 'checker/orphaned-file' && d.message.includes('home.ts'),
-    );
+    const orphanFindings = checkResult.diagnostics.filter((d) => d.code === 'checker/orphaned-file' && d.message.includes('home.ts'));
     assert.deepEqual(
       orphanFindings,
       [],
