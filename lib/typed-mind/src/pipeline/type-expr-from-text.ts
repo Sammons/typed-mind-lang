@@ -135,12 +135,53 @@ const parseNumberLiteral = (cursor: TextCursor): TypeExprNode | undefined => {
 // Balances (), [], {} to arbitrary depth exactly like the grammar's
 // _opaque_run/_opaque_piece family — the text-parser twin of that recursive
 // production, since this module cannot invoke the grammar recursively.
-const scanOpaqueRun = (cursor: TextCursor): string => {
+//
+// `<`/`>` are NOT tracked on the same bracket-closer stack as `()`/`[]`/`{}`
+// (issue #118). A generic's `<...>` is not a reliably-paired bracket the way
+// `(`/`[`/`{` are: an opaque leaf's own text can carry an UNMATCHED `>` that
+// opens nothing, most commonly an arrow-function-type's `=>` (`(result:
+// string) => void`, a corpus-confirmed opaque category per RFC-TM-8 §1) —
+// treating a bare `>` as a stack closer there would end the opaque run one
+// character early and truncate `=>` to `=`. That is exactly the defect
+// `splitObjectLiteralProperties`'s own doc comment records finding and fixing
+// the same way (typescript-to-typedmind-converter.ts): track angle-bracket
+// depth SEPARATELY, clamp it at zero, and never let an unmatched `>` corrupt
+// the count.
+//
+// So `<`/`>` only matter here when `inGenericArgs` is true — i.e. this scan
+// runs while parsing one of a generic's comma-separated arguments
+// (`parseAtom`'s `<...>` branch passes it down). In that context a bare `>`
+// at angle-depth 0 is the generic's OWN closing `>` and must end the opaque
+// run unconsumed (mirroring how an unmatched `)`/`]`/`}` at depth 0 ends it
+// unconsumed) so the caller's `cursor.startsWith('>')` check can consume it;
+// leaving it consumed here is issue #118's bug — a union member like
+// `{ b: string }` swallowed the generic's closing `>` into its own opaque
+// text and the parse never returned to the outer union/generic.
+//
+// Review finding (PR #119): the angleDepth counter alone is not enough. An
+// arrow-function-typed generic ARGUMENT (`Record<string, (result: string) =>
+// void>` — an event-handler-map shape, not just the top-level case the first
+// version of this fix guarded) puts `=>` at bracket-depth 0 INSIDE the
+// generic's args, same as a real closing `>` would sit. angleDepth is 0 in
+// both cases (no `<` was ever opened to balance), so the counter alone
+// cannot tell "this `>` closes the enclosing generic" from "this `>` is the
+// second half of `=>` and opens/closes nothing." The two are distinguished
+// by lookback: a `>` immediately preceded by `=` is `=>` and is never a
+// generic closer (TypeScript's arrow token is the only bare, unbracketed
+// `=>`/`>=`/`<=` shape the opaque fallback needs to admit — a generic can
+// never itself end in `=>`). That `=>`/`>=`/`<=` lookback is scanned
+// regardless of `inGenericArgs` so the same protection also applies while
+// PARSING an arrow-typed opaque leaf found inside a generic's own args as
+// itself a candidate for this branch (defensive: the `<`/`>` characters of
+// `<=`/`>=` must never bump angleDepth either, for the same reason).
+const scanOpaqueRun = (cursor: TextCursor, inGenericArgs = false): string => {
   const startIndex = cursor.index;
   const stack: string[] = [];
   const closerFor: Record<string, string> = { '(': ')', '[': ']', '{': '}' };
+  let angleDepth = 0;
   while (cursor.index < cursor.text.length) {
     const ch = cursor.text[cursor.index];
+    const prevCh = cursor.index > startIndex ? cursor.text[cursor.index - 1] : undefined;
     if (ch === '"' && stack.length === 0) {
       break;
     }
@@ -166,12 +207,42 @@ const scanOpaqueRun = (cursor: TextCursor): string => {
       cursor.index += 1;
       continue;
     }
-    if (stack.length === 0 && (ch === '|' || ch === '&')) {
+    // `=>`/`>=`/`<=` are two-character tokens whose `<`/`>` half opens or
+    // closes nothing — never let them touch angleDepth or the generic-closer
+    // check below, at any bracket depth (mirrors splitObjectLiteralProperties's
+    // own `=>` carve-out, PR #84 finding).
+    const isArrowOrComparisonAngle = (ch === '>' || ch === '<') && (prevCh === '=' || cursor.text[cursor.index + 1] === '=');
+    if (inGenericArgs && stack.length === 0 && !isArrowOrComparisonAngle) {
+      if (ch === '<') {
+        angleDepth += 1;
+        cursor.index += 1;
+        continue;
+      }
+      if (ch === '>') {
+        if (angleDepth === 0) {
+          // The enclosing generic's own closing '>' — end the run
+          // unconsumed, same as an unmatched bracket closer at depth 0.
+          break;
+        }
+        angleDepth -= 1;
+        cursor.index += 1;
+        continue;
+      }
+    }
+    if (stack.length === 0 && angleDepth === 0 && (ch === '|' || ch === '&')) {
       // Top-level union/intersection operators end an opaque run so
       // `union: string | number` still splits on '|' even when 'string'
       // itself fell through to opaque for some other reason; inside a
-      // bracket/paren group, '|'/'&' are part of the opaque text (e.g. a
-      // function-type union return position) and stay consumed.
+      // bracket/paren group (or, when inGenericArgs, inside a nested `<>`),
+      // '|'/'&' are part of the opaque text (e.g. a function-type union
+      // return position) and stay consumed.
+      break;
+    }
+    if (inGenericArgs && stack.length === 0 && angleDepth === 0 && ch === ',') {
+      // A generic's own argument separator ends the run unconsumed so the
+      // caller's comma-loop (parseAtom's `<...>` branch) sees it, mirroring
+      // the '>' case above — a top-level ',' inside a generic's args is
+      // never part of one argument's opaque text.
       break;
     }
     cursor.index += 1;
@@ -179,13 +250,22 @@ const scanOpaqueRun = (cursor: TextCursor): string => {
   return cursor.text.slice(startIndex, cursor.index);
 };
 
-const parseAtom = (cursor: TextCursor): TypeExprNode => {
+// `inGenericArgs` (default false) is threaded down from a generic's
+// comma-separated argument list (this function's own `<...>` branch below)
+// through every level of the recursive descent so `scanOpaqueRun` — however
+// deeply nested inside a union/intersection/postfix inside one argument —
+// knows a bare top-level `>`/`,` belongs to the ENCLOSING generic, not to its
+// own opaque text (issue #118). A parenthesized group resets it to `false`:
+// `(...)` is its own closed boundary with its own `)`, independent of any
+// outer generic's `>` — `Pick<(A | B), "x">`'s parenthesized argument must
+// not let a stray unmatched `>` inside it escape past the group.
+const parseAtom = (cursor: TextCursor, inGenericArgs = false): TypeExprNode => {
   cursor.skipWhitespace();
   const readonlyMatch = READONLY_PREFIX.exec(cursor.peek());
   if (readonlyMatch !== null) {
     const startIndex = cursor.index;
     cursor.index += readonlyMatch[0].length;
-    const element = parseAtom(cursor);
+    const element = parseAtom(cursor, inGenericArgs);
     cursor.skipWhitespace();
     if (cursor.startsWith('[]')) {
       cursor.index += 2;
@@ -200,7 +280,7 @@ const parseAtom = (cursor: TextCursor): TypeExprNode => {
   if (cursor.startsWith('(')) {
     const startIndex = cursor.index;
     cursor.index += 1;
-    const inner = parseUnion(cursor);
+    const inner = parseUnion(cursor, false);
     cursor.skipWhitespace();
     if (cursor.startsWith(')')) {
       cursor.index += 1;
@@ -208,7 +288,7 @@ const parseAtom = (cursor: TextCursor): TypeExprNode => {
     }
     // Unbalanced — fall through to opaque scanning from the original start.
     cursor.index = startIndex;
-    const text = scanOpaqueRun(cursor);
+    const text = scanOpaqueRun(cursor, inGenericArgs);
     return { kind: 'opaque', text: text.trim(), span: spanFrom(cursor, startIndex, cursor.index) };
   }
   const stringLiteral = parseStringLiteral(cursor);
@@ -236,11 +316,11 @@ const parseAtom = (cursor: TextCursor): TypeExprNode => {
     cursor.skipWhitespace();
     if (cursor.startsWith('<')) {
       cursor.index += 1;
-      const args: TypeExprNode[] = [parseUnion(cursor)];
+      const args: TypeExprNode[] = [parseUnion(cursor, true)];
       cursor.skipWhitespace();
       while (cursor.startsWith(',')) {
         cursor.index += 1;
-        args.push(parseUnion(cursor));
+        args.push(parseUnion(cursor, true));
         cursor.skipWhitespace();
       }
       if (cursor.startsWith('>')) {
@@ -259,7 +339,7 @@ const parseAtom = (cursor: TextCursor): TypeExprNode => {
     return named;
   }
   const startIndex = cursor.index;
-  const text = scanOpaqueRun(cursor);
+  const text = scanOpaqueRun(cursor, inGenericArgs);
   if (text.length === 0) {
     // Nothing recognizable and nothing to balance-scan (e.g. a stray
     // operator at the very start) — consume one character so the parser
@@ -271,9 +351,9 @@ const parseAtom = (cursor: TextCursor): TypeExprNode => {
   return { kind: 'opaque', text: text.trim(), span: spanFrom(cursor, startIndex, cursor.index) };
 };
 
-const parsePostfix = (cursor: TextCursor): TypeExprNode => {
+const parsePostfix = (cursor: TextCursor, inGenericArgs = false): TypeExprNode => {
   const elementStartIndex = cursor.index;
-  let result = parseAtom(cursor);
+  let result = parseAtom(cursor, inGenericArgs);
   cursor.skipWhitespace();
   while (cursor.startsWith('[]')) {
     cursor.index += 2;
@@ -294,13 +374,13 @@ const parsePostfix = (cursor: TextCursor): TypeExprNode => {
   return result;
 };
 
-const parseIntersection = (cursor: TextCursor): TypeExprNode => {
+const parseIntersection = (cursor: TextCursor, inGenericArgs = false): TypeExprNode => {
   const startIndex = cursor.index;
-  const members = [parsePostfix(cursor)];
+  const members = [parsePostfix(cursor, inGenericArgs)];
   cursor.skipWhitespace();
   while (cursor.startsWith('&')) {
     cursor.index += 1;
-    members.push(parsePostfix(cursor));
+    members.push(parsePostfix(cursor, inGenericArgs));
     cursor.skipWhitespace();
   }
   if (members.length === 1) {
@@ -312,13 +392,13 @@ const parseIntersection = (cursor: TextCursor): TypeExprNode => {
   return { kind: 'intersection', members, span: spanFrom(cursor, startIndex, cursor.index) };
 };
 
-const parseUnion = (cursor: TextCursor): TypeExprNode => {
+const parseUnion = (cursor: TextCursor, inGenericArgs = false): TypeExprNode => {
   const startIndex = cursor.index;
-  const members = [parseIntersection(cursor)];
+  const members = [parseIntersection(cursor, inGenericArgs)];
   cursor.skipWhitespace();
   while (cursor.startsWith('|')) {
     cursor.index += 1;
-    members.push(parseIntersection(cursor));
+    members.push(parseIntersection(cursor, inGenericArgs));
     cursor.skipWhitespace();
   }
   if (members.length === 1) {
