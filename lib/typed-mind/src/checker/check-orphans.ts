@@ -129,9 +129,27 @@ const isEntityImported = (context: CheckContext, entityName: string): boolean =>
   return false;
 };
 
+// RFC-TM-11 §RX-3 (rfc-tm-11-diamond.md) — issue #109 (RC-G): a File whose
+// EVERY export is a re-export has an empty `file.exports` array by design
+// (`convertExports` excludes re-exports from it, RX-4), so the loop above
+// alone can never prove consumption for a pure re-export barrel. A
+// re-exported name satisfies consumption the same way a declared export
+// does — `isEntityImported` already walks every entity's `imports` list
+// looking for the name; a re-exported name is, by construction, a name
+// real importers reference by its own identifier (they import
+// `getClientIp`, not the barrel File's own name). This closes RC-G
+// without touching `collectReferencedNames`'s general orphan walk,
+// `checkOrphans`'s entity-kind dispatch, or `checkDuplicateExports` (RX-3's
+// Deferrals RX-A/RX-B name the accepted blind spots this design leaves,
+// per the Diamond Doc).
 const isFileConsumed = (context: CheckContext, file: FileNode): boolean => {
   for (const exportName of file.exports) {
     if (isEntityImported(context, exportName)) {
+      return true;
+    }
+  }
+  for (const reExportName of file.reExports) {
+    if (isEntityImported(context, reExportName)) {
       return true;
     }
   }

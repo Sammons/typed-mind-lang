@@ -98,6 +98,7 @@ describe('FileNode', () => {
       path: 'src/services/user.ts',
       imports: ['Logger'],
       exports: ['createUser'],
+      reExports: [],
     });
     assert.equal(node instanceof EntityNode, true);
     assert.deepEqual(
@@ -112,6 +113,7 @@ describe('FileNode', () => {
         path: 'src/services/user.ts',
         imports: ['Logger'],
         exports: ['createUser'],
+        reExports: [],
         purpose: undefined,
       },
     );
@@ -127,6 +129,7 @@ describe('FileNode', () => {
       path: 'src/services/user.ts',
       imports: [],
       exports: [],
+      reExports: [],
       purpose: 'user persistence',
     });
     assert.deepEqual(
@@ -141,6 +144,7 @@ describe('FileNode', () => {
         path: 'src/services/user.ts',
         imports: [],
         exports: [],
+        reExports: [],
         purpose: 'user persistence',
       },
     );

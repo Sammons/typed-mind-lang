@@ -67,6 +67,10 @@ const fileToShortform = (entity: FileNode): string[] => {
   if (entity.exports.length > 0) {
     lines.push(`  -> [${entity.exports.join(', ')}]`);
   }
+  // RFC-TM-11 §RX-5 (rfc-tm-11-diamond.md) — File only, after exports.
+  if (entity.reExports.length > 0) {
+    lines.push(`  <-> [${entity.reExports.join(', ')}]`);
+  }
   return lines;
 };
 

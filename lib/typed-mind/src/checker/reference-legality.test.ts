@@ -213,6 +213,7 @@ describe('from-side + unknown-ref-type arms (defensive gates, exercised directly
       path: 'src/t.ts',
       imports: [],
       exports: [],
+      reExports: [],
     });
     const context = emptyContextWith([fn, widgetFile]);
     checkSingleReference(context, fn, 'contains', 'Target');
@@ -237,6 +238,7 @@ describe('from-side + unknown-ref-type arms (defensive gates, exercised directly
       path: 'src/s.ts',
       imports: [],
       exports: [],
+      reExports: [],
     });
     const context = emptyContextWith([file]);
     // Test-only cast: the ReferenceKind union is closed, so the ported

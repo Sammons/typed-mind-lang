@@ -292,15 +292,17 @@ describe('RFC-TM-9 Q2 check — X-AN-11: import.meta.url self-invocation guard m
     const programEntity = result.entities.find((e) => e.kind === 'Program') as { exports: readonly string[] | undefined } | undefined;
     assert.ok(programEntity?.exports?.includes('runWorker'), 'runWorker must be present in Program.exports');
 
-    // Negative check (RFC §6 F2 disposition): zero FileNode shape change.
-    // FileNode's own field set is untouched by this item — it still only
-    // carries path/imports/exports/purpose (file-node.ts:8-11) with no new
-    // self-invocation-specific field.
+    // Negative check (RFC §6 F2 disposition): zero FileNode shape change
+    // FROM THIS ITEM specifically. FileNode's field set gained `reExports`
+    // under RFC-TM-11 (rfc-tm-11-diamond.md §RX-2, unrelated to
+    // self-invocation) — the set below is updated to match that addition,
+    // not reverted; this item still introduces no self-invocation-specific
+    // field.
     const fileEntity = result.entities.find((e) => e.kind === 'File') as Record<string, unknown> | undefined;
     assert.notEqual(fileEntity, undefined);
     assert.deepEqual(
       new Set(Object.keys(fileEntity ?? {})),
-      new Set(['kind', 'name', 'span', 'raw', 'sourceForm', 'comment', 'path', 'imports', 'exports', 'purpose']),
+      new Set(['kind', 'name', 'span', 'raw', 'sourceForm', 'comment', 'path', 'imports', 'exports', 'reExports', 'purpose']),
     );
 
     const { result: checkResult } = await checkViaLongform(result.entities);

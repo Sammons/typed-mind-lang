@@ -48,6 +48,7 @@ Indented lines that attach properties to the most recently declared entity.
 |---|---|
 | Imports | `<- [...]` |
 | Exports | `-> [...]` |
+| Re-exports (File only) | `<-> [...]` |
 | Calls | `~> [...]` |
 | Function input | `<- Name` |
 | Function output | `-> Name` |
@@ -63,7 +64,7 @@ Indented lines that attach properties to the most recently declared entity.
 ```tmd
 TodoApp -> main v1.0.0
 main @ src/index.ts:
-  <- [App, Logo, DATABASE_URL, startApp]
+  <- [App, Logo, DATABASE_URL, startApp, formatDate]
   -> [startApp, UserDTO]
 
 App &! "Root component"
@@ -83,6 +84,14 @@ startApp :: () => void
 
 UserDTO %
   - name: string "User name"
+
+DateUtilsImplFile @ src/date-utils-impl.ts:
+  -> [formatDate]
+
+formatDate :: (date: Date) => string
+
+DateUtilsFile @ src/date-utils.ts:
+  <-> [formatDate]
 ```
 
 Asset-to-Program containment uses its own operator, illustrated separately:

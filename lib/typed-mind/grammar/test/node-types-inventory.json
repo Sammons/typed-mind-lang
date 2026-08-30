@@ -15,6 +15,7 @@
     "E12_typedef": ["typedef_declaration", "typedef_declaration_final", "typedef_enum_variant", "enum_kw"],
     "C1_imports": ["import_list", "import_list_final"],
     "C2_exports": ["export_list", "export_list_final"],
+    "C16_reexports": ["reexports_list", "reexports_list_final"],
     "C3_calls": ["calls_list", "calls_list_final"],
     "C4_input": ["input_name", "input_name_final"],
     "C5_output": ["output_name", "output_name_final"],

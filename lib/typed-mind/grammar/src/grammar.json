@@ -3043,6 +3043,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "reexports_list"
+        },
+        {
+          "type": "SYMBOL",
           "name": "calls_list"
         },
         {
@@ -3097,6 +3101,10 @@
         {
           "type": "SYMBOL",
           "name": "export_list_final"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "reexports_list_final"
         },
         {
           "type": "SYMBOL",
@@ -3249,6 +3257,68 @@
         {
           "type": "STRING",
           "value": "->"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "name_list"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "inline_comment"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "reexports_list": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_indent"
+        },
+        {
+          "type": "STRING",
+          "value": "<->"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "name_list"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "inline_comment"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_line_end"
+        }
+      ]
+    },
+    "reexports_list_final": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_indent"
+        },
+        {
+          "type": "STRING",
+          "value": "<->"
         },
         {
           "type": "SYMBOL",

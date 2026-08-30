@@ -29,6 +29,7 @@ export interface AccumulatorSlots {
   purpose?: string | undefined;
   version?: string | undefined;
   exports?: string[] | undefined;
+  reExports?: string[] | undefined;
   path?: string | undefined;
   imports?: string[] | undefined;
   signature?: string | undefined;
@@ -138,6 +139,7 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
       path: slots.path ?? '',
       imports: slots.imports ?? [],
       exports: slots.exports ?? [],
+      reExports: slots.reExports ?? [],
       ...(slots.purpose !== undefined ? { purpose: slots.purpose } : {}),
     });
   },
