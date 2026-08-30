@@ -2793,7 +2793,46 @@ export class TypeScriptToTypedMindConverter {
     return undefined;
   }
 
+  // issue #114 — a naive `.includes('{')` check treats a UNION of object
+  // literals (`{ tagged: false } | { tagged: true; label: string }`, a
+  // TypeScript discriminated-union idiom) as "one object literal," routing
+  // it to `parseInlineObjectLiteralToFields`. That parser's own
+  // `startsWith('{') && endsWith('}')` slice then strips only the
+  // OUTERMOST leading `{` and trailing `}` of the whole multi-member text,
+  // leaving an unbalanced middle (`tagged: false } | { tagged: true; label:
+  // string`) that `splitObjectLiteralProperties` cannot recover — the
+  // corrupted `- tagged: false } | { tagged: true` field line issue #114
+  // reports. Detected here, BEFORE the DTO/TypeDef branch decision, so a
+  // union-shaped type routes to the TypeDef/alias path instead: that path's
+  // `parseTypeExprText` already parses a top-level `|` outside any bracket
+  // depth as a real `union` TypeExprNode (confirmed empirically — each
+  // `{...}` member individually balances and falls to the grammar's own
+  // `type_opaque` leaf, per type-expr-from-text.ts's opaque-run scanner),
+  // which is a real, parseable grammar production — the "degrade honestly,
+  // anything that parses" option the issue itself names, with no new
+  // grammar surface and no field-list modeling attempted for the union.
+  private isUnionOfObjectLiterals(type: string): boolean {
+    const trimmed = type.trim();
+    if (!trimmed.includes('{') || !trimmed.includes('|')) {
+      return false;
+    }
+    let depth = 0;
+    for (const ch of trimmed) {
+      if (ch === '{' || ch === '(' || ch === '[') {
+        depth += 1;
+      } else if (ch === '}' || ch === ')' || ch === ']') {
+        depth -= 1;
+      } else if (ch === '|' && depth === 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private isObjectLikeType(type: string): boolean {
+    if (this.isUnionOfObjectLiterals(type)) {
+      return false;
+    }
     return type.includes('{') || type.includes('Record<') || type.includes('Map<');
   }
 
