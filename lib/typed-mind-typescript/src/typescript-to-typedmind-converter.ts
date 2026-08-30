@@ -29,6 +29,7 @@ import type {
   ParsedFunction,
   ParsedInterface,
   ParsedModule,
+  SstHandlerReference,
   SuppressionReason,
   TypeScriptProjectAnalysis,
 } from './types.ts';
@@ -161,6 +162,16 @@ export class TypeScriptToTypedMindConverter {
   // way the entity names themselves did). Scoped to the current `convert()`
   // call, cleared in `reset()` like every other per-run map here.
   private readonly functionNameRemap = new Map<string, string>();
+  // SST-referenced-module orphan flags (issue #52's own PR #74 closing
+  // comment; lead-authorized amendment extending X-AN-11's mechanism) —
+  // maps a module's absolute `filePath` to its FINAL File/ClassFile entity
+  // name. Unlike `functionNameRemap`, a File-like entity's name is not
+  // always derivable from its module path alone (`convertToClassFile`
+  // names the entity after the module's PRIMARY CLASS, not the module's
+  // base filename), so this is recorded at each construction site
+  // (`convertToSeparateEntities`'s FileNode, `convertToClassFile`'s
+  // ClassFileNode) rather than computed on demand.
+  private readonly fileEntityNameByModulePath = new Map<string, string>();
   private readonly dependencies = new Map<string, DependencyNode>();
   private readonly externalTypeToPackage = new Map<string, string>(); // Maps external types to their package
   private entryPoints = new Set<string>();
@@ -242,9 +253,19 @@ export class TypeScriptToTypedMindConverter {
       // Convert TypeScript constructs to TypedMind entities
       this.convertModules(filteredModules);
 
+      // SST-referenced-module orphan flags (lead-authorized amendment,
+      // half 1 of 2 — see `foldSstHandlerImportsIntoSourceFiles`'s own doc
+      // comment). Runs AFTER convertModules (every module's File/ClassFile
+      // entity name is final and recorded in `fileEntityNameByModulePath`)
+      // and BEFORE generatePrograms (independent operations — order
+      // between the two does not matter, this is placed first because it
+      // touches `this.entities` in place while generatePrograms only
+      // appends).
+      this.foldSstHandlerImportsIntoSourceFiles(analysis.sstHandlerReferences);
+
       // Generate program entities if requested (after other entities are created)
       if (this.options.generatePrograms) {
-        this.generatePrograms(analysis.entryPoints, filteredModules);
+        this.generatePrograms(analysis.entryPoints, filteredModules, analysis.sstHandlerReferences);
       }
 
       // RFC-TM-6 §3 — pre-sort into the legacy section order so checked-in
@@ -393,6 +414,7 @@ export class TypeScriptToTypedMindConverter {
     this.entityNames.clear();
     this.reservedNamedTypeNames.clear();
     this.functionNameRemap.clear();
+    this.fileEntityNameByModulePath.clear();
     this.dependencies.clear();
     this.externalTypeToPackage.clear();
     this.entryPoints.clear();
@@ -1159,6 +1181,10 @@ export class TypeScriptToTypedMindConverter {
     }
 
     this.entityNames.add(entityName);
+    // SST-referenced-module orphan flags (lead-authorized amendment) —
+    // record this module's final ClassFile entity name, mirroring the
+    // `convertToSeparateEntities` FileNode recording above.
+    this.fileEntityNameByModulePath.set(module.filePath, entityName);
 
     // X-CONV-5 — synthesize a stub for the primary class's own extends
     // target (if it's an unmodelled builtin) plus any other class in this
@@ -1244,6 +1270,13 @@ export class TypeScriptToTypedMindConverter {
   private convertToSeparateEntities(module: ParsedModule, baseName: string): void {
     // Create File entity
     const fileEntityName = createEntityName(`${baseName}File`);
+
+    // SST-referenced-module orphan flags (lead-authorized amendment) —
+    // record this module's final File entity name unconditionally, even
+    // when the entity itself was already created by a prior call (the
+    // guard below skips re-construction, not re-naming; the mapping must
+    // still resolve for `resolveSstHandlerReferences`'s lookup).
+    this.fileEntityNameByModulePath.set(module.filePath, fileEntityName);
 
     if (!this.entityNames.has(fileEntityName)) {
       this.entityNames.add(fileEntityName);
@@ -1634,7 +1667,83 @@ export class TypeScriptToTypedMindConverter {
     this.entities.push(constantsEntity);
   }
 
-  private generatePrograms(entryPoints: readonly string[], modules: ParsedModule[]): void {
+  // SST-referenced-module orphan flags (issue #52's own PR #74 closing
+  // comment; lead-authorized amendment extending the X-AN-11 mechanism,
+  // half 1 of 2 — half 2 is `resolveSstHandlerExportNames`'s exports-push
+  // below). A recognizer-resolved `handler: "path.member"` string is an
+  // import-by-convention: the infra module genuinely names the target
+  // module as its deployable, so the SOURCE File gains the TARGET File's
+  // entity name in its `imports` list — a true statement using the
+  // existing `FileNode.imports` field, no new AST surface. This
+  // independently clears `checker/orphaned-file` on the target module
+  // (`check-orphans.ts`'s `collectReferencedNames` unions every name in
+  // every File's `imports`, with no distinction between an individual
+  // entity name and a whole File's name).
+  //
+  // Runs as a POST-PASS after `convertModules` completes (rather than
+  // threading `sstHandlerReferences` into `processModule`/
+  // `convertToSeparateEntities` directly) to sidestep an ordering hazard:
+  // `fileEntityNameByModulePath` for the TARGET module is only guaranteed
+  // populated once that module's own File/ClassFile entity has been
+  // constructed, and `modules` processes in an arbitrary order relative to
+  // the source module — the same class of hazard `reserveNamedTypeEntityNames`'s
+  // own whole-run pre-pass (see its call site's comment above) already
+  // fought for named-type collisions. A post-pass over the FINISHED entity
+  // list has no such ordering dependency.
+  //
+  // Only the entry-point File is ever a valid SOURCE for this fold
+  // (`processModule`'s `!isEntryPoint` gate forces every entry point
+  // through `convertToSeparateEntities`, never `convertToClassFile` — see
+  // that call site), so the source side is always a `FileNode`, never a
+  // `ClassFileNode`. `FileNode.imports` is readonly, so a source File that
+  // needs the fold is REPLACED in `this.entities` with an equivalent
+  // `FileNode` carrying the augmented `imports` array; every other field
+  // is copied verbatim.
+  private foldSstHandlerImportsIntoSourceFiles(sstHandlerReferences: readonly SstHandlerReference[]): void {
+    for (const reference of sstHandlerReferences) {
+      const sourceFileEntityName = this.fileEntityNameByModulePath.get(reference.sourceModule);
+      const targetFileEntityName = this.fileEntityNameByModulePath.get(reference.resolvedAbsolutePath);
+      if (sourceFileEntityName === undefined || targetFileEntityName === undefined) {
+        // The recognizer's own not-found/not-exported diagnostics (X-DIAG-1)
+        // already cover an unresolved target; a target module that was
+        // resolved but never converted to a File (e.g. filtered out by an
+        // ignore pattern) degrades silently here rather than crashing —
+        // this fold only ever adds an entity name it can prove exists.
+        continue;
+      }
+
+      const sourceIndex = this.entities.findIndex((entity) => entity instanceof FileNode && entity.name === sourceFileEntityName);
+      const sourceFile = this.entities[sourceIndex];
+      if (sourceIndex === -1 || !(sourceFile instanceof FileNode)) {
+        continue;
+      }
+
+      if (sourceFile.imports.includes(targetFileEntityName)) {
+        // Already present (a second handler string in the same source file
+        // resolving into the same target module, or a re-run) — no
+        // duplicate entry.
+        continue;
+      }
+
+      this.entities[sourceIndex] = new FileNode({
+        name: sourceFile.name,
+        span: sourceFile.span,
+        raw: sourceFile.raw,
+        comment: sourceFile.comment,
+        sourceForm: sourceFile.sourceForm,
+        path: sourceFile.path,
+        imports: [...sourceFile.imports, targetFileEntityName],
+        exports: sourceFile.exports,
+        purpose: sourceFile.purpose,
+      });
+    }
+  }
+
+  private generatePrograms(
+    entryPoints: readonly string[],
+    modules: ParsedModule[],
+    sstHandlerReferences: readonly SstHandlerReference[] = [],
+  ): void {
     if (entryPoints.length === 0) {
       this.addWarning('No entry points detected, generating a default program');
 
@@ -1642,7 +1751,7 @@ export class TypeScriptToTypedMindConverter {
       if (modules.length > 0) {
         const firstModule = modules[0];
         if (firstModule) {
-          this.createProgramEntity('DefaultApp', firstModule.filePath, firstModule.selfInvokedFunctionNames);
+          this.createProgramEntity('DefaultApp', firstModule.filePath, firstModule.selfInvokedFunctionNames, sstHandlerReferences);
         }
       }
       return;
@@ -1652,11 +1761,46 @@ export class TypeScriptToTypedMindConverter {
       const fileName = path.basename(entryPoint, path.extname(entryPoint));
       const programName = this.deriveProgramName(fileName);
       const entryModule = modules.find((module) => module.filePath === entryPoint);
-      this.createProgramEntity(programName, entryPoint, entryModule?.selfInvokedFunctionNames ?? []);
+      this.createProgramEntity(programName, entryPoint, entryModule?.selfInvokedFunctionNames ?? [], sstHandlerReferences);
     }
   }
 
-  private createProgramEntity(programName: string, entryFilePath: string, selfInvokedFunctionNames: readonly string[] = []): void {
+  // SST-referenced-module orphan flags (issue #52's own PR #74 closing
+  // comment; LEAD RULING: exports-push per X-AN-11) — resolves every
+  // `sstHandlerReferences` record whose `sourceModule` matches THIS
+  // Program's own entry file into the target function's final
+  // (collision-resolved) entity name via `functionNameRemap`, keyed by
+  // `${resolvedAbsolutePath}::${memberName}` (the exact key
+  // `reserveFunctionEntityNames` writes for every exported function in
+  // every traversed module, populated before `generatePrograms` runs —
+  // `convertModules` precedes it in `convert()`). A reference whose target
+  // module was not traversed, or whose member is not itself a converted
+  // exported function (e.g. a re-exported const arrow that never entered
+  // `reserveFunctionEntityNames`), resolves to `undefined` and is silently
+  // skipped here — the recognizer's OWN not-found/not-exported diagnostics
+  // (X-DIAG-1) already cover the failure surface; this fold only ever adds
+  // an entity name it can prove exists.
+  private resolveSstHandlerExportNames(entryFilePath: string, sstHandlerReferences: readonly SstHandlerReference[]): string[] {
+    const resolved: string[] = [];
+    for (const reference of sstHandlerReferences) {
+      if (reference.sourceModule !== entryFilePath) {
+        continue;
+      }
+      const remapKey = `${reference.resolvedAbsolutePath}::${reference.memberName}`;
+      const entityName = this.functionNameRemap.get(remapKey);
+      if (entityName !== undefined) {
+        resolved.push(entityName);
+      }
+    }
+    return resolved;
+  }
+
+  private createProgramEntity(
+    programName: string,
+    entryFilePath: string,
+    selfInvokedFunctionNames: readonly string[] = [],
+    sstHandlerReferences: readonly SstHandlerReference[] = [],
+  ): void {
     const entityName = createEntityName(programName);
 
     if (this.entityNames.has(entityName)) {
@@ -1672,14 +1816,24 @@ export class TypeScriptToTypedMindConverter {
     // Extract public exports from the entry point for library support
     const publicExports = this.extractPublicExportsFromEntrypoint(entryFilePath);
 
+    // SST-referenced-module orphan flags — resolve this Program's own
+    // handler-string references (if any) to their target functions' final
+    // entity names. See `resolveSstHandlerExportNames` above.
+    const sstHandlerExportNames = this.resolveSstHandlerExportNames(entryFilePath, sstHandlerReferences);
+
     // X-AN-11 — fold the entrypoint's self-invoked function names (from the
     // `import.meta.url` guard) into the same Program.exports list. This is
     // the honest-fact fix: the guarded function IS a real graph root, and
     // Program.exports is the existing, language-optional field the checker's
     // orphan rule already unions into its referenced-names set
     // (check-orphans.ts's `collectReferencedNames`) — no FileNode change,
-    // no checker change, per the doc's negative check.
-    const allPublicExports = Array.from(new Set([...publicExports, ...selfInvokedFunctionNames]));
+    // no checker change, per the doc's negative check. The SST handler
+    // export names (above) fold into the SAME list under the SAME
+    // rationale, extended to a cross-module reference: the infra Program
+    // genuinely references the handler function via the handler string, so
+    // pushing it into Program.exports makes the graph a true statement
+    // instead of suppressing a false one.
+    const allPublicExports = Array.from(new Set([...publicExports, ...selfInvokedFunctionNames, ...sstHandlerExportNames]));
 
     const programEntity = new ProgramNode({
       name: entityName,

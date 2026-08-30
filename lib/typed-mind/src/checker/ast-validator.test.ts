@@ -379,6 +379,66 @@ describe('export checks (validator.ts:804-940)', () => {
     assert.deepEqual(messagesByCode(result, 'checker/multi-exported'), ["Entity 'thing' is exported by multiple files: Main, Other"]);
   });
 
+  // tm10-inc3a (lead-authorized amendment, SST-referenced-module orphan
+  // flags) — widened D-LEG-7 exclusion: a Program whose entry transitively
+  // imports a File is a re-export chain, not a hand-authored duplicate.
+  // Positive case mirrors the real SST shape (infra entry File imports the
+  // handler's own File by a converter-recorded convention edge, the
+  // Program's own `exports` names the handler function directly).
+  it('Program-scoped exposure: a Program exporting a name whose declaring File is reachable from the entry is NOT multi-exported', async () => {
+    const { result } = await check(
+      [
+        'program App {',
+        '  entry: ApiFile',
+        '  exports: [handler]',
+        '}',
+        '',
+        'ApiFile @ infra/api.ts:',
+        '  <- [apiFn, IndexFile]',
+        '  -> [apiFn]',
+        'IndexFile @ packages/functions/src/api/index.ts:',
+        '  -> [handler]',
+        'apiFn :: () => void',
+        'handler :: () => void',
+        '',
+      ].join('\n'),
+    );
+    assert.deepEqual(
+      messagesByCode(result, 'checker/multi-exported'),
+      [],
+      'a Program exposing a module its entry reaches (transitively, via a File-import edge) is a re-export chain, not duplication',
+    );
+  });
+
+  // Negative/bound case: the SAME shape, except IndexFile is never imported
+  // by ApiFile (or by anything reachable from ApiFile) — the widening must
+  // NOT excuse this. Proves the rule is bounded to actual reachability, not
+  // "any Program plus any File exporting the same name."
+  it('Program-scoped exposure bound: a Program exporting a name whose declaring File is NOT reachable from the entry still flags multi-exported', async () => {
+    const { result } = await check(
+      [
+        'program App {',
+        '  entry: ApiFile',
+        '  exports: [handler]',
+        '}',
+        '',
+        'ApiFile @ infra/api.ts:',
+        '  <- [apiFn]',
+        '  -> [apiFn]',
+        'IndexFile @ packages/functions/src/api/index.ts:',
+        '  -> [handler]',
+        'apiFn :: () => void',
+        'handler :: () => void',
+        '',
+      ].join('\n'),
+    );
+    assert.deepEqual(
+      messagesByCode(result, 'checker/multi-exported'),
+      ["Entity 'handler' is exported by multiple files: App, IndexFile"],
+      'no import edge from the entry to IndexFile exists, so this stays a genuine unexcused duplicate',
+    );
+  });
+
   it('reports exported names with no definition', async () => {
     const { result } = await check(['App -> Main v1.0.0', 'Main @ src/main.ts:', '  -> [phantom]', ''].join('\n'));
     assert.deepEqual(messagesByCode(result, 'checker/undefined-export'), ["Export 'phantom' is not defined anywhere in the codebase"]);
