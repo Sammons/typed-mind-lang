@@ -2,6 +2,7 @@ Main__App -> MainFile v1.0.0
   -> [mainFn]
 
 MainFile @ src/main.ts:
+  <- [helperFn]
   -> [mainFn]
 
 HelperFile @ src/helper.ts:

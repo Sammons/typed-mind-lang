@@ -9,7 +9,7 @@ MathutilsFile @ src/mathutils.ts:
 
 MathUtils <: NamespaceImport
   "Namespace import: MathUtils from ./mathutils.js"
-  => [default]
+  => [add, sub]
 
 mainFn :: mainFn() => number
 

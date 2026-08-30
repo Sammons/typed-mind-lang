@@ -92,6 +92,43 @@ describe('to-side legality (validator.ts:1278-1285), per reference kind', () => 
   });
 });
 
+// issue #90 (lead ruling, tm10-inc4) — a ClassFile is, by definition, a File
+// fused with a Class, so it satisfies "entry is a file" the same way a
+// plain File does and is now a legal Program.entry target. Two enforcement
+// points, mirroring the TM-8 two-point discipline used for `schema.to`/
+// TypeDef: VALID_REFERENCES.entry.to (this file's own table) and
+// check-entry-point.ts's inline kind check (`checker/entry-not-file`).
+// Zero grammar change. NOTE: the converter never currently produces "an
+// entrypoint module fused into a ClassFile" (processModule's ClassFile
+// branch has an explicit `!isEntryPoint` guard — entry points always go
+// through convertToSeparateEntities), so these fixtures exercise the
+// checker-level legality change directly via hand-authored `.tmd`, the
+// correct unit for this fix regardless of what the converter emits today.
+describe('issue #90: ClassFile is a legal Program.entry target', () => {
+  it('a Program.entry naming a real ClassFile entity produces zero entry-legality findings', async () => {
+    const result = await check(['App -> Service v1.0.0', 'Service #: src/service.ts', '  => [run]', 'run :: run() => void', ''].join('\n'));
+    assert.deepEqual(messagesByCode(result, 'checker/entry-not-found'), []);
+    assert.deepEqual(messagesByCode(result, 'checker/entry-not-file'), []);
+    assert.equal(
+      messagesByCode(result, 'checker/reference-to-illegal').some((m) => m.includes("'entry'")),
+      false,
+    );
+  });
+
+  it('a plain Class (never fused into a ClassFile) is still rejected as an entry target — the widening is narrow', async () => {
+    const result = await check(['App -> Widget v1.0.0', 'Widget <:', '  => [run]', 'run :: run() => void', ''].join('\n'));
+    assert.deepEqual(messagesByCode(result, 'checker/entry-not-file'), [
+      "Program 'App' entry point 'Widget' must be a File entity, but found Class",
+    ]);
+  });
+
+  it('a Program.entry naming a plain File entity is unaffected by the widening (control case)', async () => {
+    const result = await check(['App -> Main v1.0.0', 'Main @ src/main.ts:', '  -> [run]', 'run :: () => void', ''].join('\n'));
+    assert.deepEqual(messagesByCode(result, 'checker/entry-not-found'), []);
+    assert.deepEqual(messagesByCode(result, 'checker/entry-not-file'), []);
+  });
+});
+
 describe('walk quirks (validator.ts:1252-1253, 1305-1321, 1400-1409)', () => {
   it('short-circuits missing targets and skips Dependency imports and wildcards', async () => {
     const result = await check(

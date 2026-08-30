@@ -84,7 +84,12 @@ export const VALID_REFERENCES: Record<ReferenceKind, ReferenceLegality> = {
   },
   entry: {
     from: ['Program'],
-    to: ['File'],
+    // issue #90 (lead ruling) — a ClassFile is, by definition, a File fused
+    // with a Class (`--prefer-class-file`'s fusion of an entrypoint module
+    // that declares a top-level class). It satisfies "entry is a file" the
+    // same way a plain File does, so it is a legal Program.entry target.
+    // Zero grammar change — this is a reference-legality row widening only.
+    to: ['File', 'ClassFile'],
   },
   containsProgram: {
     from: ['Asset'],

@@ -122,20 +122,29 @@ describe('RFC-TM-9 Q3 check — X-SUPP-6: converter-emitted suppressions with en
     assert.equal(result.success, true);
 
     // EXACT counts per reason (doc §9: "ladder fixtures assert exact
-    // counts and reasons per target").
+    // counts and reasons per target"). issue #91 — a qualifying class now
+    // gets TWO suppression entries (checker/orphaned-entity AND its
+    // checker/class-not-exported twin), both sharing this one reason code
+    // (SuppressionNode's grain is one (code, target) pair, so the twin is a
+    // second entry, not a merged one) — count rises from 1 to 2 for this
+    // fixture's single qualifying class.
     assert.deepEqual(result.suppressionCounts, {
-      'generated-single-file-scope': 1,
+      'generated-single-file-scope': 2,
     });
 
     assert.ok(
       result.tmdContent.includes('suppress InternalRegistryEntry checker/orphaned-entity "generated-single-file-scope"'),
       'the suppression line names the exact target, code, and enumerated reason',
     );
+    assert.ok(
+      result.tmdContent.includes('suppress InternalRegistryEntry checker/class-not-exported "generated-single-file-scope"'),
+      'issue #91 — the class-not-exported twin suppression is emitted alongside the orphaned-entity one',
+    );
 
-    // The suppression actually matches a real finding this run (never
+    // Both suppressions actually match a real finding this run (never
     // stale) and the checker's suppressed-not-silenced semantics (I-9)
-    // keep the diagnostic visible with its `suppression` annotation rather
-    // than dropping it.
+    // keep both diagnostics visible with their `suppression` annotation
+    // rather than dropping them.
     const tm = await TypedMind.create();
     const checkResult = tm.check(result.tmdContent);
     const orphanFinding = checkResult.diagnostics.find(
@@ -143,10 +152,21 @@ describe('RFC-TM-9 Q3 check — X-SUPP-6: converter-emitted suppressions with en
     );
     assert.notEqual(orphanFinding, undefined, 'the orphan finding this suppression targets must still be present, annotated');
     assert.equal(orphanFinding?.suppression?.reason, 'generated-single-file-scope');
+
+    const classNotExportedFinding = checkResult.diagnostics.find(
+      (d) => d.code === 'checker/class-not-exported' && d.message.includes('InternalRegistryEntry'),
+    );
+    assert.notEqual(
+      classNotExportedFinding,
+      undefined,
+      'issue #91 — the class-not-exported finding this twin suppression targets must still be present, annotated',
+    );
+    assert.equal(classNotExportedFinding?.suppression?.reason, 'generated-single-file-scope');
+
     assert.equal(
       checkResult.diagnostics.some((d) => d.code === 'checker/stale-suppression'),
       false,
-      'the suppression matched a real finding, so it is never stale',
+      'both suppressions matched a real finding, so neither is stale',
     );
   });
 
