@@ -172,6 +172,24 @@ export class TypeScriptToTypedMindConverter {
   // (`convertToSeparateEntities`'s FileNode, `convertToClassFile`'s
   // ClassFileNode) rather than computed on demand.
   private readonly fileEntityNameByModulePath = new Map<string, string>();
+  // RC-B (ladder-diagnostic-disposition-2026-08-29.md rank 2, issue #100) —
+  // `convertToSeparateEntities` used to derive `fileEntityName` from
+  // BASENAME ONLY (`createEntityName(`${baseName}File`)`), with no
+  // directory disambiguation, and its `if (!this.entityNames.has(...))`
+  // guard silently skipped creating a second FileNode when two modules in
+  // different directories shared a basename (`db/events.ts` vs
+  // `routes/events.ts`) — the LOSING module's File entity never existed,
+  // and its functions became ownerless. Which module "won" depended on
+  // traversal order, not a fixed rule. `reserveFileEntityNames` (below)
+  // is a whole-run pre-pass, mirroring `reserveNamedTypeEntityNames`'s own
+  // "reserve everything up front, across the WHOLE module list" shape:
+  // it groups every candidate module by basename FIRST (an order-
+  // independent set operation), and only a basename with more than one
+  // module gets disambiguated — deterministically, by directory path, not
+  // by which module happened to convert first. Keyed by `module.filePath`
+  // (absolute), consulted by `convertToSeparateEntities` in place of its
+  // own ad hoc `${baseName}File` computation.
+  private readonly reservedFileEntityNameByModulePath = new Map<string, string>();
   private readonly dependencies = new Map<string, DependencyNode>();
   private readonly externalTypeToPackage = new Map<string, string>(); // Maps external types to their package
   private entryPoints = new Set<string>();
@@ -206,6 +224,28 @@ export class TypeScriptToTypedMindConverter {
   // actual emitted kind. Enums always predict TypeDef (X-CONV-2 never
   // routes an enum to DTO).
   private readonly typesRegistryPredictedKind = new Map<string, 'DTO' | 'TypeDef'>();
+
+  // RC-A (ladder-diagnostic-disposition-2026-08-29.md rank 1, issue #99) —
+  // `registerModuleExports`/`resolveImportToEntity` used to register/look up
+  // `exportRegistry` under a fixed enumeration of GUESSED specifier shapes
+  // (bare filename, `types/`/`services/`-prefixed forms only). Any relative
+  // import crossing into an arbitrary subdirectory (`./pages/Home.js`,
+  // `./commands/tenant.js`, ...) was never one of the guessed shapes, so its
+  // reference edge silently dropped — no diagnostic, just a missing
+  // `<-`/`->` entry. `TypeScriptAnalyzer` already resolves every static
+  // import/re-export/dynamic-import specifier via `ts.resolveModuleName`
+  // (X-AN-1) and records the outcome in `analysis.moduleGraph` — this map
+  // indexes that SAME resolved-edge list by `(sourceModule, specifier)` so
+  // the converter can reuse the analyzer's own resolution instead of
+  // re-deriving it by guessing. `sourceModule`/`resolvedTarget` are both
+  // project-root-relative (matching `getRelativePath`'s own output), so the
+  // resolved target doubles as the exact `exportRegistry` key
+  // `registerModuleExports` writes under (see that method's own comment).
+  private readonly moduleGraphResolution = new Map<string, string>();
+
+  private static moduleGraphResolutionKey(sourceModule: string, specifier: string): string {
+    return `${sourceModule} ${specifier}`;
+  }
 
   // issue #88 — the X-CONV-2 TypeDef exclusion above was applied ONLY at
   // `resolveImportToEntity` (the `imports.to`/`exports.to` shared arm this
@@ -258,6 +298,24 @@ export class TypeScriptToTypedMindConverter {
     // X-CONV-3 — every relativization this conversion performs targets the
     // analysis's own project root, not this process's cwd.
     this.projectRoot = analysis.projectRoot;
+
+    // RC-A (issue #99) — index the analyzer's own resolved module graph
+    // before any registration/resolution runs, so `registerModuleExports`
+    // and `resolveImportToEntity` can consult it instead of guessing
+    // specifier shapes. `analysis.moduleGraph` covers static imports,
+    // re-exports, and dynamic imports uniformly (X-AN-1's three call sites
+    // into `recordModuleGraphEdge`); only 'internal' edges resolve to a
+    // project-relative target this converter can key an entity lookup on —
+    // 'external'/'unresolved' edges are handled by the pre-existing
+    // `isExternalPackage`/undefined-return paths, unchanged by this map.
+    for (const edge of analysis.moduleGraph) {
+      if (edge.classification === 'internal' && edge.resolvedTarget !== undefined) {
+        this.moduleGraphResolution.set(
+          TypeScriptToTypedMindConverter.moduleGraphResolutionKey(edge.sourceModule, edge.specifier),
+          edge.resolvedTarget,
+        );
+      }
+    }
 
     try {
       // Filter modules based on ignore patterns
@@ -449,12 +507,14 @@ export class TypeScriptToTypedMindConverter {
     this.reservedNamedTypeNames.clear();
     this.functionNameRemap.clear();
     this.fileEntityNameByModulePath.clear();
+    this.reservedFileEntityNameByModulePath.clear();
     this.dependencies.clear();
     this.externalTypeToPackage.clear();
     this.entryPoints.clear();
     this.builtinExtendsStubNames.clear();
     this.namespaceImplementsStubNames.clear();
     this.typesRegistryPredictedKind.clear();
+    this.moduleGraphResolution.clear();
 
     // Clear two-pass registries
     Object.keys(this.exportRegistry).forEach((key) => delete this.exportRegistry[key]);
@@ -573,6 +633,12 @@ export class TypeScriptToTypedMindConverter {
     for (const module of modules) {
       this.reserveNamedTypeEntityNames(module);
     }
+
+    // RC-B (issue #100) — reserve every module's File-entity name up front,
+    // across the WHOLE `modules` list, before any module converts. See
+    // `reservedFileEntityNameByModulePath`'s own field comment and
+    // `reserveFileEntityNames`'s doc comment for the full mechanism.
+    this.reserveFileEntityNames(modules);
 
     // PHASE 2: Processing with Complete Knowledge
 
@@ -705,6 +771,19 @@ export class TypeScriptToTypedMindConverter {
     for (const specifier of specifiers) {
       this.exportRegistry[specifier] = moduleExports;
     }
+
+    // RC-A (issue #99) — register this module under its OWN canonical,
+    // extension-less project-relative path too (`withoutExt`, already
+    // computed above). This is exactly the shape `resolveImportToEntity`
+    // gets back from `moduleGraphResolution` (an `edge.resolvedTarget`,
+    // project-relative, run through `stripKnownSourceExtension`) — so ANY
+    // import that the analyzer's own `ts.resolveModuleName` call resolved to
+    // this module, regardless of how many subdirectories the relative
+    // specifier crossed, finds this entry. This is the fix for the dominant
+    // cross-directory gap: the fixed `specifiers` list above only ever
+    // guessed `types/`/`services/`-prefixed or bare-basename forms, never a
+    // general `./<subdir>/<file>` shape.
+    this.exportRegistry[withoutExt] = moduleExports;
   }
 
   private processReExport(module: ParsedModule, reExport: ParsedExport): void {
@@ -1310,7 +1389,7 @@ export class TypeScriptToTypedMindConverter {
       extends: primaryClass.extends[0] || undefined, // TypedMind supports single inheritance
       implements: this.convertImplementsList(primaryClass.extends.slice(1), primaryClass.implements),
       methods: this.convertMethods(primaryClass),
-      imports: [...this.convertImports(module.imports, module.exports), ...stubNames],
+      imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
       exports: [...this.convertExports(module, entityName), ...stubNames],
       purpose: primaryClass.description ? collapseDescription(primaryClass.description) : undefined,
     });
@@ -1357,8 +1436,17 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private convertToSeparateEntities(module: ParsedModule, baseName: string): void {
-    // Create File entity
-    const fileEntityName = createEntityName(`${baseName}File`);
+    // RC-B (issue #100) — the file-entity name comes from
+    // `reservedFileEntityNameByModulePath` (populated by `reserveFileEntityNames`'s
+    // whole-run, order-independent pre-pass in `convertModules`), not a bare
+    // `${baseName}File` recomputation here. `??` fallback covers callers
+    // that invoke this method directly without first running the whole-run
+    // pre-pass (kept for the same "correct in isolation" reason
+    // `reserveNamedTypeEntityNames`'s per-module call is kept alongside its
+    // own whole-run pass) — the fallback reproduces the PRE-FIX bare-name
+    // behavior for exactly the case the pre-pass could not have seen this
+    // module.
+    const fileEntityName = this.reservedFileEntityNameByModulePath.get(module.filePath) ?? createEntityName(`${baseName}File`);
 
     // SST-referenced-module orphan flags (lead-authorized amendment) —
     // record this module's final File entity name unconditionally, even
@@ -1392,7 +1480,7 @@ export class TypeScriptToTypedMindConverter {
         raw: `${fileEntityName} @ ${this.getRelativePath(module.filePath)}:`,
         sourceForm: 'shortform',
         path: this.getRelativePath(module.filePath),
-        imports: [...this.convertImports(module.imports, module.exports), ...stubNames],
+        imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
         exports: [...this.convertExports(module), ...stubNames],
       });
 
@@ -1547,6 +1635,72 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
+  // RC-B (issue #100) — order-independent File-entity name reservation.
+  // Groups every module by its bare basename FIRST (a pure set operation
+  // over the whole `modules` list, unaffected by which module a later loop
+  // happens to process first), then disambiguates only the basenames that
+  // actually collide. A non-colliding basename keeps the existing bare
+  // `${baseName}File` shape unchanged — this is a collision-ONLY mechanism,
+  // matching `reserveFunctionEntityNames`'s own `__`-disambiguator
+  // precedent (X-CONV-4/PR #74), not a blanket rename of every File entity.
+  //
+  // Disambiguator choice: the module's own parent directory name
+  // (`db`/`routes` for `db/events.ts` vs `routes/events.ts`), sanitized and
+  // joined with the same `__` double-underscore separator
+  // `deriveProgramName`/`reserveFunctionEntityNames` already establish as
+  // outside `sanitizeEntityName`'s codomain (see `deriveProgramName`'s own
+  // comment for the collision-proof argument — it applies identically
+  // here). If two colliding modules ALSO share the same parent directory
+  // name (a deeper nesting, e.g. `a/x/events.ts` vs `b/x/events.ts`), the
+  // single parent-directory segment does not disambiguate them either — in
+  // that case fall back to the full sanitized directory path (still
+  // unique per module by construction, since two different modules cannot
+  // share both a basename AND their full containing directory path without
+  // being the exact same file).
+  private reserveFileEntityNames(modules: readonly ParsedModule[]): void {
+    const modulesByBaseName = new Map<string, ParsedModule[]>();
+    for (const module of modules) {
+      const baseName = this.sanitizeEntityName(path.basename(module.filePath, path.extname(module.filePath)));
+      const group = modulesByBaseName.get(baseName);
+      if (group) {
+        group.push(module);
+      } else {
+        modulesByBaseName.set(baseName, [module]);
+      }
+    }
+
+    for (const [baseName, group] of modulesByBaseName) {
+      if (group.length === 1) {
+        const [onlyModule] = group;
+        if (onlyModule) {
+          this.reservedFileEntityNameByModulePath.set(onlyModule.filePath, createEntityName(`${baseName}File`));
+        }
+        continue;
+      }
+
+      // Collision: disambiguate every module in the group by parent
+      // directory name first; only fall back to the full directory path
+      // for a sub-collision (two modules sharing BOTH basename and parent
+      // directory name — only possible with a deeper, differently-rooted
+      // path, since same basename + same immediate parent + same full
+      // relative path would be the same file).
+      const parentDirNames = group.map((module) => this.sanitizeEntityName(path.basename(path.dirname(module.filePath))));
+      const parentDirNameCounts = new Map<string, number>();
+      for (const parentDirName of parentDirNames) {
+        parentDirNameCounts.set(parentDirName, (parentDirNameCounts.get(parentDirName) ?? 0) + 1);
+      }
+
+      group.forEach((module, index) => {
+        const parentDirName = parentDirNames[index] ?? '';
+        const disambiguator =
+          (parentDirNameCounts.get(parentDirName) ?? 0) > 1
+            ? this.sanitizeEntityName(this.getRelativePath(path.dirname(module.filePath)))
+            : parentDirName;
+        this.reservedFileEntityNameByModulePath.set(module.filePath, createEntityName(`${disambiguator}__${baseName}File`));
+      });
+    }
+  }
+
   private convertFunction(func: ParsedFunction, moduleFilePath: string): void {
     const remapKey = `${moduleFilePath}::${func.name}`;
     const entityName = this.functionNameRemap.get(remapKey);
@@ -1597,6 +1751,42 @@ export class TypeScriptToTypedMindConverter {
     this.addEntityName(entityName, 'convertInterfaceToDTO');
 
     const fields = iface.properties.map((prop) => {
+      // RC-D (ladder-diagnostic-disposition-2026-08-29.md rank 3, issue
+      // #101) — issue #72's nested-inline-object-literal recursion
+      // (`isInlineObjectLiteralType`/`synthesizeInlineDTO`) was wired only
+      // into the function-parameter/return-type call sites
+      // (`extractInputDTO`/`extractOutputDTO`); this field-building loop
+      // emitted `prop.type` sanitized only by `.trim()` (via
+      // `sanitizeFieldType`'s fallthrough), preserving source newlines
+      // verbatim for a multi-line-authored inline object-literal property —
+      // the exact `NotionPropertySchema.relation` shape (a two-level-nested
+      // object literal authored across 10 lines) that produced 9
+      // `syntax/*` "Unparsable text" findings. Checking
+      // `isInlineObjectLiteralType` here, BEFORE `sanitizeFieldType` runs,
+      // and routing a match through `synthesizeInlineDTO` mirrors
+      // `extractInputDTO`/`extractOutputDTO`'s own "detect the special
+      // shape ahead of the general path" pattern exactly — including
+      // `synthesizeInlineDTO`'s own nested-recursion (a doubly-nested inline
+      // object literal keeps recursing) and its brace-depth-aware
+      // `splitObjectLiteralProperties` splitter (multi-line-safe by
+      // construction: it treats `\n` as a delimiter only at brace-depth
+      // zero, so a nested `{`/`}` pair's own newlines never desync the
+      // split). The nested DTO's name is derived from THIS DTO's own name
+      // plus the field name, the same `${dtoName}_${prop.name}` convention
+      // `parseInlineObjectLiteralToFields` already establishes for a
+      // function-signature-originated nested DTO.
+      if (isInlineObjectLiteralType(prop.type)) {
+        const nestedDtoName = this.synthesizeInlineDTO(prop.type, this.sanitizeEntityName(`${entityName}_${prop.name}`));
+        const typeExpr = parseTypeExprText(nestedDtoName).typeExpr;
+        return new DtoFieldNode({
+          name: prop.name,
+          type: nestedDtoName,
+          typeExpr,
+          optionalityMarker: prop.isOptional ? 'question' : 'none',
+          span: SYNTHETIC_SPAN,
+        });
+      }
+
       const type = this.sanitizeFieldType(prop.type);
       // RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2): the converter builds a
       // synthetic DtoFieldNode from an already-sanitized type string, not a
@@ -1642,12 +1832,31 @@ export class TypeScriptToTypedMindConverter {
     if (this.isObjectLikeType(typeAlias.type)) {
       this.addEntityName(entityName, 'convertTypeAliasToDTO-objectLike');
 
+      // RC-D (ladder-diagnostic-disposition-2026-08-29.md rank 3, issue
+      // #101) — this branch used to route through `parseTypeToFields`,
+      // which calls the naive `parseObjectProperties`
+      // (`content.split(/[;,\n]/)`) — unsound the moment a field's own type
+      // contains a nested `{`/`}` pair (its OWN `;`/`,`/`\n` characters are
+      // wrongly treated as sibling-field boundaries), and with no
+      // `isInlineObjectLiteralType` check to recurse into a nested object
+      // literal as a synthesized DTO. The exact repro:
+      // `IngestEnv`'s sole field `Variables` is itself an inline object
+      // literal authored across 10 lines — `parseTypeToFields` emitted a
+      // bare, unterminated `{` as the field's type text (`syntax/*` "Missing
+      // `}`"). `parseInlineObjectLiteralToFields` is the SAME
+      // brace-depth-aware, multi-line-safe, recursion-capable parser
+      // `synthesizeInlineDTO` already uses for a function-signature-
+      // originated inline object literal (see that method's own doc
+      // comment) — reused here directly rather than re-derived, since this
+      // type alias's top-level DTO entity (`entityName`) already exists,
+      // unlike `synthesizeInlineDTO`'s own call sites which construct a NEW
+      // nested DTO from scratch.
       const dtoEntity = new DtoNode({
         name: entityName,
         span: SYNTHETIC_SPAN,
         raw: `${entityName} %`,
         sourceForm: 'shortform',
-        fields: this.parseTypeToFields(typeAlias.type),
+        fields: this.parseInlineObjectLiteralToFields(typeAlias.type, entityName),
         purpose: typeAlias.description ? collapseDescription(typeAlias.description) : undefined,
       });
 
@@ -2001,7 +2210,13 @@ export class TypeScriptToTypedMindConverter {
     return methods.map((method) => method.name);
   }
 
-  private convertImports(imports: readonly any[], moduleExports?: readonly ParsedExport[]): string[] {
+  // RC-A (issue #99) — `importerFilePath` is the ABSOLUTE path of the module
+  // whose `imports`/`exports` list this call is building (both call sites
+  // pass their own `module.filePath`). Threaded through to
+  // `resolveImportToEntity` so it can key `moduleGraphResolution` by
+  // `(sourceModule, specifier)` — the analyzer records that edge per
+  // IMPORTING module, so the specifier alone is not enough to look it up.
+  private convertImports(importerFilePath: string, imports: readonly any[], moduleExports?: readonly ParsedExport[]): string[] {
     const importNames: string[] = [];
 
     // Process regular imports
@@ -2017,7 +2232,7 @@ export class TypeScriptToTypedMindConverter {
         // Now using the complete export registry for proper resolution
 
         if (imp.defaultImport) {
-          const entityName = this.resolveImportToEntity(imp.defaultImport, imp.specifier);
+          const entityName = this.resolveImportToEntity(importerFilePath, imp.defaultImport, imp.specifier);
           if (entityName) {
             importNames.push(entityName);
           }
@@ -2026,14 +2241,14 @@ export class TypeScriptToTypedMindConverter {
         if (imp.namespaceImport) {
           // Create a class-like entity for the namespace import
           this.createNamespaceEntity(imp.namespaceImport, imp.specifier);
-          const entityName = this.resolveImportToEntity(imp.namespaceImport, imp.specifier);
+          const entityName = this.resolveImportToEntity(importerFilePath, imp.namespaceImport, imp.specifier);
           if (entityName) {
             importNames.push(entityName);
           }
         }
 
         for (const namedImport of imp.namedImports) {
-          const entityName = this.resolveImportToEntity(namedImport, imp.specifier);
+          const entityName = this.resolveImportToEntity(importerFilePath, namedImport, imp.specifier);
           if (entityName) {
             importNames.push(entityName);
           }
@@ -2046,7 +2261,7 @@ export class TypeScriptToTypedMindConverter {
       for (const reExport of moduleExports) {
         if (reExport.source && !this.isExternalPackage(reExport.source)) {
           // Treat re-export as an import of the entity from the source module
-          const entityName = this.resolveImportToEntity(reExport.name, reExport.source);
+          const entityName = this.resolveImportToEntity(importerFilePath, reExport.name, reExport.source);
           if (entityName) {
             importNames.push(entityName);
           }
@@ -2057,7 +2272,7 @@ export class TypeScriptToTypedMindConverter {
     return importNames;
   }
 
-  private resolveImportToEntity(importName: string, specifier: string): string | undefined {
+  private resolveImportToEntity(importerFilePath: string, importName: string, specifier: string): string | undefined {
     // Handle external packages
     if (this.isExternalPackage(specifier)) {
       const dependencyName = this.createDependencyName(specifier);
@@ -2067,11 +2282,29 @@ export class TypeScriptToTypedMindConverter {
       return undefined;
     }
 
+    // RC-A (issue #99) — prefer the analyzer's own `ts.resolveModuleName`
+    // resolution (X-AN-1, recorded per-edge in `analysis.moduleGraph` and
+    // indexed into `moduleGraphResolution` at the top of `convert()`) over
+    // the guessed-specifier lookup below. The analyzer resolves relative to
+    // the IMPORTING module's own directory, so it has no blind spot for a
+    // specifier crossing into an arbitrary subdirectory
+    // (`./pages/Home.js`, `./commands/tenant.js`, ...) — the guessed-key
+    // list a few lines down only ever covers a fixed enumeration of shapes
+    // and is kept only as a fallback for callers (unit-test mocks) that
+    // construct a `TypeScriptProjectAnalysis` with an empty `moduleGraph`.
+    const importerSourceModule = this.getRelativePath(importerFilePath);
+    const resolvedTarget = this.moduleGraphResolution.get(
+      TypeScriptToTypedMindConverter.moduleGraphResolutionKey(importerSourceModule, specifier),
+    );
+
     // Handle internal imports using the export registry. issue #87: the
     // registry's keys are always extension-less; the raw specifier may
     // carry an explicit extension (nodenext/verbatimModuleSyntax style), so
     // strip a known source extension before looking up.
-    const moduleExports = this.exportRegistry[specifier] ?? this.exportRegistry[this.stripKnownSourceExtension(specifier)];
+    const moduleExports =
+      (resolvedTarget !== undefined ? this.exportRegistry[this.stripKnownSourceExtension(resolvedTarget)] : undefined) ??
+      this.exportRegistry[specifier] ??
+      this.exportRegistry[this.stripKnownSourceExtension(specifier)];
     if (!moduleExports) {
       return undefined;
     }
@@ -2686,38 +2919,6 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
-  private parseTypeToFields(type: string): DtoFieldNode[] {
-    // Simple parsing - could be enhanced with proper TypeScript type parsing
-    const fields: DtoFieldNode[] = [];
-
-    if (type.startsWith('{') && type.endsWith('}')) {
-      const content = type.slice(1, -1);
-      const properties = this.parseObjectProperties(content);
-
-      for (const prop of properties) {
-        const propType = this.sanitizeFieldType(prop.type);
-        // See the convertInterfaceToDTO construction site's comment
-        // (rfc-tm-8-diamond.md §2, X-TYPE-2) for why parseTypeExprText.
-        const typeExpr = parseTypeExprText(propType).typeExpr;
-        // D-LEG-2 (rfc-tm-10-diamond.md §2, issue #65) — walk this field's
-        // TypeExprNode for any generic-argument external type needing a
-        // Dependency-exports stub.
-        this.walkGenericArgsForExternalStubs(typeExpr);
-        fields.push(
-          new DtoFieldNode({
-            name: prop.name,
-            type: propType,
-            typeExpr,
-            optionalityMarker: prop.optional ? 'question' : 'none',
-            span: SYNTHETIC_SPAN,
-          }),
-        );
-      }
-    }
-
-    return fields;
-  }
-
   private sanitizeFieldType(fieldType: string): string {
     // Fix discriminated union issues - convert 'Function' type to string literal
     if (fieldType === 'Function') {
@@ -2755,28 +2956,6 @@ export class TypeScriptToTypedMindConverter {
     }
 
     return type;
-  }
-
-  private parseObjectProperties(content: string): Array<{ name: string; type: string; optional: boolean }> {
-    // Very simple parser - would need enhancement for complex types
-    const properties: Array<{ name: string; type: string; optional: boolean }> = [];
-    const lines = content.split(/[;,\n]/);
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      const match = trimmed.match(/^(\w+)(\?)?\s*:\s*(.+)$/);
-      if (match?.[1] && match[3]) {
-        properties.push({
-          name: match[1],
-          type: match[3],
-          optional: !!match[2],
-        });
-      }
-    }
-
-    return properties;
   }
 
   private getRelativePath(filePath: string): string {

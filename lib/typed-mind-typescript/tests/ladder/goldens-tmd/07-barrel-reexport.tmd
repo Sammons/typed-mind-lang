@@ -6,6 +6,7 @@ program Main__App {
 }
 
 MainFile @ src/main.ts:
+  <- [makeWidget]
   -> [mainFn]
 
 IndexFile @ src/lib/index.ts:
