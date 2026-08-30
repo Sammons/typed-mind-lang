@@ -1,5 +1,9 @@
-Main__App -> MainFile v1.0.0
-  -> [Member, describe]
+program Main__App {
+  type: Program
+  entry: MainFile
+  version: 1.0.0
+  exports: [Member, describe]
+}
 
 MainFile @ src/main.ts:
   -> [Member, describe]

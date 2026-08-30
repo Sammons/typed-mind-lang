@@ -7,13 +7,23 @@
 // sigil-with-brace ClassFile header) emits the canonical longform keyword
 // block. This is what makes a genuinely mixed document (scenario-31) stay
 // mixed after a round-trip: format selection is per entity, not per document.
-
+//
+// RC-C (issue #102) forced-longform override: a `forceForm: 'shortform'`
+// caller (emitShortform(), or toggleFormat() targeting shortform) means
+// "make an honest single-format document" — it must never mean "silently
+// drop or corrupt data a specific entity cannot express in that form."
+// `shortformCannotExpress` (emit-shortform.ts) flags the two known cases
+// (Program.exports, a declared ClassFile's purpose) where the shortform
+// grammar has no legal continuation slot for a real AST field. When it
+// fires, THIS entity emits longform regardless of `forceForm`, while every
+// other entity in the document still honors the caller's forced form — the
+// exception is per-entity, not a silent downgrade of the whole document.
 import type { EntityNode } from '../ast/entity-node.ts';
 import type { SuppressionNode } from '../ast/suppression-node.ts';
 import type { ParseOutcome } from '../pipeline/parse-outcome.ts';
 import { detectFormat, type FormatDetectionResult, type SyntaxFormat } from './detect-format.ts';
 import { emitLongform } from './emit-longform.ts';
-import { emitShortform } from './emit-shortform.ts';
+import { emitShortform, shortformCannotExpress } from './emit-shortform.ts';
 import { suppressionsToLongformBlock, suppressionToShortformLine } from './emit-suppression.ts';
 
 export type { FormatDetectionResult, SyntaxFormat };
@@ -23,12 +33,15 @@ export interface EmitOptions {
   // Force every entity to one form regardless of its own sourceForm — the
   // mechanism toggleFormat/emitShortform/emitLongform use to produce an
   // honest single-format document (RFC §2: "toggleFormat becomes an honest
-  // operation on the new surface: parse → emit other format").
+  // operation on the new surface: parse → emit other format"). An entity
+  // `shortformCannotExpress` still promotes to longform even when this is
+  // 'shortform' — see the RC-C header comment above.
   readonly forceForm?: SyntaxFormat;
 }
 
 const emitEntity = (entity: EntityNode, options: EmitOptions): string[] => {
-  const form = options.forceForm ?? entity.sourceForm;
+  const requestedForm = options.forceForm ?? entity.sourceForm;
+  const form = requestedForm === 'shortform' && shortformCannotExpress(entity) ? 'longform' : requestedForm;
   return form === 'longform' ? emitLongform(entity) : emitShortform(entity);
 };
 

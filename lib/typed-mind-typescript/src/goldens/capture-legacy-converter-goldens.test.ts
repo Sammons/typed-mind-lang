@@ -333,15 +333,36 @@ const stripSpans = (entities: readonly EntityNode[]): unknown[] => entities.map(
 // class/DTO structure) while acknowledging the one field TM-9 intentionally
 // changed after TM-6 froze. Only fires when a Program entity is present
 // (`generatePrograms-false.tmd`'s case needs no strip and gets none).
+//
+// RC-C (sammons/typed-mind-lang#102) deviation, same narrow-strip discipline
+// as the Program-name change above: `goldens/legacy-baseline/*.tmd`'s
+// Program line (`IndexApp -> IndexFile v1.0.0\n  -> [main]`) is frozen text
+// predating the RC-C fix, so PARSING it under today's parser still hits the
+// pre-existing `semantics/illegal-continuation` this suite's own
+// no-errors test named and accepted as out-of-Quantum-scope before RC-C
+// landed (see the test below) — the continuation never attaches
+// (cst-to-ast.ts's early return on an illegal continuation), so
+// `legacyParsed`'s Program carries `exports: undefined`/`sourceForm:
+// 'shortform'`. The LIVE emission (this Quantum's regenerated
+// `goldens/live/*.tmd`, built from the SAME analysis fixture) now correctly
+// promotes to `sourceForm: 'longform'`/`exports: ['main']` — RC-C's whole
+// point. Stripping `sourceForm`/`exports` off the Program record for this
+// comparison only (never broadening `stripSpansDeep`) is what lets this
+// semantic-equivalence gate keep proving what it always proved (entry
+// resolution, class/DTO structure, every other entity's exports) without
+// re-freezing `goldens/legacy-baseline/` itself, which stays out of this
+// Quantum's authority per the same rationale as the Program-name strip.
 const stripDeliberateProgramNameChange = (entities: readonly unknown[]): unknown[] =>
   entities.map((entity) => {
     const record = entity as Record<string, unknown>;
     if (record.kind !== 'Program') {
       return entity;
     }
-    const { name, raw, ...rest } = record;
+    const { name, raw, sourceForm, exports: _exports, ...rest } = record;
     void name;
     void raw;
+    void sourceForm;
+    void _exports;
     return rest;
   });
 
@@ -391,36 +412,30 @@ describe('RFC-TM-6 Q3 — converter flip: semantic-equivalence gate + live golde
     });
   }
 
-  it('parses the live emission with no errors, and only the pre-existing shortform-Program-exports warning', () => {
+  it('parses the live emission with no errors and no diagnostics at all', () => {
     // This checks PARSING, not full semantic validity: the mock fixture is a
     // deliberately partial graph (BaseService/IUserService are referenced
     // but never declared, matching the sibling converter tests' fixtures),
-    // so `check()` reports real cross-reference findings on this input
-    // regardless of emitter correctness — those come from `AstValidator`,
-    // not from anything Q3 touches. The RFC's parse->emit->parse promise
-    // (TM-4 Q2, reused here per FAQ Q4) is about syntax.
+    // so `check()` (not called here) would report real cross-reference
+    // findings on this input regardless of emitter correctness — those come
+    // from `AstValidator`, not from anything this suite touches. The RFC's
+    // parse->emit->parse promise (TM-4 Q2, reused here per FAQ Q4) is about
+    // syntax, which is exactly what `typedMind.parse()` checks.
     //
-    // One known, pre-existing, non-blocking warning survives the flip
-    // unchanged: `emit-shortform.ts`'s programToShortform emits a Program's
-    // `exports` as a shortform `-> [...]` continuation, but the grammar's
-    // attachment rules (attachment-rules.ts export_list.accepts) only allow
-    // that continuation on File/ClassFile/Dependency — never Program (a
-    // Program's exports are longform-only, per cst-to-ast.test.ts). The
-    // legacy private emitter had the identical shape (its own Program-case
-    // formatter also emitted `-> [exports]`); this is not a Q3
-    // regression, and fixing the shared SyntaxEmitter's Program-shortform
-    // gap is outside this Quantum's scope (lib/typed-mind/src/emitter, not
-    // lib/typed-mind-typescript). Any OTHER diagnostic fails the test.
+    // RC-C (sammons/typed-mind-lang#102) fixed the one known, pre-existing
+    // warning this test used to name and accept as out-of-Quantum-scope:
+    // `emit-shortform.ts`'s programToShortform used to emit a Program's
+    // `exports` as a shortform `-> [...]` continuation the grammar's
+    // attachment rules (attachment-rules.ts export_list.accepts) never
+    // allowed on Program (File/ClassFile/Dependency only). `emit-shortform.ts`
+    // now promotes an exports-bearing Program to its legal longform block
+    // instead, so this fixture's `.tmd` output parses with zero diagnostics.
     const converter = new TypeScriptToTypedMindConverter();
     const result = converter.convert(createBaseAnalysis());
     assert.equal(result.success, true);
 
     const parseOutput = typedMind.parse(result.tmdContent);
-    const unexpected = parseOutput.diagnostics.filter((diagnostic) => diagnostic.code !== 'semantics/illegal-continuation');
-    assert.deepEqual(unexpected, []);
-    for (const diagnostic of parseOutput.diagnostics) {
-      assert.equal(diagnostic.severity, 'warning');
-    }
+    assert.deepEqual(parseOutput.diagnostics, []);
   });
 });
 

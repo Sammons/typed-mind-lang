@@ -1,5 +1,9 @@
-App__App -> AppFile v1.0.0
-  -> [App]
+program App__App {
+  type: Program
+  entry: AppFile
+  version: 1.0.0
+  exports: [App]
+}
 
 AppFile @ src/App.tsx:
   -> [App]

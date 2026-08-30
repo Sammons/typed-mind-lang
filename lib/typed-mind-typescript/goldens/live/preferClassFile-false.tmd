@@ -1,5 +1,9 @@
-Index__App -> IndexFile v1.0.0
-  -> [main]
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [main]
+}
 
 IndexFile @ project/src/index.ts:
   <- [UserService]

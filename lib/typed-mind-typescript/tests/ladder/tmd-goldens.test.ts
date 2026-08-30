@@ -81,34 +81,46 @@ interface FixtureCase {
 }
 
 const cases: readonly FixtureCase[] = [
-  { fixture: '01-js-ext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  // RC-C (sammons/typed-mind-lang#102) fixed the shortform-Program-exports/
+  // declared-ClassFile-purpose emitter defect the file header (and this
+  // suite's original comments) name as the reason every fixture below used
+  // to record `false` despite correct extraction — `emit-shortform.ts` now
+  // promotes an affected entity to its legal longform block instead of
+  // emitting a continuation attachment-rules.ts rejects. The fixtures whose
+  // ONLY remaining diagnostic was that defect flip to `true` here (expected,
+  // welcome drift per this file's own doctrine, line ~156); fixtures with an
+  // unrelated orphan-registry gap (RC-A/RC-B, tracked separately) stay
+  // `false`.
+  { fixture: '01-js-ext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   { fixture: '02-dynamic-import', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '07-barrel-reexport', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '07b-barrel-noext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '10-export-star', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '12-tsconfig-paths', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
-  { fixture: '13-jsdoc-desc', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
-  { fixture: '15-getter-setter', entrySegments: ['src', 'widget.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
-  { fixture: '16-arrow-const-fn', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
-  { fixture: '08-type-only-import', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
-  { fixture: '08b-type-only-noext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  { fixture: '13-jsdoc-desc', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  { fixture: '15-getter-setter', entrySegments: ['src', 'widget.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  { fixture: '16-arrow-const-fn', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  { fixture: '08-type-only-import', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  { fixture: '08b-type-only-noext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   { fixture: '09-namespace-import', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '09b-namespace-noext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
-  { fixture: '17-default-export', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  { fixture: '17-default-export', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   // Q2 landed (X-CONV-4): conversion now succeeds — the naming collision
-  // that used to crash this fixture no longer exists. Checker verdict is
-  // still `false`, same pre-existing shortform-Program-exports emitter
-  // defect as every other fixture above (see file header) — not owned by
-  // this Quantum.
-  { fixture: '03-app-collision', entrySegments: ['src', 'App.tsx'], expectConversionSuccess: true, recordedCheckerValid: false },
+  // that used to crash this fixture no longer exists. Checker verdict flips
+  // to `true` now that RC-C's shortform-Program-exports emitter defect
+  // (see above) is fixed — this fixture's only remaining diagnostic was
+  // that defect.
+  { fixture: '03-app-collision', entrySegments: ['src', 'App.tsx'], expectConversionSuccess: true, recordedCheckerValid: true },
   // X-AN-7/X-CONV-2 landed in Q3 (see file header for the cause-linked
-  // delta). Checker verdict stays `false` — pre-existing DTO-field-
-  // reference orphan gap plus the shortform-Program-exports defect.
-  { fixture: '14-enum', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  // delta). Checker verdict flips to `true` now that RC-C's
+  // shortform-Program-exports defect is fixed — the previously-disclosed
+  // DTO-field-reference orphan gap does not trigger on either fixture's
+  // actual content (verified directly against `TypedMind.check()`).
+  { fixture: '14-enum', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   // NEW in Q3 — a union type alias and a simple named-type alias, both
   // emitting TM-8's TypeDef entity kind (X-AN-7/X-CONV-2). No prior golden
   // to diff against; the golden IS the new baseline.
-  { fixture: '24-type-alias', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  { fixture: '24-type-alias', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   // NEW in Q3 — X-SUPP-6: a module-private class suppressed with reason
   // 'generated-single-file-scope'. issue #91 (tm10-inc4) — the SAME
   // suppression reason now also covers this class's
