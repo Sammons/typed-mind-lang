@@ -112,3 +112,38 @@ describe('callgraph increment: genuinely dead or test-only exports still flag (n
     assert.deepEqual(findings, [], `usedHelper must not orphan: ${JSON.stringify(findings)}`);
   });
 });
+
+describe('callgraph increment: a same-file new-target that converts as a ClassFile is never folded into calls', () => {
+  // Real-corpus regression found during ladder verification against
+  // webhookstorage: ingest's `s3-upload.ts` has `PayloadTooLargeError`
+  // (an exported Error subclass) as its module's ONLY class, so
+  // `convertToClassFile`'s primary-class fallback fuses it into the
+  // module's own ClassFile entity. `calls.to`'s legal targets
+  // (valid-references.ts) are `['Function', 'Class']` only — never
+  // `ClassFile` — so a same-file `new PayloadTooLargeError(...)` call edge
+  // must be dropped, not folded, or the checker fires
+  // `checker/reference-to-illegal`.
+  it('uploadPayload.calls does not name the fused ClassFile', () => {
+    const result = convert('49-intrafile-new-classfile-target', ['src', 'index.ts']);
+    assert.equal(result.success, true);
+    const uploadPayload = result.entities.find((e) => e.kind === 'Function' && e.name === 'uploadPayload') as
+      | { calls: readonly string[] }
+      | undefined;
+    assert.notEqual(uploadPayload, undefined, 'uploadPayload must be extracted as a real entity');
+    assert.ok(
+      !uploadPayload?.calls.includes('PayloadTooLargeError'),
+      `expected uploadPayload.calls to NOT include the fused ClassFile 'PayloadTooLargeError', got: ${JSON.stringify(uploadPayload?.calls)}`,
+    );
+  });
+
+  it('checker verdict: zero reference-to-illegal findings (the pre-guard regression)', async () => {
+    const result = convert('49-intrafile-new-classfile-target', ['src', 'index.ts']);
+    assert.equal(result.success, true);
+    const emitter = new SyntaxEmitter();
+    const longform = emitter.emitLongform({ entities: result.entities as never, imports: [], suppressions: [], diagnostics: [] });
+    const tm = await TypedMind.create();
+    const checkResult = tm.check(longform);
+    const illegalFindings = checkResult.diagnostics.filter((d) => d.code === 'checker/reference-to-illegal');
+    assert.deepEqual(illegalFindings, [], `must have zero reference-to-illegal findings: ${JSON.stringify(illegalFindings)}`);
+  });
+});

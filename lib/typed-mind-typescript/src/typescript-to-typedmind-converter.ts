@@ -1874,7 +1874,18 @@ export class TypeScriptToTypedMindConverter {
       const siblingClass = module.classes.find((cls) => cls.name === calledName);
       if (siblingClass !== undefined && module.exports.some((exp) => exp.name === siblingClass.name)) {
         const siblingClassEntityName = createEntityName(siblingClass.name);
-        if (this.entityNames.has(siblingClassEntityName)) {
+        // valid-references.ts's VALID_REFERENCES table legalizes `calls.to`
+        // as `['Function', 'Class']` ONLY — a ClassFile (a File fused with
+        // its module's primary class, per `convertToClassFile`) is NOT a
+        // legal `calls` target (confirmed against the real webhookstorage
+        // corpus: an Error subclass that IS the module's own primary class,
+        // e.g. ingest's `PayloadTooLargeError extends Error` in
+        // `s3-upload.ts`, `new`'d only inside a same-file function, fired
+        // `checker/reference-to-illegal` — "Cannot use 'calls' to reference
+        // ClassFile" — before this guard). Only fold in a sibling class that
+        // actually converted as a plain ClassNode.
+        const siblingClassEntity = this.entities.find((entity) => entity.name === siblingClassEntityName);
+        if (siblingClassEntity !== undefined && siblingClassEntity.kind === 'Class') {
           resolved.add(siblingClassEntityName);
         }
       }
