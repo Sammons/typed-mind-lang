@@ -157,6 +157,23 @@ const parseNumberLiteral = (cursor: TextCursor): TypeExprNode | undefined => {
 // leaving it consumed here is issue #118's bug — a union member like
 // `{ b: string }` swallowed the generic's closing `>` into its own opaque
 // text and the parse never returned to the outer union/generic.
+//
+// Review finding (PR #119): the angleDepth counter alone is not enough. An
+// arrow-function-typed generic ARGUMENT (`Record<string, (result: string) =>
+// void>` — an event-handler-map shape, not just the top-level case the first
+// version of this fix guarded) puts `=>` at bracket-depth 0 INSIDE the
+// generic's args, same as a real closing `>` would sit. angleDepth is 0 in
+// both cases (no `<` was ever opened to balance), so the counter alone
+// cannot tell "this `>` closes the enclosing generic" from "this `>` is the
+// second half of `=>` and opens/closes nothing." The two are distinguished
+// by lookback: a `>` immediately preceded by `=` is `=>` and is never a
+// generic closer (TypeScript's arrow token is the only bare, unbracketed
+// `=>`/`>=`/`<=` shape the opaque fallback needs to admit — a generic can
+// never itself end in `=>`). That `=>`/`>=`/`<=` lookback is scanned
+// regardless of `inGenericArgs` so the same protection also applies while
+// PARSING an arrow-typed opaque leaf found inside a generic's own args as
+// itself a candidate for this branch (defensive: the `<`/`>` characters of
+// `<=`/`>=` must never bump angleDepth either, for the same reason).
 const scanOpaqueRun = (cursor: TextCursor, inGenericArgs = false): string => {
   const startIndex = cursor.index;
   const stack: string[] = [];
@@ -164,6 +181,7 @@ const scanOpaqueRun = (cursor: TextCursor, inGenericArgs = false): string => {
   let angleDepth = 0;
   while (cursor.index < cursor.text.length) {
     const ch = cursor.text[cursor.index];
+    const prevCh = cursor.index > startIndex ? cursor.text[cursor.index - 1] : undefined;
     if (ch === '"' && stack.length === 0) {
       break;
     }
@@ -189,7 +207,12 @@ const scanOpaqueRun = (cursor: TextCursor, inGenericArgs = false): string => {
       cursor.index += 1;
       continue;
     }
-    if (inGenericArgs && stack.length === 0) {
+    // `=>`/`>=`/`<=` are two-character tokens whose `<`/`>` half opens or
+    // closes nothing — never let them touch angleDepth or the generic-closer
+    // check below, at any bracket depth (mirrors splitObjectLiteralProperties's
+    // own `=>` carve-out, PR #84 finding).
+    const isArrowOrComparisonAngle = (ch === '>' || ch === '<') && (prevCh === '=' || cursor.text[cursor.index + 1] === '=');
+    if (inGenericArgs && stack.length === 0 && !isArrowOrComparisonAngle) {
       if (ch === '<') {
         angleDepth += 1;
         cursor.index += 1;

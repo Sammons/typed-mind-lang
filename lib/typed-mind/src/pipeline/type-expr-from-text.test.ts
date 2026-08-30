@@ -286,5 +286,38 @@ describe('parseTypeExprText: the shared string-based type-expression parser', ()
         assert.equal(second?.kind === 'literal' ? second.value : undefined, 'x');
       }
     });
+
+    it('does not truncate an arrow-function-typed generic argument (adversarial review finding, PR #119): the "=>" inside Record<string, (result: string) => void> is not the enclosing generic\'s own closer', () => {
+      const result = parseTypeExprText('Record<string, (result: string) => void>');
+      assert.equal(
+        result.remainder,
+        '',
+        'the "=>" must not be misread as the generic\'s closing ">", truncating the argument and leaking "void>" as remainder',
+      );
+      assert.equal(result.typeExpr.kind, 'generic');
+      if (result.typeExpr.kind === 'generic') {
+        assert.equal(result.typeExpr.base.name, 'Record');
+        assert.equal(result.typeExpr.args.length, 2);
+        const [, second] = result.typeExpr.args;
+        assert.equal(second?.kind, 'opaque');
+        if (second?.kind === 'opaque') {
+          assert.equal(second.text, '(result: string) => void');
+        }
+      }
+    });
+
+    it('does not truncate a bare (unparenthesized-base) arrow-function-typed generic argument (Foo<(result: string) => void>)', () => {
+      const result = parseTypeExprText('Foo<(result: string) => void>');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'generic');
+      if (result.typeExpr.kind === 'generic') {
+        assert.equal(result.typeExpr.args.length, 1);
+        const [only] = result.typeExpr.args;
+        assert.equal(only?.kind, 'opaque');
+        if (only?.kind === 'opaque') {
+          assert.equal(only.text, '(result: string) => void');
+        }
+      }
+    });
   });
 });
