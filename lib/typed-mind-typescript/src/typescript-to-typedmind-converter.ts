@@ -498,12 +498,13 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private globToRegexSource(pattern: string): string {
+    const chars = Array.from(pattern);
     let result = '';
     let index = 0;
-    while (index < pattern.length) {
-      const char = pattern[index];
+    while (index < chars.length) {
+      const char = chars[index] ?? '';
       if (char === '*') {
-        if (pattern[index + 1] === '*') {
+        if (chars[index + 1] === '*') {
           result += '.*';
           index += 2;
         } else {
