@@ -42,9 +42,24 @@ describe('Scenario 59: Program with ClassFile as entry point', () => {
 
     const errors = validation.findings.map((f) => f.message);
 
-    // ServerApp with ClassFile entry should be valid
+    // issue #90 (lead ruling, tm10-inc4) — a ClassFile is a File fused with
+    // a Class, so it satisfies "entry is a file" and is now a legal
+    // Program.entry target (VALID_REFERENCES.entry.to widened to
+    // ['File', 'ClassFile'], check-entry-point.ts's inline kind check
+    // mirrors it). This assertion previously pinned the PRE-FIX bug
+    // (`assert.ok(serverAppErrors.length > 0)`, i.e. "ServerApp -> a
+    // ClassFile must error") even though this test's own name ("should
+    // validate ClassFile as valid entry point") and this scenario's own
+    // header comment ("Can a Program use a ClassFile as its entry point?")
+    // both state the opposite intent — the fixture was authored to prove
+    // ClassFile-as-entry legality once implemented. Zero entry-related
+    // findings for ServerApp now that the widening is live.
     const serverAppErrors = errors.filter((e) => e.includes('ServerApp') && e.includes('entry'));
-    assert.ok(serverAppErrors.length > 0);
+    assert.equal(
+      serverAppErrors.length,
+      0,
+      `ServerApp's ClassFile entry (ApplicationServer) must now be legal: ${JSON.stringify(serverAppErrors)}`,
+    );
 
     // ClientApp with File entry should be valid
     const clientAppErrors = errors.filter((e) => e.includes('ClientApp') && e.includes('ClientMain'));

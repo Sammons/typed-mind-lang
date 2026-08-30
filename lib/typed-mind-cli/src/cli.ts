@@ -147,18 +147,42 @@ async function main() {
         console.log('\u2713 No errors found!');
         process.exit(0);
       } else {
-        // Display each diagnostic
+        // issue #92 \u2014 RFC-TM-8's "suppressed-not-silenced" design (X-SUPP-3)
+        // keeps a suppressed finding in `diagnostics` with the SAME severity
+        // and a `suppression` annotation, excluded only from the error count
+        // that drives `valid`. Printing every diagnostic with the same
+        // ERROR/WARNING label made a suppressed, previously-adjudicated
+        // finding visually and numerically indistinguishable from a real,
+        // actionable one. A suppressed diagnostic now prints as
+        // `SUPPRESSED (reason)` instead of `ERROR`/`WARNING`, and the
+        // summary line reports active vs suppressed counts separately,
+        // surfacing the `suppressedCount` field `check()`/
+        // `checkWithParseGate()` already return.
+        let activeCount = 0;
+        let suppressedCount = 0;
         for (const diagnostic of result.diagnostics) {
-          const severity = diagnostic.severity === 'warning' ? 'WARNING' : 'ERROR';
+          const isSuppressed = diagnostic.suppression !== undefined;
+          const label = isSuppressed
+            ? `SUPPRESSED (${diagnostic.suppression?.reason})`
+            : diagnostic.severity === 'warning'
+              ? 'WARNING'
+              : 'ERROR';
+          if (isSuppressed) {
+            suppressedCount += 1;
+          } else {
+            activeCount += 1;
+          }
           const { line, column } = diagnostic.span.start;
-          console.error(`${severity} at line ${line}, col ${column}: ${diagnostic.message}`);
+          console.error(`${label} at line ${line}, col ${column}: ${diagnostic.message}`);
           const errorLine = content.split('\n')[line - 1] || '';
           console.error(`  ${line} | ${errorLine}`);
           console.error(`     ${' '.repeat(String(line).length)}${''.padStart(column, ' ')}^`);
           console.error(''); // Empty line between diagnostics
         }
 
-        console.error(`\u2717 Found ${result.diagnostics.length} diagnostic(s)`);
+        console.error(
+          `\u2717 Found ${activeCount} active diagnostic(s), ${suppressedCount} suppressed diagnostic(s) (${result.diagnostics.length} total)`,
+        );
         process.exit(1);
       }
     }

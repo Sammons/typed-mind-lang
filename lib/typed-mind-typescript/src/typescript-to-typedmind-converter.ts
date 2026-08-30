@@ -206,6 +206,22 @@ export class TypeScriptToTypedMindConverter {
   // actual emitted kind. Enums always predict TypeDef (X-CONV-2 never
   // routes an enum to DTO).
   private readonly typesRegistryPredictedKind = new Map<string, 'DTO' | 'TypeDef'>();
+
+  // issue #88 — the X-CONV-2 TypeDef exclusion above was applied ONLY at
+  // `resolveImportToEntity` (the `imports.to`/`exports.to` shared arm this
+  // comment already covers is the import side; the SAME grammar-legality
+  // gap exists at two more call sites this converter also owns: exporting a
+  // TypeDef name (`exports.to`, valid-references.ts:39 has no TypeDef slot
+  // either) and routing a TypeDef into `input`/`output` (`isDTOLikeType`,
+  // `input`/`output.to` accept only DTO — check-function-graph.ts:44). This
+  // shared predicate lets all three call sites (`resolveImportToEntity`,
+  // `convertExports`, `isDTOLikeType`) apply the identical exclusion so a
+  // predicted-TypeDef name can never reach a reference-legality slot the
+  // grammar has not opened for it.
+  private isPredictedTypeDef(name: string): boolean {
+    return this.typesRegistryPredictedKind.get(name) === 'TypeDef';
+  }
+
   // X-CONV-3 — the target project's root, supplied by the analysis this
   // convert() call is processing. `getRelativePath`/`filterModules`
   // relativize against this, never `process.cwd()`, so extraction produces
@@ -401,6 +417,24 @@ export class TypeScriptToTypedMindConverter {
           reason,
           span: SYNTHETIC_SPAN,
           raw: `suppress ${entity.name} checker/orphaned-entity "${reason}"`,
+        }),
+      );
+      // issue #91 — the identical unconditional-conversion gap that makes
+      // this class trip `checker/orphaned-entity` (suppressed above) ALSO
+      // makes it trip `checker/class-not-exported` (check-exports.ts,
+      // `checkClassAndFunctionExports`): a module-private class is, by the
+      // SAME TS-scoping proof already used above, never exported by any
+      // File/ClassFile by construction. One SuppressionNode is one
+      // (code, target) pair (ast/suppression-node.ts's frozen grain), so
+      // the twin finding needs its own entry, sharing the same reason code
+      // (no new SuppressionReason variant needed).
+      suppressions.push(
+        new SuppressionNode({
+          target: entity.name,
+          code: 'checker/class-not-exported',
+          reason,
+          span: SYNTHETIC_SPAN,
+          raw: `suppress ${entity.name} checker/class-not-exported "${reason}"`,
         }),
       );
     }
@@ -1864,14 +1898,23 @@ export class TypeScriptToTypedMindConverter {
 
     const publicExports: string[] = [];
 
-    // Add default export if it exists
-    if (moduleExports.defaultExport) {
+    // Add default export if it exists. issue #88 — a THIRD call site
+    // (alongside convertExports/isDTOLikeType) that builds the `exports`
+    // reference-legality verb: Program.exports (this method) pulls every
+    // named export directly from the export registry with no TypeDef
+    // filtering, so a TypeDef-predicted name in the entrypoint's own
+    // exports list produced the identical `checker/reference-to-illegal`
+    // finding `convertExports` was fixed for, via a different producer of
+    // the same verb. Same exclusion, same shared helper.
+    if (moduleExports.defaultExport && !this.isPredictedTypeDef(moduleExports.defaultExport)) {
       publicExports.push(moduleExports.defaultExport);
     }
 
     // Add all named exports
     for (const namedExport of moduleExports.namedExports) {
-      publicExports.push(namedExport);
+      if (!this.isPredictedTypeDef(namedExport)) {
+        publicExports.push(namedExport);
+      }
     }
 
     // Add namespace export if it exists
@@ -1959,8 +2002,11 @@ export class TypeScriptToTypedMindConverter {
       return undefined;
     }
 
-    // Handle internal imports using the export registry
-    const moduleExports = this.exportRegistry[specifier];
+    // Handle internal imports using the export registry. issue #87: the
+    // registry's keys are always extension-less; the raw specifier may
+    // carry an explicit extension (nodenext/verbatimModuleSyntax style), so
+    // strip a known source extension before looking up.
+    const moduleExports = this.exportRegistry[specifier] ?? this.exportRegistry[this.stripKnownSourceExtension(specifier)];
     if (!moduleExports) {
       return undefined;
     }
@@ -1986,7 +2032,7 @@ export class TypeScriptToTypedMindConverter {
     // `exports` list is `checker/reference-to-illegal` by design. A
     // predicted-DTO type alias (object-like shape) is unaffected — DTO IS
     // `imports.to`-legal, matching its pre-existing behavior.
-    if (this.typesRegistryPredictedKind.get(importName) === 'TypeDef') {
+    if (this.isPredictedTypeDef(importName)) {
       return undefined;
     }
 
@@ -2028,7 +2074,17 @@ export class TypeScriptToTypedMindConverter {
     const seenNames = new Set<string>();
 
     for (const exp of module.exports) {
-      if (exp.name !== excludeName && this.isValidEntityName(exp.name) && !seenNames.has(exp.name) && !this.isReExport(exp)) {
+      // issue #88 — a TypeDef-predicted export name (a non-object-like
+      // `type` alias, or an enum) is excluded here the same way a re-export
+      // already is: `exports.to` (valid-references.ts) has no TypeDef slot,
+      // so listing one would always produce `checker/reference-to-illegal`.
+      if (
+        exp.name !== excludeName &&
+        this.isValidEntityName(exp.name) &&
+        !seenNames.has(exp.name) &&
+        !this.isReExport(exp) &&
+        !this.isPredictedTypeDef(exp.name)
+      ) {
         // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) — a
         // top-level function renamed by `reserveFunctionEntityNames`/
         // `convertFunction` on a bare-name collision must be named by its
@@ -2164,6 +2220,17 @@ export class TypeScriptToTypedMindConverter {
     // Class/ClassFile-kind reference: leave input/output undefined, per
     // this item's disclosed-loss rationale above.
     if (this.entityRegistry.classes.has(cleaned)) {
+      return false;
+    }
+
+    // issue #88 — a TypeDef-predicted name (a non-object-like `type` alias,
+    // e.g. a discriminated union, or an enum) is NOT DTO-like: `input`/
+    // `output.to` (valid-references.ts) accept only DTO, so routing a
+    // TypeDef there always produces `checker/reference-to-illegal` (and,
+    // once resolved, `checker/{input,output}-not-dto`). Checked before the
+    // interfaces/elimination branches below, mirroring the Class-kind
+    // exclusion's placement.
+    if (this.isPredictedTypeDef(cleaned)) {
       return false;
     }
 
@@ -2720,6 +2787,22 @@ export class TypeScriptToTypedMindConverter {
     return !specifier.startsWith('.') && !specifier.startsWith('/');
   }
 
+  // issue #87 — `registerModuleExports` indexes `exportRegistry` under
+  // extension-LESS specifier guesses only (`./foo`, never `./foo.ts`). A
+  // codebase that writes explicit-extension internal imports (this repo's
+  // own `module_is_nodenext`/`verbatimModuleSyntax` convention — e.g.
+  // `import { x } from './foo.ts'`) reports `imp.specifier` verbatim WITH
+  // the extension, so the registry lookup misses on every internal import.
+  // Fix (issue #87's suggested option (b), the more robust of the two):
+  // strip a known source extension off the specifier before every
+  // `exportRegistry` lookup, rather than trying to register every
+  // extension-including permutation on the write side. Only a KNOWN source
+  // extension is stripped (not an arbitrary trailing `.something`, which
+  // could be a real directory/file segment with a dot in its name).
+  private stripKnownSourceExtension(specifier: string): string {
+    return specifier.replace(/\.(ts|tsx|js|jsx|mts|cts|mjs|cjs)$/, '');
+  }
+
   private isModuleEntryPoint(module: ParsedModule): boolean {
     // Check if this module's file path matches any entry point
     const relativePath = this.getRelativePath(module.filePath);
@@ -2729,9 +2812,16 @@ export class TypeScriptToTypedMindConverter {
   private findEntryEntityName(entryFilePath: string): string {
     const relativePath = this.getRelativePath(entryFilePath);
 
-    // Look for a File entity (Programs can only reference File entities)
+    // Look for a File OR ClassFile entity at this path. issue #90 (lead
+    // ruling) — a ClassFile is a File fused with a Class (`--prefer-class-file`
+    // fuses an entrypoint module that declares a top-level class into a
+    // ClassFile instead of a plain File), and is now a legal Program.entry
+    // target (VALID_REFERENCES.entry.to, valid-references.ts) — the search
+    // must match that shape too, or a class-containing entrypoint module
+    // would still fall through to the synthesized fallback name below,
+    // which corresponds to no real entity.
     const matchingFileEntity = this.entities.find((entity) => {
-      if (entity.kind === 'File' && 'path' in entity) {
+      if ((entity.kind === 'File' || entity.kind === 'ClassFile') && 'path' in entity) {
         return entity.path === relativePath;
       }
       return false;
@@ -2741,8 +2831,9 @@ export class TypeScriptToTypedMindConverter {
       return matchingFileEntity.name;
     }
 
-    // Since we force File entity creation for entry points in convertModule,
-    // this should always find a File entity. Fallback to predictable name.
+    // Since we force File/ClassFile entity creation for entry points in
+    // convertModule, this should always find one of those two. Fallback to
+    // predictable name.
     const fileName = path.basename(entryFilePath, path.extname(entryFilePath));
     return this.sanitizeEntityName(`${fileName}File`);
   }
@@ -2792,8 +2883,10 @@ export class TypeScriptToTypedMindConverter {
       }
     }
 
-    // For internal modules, try to extract methods from export registry
-    const moduleExports = this.exportRegistry[specifier];
+    // For internal modules, try to extract methods from export registry.
+    // issue #87 twin lookup — same extension-stripping fallback as
+    // resolveImportToEntity.
+    const moduleExports = this.exportRegistry[specifier] ?? this.exportRegistry[this.stripKnownSourceExtension(specifier)];
     if (moduleExports) {
       return Array.from(moduleExports.namedExports);
     }

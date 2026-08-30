@@ -43,7 +43,12 @@ export const checkEntryPoint = (context: CheckContext): void => {
         message: `Program '${program.name}' references undefined entry point '${program.entry}'`,
         suggestion: `Define a File entity: ${program.entry} @ path/to/file.ext:`,
       });
-    } else if (entryFile.kind !== 'File') {
+    } else if (entryFile.kind !== 'File' && entryFile.kind !== 'ClassFile') {
+      // issue #90 (lead ruling) — mirrors the VALID_REFERENCES.entry.to
+      // widening (valid-references.ts): a ClassFile is a File fused with a
+      // Class, so it satisfies "entry is a file" the same way a plain File
+      // does. Second enforcement point, same two-point discipline RFC-TM-8
+      // §5 used for `schema.to`/TypeDef.
       context.addFinding({
         code: 'checker/entry-not-file',
         severity: 'error',

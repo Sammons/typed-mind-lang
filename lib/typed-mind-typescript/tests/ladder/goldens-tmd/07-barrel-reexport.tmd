@@ -5,6 +5,7 @@ MainFile @ src/main.ts:
   -> [mainFn]
 
 IndexFile @ src/lib/index.ts:
+  <- [makeWidget]
 
 WidgetFile @ src/lib/widget.ts:
   -> [makeWidget]

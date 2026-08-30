@@ -228,6 +228,31 @@ describe('DTO field type checks (validator.ts:1473-1592)', () => {
     );
     assert.deepEqual(messagesByCode(result, 'checker/dto-field-unknown-type'), []);
   });
+
+  // issue #89 — same class of gap as #78: PRIMITIVES was missing
+  // ReadonlyMap and Uint8Array, both real lib.es2015+/lib.es5 TS/JS
+  // builtins with no import statement (never from an npm package), so
+  // `addExternalTypeToDepExports`'s package-based Dependency-exports
+  // stubbing can never cover them either. Live corpus instances:
+  // `lib/typed-mind`'s own `LinkIndexMaps` (5 `ReadonlyMap<string, ...>`
+  // fields) and `TypedMindParserOptions` (`wasmBytes?: Uint8Array`).
+  it('does not flag ReadonlyMap<K, V> or Uint8Array as unknown types (issue #89)', async () => {
+    const { result } = await check(
+      [
+        'App -> Main v1.0.0',
+        'Main @ src/main.ts:',
+        '  <- [useDto]',
+        '  -> [useDto]',
+        'useDto :: () => void',
+        '  <- GoodDTO',
+        'GoodDTO % "readonly-collection and typed-array fields"',
+        '  - byId: ReadonlyMap<string, string> "a readonly map field"',
+        '  - bytes: Uint8Array "a typed-array field"',
+        '',
+      ].join('\n'),
+    );
+    assert.deepEqual(messagesByCode(result, 'checker/dto-field-unknown-type'), []);
+  });
 });
 
 describe('UIComponent relationship checks (validator.ts:997-1047)', () => {

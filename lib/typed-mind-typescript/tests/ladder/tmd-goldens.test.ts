@@ -110,11 +110,18 @@ const cases: readonly FixtureCase[] = [
   // to diff against; the golden IS the new baseline.
   { fixture: '24-type-alias', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   // NEW in Q3 — X-SUPP-6: a module-private class suppressed with reason
-  // 'generated-single-file-scope'. Checker verdict `false` is the SAME
-  // pre-existing `checker/multi-exported`/DTO-field-reference-orphan-shape
-  // family (here `checker/class-not-exported`, a genuinely separate,
-  // un-suppressed finding — see q3-language-adoption.test.ts).
-  { fixture: '25-generated-single-file', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  // 'generated-single-file-scope'. issue #91 (tm10-inc4) — the SAME
+  // suppression reason now also covers this class's
+  // `checker/class-not-exported` twin finding (previously genuinely
+  // separate and un-suppressed — see q3-language-adoption.test.ts for the
+  // fix). Checker verdict FLIPS to `true`: both of this fixture's only two
+  // ERROR-severity findings (orphaned-entity and its class-not-exported
+  // twin) now carry a `suppression` annotation, and `valid` only counts
+  // UNSUPPRESSED errors (I-10, "suppressed-not-silenced") — the remaining
+  // `semantics/illegal-continuation` finding is a warning, which never
+  // gates `valid`. This is expected, welcome drift (file header), not a
+  // regression.
+  { fixture: '25-generated-single-file', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
 ];
 
 describe('RFC-TM-9 Q1 — .tmd goldens against the current language (per-fixture, RFC §8 golden discipline)', () => {

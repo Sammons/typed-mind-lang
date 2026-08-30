@@ -2,6 +2,7 @@ Main__App -> MainFile v1.0.0
   -> [describe]
 
 MainFile @ src/main.ts:
+  <- [Widget]
   -> [describe]
 
 describe :: describe(w: Widget) => string

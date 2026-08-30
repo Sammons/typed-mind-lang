@@ -1,0 +1,12 @@
+App -> Main v1.0.0
+
+Main @ src/main.ts:
+  <- [helper]
+  -> [helper]
+
+helper :: () => void
+
+lonely % "an unused DTO"
+noisy % "a second unused DTO, left unsuppressed"
+
+suppress lonely checker/orphaned-entity "consumed only by integration tests"
