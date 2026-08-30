@@ -477,11 +477,55 @@ export class TypeScriptToTypedMindConverter {
     });
   }
 
+  // issue #96 — the previous three-chain `.replace()` implementation had two
+  // compounding defects: (1) literal regex metacharacters in the pattern
+  // (starting with `.`) were never escaped before being embedded in the
+  // regex, so `**/*.d.ts`'s literal `.` before `d.ts` became a wildcard
+  // matching ANY character; (2) `**` was replaced with `.*` first, and the
+  // SUBSEQUENT single-`*` replace also matched the `*` that substitution
+  // just inserted, corrupting `.*` into `.[^/]*`. Combined, the default
+  // ignore pattern `**/*.d.ts` wrongly matched `src/typed-mind.ts`, silently
+  // dropping `core`'s own entrypoint module from the traversed set.
+  //
+  // Fixed by scanning the pattern character-by-character and building the
+  // regex token-by-token: every literal character is escaped via
+  // `escapeRegexChar` before being appended, and each glob wildcard
+  // (`**`, `*`, `?`) is consumed exactly once so a later step can never
+  // re-match text an earlier step already emitted.
   private matchesPattern(filePath: string, pattern: string): boolean {
-    // Simple glob matching - could be enhanced with a proper glob library
-    const regex = pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*').replace(/\?/g, '.');
-
+    const regex = this.globToRegexSource(pattern);
     return new RegExp(`^${regex}$`).test(filePath);
+  }
+
+  private globToRegexSource(pattern: string): string {
+    const chars = Array.from(pattern);
+    let result = '';
+    let index = 0;
+    while (index < chars.length) {
+      const char = chars[index] ?? '';
+      if (char === '*') {
+        if (chars[index + 1] === '*') {
+          result += '.*';
+          index += 2;
+        } else {
+          result += '[^/]*';
+          index += 1;
+        }
+        continue;
+      }
+      if (char === '?') {
+        result += '.';
+        index += 1;
+        continue;
+      }
+      result += this.escapeRegexChar(char);
+      index += 1;
+    }
+    return result;
+  }
+
+  private escapeRegexChar(char: string): string {
+    return /[.*+?^${}()|[\]\\]/.test(char) ? `\\${char}` : char;
   }
 
   private convertModules(modules: ParsedModule[]): void {

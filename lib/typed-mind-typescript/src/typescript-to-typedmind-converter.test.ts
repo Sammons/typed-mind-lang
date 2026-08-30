@@ -541,4 +541,104 @@ describe('TypeScriptToTypedMindConverter', () => {
     const internalType = result.entities.find((e) => e.name === 'InternalType');
     assert.equal(internalType, undefined);
   });
+
+  // issue #96 — matchesPattern's glob-to-regex translation had two
+  // compounding defects: unescaped literal regex metacharacters (starting
+  // with `.`) and a `**`->`.*` substitution whose output was re-matched by
+  // the subsequent `*`->`[^/]*` substitution. The live-observed failure:
+  // the default ignore pattern `**/*.d.ts` wrongly matched
+  // `src/typed-mind.ts`, silently dropping `core`'s own entrypoint module
+  // from the traversed set. Table-driven per case since these are scalar
+  // booleans, not object shapes.
+  describe('matchesPattern (issue #96 glob-to-regex escaping)', () => {
+    const cases: ReadonlyArray<{ label: string; pattern: string; filePath: string; expected: boolean }> = [
+      {
+        label: 'THE regression case: **/*.d.ts must not match a .ts file whose name merely ends in d.ts-adjacent text',
+        pattern: '**/*.d.ts',
+        filePath: 'src/typed-mind.ts',
+        expected: false,
+      },
+      {
+        label: '**/*.d.ts still matches a legitimate top-level .d.ts file',
+        pattern: '**/*.d.ts',
+        filePath: 'types/foo.d.ts',
+        expected: true,
+      },
+      {
+        label: '**/*.d.ts still matches a legitimate nested-dir .d.ts file',
+        pattern: '**/*.d.ts',
+        filePath: 'src/foo.d.ts',
+        expected: true,
+      },
+      {
+        label: '**/*.test.ts matches a legitimate test file',
+        pattern: '**/*.test.ts',
+        filePath: 'src/foo.test.ts',
+        expected: true,
+      },
+      {
+        label: '**/*.test.ts does not match a file with no literal dot before "test" (proves the dot is no longer a wildcard)',
+        pattern: '**/*.test.ts',
+        filePath: 'src/footest.ts',
+        expected: false,
+      },
+      {
+        label: 'node_modules/** matches a nested file under node_modules',
+        pattern: 'node_modules/**',
+        filePath: 'node_modules/foo/bar.ts',
+        expected: true,
+      },
+      {
+        label: 'node_modules/** does not match an unrelated file (anchoring still correct)',
+        pattern: 'node_modules/**',
+        filePath: 'src/node_modules_fake.ts',
+        expected: false,
+      },
+      {
+        label: 'single * matches within one path segment',
+        pattern: 'src/*.ts',
+        filePath: 'src/foo.ts',
+        expected: true,
+      },
+      {
+        label: 'single * does not cross a path separator',
+        pattern: 'src/*.ts',
+        filePath: 'src/sub/foo.ts',
+        expected: false,
+      },
+      {
+        label: '? matches exactly one character',
+        pattern: 'src/a?.ts',
+        filePath: 'src/ab.ts',
+        expected: true,
+      },
+      {
+        label: '? does not match two characters',
+        pattern: 'src/a?.ts',
+        filePath: 'src/abc.ts',
+        expected: false,
+      },
+      {
+        label: 'a literal + in the pattern matches the literal + in the file path',
+        pattern: 'src/foo+bar.ts',
+        filePath: 'src/foo+bar.ts',
+        expected: true,
+      },
+      {
+        label: 'a literal + in the pattern does not leak as a regex quantifier',
+        pattern: 'src/foo+bar.ts',
+        filePath: 'src/fooXbar.ts',
+        expected: false,
+      },
+    ];
+
+    for (const { label, pattern, filePath, expected } of cases) {
+      it(label, () => {
+        const converter = new TypeScriptToTypedMindConverter();
+        // biome-ignore lint/suspicious/noExplicitAny: matches this file's existing convention for reaching a private method under test
+        const matches = (converter as any).matchesPattern(filePath, pattern);
+        assert.equal(matches, expected);
+      });
+    }
+  });
 });
