@@ -11,6 +11,7 @@ import { before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { DtoNode } from '../ast/dto-node.ts';
+import { ProgramNode } from '../ast/program-node.ts';
 import { TypedMindParser } from '../pipeline/typed-mind-parser.ts';
 import { SyntaxEmitter } from './syntax-emitter.ts';
 
@@ -158,5 +159,144 @@ describe('FID-6: sigil-header classification fixture (`Name #: path {` => longfo
     const outcome = parser.parse(source);
     const classFile = outcome.entities.find((entity): entity is ClassFileNode => entity instanceof ClassFileNode);
     assert.deepEqual(classFile?.sourceForm, 'shortform');
+  });
+});
+
+// RC-C (issue #102) — shortform's grammar/attachment-rules.ts legality table
+// gives Program no exports continuation and a declared ClassFile no
+// description-line slot for `purpose` (attachment-rules.ts:144,240-243).
+// Both fields are unreachable from shortform SOURCE TEXT at all (that's the
+// legality gap itself) — they are populated by the TypeScript-to-TypedMind
+// converter (typescript-to-typedmind-converter.ts), which synthesizes
+// ProgramNode/ClassFileNode instances directly (never through the parser)
+// and, before this fix, hardcoded `sourceForm: 'shortform'` regardless.
+// These fixtures reproduce that synthesis path directly: build the entities
+// by hand (SYNTHETIC_SPAN-equivalent, `sourceForm: 'shortform'`, matching
+// the converter's own construction) and assert `emitShortform()` promotes
+// just these two kinds to a legal longform block instead of the illegal
+// continuation attachment-rules.ts rejects. Fail-before/pass-after: before
+// the fix, `emitShortform()` on this exact shape emitted `-> [handler]`
+// under the Program declaration and a bare `"..."` line under the declared
+// `#:` ClassFile; reparsing that output produced exactly the two
+// `semantics/illegal-continuation` diagnostics this fixture asserts are now
+// absent (confirmed via a manual pre-fix repro during this Quantum's own
+// authoring — see PR body).
+describe('RC-C: Program.exports and declared-ClassFile.purpose promote to longform under forced shortform', () => {
+  let parser: TypedMindParser;
+  const emitter = new SyntaxEmitter();
+  const zeroSpan = { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } };
+
+  before(async () => {
+    parser = await TypedMindParser.create({ wasmPath });
+  });
+
+  it('a synthesized Program with cross-module exports emits as a legal longform block under emitShortform() and round-trips clean', () => {
+    const program = new ProgramNode({
+      name: 'TodoApp',
+      span: zeroSpan,
+      raw: 'TodoApp -> AppEntry',
+      sourceForm: 'shortform',
+      entry: 'AppEntry',
+      exports: ['handler'],
+    });
+    const emitted = emitter.emit({ entities: [program], imports: [], suppressions: [], diagnostics: [] }, { forceForm: 'shortform' });
+
+    // Promoted to the longform keyword block — never the illegal
+    // `-> [...]` continuation a Program's shortform declaration line has no
+    // slot for.
+    assert.match(emitted, /^program TodoApp \{/m);
+    assert.match(emitted, /^\s+exports: \[handler\]$/m);
+    assert.doesNotMatch(emitted, /^\s*-> \[handler\]$/m);
+
+    const reparsed = parser.parse(emitted);
+    assert.deepEqual(
+      reparsed.diagnostics.filter((diagnostic) => diagnostic.code === 'semantics/illegal-continuation'),
+      [],
+    );
+    const reparsedProgram = reparsed.entities.find((entity): entity is ProgramNode => entity instanceof ProgramNode);
+    assert.deepEqual(reparsedProgram?.exports, ['handler']);
+  });
+
+  it('a synthesized Program with no exports still emits shortform under emitShortform() (no unwarranted promotion)', () => {
+    const program = new ProgramNode({
+      name: 'TodoApp',
+      span: zeroSpan,
+      raw: 'TodoApp -> AppEntry v1.0.0',
+      sourceForm: 'shortform',
+      entry: 'AppEntry',
+      version: '1.0.0',
+    });
+    const emitted = emitter.emit({ entities: [program], imports: [], suppressions: [], diagnostics: [] }, { forceForm: 'shortform' });
+    assert.match(emitted, /^TodoApp -> AppEntry v1\.0\.0$/m);
+    assert.doesNotMatch(emitted, /^program TodoApp \{/m);
+  });
+
+  it('a synthesized declared ClassFile with a purpose emits as a legal longform block under emitShortform() and round-trips clean', () => {
+    const classFile = new ClassFileNode({
+      name: 'SecretLimitError',
+      span: zeroSpan,
+      raw: 'SecretLimitError #: src/api/db/endpoint-secrets.ts',
+      sourceForm: 'shortform',
+      path: 'src/api/db/endpoint-secrets.ts',
+      implements: [],
+      methods: [],
+      imports: [],
+      exports: [],
+      purpose: 'Custom error for secret limit exceeded',
+    });
+    const emitted = emitter.emit({ entities: [classFile], imports: [], suppressions: [], diagnostics: [] }, { forceForm: 'shortform' });
+
+    // Promoted to the longform keyword block — never a bare description
+    // line under a declared `#:` ClassFile, which attachment-rules.ts
+    // rejects outright (only a lookahead-converted ClassFile ever accepted
+    // one).
+    assert.match(emitted, /^classfile SecretLimitError \{/m);
+    assert.match(emitted, /^\s+purpose: "Custom error for secret limit exceeded"$/m);
+    assert.doesNotMatch(emitted, /^\s*"Custom error for secret limit exceeded"$/m);
+
+    const reparsed = parser.parse(emitted);
+    assert.deepEqual(
+      reparsed.diagnostics.filter((diagnostic) => diagnostic.code === 'semantics/illegal-continuation'),
+      [],
+    );
+    const reparsedClassFile = reparsed.entities.find((entity): entity is ClassFileNode => entity instanceof ClassFileNode);
+    assert.deepEqual(reparsedClassFile?.purpose, 'Custom error for secret limit exceeded');
+  });
+
+  it('a synthesized declared ClassFile with no purpose still emits shortform under emitShortform() (no unwarranted promotion)', () => {
+    const classFile = new ClassFileNode({
+      name: 'UserService',
+      span: zeroSpan,
+      raw: 'UserService #: src/services/user.ts',
+      sourceForm: 'shortform',
+      path: 'src/services/user.ts',
+      implements: [],
+      methods: ['findById'],
+      imports: [],
+      exports: [],
+    });
+    const emitted = emitter.emit({ entities: [classFile], imports: [], suppressions: [], diagnostics: [] }, { forceForm: 'shortform' });
+    assert.match(emitted, /^UserService #: src\/services\/user\.ts$/m);
+    assert.doesNotMatch(emitted, /^classfile UserService \{/m);
+  });
+
+  it('a document mixing an exports-bearing Program with an otherwise-plain entity keeps the plain entity in shortform', () => {
+    const program = new ProgramNode({
+      name: 'TodoApp',
+      span: zeroSpan,
+      raw: 'TodoApp -> AppEntry',
+      sourceForm: 'shortform',
+      entry: 'AppEntry',
+      exports: ['handler'],
+    });
+    const outcome = parser.parse('AppEntry :: () -> void\n');
+    const appEntry = outcome.entities.at(0);
+    assert.notEqual(appEntry, undefined);
+    const emitted = emitter.emit(
+      { entities: [program, ...(appEntry ? [appEntry] : [])], imports: [], suppressions: [], diagnostics: [] },
+      { forceForm: 'shortform' },
+    );
+    assert.match(emitted, /^program TodoApp \{/m);
+    assert.match(emitted, /^AppEntry :: \(\) -> void$/m);
   });
 });

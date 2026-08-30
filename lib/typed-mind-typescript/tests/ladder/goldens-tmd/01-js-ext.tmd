@@ -1,5 +1,9 @@
-Main__App -> MainFile v1.0.0
-  -> [mainFn]
+program Main__App {
+  type: Program
+  entry: MainFile
+  version: 1.0.0
+  exports: [mainFn]
+}
 
 MainFile @ src/main.ts:
   <- [helperFn]

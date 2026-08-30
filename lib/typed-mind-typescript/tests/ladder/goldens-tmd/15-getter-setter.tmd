@@ -1,5 +1,9 @@
-Widget__App -> WidgetFile v1.0.0
-  -> [Widget]
+program Widget__App {
+  type: Program
+  entry: WidgetFile
+  version: 1.0.0
+  exports: [Widget]
+}
 
 WidgetFile @ src/widget.ts:
   -> [Widget]

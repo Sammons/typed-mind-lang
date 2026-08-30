@@ -11,7 +11,7 @@
 // (syntax-generator.ts:647-663); this port switches on the three-way
 // `optionalityMarker` so `?` round-trips as `?` and `(optional)` round-trips
 // as `(optional)`, per field.
-
+//
 import type { AssetNode } from '../ast/asset-node.ts';
 import type { ClassFileNode } from '../ast/class-file-node.ts';
 import type { ClassNode } from '../ast/class-node.ts';
@@ -245,6 +245,34 @@ const typeDefToShortform = (entity: TypeDefNode): string[] => {
     return [`${entity.name} = enum [${(entity.members ?? []).join(', ')}]`];
   }
   return [`${entity.name} = ${entity.aliasType === undefined ? '' : printTypeExpr(entity.aliasType)}`];
+};
+
+// RC-C (issue #102): shortform's grammar/attachment-rules.ts legality table
+// gives Program no `-> [...]` exports continuation and gives a declared
+// (`#:`) ClassFile no bare description line for `purpose` — both are real,
+// checker-consumed AST fields (ProgramNode.exports feeds check-orphans.ts's
+// "program exports are public API" union; ClassFileNode.purpose is a real
+// authored/derived doc comment) with no legal shortform slot. `emitShortform`
+// used to dispatch straight to `programToShortform`/`classFileToShortform`
+// regardless, which is the defect it fixes: it silently produced a `.tmd`
+// document `attachment-rules.ts`'s own legality table rejects on reparse.
+// Longform already carries both fields legally (`emit-longform.ts`), so this
+// is the capability check `syntax-emitter.ts` uses to promote just the ONE
+// affected entity to longform instead of either (a) silently dropping the
+// data or (b) emitting illegal syntax — no grammar or attachment-rules.ts
+// change; the language's shortform contract was already correct, only the
+// emitter's per-entity form selection was wrong.
+export const shortformCannotExpress = (entity: EntityNode): boolean => {
+  switch (entity.kind) {
+    case 'Program': {
+      const program = entity as ProgramNode;
+      return program.exports !== undefined && program.exports.length > 0;
+    }
+    case 'ClassFile':
+      return (entity as ClassFileNode).purpose !== undefined;
+    default:
+      return false;
+  }
 };
 
 export const emitShortform = (entity: EntityNode): string[] => {

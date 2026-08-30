@@ -1290,6 +1290,17 @@ export class TypeScriptToTypedMindConverter {
       ...otherImplementsStubNames,
     ];
 
+    // RC-C (issue #102): a declared (`#:`) ClassFile has no shortform
+    // continuation slot for `purpose` — attachment-rules.ts's
+    // `description_line` legality excludes a declared ClassFile outright
+    // (only a lookahead-converted ClassFile accepts one, per RFC-TM-3 §3.1).
+    // `sourceForm` here is 'shortform' regardless (this converter's own
+    // emission path always calls `emitShortform`, which forces every entity
+    // to shortform per `SyntaxEmitter`'s documented `forceForm` contract —
+    // per-entity `sourceForm` would be inert against that override). The
+    // emitter itself (emit-shortform.ts's `shortformCannotExpress`) is what
+    // detects this case and promotes the ONE entity to longform so the real
+    // `purpose` data round-trips instead of being silently dropped.
     const classFileEntity = new ClassFileNode({
       name: entityName,
       span: SYNTHETIC_SPAN,
@@ -1913,6 +1924,16 @@ export class TypeScriptToTypedMindConverter {
     // instead of suppressing a false one.
     const allPublicExports = Array.from(new Set([...publicExports, ...selfInvokedFunctionNames, ...sstHandlerExportNames]));
 
+    // RC-C (issue #102): shortform's `program_declaration` (grammar.js) has
+    // no exports continuation slot — attachment-rules.ts's `export_list`
+    // legality accepts File/ClassFile/Dependency, never Program. `sourceForm`
+    // stays 'shortform' (this converter always calls `emitShortform`, which
+    // forces every entity to shortform regardless of its own `sourceForm`).
+    // SST-exports-push (issue #52/PR #94) and the self-invoked-function fold
+    // (X-AN-11) both push real names into `allPublicExports`; when that list
+    // is non-empty, `emit-shortform.ts`'s `shortformCannotExpress` detects
+    // it and promotes this ONE entity to longform so the exports data
+    // round-trips through the legal serialization instead of being dropped.
     const programEntity = new ProgramNode({
       name: entityName,
       span: SYNTHETIC_SPAN,
