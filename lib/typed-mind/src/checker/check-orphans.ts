@@ -134,14 +134,35 @@ const isEntityImported = (context: CheckContext, entityName: string): boolean =>
 // (`convertExports` excludes re-exports from it, RX-4), so the loop above
 // alone can never prove consumption for a pure re-export barrel. A
 // re-exported name satisfies consumption the same way a declared export
-// does — `isEntityImported` already walks every entity's `imports` list
-// looking for the name; a re-exported name is, by construction, a name
-// real importers reference by its own identifier (they import
-// `getClientIp`, not the barrel File's own name). This closes RC-G
-// without touching `collectReferencedNames`'s general orphan walk,
-// `checkOrphans`'s entity-kind dispatch, or `checkDuplicateExports` (RX-3's
-// Deferrals RX-A/RX-B name the accepted blind spots this design leaves,
-// per the Diamond Doc).
+// does when it resolves to a local entity real importers reference by its
+// own identifier (a same-package sibling file) — `isEntityImported`
+// already walks every entity's `imports` list looking for the name. This
+// branch closes RC-G for that shape without touching
+// `collectReferencedNames`'s general orphan walk, `checkOrphans`'s
+// entity-kind dispatch, or `checkDuplicateExports` (RX-3's Deferrals
+// RX-A/RX-B name the accepted blind spots this design leaves, per the
+// Diamond Doc).
+//
+// RFC-TM-11 Amendment 1, §RX-6 (rfc-tm-11-diamond.md) — a re-export
+// target that resolves to NO local entity (an external or
+// workspace-package specifier, e.g. `@webhookstorage/core/client-ip`)
+// never reaches the branch above: `resolveImportToEntity`
+// (typescript-to-typedmind-converter.ts) returns `undefined` for every
+// caller trying to import that name, so the re-exported name (e.g.
+// `getClientIp`) never appears in ANY entity's `imports` list — not this
+// File's own, not a real importer's. The third branch below is the
+// genuinely new check this shape needs: `convertImports`'s RX-6 fold
+// (typescript-to-typedmind-converter.ts) adds THIS FILE's own entity
+// name into a real importer's `imports` list whenever that importer
+// names one of this File's `reExports`, so checking whether THIS FILE's
+// own name is imported anywhere is what proves consumption for a
+// cross-package re-export barrel. Scoped narrowly to `file.name` — the
+// same File whose consumption is being evaluated — so it does not change
+// the verdict for any File that is not itself an RX-6 fold target: no
+// existing grammar or converter mechanism puts a File's own entity name
+// into another entity's `imports` list except through this fold (import
+// lists reference what an entity produces or declares, never the File
+// that contains it).
 const isFileConsumed = (context: CheckContext, file: FileNode): boolean => {
   for (const exportName of file.exports) {
     if (isEntityImported(context, exportName)) {
@@ -152,6 +173,9 @@ const isFileConsumed = (context: CheckContext, file: FileNode): boolean => {
     if (isEntityImported(context, reExportName)) {
       return true;
     }
+  }
+  if (isEntityImported(context, file.name)) {
+    return true;
   }
   return false;
 };
