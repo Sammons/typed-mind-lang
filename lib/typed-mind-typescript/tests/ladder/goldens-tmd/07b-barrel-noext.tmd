@@ -11,6 +11,7 @@ MainFile @ src/main.ts:
 
 IndexFile @ src/lib/index.ts:
   <- [makeWidget]
+  <-> [makeWidget]
 
 WidgetFile @ src/lib/widget.ts:
   -> [makeWidget]

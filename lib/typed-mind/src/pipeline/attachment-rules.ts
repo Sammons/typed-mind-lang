@@ -53,6 +53,7 @@ import {
   CstInputName,
   CstMethodsList,
   CstOutputName,
+  CstReexportsList,
 } from '../ast/gen/cst-nodes.ts';
 import type { Span } from '../ast/span.ts';
 import type { EntityAccumulator } from './entity-accumulator.ts';
@@ -144,6 +145,19 @@ export const attachmentRules: Record<string, AttachmentRule> = {
     accepts: (target) => target.kind === 'File' || target.kind === 'ClassFile' || target.kind === 'Dependency',
     apply: (target, syntaxNode) => {
       target.slots.exports = namesOf(new CstExportList(syntaxNode));
+    },
+  },
+  // RFC-TM-11 §RX-1 (rfc-tm-11-diamond.md) — File only. A ClassFile always
+  // auto-self-exports its own class name (its `exports` can never be empty
+  // the way a barrel File's can), and `checkOrphans` never routes a
+  // ClassFile through `isFileConsumed` at all — the field would have no
+  // consumption-checking consumer, so it is not accepted here.
+  reexports_list: {
+    group: 'reExports',
+    label: 're-exports list (`<-> [...]`)',
+    accepts: (target) => target.kind === 'File',
+    apply: (target, syntaxNode) => {
+      target.slots.reExports = namesOf(new CstReexportsList(syntaxNode));
     },
   },
   calls_list: {

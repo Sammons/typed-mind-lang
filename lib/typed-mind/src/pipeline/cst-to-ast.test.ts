@@ -92,6 +92,7 @@ describe('CST→AST walk/attach layer', () => {
             path: 'src/services/user.ts',
             imports: ['Logger'],
             exports: ['createUser'],
+            reExports: [],
             purpose: 'User service file',
           },
           {

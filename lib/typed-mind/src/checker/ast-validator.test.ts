@@ -192,6 +192,7 @@ describe('import check (validator.ts:369-406)', () => {
       path: 'src/wild.ts',
       imports: ['zz*'],
       exports: [],
+      reExports: [],
     });
     const merged = { entities: [...local.entities, wild], imports: local.imports, diagnostics: local.diagnostics };
     const result = new AstValidator().validate(merged, computeLinks(merged.entities));

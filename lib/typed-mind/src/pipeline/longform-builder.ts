@@ -300,6 +300,10 @@ const applyProperties = (accumulator: EntityAccumulator, collected: CollectedPro
       slots.path = scalar('path') ?? '';
       slots.imports = list('imports') ?? [];
       slots.exports = list('exports') ?? [];
+      // RFC-TM-11 §RX-1 (rfc-tm-11-diamond.md) — File only, mirrors
+      // imports/exports. ClassFile's block (below) deliberately does not
+      // gain this property; see attachment-rules.ts's reexports_list rule.
+      slots.reExports = list('reexports') ?? [];
       if (purposeOrDescription !== undefined) {
         slots.purpose = purposeOrDescription;
       }

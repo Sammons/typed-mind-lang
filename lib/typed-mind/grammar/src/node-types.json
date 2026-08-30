@@ -1555,6 +1555,44 @@
     "fields": {}
   },
   {
+    "type": "reexports_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "inline_comment",
+          "named": true
+        },
+        {
+          "type": "name_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "reexports_list_final",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "inline_comment",
+          "named": true
+        },
+        {
+          "type": "name_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "runparameter_declaration",
     "named": true,
     "fields": {},
@@ -1854,6 +1892,14 @@
         },
         {
           "type": "program_declaration_final",
+          "named": true
+        },
+        {
+          "type": "reexports_list",
+          "named": true
+        },
+        {
+          "type": "reexports_list_final",
           "named": true
         },
         {
@@ -2435,6 +2481,10 @@
   },
   {
     "type": "<-",
+    "named": false
+  },
+  {
+    "type": "<->",
     "named": false
   },
   {

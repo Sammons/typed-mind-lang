@@ -1,16 +1,16 @@
 // GENERATED FILE — DO NOT EDIT.
 // Emitted by lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs (RFC-TM-3 §2.1)
-// from lib/typed-mind/grammar/src/node-types.json: 121 named nodes,
-// 30 `_final` twins → 91 wrapper classes (one per logical production).
+// from lib/typed-mind/grammar/src/node-types.json: 123 named nodes,
+// 31 `_final` twins → 92 wrapper classes (one per logical production).
 // Regenerate: node lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs
 // CI diff-gates this file via scripts/check-generated.mjs step 2b.
 
 import type { Node as SyntaxNode } from 'web-tree-sitter';
 import type { Span } from '../span.ts';
 
-export const CST_NAMED_NODE_TYPE_COUNT = 121;
-export const CST_FINAL_TWIN_COUNT = 30;
-export const CST_LOGICAL_CLASS_COUNT = 91;
+export const CST_NAMED_NODE_TYPE_COUNT = 123;
+export const CST_FINAL_TWIN_COUNT = 31;
+export const CST_LOGICAL_CLASS_COUNT = 92;
 
 const spanOf = (syntaxNode: SyntaxNode): Span => ({
   start: { line: syntaxNode.startPosition.row + 1, column: syntaxNode.startPosition.column + 1 },
@@ -917,6 +917,19 @@ export class CstReadonlyParenRest extends CstNode {
   }
 }
 
+export class CstReexportsList extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['reexports_list', 'reexports_list_final'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstReexportsList.nodeTypes);
+  }
+  inlineCommentChildren(): CstInlineComment[] {
+    return this.childrenOfTypes(['inline_comment'], CstInlineComment);
+  }
+  nameListChildren(): CstNameList[] {
+    return this.childrenOfTypes(['name_list'], CstNameList);
+  }
+}
+
 export class CstRunparameterDeclaration extends CstNode {
   static readonly nodeTypes: readonly string[] = ['runparameter_declaration', 'runparameter_declaration_final'];
   constructor(syntaxNode: SyntaxNode) {
@@ -1037,6 +1050,9 @@ export class CstSourceFile extends CstNode {
   }
   programDeclarationChildren(): CstProgramDeclaration[] {
     return this.childrenOfTypes(['program_declaration', 'program_declaration_final'], CstProgramDeclaration);
+  }
+  reexportsListChildren(): CstReexportsList[] {
+    return this.childrenOfTypes(['reexports_list', 'reexports_list_final'], CstReexportsList);
   }
   runparameterDeclarationChildren(): CstRunparameterDeclaration[] {
     return this.childrenOfTypes(['runparameter_declaration', 'runparameter_declaration_final'], CstRunparameterDeclaration);
@@ -1446,6 +1462,7 @@ export type CstNamedNode =
   | CstReadonlyKw
   | CstReadonlyNameRest
   | CstReadonlyParenRest
+  | CstReexportsList
   | CstRunparameterDeclaration
   | CstSignature
   | CstSourceFile
@@ -1570,6 +1587,8 @@ export const cstNodeClassByType: ReadonlyMap<string, new (syntaxNode: SyntaxNode
   ['readonly_kw', CstReadonlyKw],
   ['readonly_name_rest', CstReadonlyNameRest],
   ['readonly_paren_rest', CstReadonlyParenRest],
+  ['reexports_list', CstReexportsList],
+  ['reexports_list_final', CstReexportsList],
   ['runparameter_declaration', CstRunparameterDeclaration],
   ['runparameter_declaration_final', CstRunparameterDeclaration],
   ['signature', CstSignature],

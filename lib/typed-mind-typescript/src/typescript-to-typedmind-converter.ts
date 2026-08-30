@@ -1424,6 +1424,10 @@ export class TypeScriptToTypedMindConverter {
     // emitter itself (emit-shortform.ts's `shortformCannotExpress`) is what
     // detects this case and promotes the ONE entity to longform so the real
     // `purpose` data round-trips instead of being silently dropped.
+    // RFC-TM-11 §RX-1 — ClassFile does not carry `reExports` (it always
+    // auto-self-exports, so it can never be RC-G-shaped); any re-exported
+    // names `convertExports` reports for this module are not applicable
+    // here and are intentionally not read.
     const classFileEntity = new ClassFileNode({
       name: entityName,
       span: SYNTHETIC_SPAN,
@@ -1434,7 +1438,7 @@ export class TypeScriptToTypedMindConverter {
       implements: this.convertImplementsList(primaryClass.extends.slice(1), primaryClass.implements),
       methods: this.convertMethods(primaryClass),
       imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
-      exports: [...this.convertExports(module, entityName), ...stubNames],
+      exports: [...this.convertExports(module, entityName).exportNames, ...stubNames],
       purpose: primaryClass.description ? collapseDescription(primaryClass.description) : undefined,
     });
 
@@ -1521,6 +1525,11 @@ export class TypeScriptToTypedMindConverter {
         ...this.collectNamespaceImplementsStubImports(module.classes),
       ];
 
+      // RFC-TM-11 §RX-4 (rfc-tm-11-diamond.md) — the RC-G fix: a re-exported
+      // name (issue #109) no longer vanishes when every one of a File's
+      // exports is a re-export. It is destructured into `reExports`
+      // instead of being silently dropped from `exportNames`.
+      const { exportNames, reExportNames } = this.convertExports(module);
       const fileEntity = new FileNode({
         name: fileEntityName,
         span: SYNTHETIC_SPAN,
@@ -1528,7 +1537,8 @@ export class TypeScriptToTypedMindConverter {
         sourceForm: 'shortform',
         path: this.getRelativePath(module.filePath),
         imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
-        exports: [...this.convertExports(module), ...stubNames],
+        exports: [...exportNames, ...stubNames],
+        reExports: reExportNames,
       });
 
       this.entities.push(fileEntity);
@@ -2105,6 +2115,7 @@ export class TypeScriptToTypedMindConverter {
         path: sourceFile.path,
         imports: [...sourceFile.imports, targetFileEntityName],
         exports: sourceFile.exports,
+        reExports: sourceFile.reExports,
         purpose: sourceFile.purpose,
       });
     }
@@ -2238,6 +2249,7 @@ export class TypeScriptToTypedMindConverter {
                 path: sourceEntity.path,
                 imports: [...sourceEntity.imports, ...newNames],
                 exports: sourceEntity.exports,
+                reExports: sourceEntity.reExports,
                 purpose: sourceEntity.purpose,
               })
             : new ClassFileNode({
@@ -2588,37 +2600,50 @@ export class TypeScriptToTypedMindConverter {
     return typeAliasNames.includes(name) || constantNames.includes(name);
   }
 
-  private convertExports(module: ParsedModule, excludeName?: string): string[] {
+  // RFC-TM-11 §RX-4 (rfc-tm-11-diamond.md) — a re-exported name now lands
+  // in `reExportNames` instead of being dropped: `convertExports`'s
+  // exclusion of re-exports from the returned `exports` array is UNCHANGED
+  // (a re-exported name still never appears in `exportNames`, still never
+  // routes through `exports:`'s VALID_REFERENCES-checked slot regardless
+  // of kind, so `isPredictedTypeDef`'s exclusion stays scoped to the
+  // non-re-export branch only), but the excluded name is no longer
+  // discarded — it is returned as the RFC's new `reExports` field's
+  // source. Every call site now destructures the pair.
+  private convertExports(module: ParsedModule, excludeName?: string): { exportNames: string[]; reExportNames: string[] } {
     const exportNames: string[] = [];
+    const reExportNames: string[] = [];
     const seenNames = new Set<string>();
 
     for (const exp of module.exports) {
-      // issue #88 — a TypeDef-predicted export name (a non-object-like
-      // `type` alias, or an enum) is excluded here the same way a re-export
-      // already is: `exports.to` (valid-references.ts) has no TypeDef slot,
-      // so listing one would always produce `checker/reference-to-illegal`.
-      if (
-        exp.name !== excludeName &&
-        this.isValidEntityName(exp.name) &&
-        !seenNames.has(exp.name) &&
-        !this.isReExport(exp) &&
-        !this.isPredictedTypeDef(exp.name)
-      ) {
-        // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) — a
-        // top-level function renamed by `reserveFunctionEntityNames`/
-        // `convertFunction` on a bare-name collision must be named by its
-        // ACTUAL emitted entity name here too, or this File/ClassFile's
-        // `exports:` list would reference a name no entity carries.
-        // `functionNameRemap` returns `undefined` for every export that
-        // isn't a renamed function (constants, classes, interfaces, ...),
-        // which is exactly when the raw `exp.name` is already correct.
-        const remapped = this.functionNameRemap.get(`${module.filePath}::${exp.name}`);
-        exportNames.push(remapped ?? exp.name);
+      if (exp.name !== excludeName && this.isValidEntityName(exp.name) && !seenNames.has(exp.name)) {
+        if (this.isReExport(exp)) {
+          reExportNames.push(exp.name);
+        } else if (!this.isPredictedTypeDef(exp.name)) {
+          // issue #88 — a TypeDef-predicted export name (a non-object-like
+          // `type` alias, or an enum) is excluded here: `exports.to`
+          // (valid-references.ts) has no TypeDef slot, so listing one
+          // would always produce `checker/reference-to-illegal`. Scoped to
+          // this branch only — a re-exported TypeDef-shaped name still
+          // lands in `reExportNames` above, since it is never routed
+          // through `exports:`'s checked slot regardless of kind.
+          //
+          // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) —
+          // a top-level function renamed by `reserveFunctionEntityNames`/
+          // `convertFunction` on a bare-name collision must be named by
+          // its ACTUAL emitted entity name here too, or this File's
+          // `exports:` list would reference a name no entity carries.
+          // `functionNameRemap` returns `undefined` for every export that
+          // isn't a renamed function (constants, classes, interfaces,
+          // ...), which is exactly when the raw `exp.name` is already
+          // correct.
+          const remapped = this.functionNameRemap.get(`${module.filePath}::${exp.name}`);
+          exportNames.push(remapped ?? exp.name);
+        }
         seenNames.add(exp.name);
       }
     }
 
-    return exportNames;
+    return { exportNames, reExportNames };
   }
 
   private isReExport(exportItem: any): boolean {

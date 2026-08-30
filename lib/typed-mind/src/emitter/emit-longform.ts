@@ -83,6 +83,10 @@ const fileToLongform = (entity: FileNode): string[] => {
   if (entity.exports.length > 0) {
     body.push(`exports: [${entity.exports.join(', ')}]`);
   }
+  // RFC-TM-11 §RX-5 (rfc-tm-11-diamond.md) — File only, after exports.
+  if (entity.reExports.length > 0) {
+    body.push(`reexports: [${entity.reExports.join(', ')}]`);
+  }
   return [`file ${entity.name} {`, ...indent(body), '}'];
 };
 

@@ -93,8 +93,15 @@ const cases: readonly FixtureCase[] = [
   // `false`.
   { fixture: '01-js-ext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   { fixture: '02-dynamic-import', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
-  { fixture: '07-barrel-reexport', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
-  { fixture: '07b-barrel-noext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  // RFC-TM-11 (rfc-tm-11-diamond.md, issue #109 RC-G) — expected, welcome
+  // drift per this file's own recorded-verdict discipline above: these two
+  // fixtures ARE the RC-G shape (a barrel File whose only export is a
+  // re-export). `checker/orphaned-file` no longer fires now that
+  // `isFileConsumed` counts a re-exported name as consumption
+  // (check-orphans.ts). Verified directly: both fixtures' converted
+  // `.tmd` now check clean (`valid: true`, zero diagnostics).
+  { fixture: '07-barrel-reexport', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  { fixture: '07b-barrel-noext', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   { fixture: '10-export-star', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '12-tsconfig-paths', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '13-jsdoc-desc', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
