@@ -2811,6 +2811,18 @@ export class TypeScriptToTypedMindConverter {
   // which is a real, parseable grammar production — the "degrade honestly,
   // anything that parses" option the issue itself names, with no new
   // grammar surface and no field-list modeling attempted for the union.
+  // Adversarial review finding (PR #115) — the depth tracker below MUST
+  // also count `<`/`>` alongside `{()[]}`, or a union nested inside a
+  // generic (`Record<string, { a: string } | { b: string }>`) misreports
+  // its `|` as top-level the instant the first `{...}` member closes,
+  // routing an alias that should stay a DTO into the TypeDef/alias path
+  // and corrupting a PREVIOUSLY-correct emission (confirmed: pre-fix,
+  // `Shapes = Record<string, {...}|{...}>>` — a doubled trailing `>>` —
+  // produced `syntax/error: Unparsable text`). `<`/`>` are unambiguous
+  // generic delimiters in this context: `type` is always TYPE-POSITION
+  // text extracted from a type alias's own right-hand side (never an
+  // expression), so there is no comparison-operator ambiguity to worry
+  // about the way there would be in general TypeScript source text.
   private isUnionOfObjectLiterals(type: string): boolean {
     const trimmed = type.trim();
     if (!trimmed.includes('{') || !trimmed.includes('|')) {
@@ -2818,9 +2830,9 @@ export class TypeScriptToTypedMindConverter {
     }
     let depth = 0;
     for (const ch of trimmed) {
-      if (ch === '{' || ch === '(' || ch === '[') {
+      if (ch === '{' || ch === '(' || ch === '[' || ch === '<') {
         depth += 1;
-      } else if (ch === '}' || ch === ')' || ch === ']') {
+      } else if (ch === '}' || ch === ')' || ch === ']' || ch === '>') {
         depth -= 1;
       } else if (ch === '|' && depth === 0) {
         return true;
