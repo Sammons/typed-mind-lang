@@ -172,6 +172,18 @@ export class TypeScriptToTypedMindConverter {
   // (`convertToSeparateEntities`'s FileNode, `convertToClassFile`'s
   // ClassFileNode) rather than computed on demand.
   private readonly fileEntityNameByModulePath = new Map<string, string>();
+  // RC-E (issue #107) — a sibling of `fileEntityNameByModulePath`, keyed by
+  // the module's project-relative, extension-stripped path instead of its
+  // absolute `filePath`. This is the exact key shape `moduleGraphResolution`
+  // stores its `resolvedTarget` values under (see that field's own comment:
+  // "project-root-relative... run through `stripKnownSourceExtension`"), so
+  // `foldDynamicImportsIntoSourceFiles` can resolve a dynamic `import()`
+  // specifier straight from `moduleGraphResolution` to a File/ClassFile
+  // entity name without reconstructing an absolute path (which would risk
+  // an extension mismatch between the analyzer's resolved target and the
+  // module's own `filePath`). Populated at the same two construction sites
+  // as `fileEntityNameByModulePath`.
+  private readonly fileEntityNameByRelativePath = new Map<string, string>();
   // RC-B (ladder-diagnostic-disposition-2026-08-29.md rank 2, issue #100) —
   // `convertToSeparateEntities` used to derive `fileEntityName` from
   // BASENAME ONLY (`createEntityName(`${baseName}File`)`), with no
@@ -336,6 +348,13 @@ export class TypeScriptToTypedMindConverter {
       // touches `this.entities` in place while generatePrograms only
       // appends).
       this.foldSstHandlerImportsIntoSourceFiles(analysis.sstHandlerReferences);
+
+      // RC-E (issue #107) — same ordering rationale as the SST-handler fold
+      // immediately above: a dynamic `import()` specifier's TARGET module's
+      // File/ClassFile entity name is only guaranteed final once
+      // `convertModules` has finished (an arbitrary-order pass), so this
+      // also runs as a post-pass rather than threaded into `convertImports`.
+      this.foldDynamicImportsIntoSourceFiles(filteredModules);
 
       // Generate program entities if requested (after other entities are created)
       if (this.options.generatePrograms) {
@@ -507,6 +526,7 @@ export class TypeScriptToTypedMindConverter {
     this.reservedNamedTypeNames.clear();
     this.functionNameRemap.clear();
     this.fileEntityNameByModulePath.clear();
+    this.fileEntityNameByRelativePath.clear();
     this.reservedFileEntityNameByModulePath.clear();
     this.dependencies.clear();
     this.externalTypeToPackage.clear();
@@ -1115,7 +1135,17 @@ export class TypeScriptToTypedMindConverter {
     // does; without `module.enums` here, 14-enum's `src/status.ts` would
     // fall through to `convertToSeparateEntities` and gain a redundant File
     // entity a types-only source file should not have.
-    const hasRealCode = module.classes.length > 0 || module.functions.length > 0;
+    // RC-F (issue #108) — a module whose only logic lives in a top-level
+    // registration-callback call (`accountRoutes.openapi(route, async (c) =>
+    // {...})`, the Hono OpenAPI idiom, or an equivalent Express/router
+    // shape) has zero top-level `function`/`class` DECLARATIONS, so the
+    // pre-existing `hasRealCode` check alone misclassified it as
+    // "pure types" — `processModule` then routed it to
+    // `convertTypesAndConstants`, which never calls `convertImports`,
+    // silently dropping every real cross-file import the file has.
+    // `hasTopLevelCallbackRegistration` (computed by the analyzer, which has
+    // AST access `ParsedModule` does not carry) closes this gap.
+    const hasRealCode = module.classes.length > 0 || module.functions.length > 0 || (module.hasTopLevelCallbackRegistration ?? false);
     const hasTypesOrConstants =
       module.types.length > 0 || module.interfaces.length > 0 || module.constants.length > 0 || (module.enums?.length ?? 0) > 0;
 
@@ -1353,6 +1383,9 @@ export class TypeScriptToTypedMindConverter {
     // record this module's final ClassFile entity name, mirroring the
     // `convertToSeparateEntities` FileNode recording above.
     this.fileEntityNameByModulePath.set(module.filePath, entityName);
+    // RC-E (issue #107) — same recording, keyed by relative path for
+    // `foldDynamicImportsIntoSourceFiles`'s `moduleGraphResolution` lookup.
+    this.fileEntityNameByRelativePath.set(this.stripKnownSourceExtension(this.getRelativePath(module.filePath)), entityName);
 
     // X-CONV-5 — synthesize a stub for the primary class's own extends
     // target (if it's an unmodelled builtin) plus any other class in this
@@ -1465,6 +1498,9 @@ export class TypeScriptToTypedMindConverter {
     // guard below skips re-construction, not re-naming; the mapping must
     // still resolve for `resolveSstHandlerReferences`'s lookup).
     this.fileEntityNameByModulePath.set(module.filePath, fileEntityName);
+    // RC-E (issue #107) — same recording, keyed by relative path for
+    // `foldDynamicImportsIntoSourceFiles`'s `moduleGraphResolution` lookup.
+    this.fileEntityNameByRelativePath.set(this.stripKnownSourceExtension(this.getRelativePath(module.filePath)), fileEntityName);
 
     if (!this.entityNames.has(fileEntityName)) {
       this.entityNames.add(fileEntityName);
@@ -2071,6 +2107,124 @@ export class TypeScriptToTypedMindConverter {
         exports: sourceFile.exports,
         purpose: sourceFile.purpose,
       });
+    }
+  }
+
+  // RC-E (issue #107) — a dynamic `import()` nested at any expression depth
+  // (a `lazy(() => import('./pages/Home.js'))`-shaped call, not only a
+  // top-level/statement-level `import(...)`) never produced an import-graph
+  // edge: `TypeScriptAnalyzer`'s visitor walk (X-AN-2) already discovers the
+  // specifier regardless of nesting depth — `ts.forEachChild` recurses
+  // unconditionally into call arguments and arrow-function bodies — and
+  // records it in both `module.dynamicImportSpecifiers` and
+  // `analysis.moduleGraph` (X-AN-1, "covers static imports, re-exports, and
+  // dynamic imports uniformly"). But `convertImports` never reads
+  // `module.dynamicImportSpecifiers` at all, so the specifier's resolved
+  // target — even though it gets traversed and converted into its own real
+  // entity — was never folded into the IMPORTING module's own `imports:`
+  // list. `check-orphans.ts`'s orphan check only looks at what a File's
+  // `imports` name, so the target module and everything it exports read as
+  // permanently unreferenced.
+  //
+  // Fixed the same way as the SST-handler fold immediately above (a
+  // post-pass over the finished entity list, sidestepping the same
+  // ordering hazard: the TARGET module's File/ClassFile entity name is only
+  // guaranteed final once every module has been converted). For each
+  // module's own `dynamicImportSpecifiers`, resolve the specifier through
+  // `moduleGraphResolution` (populated at the top of `convert()` from
+  // `analysis.moduleGraph`, which already covers dynamic imports) to get
+  // the target's project-relative path, then through
+  // `fileEntityNameByRelativePath` to get its final entity name. A
+  // `lazy()`-wrapped dynamic import has no bound import name (the whole
+  // module namespace is the target, not one named export) — unlike a named
+  // import, there is no `resolveImportToEntity`-style named-symbol
+  // resolution to attempt first; naming the target File/ClassFile entity
+  // itself is the correct and only nameable reference here, and `File` is
+  // `imports.to`-legal (valid-references.ts) so this is not a reference-
+  // legality violation.
+  private foldDynamicImportsIntoSourceFiles(modules: readonly ParsedModule[]): void {
+    for (const module of modules) {
+      // `?? []` — same defensive-optional convention `isPureTypesFile`
+      // already uses for `module.enums`: a handful of pre-existing unit
+      // tests build a `ParsedModule` mock via an `as ParsedModule` cast that
+      // bypasses the compiler's field check, omitting `dynamicImportSpecifiers`
+      // entirely. The real analyzer always sets it (`analyzeModule` always
+      // returns the field); this guard is for those mocks, not a
+      // real-world code path.
+      const dynamicImportSpecifiers = module.dynamicImportSpecifiers ?? [];
+      if (dynamicImportSpecifiers.length === 0) {
+        continue;
+      }
+
+      const sourceRelativePath = this.getRelativePath(module.filePath);
+      const sourceFileEntityName = this.fileEntityNameByRelativePath.get(this.stripKnownSourceExtension(sourceRelativePath));
+      if (sourceFileEntityName === undefined) {
+        continue;
+      }
+
+      for (const specifier of dynamicImportSpecifiers) {
+        if (this.isExternalPackage(specifier)) {
+          // A dynamic import of an external package (`import('lodash')`) is
+          // out of scope — external packages are Dependency entities, and
+          // `lazy(() => import('some-npm-package'))` is not the false-
+          // orphan shape issue #107 names (the code-splitting idiom is
+          // always a relative, internal specifier).
+          continue;
+        }
+
+        const resolvedTarget = this.moduleGraphResolution.get(
+          TypeScriptToTypedMindConverter.moduleGraphResolutionKey(sourceRelativePath, specifier),
+        );
+        if (resolvedTarget === undefined) {
+          // Genuinely unresolved (analyzer already surfaced its own
+          // `unresolvable-import`/`non-literal-dynamic-import` diagnostic
+          // for this case) — nothing to fold.
+          continue;
+        }
+
+        const targetFileEntityName = this.fileEntityNameByRelativePath.get(this.stripKnownSourceExtension(resolvedTarget));
+        if (targetFileEntityName === undefined || targetFileEntityName === sourceFileEntityName) {
+          continue;
+        }
+
+        const sourceIndex = this.entities.findIndex((entity) => entity.name === sourceFileEntityName);
+        const sourceEntity = this.entities[sourceIndex];
+        if (sourceIndex === -1 || (!(sourceEntity instanceof FileNode) && !(sourceEntity instanceof ClassFileNode))) {
+          continue;
+        }
+
+        if (sourceEntity.imports.includes(targetFileEntityName)) {
+          continue;
+        }
+
+        this.entities[sourceIndex] =
+          sourceEntity instanceof FileNode
+            ? new FileNode({
+                name: sourceEntity.name,
+                span: sourceEntity.span,
+                raw: sourceEntity.raw,
+                comment: sourceEntity.comment,
+                sourceForm: sourceEntity.sourceForm,
+                path: sourceEntity.path,
+                imports: [...sourceEntity.imports, targetFileEntityName],
+                exports: sourceEntity.exports,
+                purpose: sourceEntity.purpose,
+              })
+            : new ClassFileNode({
+                name: sourceEntity.name,
+                span: sourceEntity.span,
+                raw: sourceEntity.raw,
+                comment: sourceEntity.comment,
+                sourceForm: sourceEntity.sourceForm,
+                path: sourceEntity.path,
+                implements: sourceEntity.implements,
+                methods: sourceEntity.methods,
+                imports: [...sourceEntity.imports, targetFileEntityName],
+                exports: sourceEntity.exports,
+                extends: sourceEntity.extends,
+                purpose: sourceEntity.purpose,
+              });
+      }
     }
   }
 

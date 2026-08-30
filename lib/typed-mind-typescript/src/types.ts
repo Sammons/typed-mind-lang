@@ -86,6 +86,15 @@ export interface ParsedModule {
   // instead of a false "orphaned" finding on a function that IS the
   // program's own entry action.
   readonly selfInvokedFunctionNames: readonly string[];
+  // RC-F (issue #108) — true when this module has at least one top-level
+  // expression-statement call whose argument is a function/arrow-function
+  // expression with a real body (the `app.openapi(route, async (c) => {...})`/
+  // `router.get(path, async (req, res) => {...})` registration-callback
+  // idiom). `isPureTypesFile` (typescript-to-typedmind-converter.ts) folds
+  // this into its `hasRealCode` check so a route/handler module with zero
+  // top-level `function`/`class` DECLARATIONS is not misclassified as
+  // "pure types" and routed away from `convertImports`.
+  readonly hasTopLevelCallbackRegistration: boolean;
 }
 
 export interface ParsedImport {
