@@ -26,6 +26,7 @@ import type { RunParameterNode } from '../ast/run-parameter-node.ts';
 import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
 import { printTypeExpr } from './print-type-expr.ts';
+import { quoteStringLiteral } from './quote-string-literal.ts';
 
 // A shortform `comment` is an INLINE trailing comment on the declaration's
 // own first line (grammar.js: every *_declaration production takes an
@@ -44,7 +45,7 @@ const withInlineComment = (lines: string[], comment: string | undefined): string
 const programToShortform = (entity: ProgramNode): string[] => {
   let line = `${entity.name} -> ${entity.entry}`;
   if (entity.purpose !== undefined) {
-    line += ` "${entity.purpose}"`;
+    line += ` ${quoteStringLiteral(entity.purpose)}`;
   }
   if (entity.version !== undefined) {
     line += ` v${entity.version}`;
@@ -59,7 +60,7 @@ const programToShortform = (entity: ProgramNode): string[] => {
 const fileToShortform = (entity: FileNode): string[] => {
   const lines = [`${entity.name} @ ${entity.path}:`];
   if (entity.purpose !== undefined) {
-    lines.push(`  "${entity.purpose}"`);
+    lines.push(`  ${quoteStringLiteral(entity.purpose)}`);
   }
   if (entity.imports.length > 0) {
     lines.push(`  <- [${entity.imports.join(', ')}]`);
@@ -77,7 +78,7 @@ const fileToShortform = (entity: FileNode): string[] => {
 const functionToShortform = (entity: FunctionNode): string[] => {
   const lines = [`${entity.name} :: ${entity.signature}`];
   if (entity.description !== undefined) {
-    lines.push(`  "${entity.description}"`);
+    lines.push(`  ${quoteStringLiteral(entity.description)}`);
   }
   // pendingDependencies is the unresolved residue of the mixed `<- [...]`
   // list after Q4's forward-semantics distribution (§3.4) — the names that
@@ -119,7 +120,7 @@ const inheritanceSuffix = (extendsName: string | undefined, implementsList: read
 const classToShortform = (entity: ClassNode): string[] => {
   const lines = [`${entity.name} <:${inheritanceSuffix(entity.extends, entity.implements)}`];
   if (entity.purpose !== undefined) {
-    lines.push(`  "${entity.purpose}"`);
+    lines.push(`  ${quoteStringLiteral(entity.purpose)}`);
   }
   if (entity.methods.length > 0) {
     lines.push(`  => [${entity.methods.join(', ')}]`);
@@ -132,7 +133,7 @@ const classFileToShortform = (entity: ClassFileNode): string[] => {
     entity.extends === undefined && entity.implements.length === 0 ? '' : ` <:${inheritanceSuffix(entity.extends, entity.implements)}`;
   const lines = [`${entity.name} #: ${entity.path}${inheritance}`];
   if (entity.purpose !== undefined) {
-    lines.push(`  "${entity.purpose}"`);
+    lines.push(`  ${quoteStringLiteral(entity.purpose)}`);
   }
   if (entity.imports.length > 0) {
     lines.push(`  <- [${entity.imports.join(', ')}]`);
@@ -161,7 +162,7 @@ const constantsToShortform = (entity: ConstantsNode): string[] => {
   }
   const lines = [line];
   if (entity.purpose !== undefined) {
-    lines.push(`  "${entity.purpose}"`);
+    lines.push(`  ${quoteStringLiteral(entity.purpose)}`);
   }
   return lines;
 };
@@ -173,7 +174,7 @@ const dtoFieldLine = (field: DtoNode['fields'][number]): string => {
   }
   fieldLine += `: ${field.type}`;
   if (field.description !== undefined) {
-    fieldLine += ` "${field.description}"`;
+    fieldLine += ` ${quoteStringLiteral(field.description)}`;
   }
   if (field.optionalityMarker === 'parenthesized') {
     fieldLine += ' (optional)';
@@ -184,7 +185,7 @@ const dtoFieldLine = (field: DtoNode['fields'][number]): string => {
 const dtoToShortform = (entity: DtoNode): string[] => {
   let line = `${entity.name} %`;
   if (entity.purpose !== undefined) {
-    line += ` "${entity.purpose}"`;
+    line += ` ${quoteStringLiteral(entity.purpose)}`;
   }
   const lines = [line];
   for (const field of entity.fields) {
@@ -194,7 +195,7 @@ const dtoToShortform = (entity: DtoNode): string[] => {
 };
 
 const assetToShortform = (entity: AssetNode): string[] => {
-  const lines = [`${entity.name} ~ "${entity.description}"`];
+  const lines = [`${entity.name} ~ ${quoteStringLiteral(entity.description)}`];
   if (entity.containsProgram !== undefined) {
     lines.push(`  >> ${entity.containsProgram}`);
   }
@@ -203,7 +204,7 @@ const assetToShortform = (entity: AssetNode): string[] => {
 
 const uiComponentToShortform = (entity: UiComponentNode): string[] => {
   const marker = entity.root ? '&!' : '&';
-  const lines = [`${entity.name} ${marker} "${entity.purpose}"`];
+  const lines = [`${entity.name} ${marker} ${quoteStringLiteral(entity.purpose)}`];
   if (entity.contains !== undefined && entity.contains.length > 0) {
     lines.push(`  > [${entity.contains.join(', ')}]`);
   }
@@ -214,19 +215,19 @@ const uiComponentToShortform = (entity: UiComponentNode): string[] => {
 };
 
 const runParameterToShortform = (entity: RunParameterNode): string[] => {
-  let line = `${entity.name} $${entity.paramType} "${entity.description}"`;
+  let line = `${entity.name} $${entity.paramType} ${quoteStringLiteral(entity.description)}`;
   if (entity.required === true) {
     line += ' (required)';
   }
   const lines = [line];
   if (entity.defaultValue !== undefined) {
-    lines.push(`  = "${entity.defaultValue}"`);
+    lines.push(`  = ${quoteStringLiteral(entity.defaultValue)}`);
   }
   return lines;
 };
 
 const dependencyToShortform = (entity: DependencyNode): string[] => {
-  let line = `${entity.name} ^ "${entity.purpose}"`;
+  let line = `${entity.name} ^ ${quoteStringLiteral(entity.purpose)}`;
   if (entity.version !== undefined) {
     line += ` v${entity.version}`;
   }

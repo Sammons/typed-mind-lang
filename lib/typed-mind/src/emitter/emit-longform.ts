@@ -34,6 +34,7 @@ import type { RunParameterNode } from '../ast/run-parameter-node.ts';
 import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
 import { printTypeExpr } from './print-type-expr.ts';
+import { quoteStringLiteral } from './quote-string-literal.ts';
 
 const indent = (lines: string[]): string[] => lines.map((line) => `  ${line}`);
 
@@ -54,10 +55,10 @@ const dependencyHeaderName = (name: string): string => {
 const descriptionAndPurposeLines = (comment: string | undefined, purpose: string | undefined): string[] => {
   const lines: string[] = [];
   if (comment !== undefined) {
-    lines.push(`description: "${comment}"`);
+    lines.push(`description: ${quoteStringLiteral(comment)}`);
   }
   if (purpose !== undefined && purpose !== comment) {
-    lines.push(`purpose: "${purpose}"`);
+    lines.push(`purpose: ${quoteStringLiteral(purpose)}`);
   }
   return lines;
 };
@@ -93,7 +94,7 @@ const fileToLongform = (entity: FileNode): string[] => {
 const functionToLongform = (entity: FunctionNode): string[] => {
   const body: string[] = [`type: Function`, `signature: ${entity.signature}`];
   if (entity.description !== undefined) {
-    body.push(`description: "${entity.description}"`);
+    body.push(`description: ${quoteStringLiteral(entity.description)}`);
   }
   if (entity.input !== undefined) {
     body.push(`input: ${entity.input}`);
@@ -164,7 +165,7 @@ const constantsToLongform = (entity: ConstantsNode): string[] => {
 const dtoFieldToLongform = (field: DtoNode['fields'][number]): string[] => {
   const body: string[] = [`type: ${field.type}`];
   if (field.description !== undefined) {
-    body.push(`description: "${field.description}"`);
+    body.push(`description: ${quoteStringLiteral(field.description)}`);
   }
   // Longform spells both `?` and `(optional)` inputs as `optional: true`
   // (longform-builder.ts fieldPropsOf/dtoFieldOf: both map to the
@@ -189,7 +190,7 @@ const dtoToLongform = (entity: DtoNode): string[] => {
 };
 
 const assetToLongform = (entity: AssetNode): string[] => {
-  const body: string[] = [`type: Asset`, `description: "${entity.description}"`];
+  const body: string[] = [`type: Asset`, `description: ${quoteStringLiteral(entity.description)}`];
   if (entity.containsProgram !== undefined) {
     body.push(`containsProgram: ${entity.containsProgram}`);
   }
@@ -197,7 +198,7 @@ const assetToLongform = (entity: AssetNode): string[] => {
 };
 
 const uiComponentToLongform = (entity: UiComponentNode): string[] => {
-  const body: string[] = [`type: UIComponent`, `description: "${entity.purpose}"`];
+  const body: string[] = [`type: UIComponent`, `description: ${quoteStringLiteral(entity.purpose)}`];
   if (entity.root) {
     body.push(`root: true`);
   }
@@ -221,9 +222,9 @@ const runParameterToLongform = (entity: RunParameterNode): string[] => {
   // decorative line (what the legacy converter emitted, syntax-generator.ts:975,
   // alongside its own now-dead `paramType:` key) would collide with and
   // overwrite the real paramType on reparse.
-  const body: string[] = [`type: ${entity.paramType}`, `description: "${entity.description}"`];
+  const body: string[] = [`type: ${entity.paramType}`, `description: ${quoteStringLiteral(entity.description)}`];
   if (entity.defaultValue !== undefined) {
-    body.push(`default: "${entity.defaultValue}"`);
+    body.push(`default: ${quoteStringLiteral(entity.defaultValue)}`);
   }
   if (entity.required === true) {
     body.push(`required: true`);
@@ -260,6 +261,29 @@ const dependencyToLongform = (entity: DependencyNode): string[] => {
 // the leading `string`, stranding `| number` as unparsable text — quoting
 // routes it through the SAME string-based re-parse path
 // (type-expr-from-text.ts) longform-builder.ts's dtoFieldOf already uses.
+//
+// toggle-fidelity audit (2026-08-31, issue #103 addendum, claude-home
+// knowledge/projects/typedmind/toggle-fidelity-audit-2026-08-31.md) — a
+// printed type containing its OWN string-literal spelling (a literal member,
+// e.g. `"active" | "inactive"`, or a generic's string-literal argument, e.g.
+// `Pick<S3Client, "send">`) breaks the SAME way issue #103 documents: this
+// outer `type: "..."` wrap is itself a property_string-shaped value, and an
+// embedded `"` inside it hits the identical block_property GLR-precedence
+// race (property_string commits to the FIRST `"..."` and ERRORs on the
+// remainder) — just reached via this quoting wrapper instead of a raw
+// unquoted value. Unlike every other quoteStringLiteral call site in this
+// module, the `"` -> `'` substitution is NOT safe to apply here: the printed
+// text gets reparsed as a TypeExprNode by type-expr-from-text.ts
+// (longform-builder.ts), and that reparser's parseStringLiteral only
+// recognizes `"`, never `'` — swapping the inner quotes would silently
+// degrade a `literal`/literalKind:'string' member to an `opaque` leaf (the
+// checker DISTINGUISHES the two, check-dto-fields.ts:181), a semantic
+// change, not a byte-preservation nicety. Left AS UNQUOTED-INNER-BROKEN
+// (matching pre-fix #103 behavior) is deliberately not "fixed" with a
+// meaning-changing substitution the way emit-suppression.ts's reason field
+// and every description/purpose site above safely can (those never get
+// reparsed as a TypeExprNode). Tracked as an issue #103 addendum, NOT a
+// separate issue — same grammar-level mechanism, different call site.
 const typeDefToLongform = (entity: TypeDefNode): string[] => {
   const body: string[] = [];
   if (entity.variant === 'enum') {

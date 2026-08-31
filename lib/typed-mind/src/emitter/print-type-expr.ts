@@ -15,6 +15,7 @@
 // doc names as the point of carrying the field at all.
 
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
+import { quoteStringLiteral } from './quote-string-literal.ts';
 
 const printAtomWithParensIfNeeded = (node: TypeExprNode): string => {
   if (node.kind === 'union' || node.kind === 'intersection') {
@@ -28,7 +29,7 @@ export const printTypeExpr = (node: TypeExprNode): string => {
     case 'named':
       return node.name;
     case 'literal':
-      return node.literalKind === 'string' ? `"${node.value}"` : node.value;
+      return node.literalKind === 'string' ? quoteStringLiteral(node.value) : node.value;
     case 'generic':
       return `${node.base.name}<${node.args.map(printTypeExpr).join(', ')}>`;
     case 'array':
