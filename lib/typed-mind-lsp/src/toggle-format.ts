@@ -18,6 +18,13 @@
 // buffers, etc.) fails the conversion; that case falls back to no filePath,
 // preserving today's single-document behavior for those buffers rather than
 // throwing.
+//
+// Range-scoped toggles NEVER resolve imports (PR #123 review finding,
+// comment id=20118): the caller replaces ONLY the selected lines with
+// `newText`, so splicing the imported module's entities into a line-sliced
+// substring would duplicate them into the document as local text —
+// corrupting it. Import resolution is correct only when the toggled text is
+// the whole document; a selection falls back to single-document mode.
 
 import { fileURLToPath } from 'node:url';
 import type { TypedMind } from '@sammons/typed-mind';
@@ -42,7 +49,7 @@ export const handleToggleFormat = (typedMind: TypedMind, fullText: string, param
       textToProcess = lines.slice(startLineIndex, endLineIndex + 1).join('\n');
     }
   }
-  const filePath = toFilePathOrUndefined(params.uri);
+  const filePath = params.range === undefined ? toFilePathOrUndefined(params.uri) : undefined;
   const newText = typedMind.toggleFormat(textToProcess, filePath);
   return { newText };
 };

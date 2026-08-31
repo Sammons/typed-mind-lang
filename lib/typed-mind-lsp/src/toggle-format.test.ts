@@ -50,6 +50,27 @@ describe('handleToggleFormat (RFC-TM-5 §1)', () => {
     assert.equal(result.newText.includes('AuthFile'), true);
   });
 
+  // Regression guard for the PR #123 review blocker (comment id=20118): a
+  // range-scoped toggle's newText replaces ONLY the selected lines, so
+  // resolving imports there would splice the entire imported module into a
+  // small selection replacement — duplicating imported entities into the
+  // document as local text. Range toggles must stay in single-document mode
+  // even when params.uri is a valid file:// URI for an import-bearing file.
+  it('a range-scoped toggle never resolves imports, even with a valid file:// URI', async () => {
+    const typedMind = await TypedMind.create();
+    const path = join(scenariosDir, 'scenario-20-basic-import.tmd');
+    const source = readFileSync(path, 'utf8');
+    const uri = pathToFileURL(path).toString();
+    // A small selection that includes the @import line — the reviewer's
+    // repro shape: before the fix, this 4-line selection's replacement text
+    // ballooned with the imported module's three entities.
+    const result = handleToggleFormat(typedMind, source, { uri, range: { start: 0, end: 3 } });
+    assert.equal(result.error, undefined);
+    // AuthFile only exists in the imported module — its absence proves the
+    // range path stayed in single-document mode.
+    assert.equal(result.newText.includes('AuthFile'), false);
+  });
+
   it('a non-file:// URI (untitled buffer) falls back to single-document mode instead of throwing', async () => {
     const typedMind = await TypedMind.create();
     const path = join(scenariosDir, 'scenario-20-basic-import.tmd');
