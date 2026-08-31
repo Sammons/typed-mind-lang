@@ -1,4 +1,40 @@
 export { AssertionEngine } from './assertion-engine.ts';
-export * from './types.ts';
+export type {
+  AnalyzerDiagnostic,
+  AssertionResult,
+  ConversionError,
+  ConversionOptions,
+  ConversionResult,
+  ConversionWarning,
+  Deviation,
+  ModuleGraphEdge,
+  ParsedClass,
+  ParsedConstant,
+  ParsedEnum,
+  ParsedExport,
+  ParsedFunction,
+  ParsedImport,
+  ParsedInterface,
+  ParsedMethod,
+  ParsedModule,
+  ParsedParameter,
+  ParsedProperty,
+  ParsedTypeAlias,
+  RecognizerName,
+  SstHandlerReference,
+  SuppressionReason,
+  TypeScriptProjectAnalysis,
+} from './types.ts';
+export {
+  createEntityName,
+  createFilePath,
+  isClass,
+  isExportDeclaration,
+  isFunction,
+  isImportDeclaration,
+  isInterface,
+  isTypeAlias,
+  isVariableStatement,
+} from './types.ts';
 export { TypeScriptAnalyzer } from './typescript-analyzer.ts';
 export { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';

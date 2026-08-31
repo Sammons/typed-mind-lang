@@ -311,6 +311,17 @@ Steps, in order, all in one PR:
 This bump PR is the only sanctioned way the `check:generated` baseline changes. See
 `rfc-tm-1-diamond.md` (RFC-TM-1) for the full design and rationale.
 
+## Dependency exceptions
+
+This repo defaults to zero/minimal runtime dependencies. These are the justified exceptions.
+
+- `web-tree-sitter` — core grammar parsing; no builtin WASM tree-sitter in Node.
+- `vscode-languageserver` / `vscode-languageserver-textdocument` — LSP protocol, Microsoft-maintained.
+- `vscode-languageclient` / `vscode-oniguruma` / `vscode-textmate` — VS Code extension requirement.
+- `typescript` as a runtime dependency in `typed-mind-typescript` — compiler-API-based analysis; sanctioned vendor per this repo's own supply-chain rules (Microsoft-owned).
+- `tsup` (and its bundled `esbuild`) as a dev-only dep for the two self-contained bundle targets — see `lib/typed-mind-lsp/tsup.bundled.config.ts`'s RFC-TM-5 §2 rationale (self-contained VS Code extension bundle, no node_modules in the vsix).
+- `monaco-editor` / `prismjs` / `wrangler` in the static website package — prebuilt-dist vendoring via `fs` copy, no bundler.
+
 ## License
 
 MIT
