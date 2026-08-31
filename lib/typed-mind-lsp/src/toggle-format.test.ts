@@ -3,13 +3,20 @@
 // `_tag`/`.value`/`.error` unwrapping (legacy server.ts:696-711).
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { TypedMind } from '@sammons/typed-mind';
 import { handleToggleFormat } from './toggle-format.ts';
 
 const SOURCE = `AppEntry @ src/index.ts:
   -> [start]
 `;
+
+const testDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(testDir, '..', '..', '..');
+const scenariosDir = join(repoRoot, 'lib', 'typed-mind-test-suite', 'scenarios');
 
 describe('handleToggleFormat (RFC-TM-5 §1)', () => {
   it('returns newText from the facade toggleFormat call directly, with no Result-box unwrapping', async () => {
@@ -26,5 +33,32 @@ describe('handleToggleFormat (RFC-TM-5 §1)', () => {
     const fullResult = handleToggleFormat(typedMind, multiline, { uri: 'file:///test.tmd' });
     const rangedResult = handleToggleFormat(typedMind, multiline, { uri: 'file:///test.tmd', range: { start: 0, end: 1 } });
     assert.notEqual(rangedResult.newText, fullResult.newText);
+  });
+
+  // Defect fix (same-day follow-up to PR #122, independent post-merge review
+  // finding) — params.uri must resolve @import statements end to end, the
+  // same way the CLI's filePath argument does for parse()/check(). Before
+  // the fix, handleToggleFormat never passed params.uri through at all, so
+  // AuthService (defined only in the imported module) silently vanished.
+  it('resolves @import statements end to end via params.uri (real file:// URI, not a synthetic path)', async () => {
+    const typedMind = await TypedMind.create();
+    const path = join(scenariosDir, 'scenario-20-basic-import.tmd');
+    const source = readFileSync(path, 'utf8');
+    const uri = pathToFileURL(path).toString();
+    const result = handleToggleFormat(typedMind, source, { uri });
+    assert.equal(result.error, undefined);
+    assert.equal(result.newText.includes('AuthFile'), true);
+  });
+
+  it('a non-file:// URI (untitled buffer) falls back to single-document mode instead of throwing', async () => {
+    const typedMind = await TypedMind.create();
+    const path = join(scenariosDir, 'scenario-20-basic-import.tmd');
+    const source = readFileSync(path, 'utf8');
+    const result = handleToggleFormat(typedMind, source, { uri: 'untitled:Untitled-1' });
+    assert.equal(result.error, undefined);
+    // AuthFile only exists in the imported module (unlike AuthService, which
+    // scenario-20 also references locally) — its absence proves imports
+    // stayed unresolved rather than the conversion silently succeeding.
+    assert.equal(result.newText.includes('AuthFile'), false);
   });
 });

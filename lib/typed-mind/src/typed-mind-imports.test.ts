@@ -191,3 +191,77 @@ describe('TypedMind facade — cross-file @import resolution (filePath wiring)',
     );
   });
 });
+
+// Same-day follow-up fix to PR #122 (independent post-merge review finding,
+// PR #122 comment #20110): emitShortform/emitLongform/toggleFormat called
+// this.#parser.parse(source) directly — no filePath, no resolveImportsInto —
+// unlike parse()/check()/parseWithCst() above, which all got the filePath
+// fix in this same file's original Quantum. Any @import-bearing document
+// silently lost its imported entities when emitted or toggled through the
+// facade. Reachable in production via the LSP's real "toggle document
+// format" command (toggle-format.ts's handleToggleFormat), which had
+// params.uri available but never threaded it through until this fix.
+describe('TypedMind facade — emitShortform/emitLongform/toggleFormat import resolution (filePath wiring)', () => {
+  let typedMind: TypedMind;
+
+  before(async () => {
+    typedMind = await TypedMind.create({ wasmPath });
+  });
+
+  it('scenario-20 (basic import): emitShortform with filePath includes the imported entities', () => {
+    const path = join(scenariosDir, 'scenario-20-basic-import.tmd');
+    const source = readFileSync(path, 'utf8');
+    const withPath = typedMind.emitShortform(source, path);
+    const withoutPath = typedMind.emitShortform(source);
+    assert.deepEqual(
+      {
+        withPathHasImportedEntity: withPath.includes('AuthFile'),
+        withoutPathHasImportedEntity: withoutPath.includes('AuthFile'),
+      },
+      // No filePath = single-document mode (pre-existing, unchanged
+      // behavior): imports stay unresolved, matching parse()'s own
+      // no-filePath contract asserted above.
+      { withPathHasImportedEntity: true, withoutPathHasImportedEntity: false },
+    );
+  });
+
+  it('scenario-20 (basic import): emitLongform with filePath includes the imported entities', () => {
+    const path = join(scenariosDir, 'scenario-20-basic-import.tmd');
+    const source = readFileSync(path, 'utf8');
+    const withPath = typedMind.emitLongform(source, path);
+    const withoutPath = typedMind.emitLongform(source);
+    assert.deepEqual(
+      {
+        withPathHasImportedEntity: withPath.includes('AuthFile'),
+        withoutPathHasImportedEntity: withoutPath.includes('AuthFile'),
+      },
+      { withPathHasImportedEntity: true, withoutPathHasImportedEntity: false },
+    );
+  });
+
+  it('scenario-20 (basic import): toggleFormat with filePath includes the imported entities', () => {
+    const path = join(scenariosDir, 'scenario-20-basic-import.tmd');
+    const source = readFileSync(path, 'utf8');
+    const withPath = typedMind.toggleFormat(source, path);
+    const withoutPath = typedMind.toggleFormat(source);
+    assert.deepEqual(
+      {
+        withPathHasImportedEntity: withPath.includes('AuthFile'),
+        withoutPathHasImportedEntity: withoutPath.includes('AuthFile'),
+      },
+      { withPathHasImportedEntity: true, withoutPathHasImportedEntity: false },
+    );
+  });
+
+  it('scenario-20 (basic import): toggleFormat with filePath still targets the format detected from the ORIGINAL source', () => {
+    const path = join(scenariosDir, 'scenario-20-basic-import.tmd');
+    const source = readFileSync(path, 'utf8');
+    const { format: originalFormat } = typedMind.detectFormat(source);
+    const toggled = typedMind.toggleFormat(source, path);
+    const { format: toggledFormat } = typedMind.detectFormat(toggled);
+    // detectFormat reads the on-disk syntax, not the resolved/merged entity
+    // set — toggling must still flip shortform<->longform based on what the
+    // ORIGINAL document actually looked like, import resolution aside.
+    assert.notEqual(toggledFormat, originalFormat);
+  });
+});
