@@ -52,13 +52,44 @@ const dependencyHeaderName = (name: string): string => {
 
 // The shared description/purpose property lines for the six kinds whose
 // honest-fields table carries a distinct `purpose`.
+//
+// toggle-fidelity audit (2026-08-31, claude-home knowledge/projects/typedmind/
+// toggle-fidelity-audit-2026-08-31.md) — the `comment === undefined` case
+// used to fall through to "distinct purpose" and emit ONLY `purpose: "..."`,
+// never `description: "..."`. That is functionally harmless in isolation
+// (longform-builder.ts sets `comment` from `description:` alone, never from
+// `purpose:`, but neither the checker nor link-index ever reads `.comment` —
+// it exists purely for re-emission fidelity) but it broke the toggle
+// round-trip's own honest-field bar: a longform-authored entity with
+// `comment === purpose` (the common case) that bounces through a shortform
+// intermediate form loses `comment` on the way back (emit-shortform.ts's
+// withInlineComment dedup, per that file's own comment, correctly drops the
+// duplicate `# comment` when it equals the body's own purpose/description
+// line — so the reparsed shortform entity has `comment: undefined`,
+// `purpose` intact) and then re-longforming via the OLD `purpose:`-only path
+// never restored it. Since `description:` sets BOTH `comment` and `purpose`
+// identically whenever they're meant to agree, preferring `description:`
+// here (falling back to `purpose:` only when the caller's `comment` is
+// undefined AND we want the value to read back into `purpose` alone, which
+// no caller here needs) closes the gap with no downside: a document that
+// legitimately never had a `comment` still round-trips fine, and a document
+// that DID gets it back.
 const descriptionAndPurposeLines = (comment: string | undefined, purpose: string | undefined): string[] => {
   const lines: string[] = [];
   if (comment !== undefined) {
     lines.push(`description: ${quoteStringLiteral(comment)}`);
+    if (purpose !== undefined && purpose !== comment) {
+      lines.push(`purpose: ${quoteStringLiteral(purpose)}`);
+    }
+    return lines;
   }
-  if (purpose !== undefined && purpose !== comment) {
-    lines.push(`purpose: ${quoteStringLiteral(purpose)}`);
+  if (purpose !== undefined) {
+    // No distinct comment to preserve: emit as `description:` so a reparse
+    // sets BOTH comment and purpose to this value, matching what an author
+    // who typed one `description:` line would have produced in the first
+    // place (longform-builder.ts's buildFromLongformBlock: `comment:
+    // collected.scalars.get('description')`).
+    lines.push(`description: ${quoteStringLiteral(purpose)}`);
   }
   return lines;
 };
@@ -162,8 +193,34 @@ const constantsToLongform = (entity: ConstantsNode): string[] => {
   return [`constants ${entity.name} {`, ...indent(body), '}'];
 };
 
+// toggle-fidelity audit (2026-08-31, claude-home knowledge/projects/typedmind/
+// toggle-fidelity-audit-2026-08-31.md) — longform-builder.ts's own comment
+// (buildFromLongformBlock's field walker) states the canonical spelling:
+// "the longform `type:` value is a QUOTED STRING at the grammar level
+// (corpus: every longform fixture's `type: \"string[]\"` spelling)". This
+// function used to emit `type: ${field.type}` UNQUOTED — a bare multi-token
+// type (`type: string | number`) hits the SAME block_property GLR-
+// precedence race issue #103 documents (property_identifier matches only
+// the leading `string`, stranding `| number` as unparsable text). The
+// corpus round-trip bar (round-trip.test.ts) never caught this because
+// every existing corpus DTO field type is a single token (`string`, `Date`)
+// that happens to parse fine unquoted too — the toggle round-trip harness's
+// targeted union-type fixture is what surfaces it. Quoting matches the
+// documented canonical form and what real corpus fixtures already do.
+//
+// Embedded-quote caveat (same analysis as typeDefToLongform's aliasType,
+// above): if `field.type`'s raw text itself contains a literal `"` (a
+// string-literal-union DTO field type, e.g. `"active" | "inactive"`), the
+// SAME quoteStringLiteral substitution used everywhere else in this module
+// is unsafe here too — a DTO field's `type:` value is also reparsed as a
+// structured TypeExprNode via type-expr-from-text.ts, whose
+// parseStringLiteral only recognizes `"`. Quoting without substitution
+// still leaves that narrower case as a known #103-family gap (documented in
+// toggle-round-trip.test.ts's TYPE_EXPR_KIND_FIXTURES), but it is a strict
+// improvement over the prior unquoted behavior, which broke on EVERY
+// multi-token type, not just ones containing an embedded literal.
 const dtoFieldToLongform = (field: DtoNode['fields'][number]): string[] => {
-  const body: string[] = [`type: ${field.type}`];
+  const body: string[] = [`type: "${field.type}"`];
   if (field.description !== undefined) {
     body.push(`description: ${quoteStringLiteral(field.description)}`);
   }

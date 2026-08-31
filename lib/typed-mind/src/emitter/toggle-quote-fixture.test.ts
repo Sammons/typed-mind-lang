@@ -76,12 +76,16 @@ describe('bucket-a: embedded double-quote in description/purpose/reason breaks e
     });
     const lines = emitLongformEntity(dto);
     // DtoNode has no `comment` here, only `purpose` — descriptionAndPurposeLines
-    // (emit-longform.ts) emits a `purpose:` line (not `description:`) whenever
-    // `purpose !== comment`, which holds since `comment` is undefined.
-    const purposeLine = lines.find((line) => line.trim().startsWith('purpose:'));
-    assert.notEqual(purposeLine, undefined);
-    const quoteCount = ((purposeLine ?? '').match(/"/g) ?? []).length;
-    assert.equal(quoteCount, 2, `expected exactly one quote pair on the purpose line, got: ${lines.join('\n')}`);
+    // (emit-longform.ts) emits a `description:` line for this shape (comment
+    // undefined, purpose defined): `description:` sets both comment and
+    // purpose identically on reparse, closing the toggle round-trip gap
+    // where a `purpose:`-only spelling used to lose `comment` on a bounce
+    // through shortform (see that function's own comment for the full
+    // toggle-fidelity-audit analysis).
+    const descriptionLine = lines.find((line) => line.trim().startsWith('description:'));
+    assert.notEqual(descriptionLine, undefined);
+    const quoteCount = ((descriptionLine ?? '').match(/"/g) ?? []).length;
+    assert.equal(quoteCount, 2, `expected exactly one quote pair on the description line, got: ${lines.join('\n')}`);
   });
 
   it('a suppression reason containing a literal quote emits with balanced quoting (shortform)', () => {

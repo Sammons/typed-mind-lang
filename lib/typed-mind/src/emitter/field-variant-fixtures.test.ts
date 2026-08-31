@@ -250,8 +250,24 @@ describe('RC-C: Program.exports and declared-ClassFile.purpose promote to longfo
     // line under a declared `#:` ClassFile, which attachment-rules.ts
     // rejects outright (only a lookahead-converted ClassFile ever accepted
     // one).
+    //
+    // toggle-fidelity audit (2026-08-31, claude-home knowledge/projects/
+    // typedmind/toggle-fidelity-audit-2026-08-31.md) — this synthesized
+    // ClassFile has `purpose` set but no `comment` (never parsed from real
+    // source). descriptionAndPurposeLines (emit-longform.ts) now emits
+    // `description: "..."` rather than `purpose: "..."` for this shape: a
+    // `purpose:`-only spelling reparses to `comment: undefined`, which used
+    // to silently diverge from a longform-authored entity's `comment ===
+    // purpose` invariant on a toggle round-trip (found via the toggle
+    // round-trip harness — a longform-sourced entity bounced through a
+    // shortform intermediate form lost its `comment` on the way back).
+    // `description:` sets BOTH comment and purpose identically, matching
+    // what an author who typed one `description:` line would produce. The
+    // reparsed-purpose assertion below is what this test actually cares
+    // about (RC-C promotion recovers the field); the exact property NAME
+    // emitted is an implementation detail this test no longer pins.
     assert.match(emitted, /^classfile SecretLimitError \{/m);
-    assert.match(emitted, /^\s+purpose: "Custom error for secret limit exceeded"$/m);
+    assert.match(emitted, /^\s+description: "Custom error for secret limit exceeded"$/m);
     assert.doesNotMatch(emitted, /^\s*"Custom error for secret limit exceeded"$/m);
 
     const reparsed = parser.parse(emitted);

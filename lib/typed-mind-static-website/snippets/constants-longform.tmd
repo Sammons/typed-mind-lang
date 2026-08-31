@@ -1,37 +1,37 @@
 # Longform syntax is for humans
 constants API_VERSION {
-  file: "config.ts"
+  path: "config.ts"
   type: "string"
 }
 
 constants MAX_RETRIES {
-  file: "config.ts"
+  path: "config.ts"
   type: "number"
 }
 
 constants DEFAULT_TIMEOUT {
-  file: "config.ts"
+  path: "config.ts"
   type: "number"
 }
 
 # Object constants with schema
 constants DATABASE_CONFIG {
-  file: "database/config.ts"
+  path: "database/config.ts"
   type: "DatabaseConfig"
 }
 
 constants FEATURE_FLAGS {
-  file: "features.ts"
+  path: "features.ts"
   type: "FeatureFlags"
 }
 
 # Array constants
 constants ALLOWED_ORIGINS {
-  file: "cors.config.ts"
+  path: "cors.config.ts"
   type: "string[]"
 }
 
 constants SUPPORTED_LOCALES {
-  file: "i18n/config.ts"
+  path: "i18n/config.ts"
   type: "Locale[]"
 }

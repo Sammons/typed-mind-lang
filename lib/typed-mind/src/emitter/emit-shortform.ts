@@ -42,6 +42,54 @@ const withInlineComment = (lines: string[], comment: string | undefined): string
   return [`${first} # ${comment}`, ...rest];
 };
 
+// toggle-fidelity audit (2026-08-31, claude-home knowledge/projects/typedmind/
+// toggle-fidelity-audit-2026-08-31.md) — a bucket-a mechanical bug found by
+// the toggle round-trip harness: longform-builder.ts sets `entity.comment`
+// from the SAME `description:` property value it also assigns to
+// `purpose`/`description` ("Legacy longform comment = the description
+// property", longform-builder.ts's buildFromLongformBlock). For every kind
+// whose shortform body already prints that purpose/description as its own
+// quoted continuation line (or on the header line), a longform-sourced
+// entity's `comment` therefore always equals what the body already shows —
+// re-emitting it via withInlineComment doubles the same text onto the line
+// as BOTH the quoted body text and a distinct `# comment`, which then
+// reparses into a genuinely-distinct-looking `comment` field that never
+// existed in a shortform-authored original (confirmed: shortform CAN
+// legally carry a real, DIFFERENT comment alongside a purpose — `Foo %
+// "purpose" # a different comment` parses to two separate string values —
+// so this function only suppresses the duplicate when the two values are
+// actually equal, never blanket-drops a comment). TypeDef has no
+// purpose/description line in its shortform body at all (typeDefToShortform
+// below), so its comment is never a duplicate and always re-emits.
+const bodyAlreadyShows = (entity: EntityNode): string | undefined => {
+  switch (entity.kind) {
+    case 'Program':
+      return (entity as ProgramNode).purpose;
+    case 'File':
+      return (entity as FileNode).purpose;
+    case 'Function':
+      return (entity as FunctionNode).description;
+    case 'Class':
+      return (entity as ClassNode).purpose;
+    case 'ClassFile':
+      return (entity as ClassFileNode).purpose;
+    case 'Constants':
+      return (entity as ConstantsNode).purpose;
+    case 'DTO':
+      return (entity as DtoNode).purpose;
+    case 'Asset':
+      return (entity as AssetNode).description;
+    case 'UIComponent':
+      return (entity as UiComponentNode).purpose;
+    case 'RunParameter':
+      return (entity as RunParameterNode).description;
+    case 'Dependency':
+      return (entity as DependencyNode).purpose;
+    case 'TypeDef':
+      return undefined;
+  }
+};
+
 const programToShortform = (entity: ProgramNode): string[] => {
   let line = `${entity.name} -> ${entity.entry}`;
   if (entity.purpose !== undefined) {
@@ -267,6 +315,19 @@ const typeDefToShortform = (entity: TypeDefNode): string[] => {
 // data or (b) emitting illegal syntax — no grammar or attachment-rules.ts
 // change; the language's shortform contract was already correct, only the
 // emitter's per-entity form selection was wrong.
+//
+// toggle-fidelity audit (2026-08-31, claude-home knowledge/projects/typedmind/
+// toggle-fidelity-audit-2026-08-31.md) — the SAME RC-C gap exists for
+// UIComponent.declaredAffectedBy: grammar.js/attachment-rules.ts have no
+// shortform continuation production for `affectedBy` at all (grep-confirmed:
+// zero `affectedBy`/`affected_by` occurrences anywhere in the shortform
+// grammar or attachment-rules.ts), while longform's `affectedBy: [...]`
+// property (longform-builder.ts's UIComponent case) reads it legally. Before
+// this fix, `uiComponentToShortform` silently dropped `declaredAffectedBy`
+// on every shortform emission — found by the toggle round-trip harness
+// forcing a longform-sourced UIComponent with `affectedBy` through
+// shortform. Same fix shape as Program.exports/ClassFile.purpose: promote
+// just this one entity to longform when it carries the field.
 export const shortformCannotExpress = (entity: EntityNode): boolean => {
   switch (entity.kind) {
     case 'Program': {
@@ -275,6 +336,10 @@ export const shortformCannotExpress = (entity: EntityNode): boolean => {
     }
     case 'ClassFile':
       return (entity as ClassFileNode).purpose !== undefined;
+    case 'UIComponent': {
+      const uiComponent = entity as UiComponentNode;
+      return uiComponent.declaredAffectedBy !== undefined && uiComponent.declaredAffectedBy.length > 0;
+    }
     default:
       return false;
   }
@@ -309,5 +374,6 @@ export const emitShortform = (entity: EntityNode): string[] => {
         return typeDefToShortform(entity as TypeDefNode);
     }
   })();
-  return withInlineComment(body, entity.comment);
+  const commentToEmit = entity.comment === bodyAlreadyShows(entity) ? undefined : entity.comment;
+  return withInlineComment(body, commentToEmit);
 };

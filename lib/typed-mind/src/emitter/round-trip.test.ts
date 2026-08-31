@@ -14,11 +14,9 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DtoNode } from '../ast/dto-node.ts';
-import type { EntityNode } from '../ast/entity-node.ts';
-import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { TypedMindParser } from '../pipeline/typed-mind-parser.ts';
 import { detectFormat } from './detect-format.ts';
+import { honestFieldsOf } from './honest-fields.ts';
 import { SyntaxEmitter } from './syntax-emitter.ts';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -49,44 +47,6 @@ const enumerateCorpus = (): string[] => {
     walkTmd(root, files);
   }
   return files;
-};
-
-// RFC-TM-8 §3 (rfc-tm-8-diamond.md, X-TYPE-3) — typeExpr carries its own
-// recursive span tree (one per structured sub-node); a round-trip regenerates
-// new text so every span in that tree moves the same way DtoFieldNode.span
-// itself does. honestTypeExprOf strips span at every level, recursing through
-// the union/intersection/array/generic member arrays.
-const honestTypeExprOf = (typeExpr: TypeExprNode): unknown => {
-  const { span: _span, ...rest } = typeExpr;
-  if (rest.kind === 'union' || rest.kind === 'intersection') {
-    return { ...rest, members: rest.members.map(honestTypeExprOf) };
-  }
-  if (rest.kind === 'array') {
-    return { ...rest, element: honestTypeExprOf(rest.element) };
-  }
-  if (rest.kind === 'generic') {
-    const { span: _baseSpan, ...baseRest } = rest.base;
-    return { ...rest, base: baseRest, args: rest.args.map(honestTypeExprOf) };
-  }
-  return rest;
-};
-
-// Honest-field projection: every own enumerable field except span/raw, which
-// are expected to move across a round-trip (new source text, new positions).
-// DtoNode's fields carry their own per-field span (DtoFieldNode) and typeExpr
-// span tree, stripped the same way one level down.
-const honestFieldsOf = (entity: EntityNode): Record<string, unknown> => {
-  const { span: _span, raw: _raw, ...fields } = { ...entity };
-  if (entity instanceof DtoNode) {
-    return {
-      ...fields,
-      fields: entity.fields.map((field) => {
-        const { span: _fieldSpan, typeExpr, ...fieldRest } = { ...field };
-        return { ...fieldRest, typeExpr: honestTypeExprOf(typeExpr) };
-      }),
-    };
-  }
-  return fields;
 };
 
 describe('S-CORE-2a: corpus-wide format preservation + parse→emit→parse AST equality', () => {
