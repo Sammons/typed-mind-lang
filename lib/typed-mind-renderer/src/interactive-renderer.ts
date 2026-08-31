@@ -1734,7 +1734,20 @@ ${this.generateInteractiveRendererJS()}
       this.currentViewState.searchQuery = query;
 
       // Multi-field search
-      const searchTerms = query.toLowerCase().split(/\s+/);
+      // Issue #36 — this line lives inside generateInteractiveRendererJS's
+      // outer non-raw template literal, which drops a single backslash at
+      // parse time for any escape it does not recognize, so the previous
+      // single-backslash source spelling shipped a whitespace-less pattern
+      // to the browser. The doubled backslash below is required so the
+      // outer template literal's own escape processing leaves one
+      // backslash in the string the browser receives. The biome-ignore is
+      // required alongside it: Biome's noUselessEscapeInString autofix
+      // re-strips one backslash from this exact spelling on every --write
+      // pass (see interactive-renderer.test.ts, case 1), treating it as a
+      // needless escape in what it sees as plain string content rather
+      // than recognizing it must survive one more layer of unescaping.
+      // biome-ignore lint/suspicious/noUselessEscapeInString: the doubled backslash must survive the outer template literal's own escape processing to reach the browser as a single backslash
+      const searchTerms = query.toLowerCase().split(/\\s+/);
       const matchedEntities = new Set();
 
       this.data.entities.forEach(entity => {
