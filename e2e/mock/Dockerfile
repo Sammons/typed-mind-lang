@@ -16,9 +16,9 @@ WORKDIR /work
 # workspace source, no other package's node_modules, and no build step run
 # inside the container.
 COPY package.json ./
-RUN npm install --no-audit --no-fund
+RUN corepack enable && corepack prepare pnpm@11.15.1 --activate && pnpm install --no-frozen-lockfile
 
 COPY playwright.config.ts ./
 COPY playground-smoke.spec.ts ./
 
-CMD ["npx", "playwright", "test"]
+CMD ["pnpm", "exec", "playwright", "test"]
