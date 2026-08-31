@@ -153,18 +153,31 @@ export class TypedMind {
     return this.check(source, filePath);
   }
 
-  emitShortform(source: string): string {
-    const outcome = this.#parser.parse(source);
+  // Defect fix (same-day follow-up to PR #122, independent post-merge review
+  // finding) — mirrors parse()/check()'s resolveImportsInto wiring, which
+  // these three methods never got when they were first written. Without it,
+  // any document with `@import` silently drops its imported entities when
+  // emitted or toggled (the LSP's real "toggle document format" command goes
+  // through toggleFormat, so this was reachable in production). filePath is
+  // optional and follows the same single-document-mode gate as parse()/
+  // check(): omitting it (or the document having no imports) leaves
+  // resolveImportsInto a no-op, so unprefixed callers are unaffected.
+  emitShortform(source: string, filePath?: string): string {
+    const outcome = resolveImportsInto(this.#parser, this.#parser.parse(source), filePath);
     return this.#emitter.emitShortform(outcome);
   }
 
-  emitLongform(source: string): string {
-    const outcome = this.#parser.parse(source);
+  emitLongform(source: string, filePath?: string): string {
+    const outcome = resolveImportsInto(this.#parser, this.#parser.parse(source), filePath);
     return this.#emitter.emitLongform(outcome);
   }
 
-  toggleFormat(source: string): string {
-    const outcome = this.#parser.parse(source);
+  // detectFormat reads the ORIGINAL source, not the import-resolved outcome:
+  // format detection is about the document's own on-disk syntax (shortform
+  // vs longform spelling), not the resolved/merged entity set. Only the
+  // entity list handed to the emitter needs import resolution.
+  toggleFormat(source: string, filePath?: string): string {
+    const outcome = resolveImportsInto(this.#parser, this.#parser.parse(source), filePath);
     const { format } = detectFormat(source);
     return this.#emitter.toggleFormat(outcome, format);
   }
