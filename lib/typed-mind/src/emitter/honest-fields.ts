@@ -117,10 +117,28 @@ export const honestFieldsAcrossToggleOf = (entity: EntityNode): Record<string, u
   }
   const commentValue = fields['comment'];
   const freeTextValue = fields[freeTextKey];
-  const { comment: _comment, ...rest } = fields;
-  // Normalize: whichever of comment/purpose-shaped-field carries text,
-  // represent it under ONE canonical key (the free-text field's own name)
-  // so a comment-vs-purpose re-attribution compares equal, while an actual
-  // content change or total loss still shows up as a real diff.
-  return { ...rest, [freeTextKey]: freeTextValue ?? commentValue };
+  // Collapse comment/free-text-field into ONE canonical value ONLY when at
+  // most one of the two actually carries text (the shapes a real
+  // shortform-authored document produces: either a bare inline `# comment`
+  // sets only `comment`, or a quoted continuation line sets only
+  // `purpose`/`description`, never both independently unless the author
+  // wrote a genuinely distinct pair — `Foo % "purpose" # comment` — which
+  // IS both non-undefined and DIFFERENT, so it falls through and both
+  // fields stay in the comparison honestly). This is what lets a
+  // comment-vs-purpose re-attribution (either direction) compare equal
+  // while a real content change or total loss on either side still shows
+  // up as a diff: collapsing unconditionally (an earlier version of this
+  // function keyed only on `commentValue === undefined || commentValue ===
+  // freeTextValue`) missed the case where the ORIGINAL side carries the
+  // text in `comment` alone and the TOGGLED side carries it in the
+  // free-text field alone — confirmed via a synthetic corrupted-entity
+  // check that a genuine loss of a distinct comment slipped through
+  // undetected before this fix.
+  const collapsedValue = commentValue ?? freeTextValue;
+  const canCollapse = commentValue === undefined || freeTextValue === undefined || commentValue === freeTextValue;
+  if (canCollapse) {
+    const { comment: _comment, ...rest } = fields;
+    return { ...rest, [freeTextKey]: collapsedValue };
+  }
+  return fields;
 };

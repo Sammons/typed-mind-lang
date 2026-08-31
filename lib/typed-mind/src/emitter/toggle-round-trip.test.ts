@@ -103,11 +103,29 @@ const enumerateCorpus = (): string[] => {
 //   RC-C (issue #102) but requiring a NEW grammar-recognized property key
 //   (not fixable by promoting the entity to a form it's already declaring),
 //   so it needs its own issue rather than a mechanical emitter fix.
+//
+// - scenario-55-common-validation-mistakes.tmd: a REAL bucket-b design gap,
+//   same shape as the pendingDependencies gap above. `RunParameter` (and
+//   the other three kinds with no separate purpose key — Function, Asset,
+//   UIComponent, per emit-longform.ts's own header comment) has exactly
+//   ONE longform free-text slot (`description:`), which the parser sets
+//   BOTH `comment` and `description` from identically. A shortform-authored
+//   entity of one of these four kinds CAN legally carry a comment
+//   GENUINELY DISTINCT from its description/purpose (`API_KEY $secret "API
+//   key" # Wrong type comment` — two separate string values on parse, see
+//   honest-fields.ts's honestFieldsAcrossToggleOf doc comment) — but
+//   forcing it through longform has no property key to carry the distinct
+//   comment alongside the description, so it is silently dropped. Same
+//   missing-schema-slot mechanism as pendingDependencies; not filed as a
+//   separate issue from #121 since the fix (reserve a `comment:`-equivalent
+//   longform property for these four kinds) is the same class of change —
+//   noted in issue #121's own scope for the eventual fix to consider.
 const KNOWN_CORPUS_TOGGLE_EXCEPTIONS: ReadonlySet<string> = new Set([
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-61-multiple-dtos-function-deps.tmd'),
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-49-dto-complex-structures.tmd'),
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-31-mixed-syntax.tmd'),
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-47-function-mixed-dependencies.tmd'),
+  join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-55-common-validation-mistakes.tmd'),
 ]);
 
 describe('toggle round-trip: corpus-wide parse -> toggleFormat -> toggle back -> AST equal', () => {
