@@ -10,16 +10,17 @@
 // which already excludes span/raw from its comparison.
 
 import type { SuppressionNode } from '../ast/suppression-node.ts';
+import { quoteStringLiteral } from './quote-string-literal.ts';
 
 // One shortform suppression line: `suppress Target code/name "reason"`.
 export const suppressionToShortformLine = (suppression: SuppressionNode): string => {
-  return `suppress ${suppression.target} ${suppression.code} "${suppression.reason}"`;
+  return `suppress ${suppression.target} ${suppression.code} ${quoteStringLiteral(suppression.reason)}`;
 };
 
 // One longform block entry (no leading `suppress` keyword — the block header
 // carries it once): `Target code/name "reason"`.
 const suppressionToLongformEntry = (suppression: SuppressionNode): string => {
-  return `  ${suppression.target} ${suppression.code} "${suppression.reason}"`;
+  return `  ${suppression.target} ${suppression.code} ${quoteStringLiteral(suppression.reason)}`;
 };
 
 // A whole `suppress { ... }` block wrapping every suppression in the group.

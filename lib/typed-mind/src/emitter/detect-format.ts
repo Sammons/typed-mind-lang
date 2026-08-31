@@ -27,8 +27,19 @@ const CONTINUATION_PATTERN = /^\s+(->|<-|~>|=>|>>|>|<|~|"|#|-|=|\$<)/;
 
 // Legacy LONGFORM_DECLARATION keyword set plus `classfile` (the keyword the
 // legacy regex omitted — longform-builder.ts's LONGFORM_KIND_BY_KEYWORD has
-// carried it since TM-3).
-const LONGFORM_KEYWORD_PATTERN = /^(program|file|function|class|classfile|dto|component|asset|constants|parameter|import|dependency)\s+/;
+// carried it since TM-3) plus `typedef` (X-TYPE-7, rfc-tm-8-diamond.md §5 —
+// added to LONGFORM_KIND_BY_KEYWORD when TypeDef shipped, but never added
+// here; toggle-fidelity audit 2026-08-31, claude-home knowledge/projects/
+// typedmind/toggle-fidelity-audit-2026-08-31.md, found a pure-`typedef`
+// longform document undercounted to zero longform lines and misdetected as
+// shortform — same class of gap this file's own header comment already
+// documents fixing once for `classfile`). Keep this pattern's keyword set a
+// superset of longform-builder.ts's LONGFORM_KIND_BY_KEYWORD keys (`import`
+// is the one exception: it has its own statement grammar, not an entity
+// kind, so it is not a LONGFORM_KIND_BY_KEYWORD member but IS still a
+// longform-only keyword worth detecting here).
+const LONGFORM_KEYWORD_PATTERN =
+  /^(program|file|function|class|classfile|dto|component|asset|constants|parameter|import|dependency|typedef)\s+/;
 
 // The sigil-with-brace ClassFile header (`Name #: path {`, optionally with
 // `<: inherit_list`), ending the line in an opening brace: a longform marker
