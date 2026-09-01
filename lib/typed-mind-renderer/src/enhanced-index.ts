@@ -1309,8 +1309,8 @@ ${this.generateRendererJS()}
     };
   }
 
-  private openInBrowser(url: string): void {
-    const { exec } = require('node:child_process');
+  private async openInBrowser(url: string): Promise<void> {
+    const { exec } = await import('node:child_process');
     const platform = process.platform;
 
     let command: string;
