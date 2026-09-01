@@ -1,34 +1,29 @@
 # Shortform syntax is for LLMs
-TodoApp -> api v1.0.0
+OrderPlatform -> gateway v1.0.0
 
-api @ api.ts:
-  <- [CreateTodoDto, Todo]
-  -> [TodoService, BaseService]
+gateway @ gateway-service.ts:
+  <- [OrderGateway]
+  -> [OrderGateway]
 
-TodoService <: BaseService
-  => [createTodo, getTodos]
+OrderGateway <:
+  => [routeOrder]
 
-createTodo :: (input: CreateTodoDto) => Todo
-  "Creates a new todo item"
-  <- CreateTodoDto
-  -> Todo
+routeOrder :: (input: PlaceOrderInput) => OrderReceipt
+  "Routes an incoming order to the inventory and payment services"
+  <- PlaceOrderInput
+  -> OrderReceipt
+  $< [INVENTORY_SERVICE_URL, PAYMENT_SERVICE_URL]
 
-getTodos :: () => Todo[]
-  "Retrieves all todo items"
-  -> Todo
+inventory-client ^ "Inventory microservice HTTP client" v2.4.0
+payment-client ^ "Payment microservice HTTP client" v3.1.0
 
-CreateTodoDto % "Input for creating todos"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
+PlaceOrderInput % "Order placement request"
+  - sku: string "Product SKU"
+  - quantity: number "Units ordered"
 
-Todo % "Todo entity"
-  - id: string "Unique identifier"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
-  - createdAt: Date "Creation timestamp"
+OrderReceipt % "Order confirmation"
+  - orderId: string "Generated order identifier"
+  - status: string "Order status"
 
-BaseService <:
-  => [validate]
-
-validate :: (data: any) => boolean
-  "Validates input data"
+INVENTORY_SERVICE_URL $env "Inventory service base URL" (required)
+PAYMENT_SERVICE_URL $env "Payment service base URL" (required)
