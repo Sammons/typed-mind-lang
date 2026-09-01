@@ -6,7 +6,10 @@
 
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import { ClassFileNode, DependencyNode, type Diagnostic, FileNode, FunctionNode, type ParseOutput, ProgramNode } from '@sammons/typed-mind';
 
 export interface EnhancedRendererOptions {

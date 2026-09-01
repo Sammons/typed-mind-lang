@@ -6,7 +6,10 @@
 
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import type { Diagnostic, ParseOutput } from '@sammons/typed-mind';
 import { type CodeGenConfig, CodeGenerationEngine, type CodePreview } from './codegen/code-generation.ts';
 import { type ArchitectureDiff, ArchitectureDiffAnalyzer, type DiffOptions } from './diff/diff-visualization.ts';
