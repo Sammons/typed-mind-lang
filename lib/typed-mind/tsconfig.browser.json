@@ -6,6 +6,7 @@
     "tsBuildInfoFile": "./dist-browser/.tsbuildinfo",
     "module": "es2022",
     "moduleResolution": "bundler",
+    "verbatimModuleSyntax": false,
     "noUncheckedIndexedAccess": false,
     "composite": false,
     "declaration": false,

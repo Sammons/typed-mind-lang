@@ -66,7 +66,8 @@ export default defineConfig({
   clean: true,
   bundle: true,
   platform: 'node',
-  target: 'node18',
+  target: 'node26',
+  shims: true,
   noExternal: [/@sammons/, 'vscode-languageserver', 'vscode-languageserver-textdocument'],
   onSuccess: copyBundledWasms,
 });

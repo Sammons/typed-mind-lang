@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // RFC-TM-4 §3 (rfc-tm-4-diamond.md, S-CORE-3 packaging) — named check asserting
-// every non-private package.json under lib/ carries `engines.node: >=24.0.0`.
+// every non-private package.json under lib/ carries `engines.node: >=26.0.0`.
 // The five currently-published packages (core, cli, lsp, renderer, typescript)
 // are the ones this bumps; the check is written generically over "every
 // non-private package" so a future sixth published package is caught by
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const LIB_DIR = join(REPO_ROOT, 'lib');
-const REQUIRED_ENGINE = '>=24.0.0';
+const REQUIRED_ENGINE = '>=26.0.0';
 
 class EnginesCheckError extends Error {}
 

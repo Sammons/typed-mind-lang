@@ -13,7 +13,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Try multiple paths for the LSP server module
   // 1. First try the bundled path (packaged extension)
-  let serverModule = context.asAbsolutePath(path.join('lsp-bundled', 'cli.js'));
+  let serverModule = context.asAbsolutePath(path.join('lsp-bundled', 'cli.cjs'));
 
   if (!fs.existsSync(serverModule)) {
     // 2. Try the installed package path (production)
@@ -33,7 +33,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const errorMsg = `TypedMind LSP server module not found`;
     console.error(errorMsg);
     console.error('Searched paths:', {
-      bundled: context.asAbsolutePath(path.join('lsp-bundled', 'cli.js')),
+      bundled: context.asAbsolutePath(path.join('lsp-bundled', 'cli.cjs')),
       installed: context.asAbsolutePath(path.join('node_modules', '@sammons', 'typed-mind-lsp', 'dist', 'cli.js')),
       workspace: path.join(__dirname, '..', '..', '..', 'typed-mind-lsp', 'dist', 'cli.js'),
     });

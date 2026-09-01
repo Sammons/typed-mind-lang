@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = join(testDir, '..');
-const cliPath = join(packageDir, 'dist-bundled', 'cli.js');
+const cliPath = join(packageDir, 'dist-bundled', 'cli.cjs');
 // This package's own local bin — pnpm's strict node_modules does not hoist
 // devDependency bins to the workspace root, so tsup lives at
 // lib/typed-mind-lsp/node_modules/.bin/tsup, not the repo root's .bin/.

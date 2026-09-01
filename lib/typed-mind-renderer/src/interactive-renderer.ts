@@ -6,7 +6,10 @@
 
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import { ClassFileNode, DependencyNode, type Diagnostic, FileNode, FunctionNode, type ParseOutput, ProgramNode } from '@sammons/typed-mind';
 
 export interface InteractiveRendererOptions {
@@ -3192,8 +3195,8 @@ ${this.generateInteractiveRendererJS()}
     };
   }
 
-  private openInBrowser(url: string): void {
-    const { exec } = require('node:child_process');
+  private async openInBrowser(url: string): Promise<void> {
+    const { exec } = await import('node:child_process');
     const platform = process.platform;
 
     let command: string;

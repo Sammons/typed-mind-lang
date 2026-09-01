@@ -2,6 +2,7 @@
   "name": "@sammons/typed-mind-lsp",
   "version": "1.0.0",
   "description": "Language Server Protocol implementation for TypedMind DSL - providing IDE support with syntax highlighting, validation, and intellisense",
+  "type": "module",
   "keywords": [
     "typedmind",
     "dsl",
@@ -31,7 +32,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=26.0.0"
   },
   "scripts": {
     "build": "tsc --build",
@@ -49,7 +50,7 @@
     "vscode-languageserver-textdocument": "^1.0.12"
   },
   "devDependencies": {
-    "@types/node": "^22.18.1",
+    "@types/node": "^26.4.0",
     "tsup": "^8.3.5",
     "typescript": "^5.9.2"
   },

@@ -2,7 +2,7 @@
 // needs to read a .vsix's entry names and uncompressed sizes without adding a
 // zip-reading dependency (per zero_runtime_deps_for_libraries /
 // dep_trust_is_full_transitive_graph). A .vsix is a standard ZIP archive; the
-// entries this check cares about (lsp-bundled/cli.js and both wasms) are
+// entries this check cares about (lsp-bundled/cli.cjs and both wasms) are
 // vsce-written with compression method 8 (DEFLATE) and a trailing data
 // descriptor (the local file header carries zeroed sizes), so sizes must come
 // from the End-Of-Central-Directory-anchored central directory, not the local
