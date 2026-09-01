@@ -1,33 +1,35 @@
 # Shortform syntax is for LLMs
-TodoApp -> api v1.0.0
+DashboardApp -> main v1.0.0
 
-api @ api.ts:
-  <- [CreateTodoDto, Todo]
-  -> [TodoService, BaseService]
+main @ src/index.tsx:
+  <- [App, ChartService]
+  -> [App, ChartService]
 
-TodoService <: BaseService
-  => [createTodo, getTodos]
+App &! "Root dashboard component"
+  > [Sidebar, ChartPanel]
 
-createTodo :: (input: CreateTodoDto) => Todo
-  "Creates a new todo item"
-  <- CreateTodoDto
-  -> Todo
+Sidebar & "Navigation sidebar"
+  < [App]
+  > [NavLink]
 
-getTodos :: () => Todo[]
-  "Retrieves all todo items"
-  -> Todo
+NavLink & "Single sidebar navigation link"
+  < [Sidebar]
 
-CreateTodoDto % "Input for creating todos"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
+ChartPanel & "Main chart display area"
+  < [App]
 
-Todo % "Todo entity"
-  - id: string "Unique identifier"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
-  - createdAt: Date "Creation timestamp"
-BaseService <:
-  => [validate]
+ChartService <:
+  => [fetchRevenue]
 
-validate :: (data: any) => boolean
-  "Validates input data"
+fetchRevenue :: (range: DateRange) => RevenueSeries
+  "Fetches revenue data for the dashboard's chart panel"
+  <- DateRange
+  -> RevenueSeries
+
+DateRange % "Chart date range filter"
+  - start: Date "Range start"
+  - end: Date "Range end"
+
+RevenueSeries % "Time series for the revenue chart"
+  - points: number[] "Revenue values"
+  - labels: string[] "X-axis labels"

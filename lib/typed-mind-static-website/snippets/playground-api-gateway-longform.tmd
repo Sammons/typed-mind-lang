@@ -1,34 +1,90 @@
 # Longform syntax is for humans
-TodoApp -> api v1.0.0
+program EdgeGateway {
+  entry: router
+  version: 1.0.0
+}
 
-api @ api.ts:
-  <- [CreateTodoDto, Todo]
-  -> [TodoService, BaseService]
+file router {
+  path: router.ts
+  imports: [GatewayRouter]
+  exports: [GatewayRouter]
+}
 
-TodoService <: BaseService
-  => [createTodo, getTodos]
+class GatewayRouter {
+  methods: [forwardRequest]
+}
 
-createTodo :: (input: CreateTodoDto) => Todo
-  "Creates a new todo item"
-  <- CreateTodoDto
-  -> Todo
+dto RouteTable {
+  description: "Path-to-backend route mapping"
+  fields: {
+    path: {
+      type: "string"
+      description: "Matched request path prefix"
+    }
+    backend: {
+      type: "string"
+      description: "Upstream service name"
+    }
+  }
+}
 
-getTodos :: () => Todo[]
-  "Retrieves all todo items"
-  -> Todo
+constants ROUTE_TABLE {
+  path: routes.config.ts
+  schema: RouteTable
+}
 
-CreateTodoDto % "Input for creating todos"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
+function forwardRequest {
+  signature: (request: InboundRequest) => ProxiedResponse
+  description: "Matches the request path against the route table and proxies to the backend"
+  input: InboundRequest
+  output: ProxiedResponse
+  consumes: [ROUTE_TABLE, RATE_LIMIT_PER_MINUTE]
+}
 
-Todo % "Todo entity"
-  - id: string "Unique identifier"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
-  - createdAt: Date "Creation timestamp"
+dependency "users-service" {
+  description: "Upstream users backend"
+  version: 1.2.0
+}
 
-BaseService <:
-  => [validate]
+dependency "billing-service" {
+  description: "Upstream billing backend"
+  version: 4.0.0
+}
 
-validate :: (data: any) => boolean
-  "Validates input data"
+dto InboundRequest {
+  description: "Incoming HTTP request"
+  fields: {
+    path: {
+      type: "string"
+      description: "Request path"
+    }
+    method: {
+      type: "string"
+      description: "HTTP method"
+    }
+  }
+}
+
+dto ProxiedResponse {
+  description: "Response proxied from a backend service"
+  fields: {
+    status: {
+      type: "number"
+      description: "HTTP status code"
+    }
+    body: {
+      type: "string"
+      description: "Response body"
+    }
+    matchedRoute: {
+      type: "RouteTable"
+      description: "Route table entry that matched this request"
+    }
+  }
+}
+
+parameter RATE_LIMIT_PER_MINUTE {
+  type: env
+  description: "Per-client request budget"
+  required: true
+}

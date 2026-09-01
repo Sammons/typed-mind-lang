@@ -1,34 +1,35 @@
 # Shortform syntax is for LLMs
-TodoApp -> api v1.0.0
+EdgeGateway -> router v1.0.0
 
-api @ api.ts:
-  <- [CreateTodoDto, Todo]
-  -> [TodoService, BaseService]
+router @ router.ts:
+  <- [GatewayRouter]
+  -> [GatewayRouter]
 
-TodoService <: BaseService
-  => [createTodo, getTodos]
+GatewayRouter <:
+  => [forwardRequest]
 
-createTodo :: (input: CreateTodoDto) => Todo
-  "Creates a new todo item"
-  <- CreateTodoDto
-  -> Todo
+RouteTable % "Path-to-backend route mapping"
+  - path: string "Matched request path prefix"
+  - backend: string "Upstream service name"
 
-getTodos :: () => Todo[]
-  "Retrieves all todo items"
-  -> Todo
+ROUTE_TABLE ! routes.config.ts : RouteTable
 
-CreateTodoDto % "Input for creating todos"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
+forwardRequest :: (request: InboundRequest) => ProxiedResponse
+  "Matches the request path against the route table and proxies to the backend"
+  <- InboundRequest
+  -> ProxiedResponse
+  $< [ROUTE_TABLE, RATE_LIMIT_PER_MINUTE]
 
-Todo % "Todo entity"
-  - id: string "Unique identifier"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
-  - createdAt: Date "Creation timestamp"
+users-service ^ "Upstream users backend" v1.2.0
+billing-service ^ "Upstream billing backend" v4.0.0
 
-BaseService <:
-  => [validate]
+InboundRequest % "Incoming HTTP request"
+  - path: string "Request path"
+  - method: string "HTTP method"
 
-validate :: (data: any) => boolean
-  "Validates input data"
+ProxiedResponse % "Response proxied from a backend service"
+  - status: number "HTTP status code"
+  - body: string "Response body"
+  - matchedRoute: RouteTable "Route table entry that matched this request"
+
+RATE_LIMIT_PER_MINUTE $env "Per-client request budget" (required)

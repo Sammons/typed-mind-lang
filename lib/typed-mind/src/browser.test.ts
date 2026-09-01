@@ -71,3 +71,53 @@ describe('TypedMindBrowser: emitShortform/emitLongform/toggleFormat/detectFormat
     assert.equal(reparsedFromShortform.entities.length, parsed.entities.length);
   });
 });
+
+// Playground audit finding (typed-mind-lang#125's default-document fix
+// surfaced this): TypedMindBrowser.check() used to stop at
+// toDiagnostics(outcome.diagnostics/findings) and never call
+// applySuppressions(), unlike typed-mind.ts's check() (the Node facade),
+// which always has. A document using `suppress` therefore showed the
+// suppressed finding as a plain, unsuppressed error through the browser
+// facade — the exact facade the playground's window.typedMindBrowser uses —
+// even though the same document checked clean (suppression applied) through
+// the CLI/Node facade. This pins the now-matching contract: same source,
+// same suppression outcome, through either facade.
+describe('TypedMindBrowser.check(): suppression parity with the Node facade (typed-mind.ts)', () => {
+  let browser: TypedMindBrowser;
+
+  before(async () => {
+    browser = await TypedMindBrowser.create({ wasmPath });
+  });
+
+  const SOURCE_WITH_SUPPRESSED_ORPHAN = `App -> Main v1.0.0
+
+Main @ src/main.ts:
+  <- [helper]
+  -> [helper]
+
+helper :: () => void
+
+lonely % "an unused DTO"
+
+suppress lonely checker/orphaned-entity "consumed only by an external integration test suite"
+`;
+
+  it('applies suppressions: a suppressed finding stays in diagnostics but does not fail valid', () => {
+    const result = browser.check(SOURCE_WITH_SUPPRESSED_ORPHAN);
+    assert.equal(result.valid, true);
+    assert.equal(result.suppressedCount, 1);
+    const orphanFinding = result.diagnostics.find((diagnostic) => diagnostic.code === 'checker/orphaned-entity');
+    assert.notEqual(orphanFinding, undefined);
+    assert.notEqual(orphanFinding?.suppression, undefined);
+  });
+
+  it('a genuinely unsuppressed error still fails valid (suppression is not a blanket pass)', () => {
+    const sourceWithUnsuppressedOrphan = SOURCE_WITH_SUPPRESSED_ORPHAN.replace(
+      'suppress lonely checker/orphaned-entity "consumed only by an external integration test suite"\n',
+      '',
+    );
+    const result = browser.check(sourceWithUnsuppressedOrphan);
+    assert.equal(result.valid, false);
+    assert.equal(result.suppressedCount, 0);
+  });
+});

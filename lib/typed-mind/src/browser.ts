@@ -32,6 +32,8 @@
 // (typed-mind.ts), so the playground can now call the real toggle machinery.
 
 import type { Diagnostic } from './ast/diagnostic.ts';
+import type { EntityNode } from './ast/entity-node.ts';
+import { applySuppressions } from './checker/apply-suppressions.ts';
 import { AstValidator } from './checker/ast-validator.ts';
 import { toDiagnostics } from './checker/finding.ts';
 import { detectFormat, type FormatDetectionResult } from './emitter/detect-format.ts';
@@ -47,6 +49,15 @@ export interface TypedMindBrowserOptions extends TypedMindParserOptions {
 export interface CheckOutcome {
   readonly valid: boolean;
   readonly diagnostics: readonly Diagnostic[];
+  // Mirrors typed-mind.ts's CheckOutcome.suppressedCount (RFC-TM-8 §8,
+  // I-10) — the browser facade previously never called applySuppressions at
+  // all (found auditing typed-mind-lang#125's default-document fix: a
+  // playground document using `suppress` still showed the suppressed
+  // finding as a raw, unsuppressed error, because this facade's check()
+  // stopped at toDiagnostics() and never ran the suppression partition the
+  // Node facade always has). Adding the same applySuppressions() call this
+  // facade was missing closes that gap.
+  readonly suppressedCount: number;
 }
 
 export type ParseOutput = ParseOutcome & { readonly links: LinkIndex };
@@ -81,9 +92,20 @@ export class TypedMindBrowser {
     const outcome = this.#parser.parse(source);
     const links = computeLinks(outcome.entities);
     const { findings } = this.#validator.validate(outcome, links);
-    const diagnostics = [...outcome.diagnostics, ...toDiagnostics(findings)];
-    const valid = diagnostics.every((diagnostic) => diagnostic.severity !== 'error');
-    return { valid, diagnostics };
+    const rawDiagnostics = [...outcome.diagnostics, ...toDiagnostics(findings)];
+    // RFC-TM-8 §8 (rfc-tm-8-diamond.md, X-SUPP-3), mirroring typed-mind.ts's
+    // check(): suppression is a post-processing partition over the finding
+    // list, applied after every check has run.
+    const byName = new Map<string, EntityNode>();
+    for (const entity of outcome.entities) {
+      byName.set(entity.name, entity);
+    }
+    const { diagnostics, suppressedCount } = applySuppressions(rawDiagnostics, outcome.suppressions, byName);
+    // I-10 / doc §8: a suppressed finding keeps its severity and stays in
+    // `diagnostics`, but is excluded from the error count that drives
+    // `valid` — "suppressed-not-silenced," not "suppressed-and-hidden."
+    const valid = diagnostics.every((diagnostic) => diagnostic.severity !== 'error' || diagnostic.suppression !== undefined);
+    return { valid, diagnostics, suppressedCount };
   }
 
   emitShortform(source: string): string {

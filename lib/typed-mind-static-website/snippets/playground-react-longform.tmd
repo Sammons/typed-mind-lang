@@ -1,34 +1,72 @@
 # Longform syntax is for humans
-TodoApp -> api v1.0.0
+program DashboardApp {
+  entry: main
+  version: 1.0.0
+}
 
-api @ api.ts:
-  <- [CreateTodoDto, Todo]
-  -> [TodoService, BaseService]
+file main {
+  path: src/index.tsx
+  imports: [App, ChartService]
+  exports: [App, ChartService]
+}
 
-TodoService <: BaseService
-  => [createTodo, getTodos]
+component App {
+  description: "Root dashboard component"
+  root: true
+  contains: [Sidebar, ChartPanel]
+}
 
-createTodo :: (input: CreateTodoDto) => Todo
-  "Creates a new todo item"
-  <- CreateTodoDto
-  -> Todo
+component Sidebar {
+  description: "Navigation sidebar"
+  contains: [NavLink]
+  containedBy: [App]
+}
 
-getTodos :: () => Todo[]
-  "Retrieves all todo items"
-  -> Todo
+component NavLink {
+  description: "Single sidebar navigation link"
+  containedBy: [Sidebar]
+}
 
-CreateTodoDto % "Input for creating todos"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
+component ChartPanel {
+  description: "Main chart display area"
+  containedBy: [App]
+}
 
-Todo % "Todo entity"
-  - id: string "Unique identifier"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
-  - createdAt: Date "Creation timestamp"
+class ChartService {
+  methods: [fetchRevenue]
+}
 
-BaseService <:
-  => [validate]
+function fetchRevenue {
+  signature: (range: DateRange) => RevenueSeries
+  description: "Fetches revenue data for the dashboard's chart panel"
+  input: DateRange
+  output: RevenueSeries
+}
 
-validate :: (data: any) => boolean
-  "Validates input data"
+dto DateRange {
+  description: "Chart date range filter"
+  fields: {
+    start: {
+      type: "Date"
+      description: "Range start"
+    }
+    end: {
+      type: "Date"
+      description: "Range end"
+    }
+  }
+}
+
+dto RevenueSeries {
+  description: "Time series for the revenue chart"
+  fields: {
+    points: {
+      type: "number[]"
+      description: "Revenue values"
+    }
+    labels: {
+      type: "string[]"
+      description: "X-axis labels"
+    }
+  }
+}

@@ -1,34 +1,73 @@
 # Longform syntax is for humans
-TodoApp -> api v1.0.0
+program OrderPlatform {
+  entry: gateway
+  version: 1.0.0
+}
 
-api @ api.ts:
-  <- [CreateTodoDto, Todo]
-  -> [TodoService, BaseService]
+file gateway {
+  path: gateway-service.ts
+  imports: [OrderGateway]
+  exports: [OrderGateway]
+}
 
-TodoService <: BaseService
-  => [createTodo, getTodos]
+class OrderGateway {
+  methods: [routeOrder]
+}
 
-createTodo :: (input: CreateTodoDto) => Todo
-  "Creates a new todo item"
-  <- CreateTodoDto
-  -> Todo
+function routeOrder {
+  signature: (input: PlaceOrderInput) => OrderReceipt
+  description: "Routes an incoming order to the inventory and payment services"
+  input: PlaceOrderInput
+  output: OrderReceipt
+  consumes: [INVENTORY_SERVICE_URL, PAYMENT_SERVICE_URL]
+}
 
-getTodos :: () => Todo[]
-  "Retrieves all todo items"
-  -> Todo
+dependency "inventory-client" {
+  description: "Inventory microservice HTTP client"
+  version: 2.4.0
+}
 
-CreateTodoDto % "Input for creating todos"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
+dependency "payment-client" {
+  description: "Payment microservice HTTP client"
+  version: 3.1.0
+}
 
-Todo % "Todo entity"
-  - id: string "Unique identifier"
-  - title: string "Todo title"
-  - completed: boolean "Completion status"
-  - createdAt: Date "Creation timestamp"
+dto PlaceOrderInput {
+  description: "Order placement request"
+  fields: {
+    sku: {
+      type: "string"
+      description: "Product SKU"
+    }
+    quantity: {
+      type: "number"
+      description: "Units ordered"
+    }
+  }
+}
 
-BaseService <:
-  => [validate]
+dto OrderReceipt {
+  description: "Order confirmation"
+  fields: {
+    orderId: {
+      type: "string"
+      description: "Generated order identifier"
+    }
+    status: {
+      type: "string"
+      description: "Order status"
+    }
+  }
+}
 
-validate :: (data: any) => boolean
-  "Validates input data"
+parameter INVENTORY_SERVICE_URL {
+  type: env
+  description: "Inventory service base URL"
+  required: true
+}
+
+parameter PAYMENT_SERVICE_URL {
+  type: env
+  description: "Payment service base URL"
+  required: true
+}

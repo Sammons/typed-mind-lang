@@ -2,7 +2,7 @@
 TodoApp -> api v1.0.0
 
 api @ api.ts:
-  <- [CreateTodoDto, Todo]
+  <- [CreateTodoDto, Todo, TodoService, BaseService]
   -> [TodoService, BaseService]
 
 TodoService <: BaseService

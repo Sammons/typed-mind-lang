@@ -90,7 +90,31 @@ const bodyAlreadyShows = (entity: EntityNode): string | undefined => {
   }
 };
 
+// Defect fix (issue #126): entity.entry is a required, always-a-string field
+// (ProgramNode's honest-fields table calls it Required), but the longform
+// builder fills it with '' rather than leaving it undefined whenever the
+// source document never resolved a real entry point (a typo'd property key
+// like `entryPoint:`, or a different path check-entry-point.ts's "references
+// undefined entry point ''" diagnostic already flags). Emitting
+// `${name} -> ${entry}` unconditionally on an empty entry produced
+// `Name ->  vVersion` — a double space with no real Entry token for the
+// reparser to anchor on, which silently mis-split the trailing `v1.0.0` blob
+// at the first `.` into a garbage entry ('v1') and a truncated version
+// ('.0.0'). No diagnostic ever named that corruption. Refusing to emit here
+// is the fix: a document whose Program entry point cannot be honestly
+// expressed in shortform must fail loud (this throw), not produce a
+// syntactically-parseable-but-semantically-wrong document. Callers
+// (browser.ts's toggleFormat/emitShortform, the playground's toggle handler)
+// already catch emitter exceptions and surface them as errors instead of
+// silently swallowing them.
 const programToShortform = (entity: ProgramNode): string[] => {
+  if (entity.entry === '') {
+    throw new Error(
+      `Cannot emit shortform for Program '${entity.name}': entry point is unresolved (empty). ` +
+        `Shortform's 'Name -> Entry' line has no token to carry an empty entry, and emitting one ` +
+        `anyway would corrupt the version on reparse. Fix the Program's 'entry:' property first.`,
+    );
+  }
   let line = `${entity.name} -> ${entity.entry}`;
   if (entity.purpose !== undefined) {
     line += ` ${quoteStringLiteral(entity.purpose)}`;
