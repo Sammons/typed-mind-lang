@@ -2,6 +2,7 @@
   "name": "@sammons/typed-mind-cli",
   "version": "1.0.0",
   "description": "Command-line interface for TypedMind DSL - a declarative language for building software architectures",
+  "type": "module",
   "keywords": [
     "cli",
     "command-line",
@@ -40,13 +41,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "require": "./dist/index.js"
+      "import": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
   "sideEffects": false,
   "engines": {
-    "node": ">=24.0.0",
+    "node": ">=26.0.0",
     "npm": ">=10.0.0"
   },
   "scripts": {
@@ -69,7 +70,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@types/node": "^22.18.1",
+    "@types/node": "^26.4.0",
     "publint": "^0.3.24"
   },
   "publishConfig": {

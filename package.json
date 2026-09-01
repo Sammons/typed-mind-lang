@@ -38,11 +38,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.10",
-    "@types/node": "^22.18.1",
+    "@types/node": "^26.4.0",
     "typescript": "^5.9.2"
   },
   "engines": {
-    "node": ">=24.0.0",
+    "node": ">=26.0.0",
     "pnpm": ">=9.0.0"
   }
 }

@@ -2,6 +2,7 @@
   "name": "@sammons/typed-mind",
   "version": "1.0.0",
   "description": "Core language parser and validator for TypedMind DSL - a declarative language for building software architectures",
+  "type": "module",
   "keywords": [
     "typedmind",
     "dsl",
@@ -31,7 +32,7 @@
     "grammar.ebnf"
   ],
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=26.0.0"
   },
   "scripts": {
     "prebuild": "node scripts/build-wasm.mjs",
@@ -48,7 +49,7 @@
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
   },
   "devDependencies": {
-    "@types/node": "^22.18.1"
+    "@types/node": "^26.4.0"
   },
   "publishConfig": {
     "access": "public"

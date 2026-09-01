@@ -12,8 +12,8 @@ importers:
         specifier: 2.5.10
         version: 2.5.10
       '@types/node':
-        specifier: ^22.18.1
-        version: 22.18.1
+        specifier: ^26.4.0
+        version: 26.4.0
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
@@ -25,8 +25,8 @@ importers:
         version: 0.26.13
     devDependencies:
       '@types/node':
-        specifier: ^22.18.1
-        version: 22.18.1
+        specifier: ^26.4.0
+        version: 26.4.0
 
   lib/typed-mind-cli:
     dependencies:
@@ -41,8 +41,8 @@ importers:
         specifier: ^0.18.5
         version: 0.18.5
       '@types/node':
-        specifier: ^22.18.1
-        version: 22.18.1
+        specifier: ^26.4.0
+        version: 26.4.0
       publint:
         specifier: ^0.3.24
         version: 0.3.24
@@ -60,8 +60,8 @@ importers:
         version: 1.0.12
     devDependencies:
       '@types/node':
-        specifier: ^22.18.1
-        version: 22.18.1
+        specifier: ^26.4.0
+        version: 26.4.0
       tsup:
         specifier: ^8.3.5
         version: 8.5.0(postcss@8.5.6)(supports-color@10.2.2)(tsx@4.20.5)(typescript@5.9.2)
@@ -79,8 +79,8 @@ importers:
         specifier: ^7.4.3
         version: 7.4.3
       '@types/node':
-        specifier: ^22.18.1
-        version: 22.18.1
+        specifier: ^26.4.0
+        version: 26.4.0
 
   lib/typed-mind-static-website:
     devDependencies:
@@ -101,8 +101,8 @@ importers:
         version: link:../typed-mind
     devDependencies:
       '@types/node':
-        specifier: ^22.18.1
-        version: 22.18.1
+        specifier: ^26.4.0
+        version: 26.4.0
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
@@ -117,8 +117,8 @@ importers:
         version: 5.9.2
     devDependencies:
       '@types/node':
-        specifier: ^22.18.1
-        version: 22.18.1
+        specifier: ^26.4.0
+        version: 26.4.0
 
   lib/typed-mind-vscode-extension:
     dependencies:
@@ -136,8 +136,8 @@ importers:
         version: 9.0.1
     devDependencies:
       '@types/node':
-        specifier: ^24.3.1
-        version: 24.3.1
+        specifier: ^26.4.0
+        version: 26.4.0
       '@types/vscode':
         specifier: ^1.99.0
         version: 1.103.0
@@ -1321,11 +1321,8 @@ packages:
   '@types/geojson@7946.0.16':
     resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
 
-  '@types/node@22.18.1':
-    resolution: {integrity: sha512-rzSDyhn4cYznVG+PCzGe1lwuMYJrcBS1fc3JqSa2PvtABwWo+dZ1ij5OVok3tqfpEBCBoaR4d7upFJk73HRJDw==}
-
-  '@types/node@24.3.1':
-    resolution: {integrity: sha512-3vXmQDXy+woz+gnrTvuvNrPzekOi+Ds0ReMxw0LzBiK3a+1k0kQn9f2NWk+lgD4rJehFUmYy2gMhJ2ZI+7YP9g==}
+  '@types/node@26.4.0':
+    resolution: {integrity: sha512-faiGnoIrLH/V8cibOMEAZ8pMw6oXqSukl29ra4mN8GdaB2ZewzeaLj+INpV5N+Z1eKWzY+IzaIZH2EIR6YZRNQ==}
 
   '@types/normalize-package-data@2.4.4':
     resolution: {integrity: sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==}
@@ -2655,11 +2652,8 @@ packages:
   underscore@1.13.7:
     resolution: {integrity: sha512-GMXzWtsc57XAtguZgaQViUOzs0KTkk8ojr3/xAxXLITqf/3EMwxC0inyETfDFjH/Krbhuep0HNbbjI9i/q3F3g==}
 
-  undici-types@6.21.0:
-    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
-
-  undici-types@7.10.0:
-    resolution: {integrity: sha512-t5Fy/nfn+14LuOc2KNYg75vZqClpAiqscVvMygNnlsHBFpSXdJaYtXMcdNLpl/Qvc3P2cB3s6lOV51nqsFq4ag==}
+  undici-types@8.3.0:
+    resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
   undici@7.12.0:
     resolution: {integrity: sha512-GrKEsc3ughskmGA9jevVlIOPMiiAHJ4OFUtaAH+NhfTUSiZ1wMPIQqQvAJUrJspFXJt3EBWgpAeoHEDVT1IBug==}
@@ -3734,13 +3728,9 @@ snapshots:
 
   '@types/geojson@7946.0.16': {}
 
-  '@types/node@22.18.1':
+  '@types/node@26.4.0':
     dependencies:
-      undici-types: 6.21.0
-
-  '@types/node@24.3.1':
-    dependencies:
-      undici-types: 7.10.0
+      undici-types: 8.3.0
 
   '@types/normalize-package-data@2.4.4': {}
 
@@ -5254,9 +5244,7 @@ snapshots:
 
   underscore@1.13.7: {}
 
-  undici-types@6.21.0: {}
-
-  undici-types@7.10.0: {}
+  undici-types@8.3.0: {}
 
   undici@7.12.0: {}
 

@@ -23,31 +23,34 @@ export interface TypedMindParserOptions {
   readonly runtimeWasmPath?: string;
 }
 
-// Default wasm resolution is __dirname-relative in the compiled CommonJS
-// output (doc §3.1/§4). Candidates, in order, both rooted at the package dir:
-//   - in-repo: dist/pipeline → ../../grammar/grammar.wasm (built by the
+// Default wasm resolution uses import.meta.url to locate the grammar.wasm
+// relative to this module's filesystem position. Candidates, in order, both
+// rooted at the package dir:
+//   - in-repo: src/pipeline → ../../grammar/grammar.wasm (built by the
 //     package's pretest step, gitignored);
 //   - published: the files manifest ships grammar.wasm alongside dist/ at the
 //     TM-4/S-CORE-3 publish → ../../grammar.wasm.
 // Everything else (type-stripped src execution, browser bundles — the TM-7
 // contract) passes { wasmPath } or { wasmBytes } explicitly.
-const resolveDefaultWasmPath = () => {
-  if (typeof __dirname !== 'string' || typeof require !== 'function') {
+const resolveDefaultWasmPath = async () => {
+  if (typeof import.meta.url !== 'string') {
     throw new Error(
-      'TypedMindParser.create(): default grammar.wasm resolution is __dirname-relative and only works from the compiled CommonJS output; pass { wasmPath } or { wasmBytes }',
+      'TypedMindParser.create(): default grammar.wasm resolution requires import.meta.url; pass { wasmPath } or { wasmBytes }',
     );
   }
-  // Lazy require keeps node:path/node:fs out of this module's static import
-  // graph — the pipeline's browser-safe entry must never reach them (doc §3.7,
-  // the I-8 precursor); the requires only execute on the Node/CJS default path.
-  const nodePath: typeof import('node:path') = require('node:path');
-  const nodeFs: typeof import('node:fs') = require('node:fs');
+  // Dynamic import keeps node:path/node:fs/node:url out of this module's
+  // static import graph — the pipeline's browser-safe entry must never reach
+  // them. The imports only execute on the Node default path.
+  const { fileURLToPath } = await import('node:url');
+  const { join, dirname } = await import('node:path');
+  const { existsSync } = await import('node:fs');
+  const thisDir = dirname(fileURLToPath(import.meta.url));
   const candidates = [
-    nodePath.join(__dirname, '..', '..', 'grammar', 'grammar.wasm'),
-    nodePath.join(__dirname, '..', '..', 'grammar.wasm'),
+    join(thisDir, '..', '..', 'grammar', 'grammar.wasm'),
+    join(thisDir, '..', '..', 'grammar.wasm'),
   ];
   for (const candidate of candidates) {
-    if (nodeFs.existsSync(candidate)) {
+    if (existsSync(candidate)) {
       return candidate;
     }
   }
@@ -77,7 +80,7 @@ export class TypedMindParser {
       const runtimeWasmPath = options.runtimeWasmPath;
       await Parser.init({ locateFile: () => runtimeWasmPath });
     }
-    const wasmSource = options.wasmBytes ?? options.wasmPath ?? resolveDefaultWasmPath();
+    const wasmSource = options.wasmBytes ?? options.wasmPath ?? await resolveDefaultWasmPath();
     const language = await Language.load(wasmSource);
     const parser = new Parser();
     parser.setLanguage(language);

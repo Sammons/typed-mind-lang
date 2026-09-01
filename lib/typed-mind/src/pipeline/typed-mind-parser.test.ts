@@ -65,9 +65,11 @@ describe('generated CST wrapper layer', () => {
   });
 });
 
-describe('TypedMindParser (src dev layout, wasmPath override)', () => {
-  it('rejects default wasm resolution outside the compiled CJS output', async () => {
-    await assert.rejects(TypedMindParser.create(), /compiled CommonJS output/);
+describe('TypedMindParser (src dev layout, default + wasmPath override)', () => {
+  it('resolves default wasm path via import.meta.url from the source layout', async () => {
+    const parser = await TypedMindParser.create();
+    const root = parser.parseCst('Program "test" {}');
+    assert.ok(root instanceof CstSourceFile);
   });
 
   it('parses the hero fixture into a wrapped CST root with a real 1-based span', async () => {

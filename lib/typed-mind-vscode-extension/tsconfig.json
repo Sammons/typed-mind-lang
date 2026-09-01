@@ -5,7 +5,10 @@
     "rootDir": "./src",
     "composite": true,
     "module": "commonjs",
-    "lib": ["ES2020"],
+    "moduleResolution": "node",
+    "verbatimModuleSyntax": false,
+    "erasableSyntaxOnly": false,
+    "lib": ["ES2024"],
     "types": ["node", "vscode"]
   },
   "include": ["src/**/*.ts"],
