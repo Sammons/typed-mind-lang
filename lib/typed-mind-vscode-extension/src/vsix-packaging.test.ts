@@ -1,6 +1,6 @@
 // RFC-TM-5 §3 (rfc-tm-5-diamond.md), goal-scope IE-8 — the vsix must carry the
 // bundled LSP server plus both wasm artifacts. Check binding: "vsce package
-// --no-dependencies dry-run, unzip the .vsix, assert lsp-bundled/cli.js,
+// --no-dependencies dry-run, unzip the .vsix, assert lsp-bundled/cli.cjs,
 // lsp-bundled/grammar.wasm, and lsp-bundled/web-tree-sitter.wasm are present
 // with non-zero sizes (mirroring stage-published-wasm.mjs:30-33's emptiness
 // guard)." This test rebuilds lsp-bundled/ (via bundle-lsp) and the extension
@@ -22,16 +22,16 @@ const vsceBinPath = join(packageDir, 'node_modules', '.bin', 'vsce');
 const vsixOutputPath = join(packageDir, 'tm5-q3-packaging-check.vsix');
 
 const REQUIRED_LSP_BUNDLED_FILES = [
-  'extension/lsp-bundled/cli.js',
+  'extension/lsp-bundled/cli.cjs',
   'extension/lsp-bundled/grammar.wasm',
   'extension/lsp-bundled/web-tree-sitter.wasm',
 ];
 
 describe('vsix packaging (RFC-TM-5 §3, IE-8)', () => {
-  it('carries lsp-bundled/cli.js, grammar.wasm, and web-tree-sitter.wasm with non-zero sizes', () => {
+  it('carries lsp-bundled/cli.cjs, grammar.wasm, and web-tree-sitter.wasm with non-zero sizes', () => {
     // bundle-lsp rebuilds the LSP's bundled output (dist-bundled/, incl. both
     // wasms per RFC-TM-5 §2) and copies it to ./lsp-bundled/ — the committed
-    // lsp-bundled/cli.js predates this RFC's wasm-copy step and must never be
+    // lsp-bundled/cli.cjs predates this RFC's wasm-copy step and must never be
     // what this check exercises.
     execFileSync('pnpm', ['run', 'bundle-lsp'], { cwd: packageDir, encoding: 'utf8' });
 
