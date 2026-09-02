@@ -7,7 +7,7 @@
 // that keeps a twelfth kind from silently falling through again.
 
 import type { EntityKind } from '@sammons/typed-mind';
-import { CompletionItemKind, SemanticTokenTypes } from 'vscode-languageserver/node.js';
+import { CompletionItemKind, SemanticTokenTypes } from 'vscode-languageserver/node';
 
 const assertNever = (value: never): never => {
   throw new Error(`entity-kind-maps: unhandled EntityKind ${JSON.stringify(value)}`);

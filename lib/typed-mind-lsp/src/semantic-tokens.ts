@@ -6,7 +6,7 @@
 // server.ts:647-654) with a fact the CST already proved: an entity_name
 // occurrence IS the declaration.
 
-import { SemanticTokenModifiers, SemanticTokensBuilder } from 'vscode-languageserver/node.js';
+import { SemanticTokenModifiers, SemanticTokensBuilder } from 'vscode-languageserver/node';
 import type { DocumentState } from './document-state.ts';
 import { getSemanticTokenType, SEMANTIC_TOKEN_LEGEND } from './entity-kind-maps.ts';
 
