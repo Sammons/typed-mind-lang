@@ -1,14 +1,15 @@
 import * as path from 'node:path';
 import { TypedMind } from '@sammons/typed-mind';
 import { AdvancedTypedMindRenderer } from '@sammons/typed-mind-renderer';
+import type * as Vscode from 'vscode';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions, TransportKind } from 'vscode-languageclient/node';
 
 // Use require for vscode to avoid __toESM issues
-const vscode = require('vscode');
+const vscode = require('vscode') as typeof Vscode;
 
 let client: LanguageClient;
 
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(context: Vscode.ExtensionContext): void {
   const fs = require('node:fs');
 
   // Try multiple paths for the LSP server module
@@ -92,7 +93,7 @@ export function activate(context: vscode.ExtensionContext): void {
 /**
  * Handle the preview command - renders TypedMind visualization
  */
-async function handlePreview(_context: vscode.ExtensionContext): Promise<void> {
+async function handlePreview(_context: Vscode.ExtensionContext): Promise<void> {
   const editor = vscode.window.activeTextEditor;
 
   if (!editor) {
@@ -172,7 +173,7 @@ async function handlePreview(_context: vscode.ExtensionContext): Promise<void> {
     panel.webview.html = html;
 
     // Update preview when document changes
-    const changeSubscription = vscode.workspace.onDidChangeTextDocument((e) => {
+    const changeSubscription = vscode.workspace.onDidChangeTextDocument((e: Vscode.TextDocumentChangeEvent) => {
       if (e.document === editor.document) {
         // Debounce updates
         if (panel.visible) {
@@ -236,7 +237,7 @@ async function handleToggleFormat(client: LanguageClient): Promise<void> {
         title: 'Toggling TypedMind format...',
         cancellable: false,
       },
-      async (progress) => {
+      async (progress: Vscode.Progress<{ message?: string; increment?: number }>) => {
         progress.report({ increment: 0 });
 
         // Determine if we have a selection or process the entire document
@@ -244,7 +245,7 @@ async function handleToggleFormat(client: LanguageClient): Promise<void> {
         const hasSelection = !selection.isEmpty;
 
         let range: { start: number; end: number } | undefined;
-        let textRange: vscode.Range;
+        let textRange: Vscode.Range;
 
         if (hasSelection) {
           // Process only the selected lines
