@@ -36,9 +36,9 @@ describe('web-tree-sitter / tree-sitter CLI pin lockstep', () => {
       },
       {
         declaredPinIsExact: true,
-        declaredPin: '0.26.13',
-        resolvedVersion: '0.26.13',
-        miseCliPin: '0.26.13',
+        declaredPin: '0.27.0',
+        resolvedVersion: '0.27.0',
+        miseCliPin: '0.27.0',
       },
     );
   });

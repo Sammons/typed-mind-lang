@@ -15,7 +15,7 @@ export interface TypedMindParserOptions {
   // web-tree-sitter's own emscripten runtime wasm (distinct from
   // grammar.wasm, the language). The glue's findWasmBinary() calls
   // Module["locateFile"]("web-tree-sitter.wasm") when a locateFile hook is
-  // present (web-tree-sitter@0.26.13, web-tree-sitter.js:1707-1712), falling
+  // present (web-tree-sitter@0.27.0, web-tree-sitter.js:1766-1767), falling
   // back to a same-directory URL resolution otherwise — that fallback breaks
   // once the glue is bundled into a different directory layout (a bundled
   // cli.js is not adjacent to node_modules/web-tree-sitter/). When set, this

@@ -1,15 +1,15 @@
 [tools]
 node = "26" # bumped from 24 → 26 for native type stripping, stable node:sqlite, Temporal
-tree-sitter = "0.26.13"            # resolves via aqua:tree-sitter/tree-sitter
+tree-sitter = "0.27.0"            # resolves via aqua:tree-sitter/tree-sitter
 
 [tools."http:wasi-sdk"]
-version = "29.0"
+version = "34.0"
 strip_components = 1
 
 [tools."http:wasi-sdk".platforms]
-linux-x64   = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-x86_64-linux.tar.gz",  checksum = "sha256:87d1d1a2879d139cdc624b968efad3d4a97b8078cdff95e63ac88ecafd1a0171" }
-linux-arm64 = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-arm64-linux.tar.gz",   checksum = "sha256:052ad773397dc9e5aa99fb4cfef694175e6b1e81bb2ad1d3c8e7b3fc81441b7c" }
-macos-arm64 = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-arm64-macos.tar.gz",   checksum = "sha256:e11552913e3f99e834d7fe7da1bd081abaf764759ed76b6097a34c63fc83665e" }
+linux-x64   = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-x86_64-linux.tar.gz",  checksum = "sha256:b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4" }
+linux-arm64 = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-arm64-linux.tar.gz",   checksum = "sha256:f7e243dff54d60bcc576e94d6166b69f410f2500ae4a9ceef34315be10e77971" }
+macos-arm64 = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-arm64-macos.tar.gz",   checksum = "sha256:9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9" }
 
 # Paired-bump procedure: the tree-sitter CLI, wasi-sdk, and (from TM-3) web-tree-sitter bump only
 # together, in a single PR. Steps: (1) bump the CLI pin above; (2) copy the new tag's
