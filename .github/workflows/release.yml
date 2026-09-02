@@ -247,6 +247,17 @@ jobs:
       # not what the LSP source currently compiles to. Rebuilding here and
       # then asserting a clean tree makes a stale-bundle publish fail loudly
       # instead of silently shipping bytes CI never validated.
+      #
+      # @sammons/typed-mind's grammar.wasm is gitignored and produced only by
+      # its own prebuild script (scripts/build-wasm.mjs), which fires only
+      # when `pnpm run build` runs scoped to that package. bundle-lsp's tsup
+      # onSuccess hook copies that wasm (and bundles @sammons/typed-mind's
+      # dist via esbuild) but never builds it — on a clean checkout, skipping
+      # this step makes bundle-lsp throw BundledWasmCopyError / an
+      # unresolved-module error before the rebuild even finishes.
+      - name: Build core TypedMind package (produces grammar.wasm + dist)
+        run: mise exec -- pnpm --filter @sammons/typed-mind run build
+
       - name: Rebuild bundled LSP for the extension
         run: mise exec -- pnpm --filter typed-mind run bundle-lsp
 
