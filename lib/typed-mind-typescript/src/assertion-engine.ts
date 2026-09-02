@@ -1,4 +1,14 @@
-import { type EntityNode, TypedMind } from '@sammons/typed-mind';
+import {
+  ClassFileNode,
+  ClassNode,
+  ConstantsNode,
+  DtoNode,
+  type EntityNode,
+  FileNode,
+  FunctionNode,
+  ProgramNode,
+  TypedMind,
+} from '@sammons/typed-mind';
 import type { AssertionResult, ConversionResult, Deviation } from './types.ts';
 
 export class AssertionEngine {
@@ -148,104 +158,110 @@ export class AssertionEngine {
   }
 
   private compareProgramEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
-    const actualProg = actual as any;
-    const expectedProg = expected as any;
+    if (!(actual instanceof ProgramNode) || !(expected instanceof ProgramNode)) {
+      return;
+    }
 
-    if (actualProg.entry !== expectedProg.entry) {
+    if (actual.entry !== expected.entry) {
       deviations.push({
         entityName: actual.name,
         property: 'entry',
-        expected: expectedProg.entry,
-        actual: actualProg.entry,
+        expected: expected.entry,
+        actual: actual.entry,
         severity: 'error',
       });
     }
 
-    if (actualProg.version !== expectedProg.version) {
+    if (actual.version !== expected.version) {
       deviations.push({
         entityName: actual.name,
         property: 'version',
-        expected: expectedProg.version,
-        actual: actualProg.version,
+        expected: expected.version,
+        actual: actual.version,
         severity: 'warning',
       });
     }
   }
 
   private compareFileEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
-    const actualFile = actual as any;
-    const expectedFile = expected as any;
+    if (!(actual instanceof FileNode) || !(expected instanceof FileNode)) {
+      return;
+    }
 
-    if (actualFile.path !== expectedFile.path) {
+    if (actual.path !== expected.path) {
       deviations.push({
         entityName: actual.name,
         property: 'path',
-        expected: expectedFile.path,
-        actual: actualFile.path,
+        expected: expected.path,
+        actual: actual.path,
         severity: 'warning',
       });
     }
 
-    this.compareArrayProperty(actual.name, 'imports', actualFile.imports, expectedFile.imports, deviations);
-    this.compareArrayProperty(actual.name, 'exports', actualFile.exports, expectedFile.exports, deviations);
+    this.compareArrayProperty(actual.name, 'imports', actual.imports, expected.imports, deviations);
+    this.compareArrayProperty(actual.name, 'exports', actual.exports, expected.exports, deviations);
   }
 
   private compareFunctionEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
-    const actualFunc = actual as any;
-    const expectedFunc = expected as any;
+    if (!(actual instanceof FunctionNode) || !(expected instanceof FunctionNode)) {
+      return;
+    }
 
     // Compare signature (allowing some flexibility in formatting)
-    if (!this.signaturesMatch(actualFunc.signature, expectedFunc.signature)) {
+    if (!this.signaturesMatch(actual.signature, expected.signature)) {
       deviations.push({
         entityName: actual.name,
         property: 'signature',
-        expected: expectedFunc.signature,
-        actual: actualFunc.signature,
+        expected: expected.signature,
+        actual: actual.signature,
         severity: 'error',
       });
     }
 
-    this.compareStringProperty(actual.name, 'input', actualFunc.input, expectedFunc.input, deviations);
-    this.compareStringProperty(actual.name, 'output', actualFunc.output, expectedFunc.output, deviations);
-    this.compareArrayProperty(actual.name, 'calls', actualFunc.calls, expectedFunc.calls, deviations);
+    this.compareStringProperty(actual.name, 'input', actual.input, expected.input, deviations);
+    this.compareStringProperty(actual.name, 'output', actual.output, expected.output, deviations);
+    this.compareArrayProperty(actual.name, 'calls', actual.calls, expected.calls, deviations);
   }
 
   private compareClassEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
-    const actualClass = actual as any;
-    const expectedClass = expected as any;
+    if (!(actual instanceof ClassNode) || !(expected instanceof ClassNode)) {
+      return;
+    }
 
-    this.compareStringProperty(actual.name, 'extends', actualClass.extends, expectedClass.extends, deviations);
-    this.compareArrayProperty(actual.name, 'implements', actualClass.implements, expectedClass.implements, deviations);
-    this.compareArrayProperty(actual.name, 'methods', actualClass.methods, expectedClass.methods, deviations);
+    this.compareStringProperty(actual.name, 'extends', actual.extends, expected.extends, deviations);
+    this.compareArrayProperty(actual.name, 'implements', actual.implements, expected.implements, deviations);
+    this.compareArrayProperty(actual.name, 'methods', actual.methods, expected.methods, deviations);
   }
 
   private compareClassFileEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
-    const actualCF = actual as any;
-    const expectedCF = expected as any;
+    if (!(actual instanceof ClassFileNode) || !(expected instanceof ClassFileNode)) {
+      return;
+    }
 
-    if (actualCF.path !== expectedCF.path) {
+    if (actual.path !== expected.path) {
       deviations.push({
         entityName: actual.name,
         property: 'path',
-        expected: expectedCF.path,
-        actual: actualCF.path,
+        expected: expected.path,
+        actual: actual.path,
         severity: 'warning',
       });
     }
 
-    this.compareStringProperty(actual.name, 'extends', actualCF.extends, expectedCF.extends, deviations);
-    this.compareArrayProperty(actual.name, 'implements', actualCF.implements, expectedCF.implements, deviations);
-    this.compareArrayProperty(actual.name, 'methods', actualCF.methods, expectedCF.methods, deviations);
-    this.compareArrayProperty(actual.name, 'imports', actualCF.imports, expectedCF.imports, deviations);
-    this.compareArrayProperty(actual.name, 'exports', actualCF.exports, expectedCF.exports, deviations);
+    this.compareStringProperty(actual.name, 'extends', actual.extends, expected.extends, deviations);
+    this.compareArrayProperty(actual.name, 'implements', actual.implements, expected.implements, deviations);
+    this.compareArrayProperty(actual.name, 'methods', actual.methods, expected.methods, deviations);
+    this.compareArrayProperty(actual.name, 'imports', actual.imports, expected.imports, deviations);
+    this.compareArrayProperty(actual.name, 'exports', actual.exports, expected.exports, deviations);
   }
 
   private compareDTOEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
-    const actualDTO = actual as any;
-    const expectedDTO = expected as any;
+    if (!(actual instanceof DtoNode) || !(expected instanceof DtoNode)) {
+      return;
+    }
 
-    const actualFieldMap = new Map(actualDTO.fields?.map((f: any) => [f.name, f]) || []);
-    const expectedFieldMap = new Map(expectedDTO.fields?.map((f: any) => [f.name, f]) || []);
+    const actualFieldMap = new Map(actual.fields.map((field) => [field.name, field] as const));
+    const expectedFieldMap = new Map(expected.fields.map((field) => [field.name, field] as const));
 
     // Check for missing fields
     for (const [fieldName] of expectedFieldMap) {
@@ -278,33 +294,23 @@ export class AssertionEngine {
       const expectedField = expectedFieldMap.get(fieldName);
       const actualField = actualFieldMap.get(fieldName);
 
-      if (
-        actualField &&
-        expectedField &&
-        typeof expectedField === 'object' &&
-        expectedField !== null &&
-        'type' in expectedField &&
-        'optional' in expectedField
-      ) {
-        const expectedFieldObj = expectedField as { type: string; optional: boolean };
-        const actualFieldObj = actualField as { type: string; optional: boolean };
-
-        if (actualFieldObj.type !== expectedFieldObj.type) {
+      if (actualField && expectedField) {
+        if (actualField.type !== expectedField.type) {
           deviations.push({
             entityName: actual.name,
             property: `field.${fieldName}.type`,
-            expected: expectedFieldObj.type,
-            actual: actualFieldObj.type,
+            expected: expectedField.type,
+            actual: actualField.type,
             severity: 'error',
           });
         }
 
-        if (actualFieldObj.optional !== expectedFieldObj.optional) {
+        if (actualField.isOptional !== expectedField.isOptional) {
           deviations.push({
             entityName: actual.name,
             property: `field.${fieldName}.optional`,
-            expected: expectedFieldObj.optional,
-            actual: actualFieldObj.optional,
+            expected: expectedField.isOptional,
+            actual: actualField.isOptional,
             severity: 'warning',
           });
         }
@@ -313,20 +319,21 @@ export class AssertionEngine {
   }
 
   private compareConstantsEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
-    const actualConst = actual as any;
-    const expectedConst = expected as any;
+    if (!(actual instanceof ConstantsNode) || !(expected instanceof ConstantsNode)) {
+      return;
+    }
 
-    if (actualConst.path !== expectedConst.path) {
+    if (actual.path !== expected.path) {
       deviations.push({
         entityName: actual.name,
         property: 'path',
-        expected: expectedConst.path,
-        actual: actualConst.path,
+        expected: expected.path,
+        actual: actual.path,
         severity: 'warning',
       });
     }
 
-    this.compareStringProperty(actual.name, 'schema', actualConst.schema, expectedConst.schema, deviations);
+    this.compareStringProperty(actual.name, 'schema', actual.schema, expected.schema, deviations);
   }
 
   private compareStringProperty(
@@ -350,8 +357,8 @@ export class AssertionEngine {
   private compareArrayProperty(
     entityName: string,
     propertyName: string,
-    actual: string[] | undefined,
-    expected: string[] | undefined,
+    actual: readonly string[] | undefined,
+    expected: readonly string[] | undefined,
     deviations: Deviation[],
   ): void {
     const actualSet = new Set(actual || []);

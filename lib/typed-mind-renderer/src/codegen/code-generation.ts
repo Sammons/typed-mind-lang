@@ -7,12 +7,14 @@
 import {
   ClassFileNode,
   ClassNode,
+  DtoNode,
   type EntityKind,
   type EntityNode,
   FileNode,
   FunctionNode,
   LinkIndex,
   type ParseOutput,
+  UiComponentNode,
 } from '@sammons/typed-mind';
 
 /**
@@ -140,7 +142,9 @@ export class CodeGenerationEngine {
         generatedEntities.push(generated);
 
         // Collect dependencies
-        generated.dependencies.forEach((dep) => globalDependencies.add(dep));
+        for (const dep of generated.dependencies) {
+          globalDependencies.add(dep);
+        }
       } catch (error) {
         console.warn(`Failed to generate code for ${entity.name}:`, error);
       }
@@ -684,24 +688,18 @@ class TypeScriptGenerator extends LanguageGenerator {
     const files: GeneratedFile[] = [];
     const dependencies: CodeDependency[] = [];
 
-    switch (entity.kind) {
-      case 'DTO':
-        files.push(this.generateDTOInterface(entity as any, config));
-        break;
-      case 'Class':
-      case 'ClassFile':
-        files.push(this.generateClass(entity as any, config));
-        if (config.includeTests) {
-          files.push(this.generateClassTest(entity as any, config));
-        }
-        break;
-      case 'Function':
-        files.push(this.generateFunction(entity as any, config));
-        break;
-      case 'UIComponent':
-        files.push(...this.generateUIComponent(entity as any, config));
-        dependencies.push({ name: 'react', version: '^18.0.0', type: 'dependency', purpose: 'UI framework' });
-        break;
+    if (entity instanceof DtoNode) {
+      files.push(this.generateDTOInterface(entity, config));
+    } else if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
+      files.push(this.generateClass(entity, config));
+      if (config.includeTests) {
+        files.push(this.generateClassTest(entity, config));
+      }
+    } else if (entity instanceof FunctionNode) {
+      files.push(this.generateFunction(entity, config));
+    } else if (entity instanceof UiComponentNode) {
+      files.push(...this.generateUIComponent(entity, config));
+      dependencies.push({ name: 'react', version: '^18.0.0', type: 'dependency', purpose: 'UI framework' });
     }
 
     return {
@@ -715,13 +713,13 @@ class TypeScriptGenerator extends LanguageGenerator {
     };
   }
 
-  private generateDTOInterface(entity: any, config: CodeGenConfig): GeneratedFile {
-    const fields = entity.fields || [];
+  private generateDTOInterface(entity: DtoNode, config: CodeGenConfig): GeneratedFile {
+    const fields = entity.fields;
 
     const content = `${config.includeComments ? `/**\n * ${entity.purpose || `DTO for ${entity.name}`}\n */\n` : ''}export interface ${entity.name} {
 ${fields
-  .map((field: any) => {
-    const optional = field.optional ? '?' : '';
+  .map((field) => {
+    const optional = field.isOptional ? '?' : '';
     const comment = config.includeComments && field.description ? `\n  /** ${field.description} */` : '';
     return `${comment}\n  ${field.name}${optional}: ${field.type};`;
   })
@@ -741,10 +739,10 @@ ${config.includeTypeDefinitions ? `\nexport type Partial${entity.name} = Partial
     };
   }
 
-  private generateClass(entity: any, config: CodeGenConfig): GeneratedFile {
-    const methods = entity.methods || [];
+  private generateClass(entity: ClassNode | ClassFileNode, config: CodeGenConfig): GeneratedFile {
+    const methods = entity.methods;
     const extendsClause = entity.extends ? ` extends ${entity.extends}` : '';
-    const implementsClause = entity.implements?.length ? ` implements ${entity.implements.join(', ')}` : '';
+    const implementsClause = entity.implements.length ? ` implements ${entity.implements.join(', ')}` : '';
 
     const content = `${config.includeComments ? `/**\n * ${entity.purpose || `Class ${entity.name}`}\n */\n` : ''}export class ${entity.name}${extendsClause}${implementsClause} {
   constructor() {
@@ -753,7 +751,7 @@ ${config.includeTypeDefinitions ? `\nexport type Partial${entity.name} = Partial
 
 ${methods
   .map(
-    (method: string) => `  ${method}(): void {
+    (method) => `  ${method}(): void {
     // TODO: Implement ${method}
   }`,
   )
@@ -771,7 +769,7 @@ ${methods
     };
   }
 
-  private generateClassTest(entity: any, _config: CodeGenConfig): GeneratedFile {
+  private generateClassTest(entity: ClassNode | ClassFileNode, _config: CodeGenConfig): GeneratedFile {
     const content = `import { ${entity.name} } from '../classes/${entity.name}';
 
 describe('${entity.name}', () => {
@@ -799,7 +797,7 @@ describe('${entity.name}', () => {
     };
   }
 
-  private generateFunction(entity: any, config: CodeGenConfig): GeneratedFile {
+  private generateFunction(entity: FunctionNode, config: CodeGenConfig): GeneratedFile {
     const signature = entity.signature || `${entity.name}(): void`;
     const content = `${config.includeComments ? `/**\n * ${entity.description || `Function ${entity.name}`}\n */\n` : ''}export function ${signature} {
   // TODO: Implement function
@@ -816,7 +814,7 @@ describe('${entity.name}', () => {
     };
   }
 
-  private generateUIComponent(entity: any, config: CodeGenConfig): GeneratedFile[] {
+  private generateUIComponent(entity: UiComponentNode, config: CodeGenConfig): GeneratedFile[] {
     const files: GeneratedFile[] = [];
 
     // React component
@@ -909,7 +907,7 @@ class CodeTemplateEngine {
     this.templates.set(name, template);
   }
 
-  render(templateName: string, context: Record<string, any>): string {
+  render(templateName: string, context: Record<string, unknown>): string {
     const template = this.templates.get(templateName);
     if (!template) {
       throw new Error(`Template not found: ${templateName}`);

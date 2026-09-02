@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { ParsedModule, TypeScriptProjectAnalysis } from './types.ts';
+import { ClassFileNode, DtoNode } from '@sammons/typed-mind';
+import type { ParsedClass, ParsedModule, TypeScriptProjectAnalysis } from './types.ts';
 import { createFilePath } from './types.ts';
 import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
 
@@ -238,11 +239,11 @@ describe('TypeScriptToTypedMindConverter', () => {
     assert.equal(userServiceEntity?.kind, 'ClassFile');
 
     // Should have both class methods and file imports/exports
-    const classFile = userServiceEntity as any;
-    assert.ok(classFile.methods.includes('createUser'));
-    assert.ok(classFile.methods.includes('findUser'));
-    assert.ok(classFile.imports.includes('UserDTO'));
-    assert.ok(classFile.imports.includes('CreateUserDTO'));
+    assert.ok(userServiceEntity instanceof ClassFileNode);
+    assert.ok(userServiceEntity.methods.includes('createUser'));
+    assert.ok(userServiceEntity.methods.includes('findUser'));
+    assert.ok(userServiceEntity.imports.includes('UserDTO'));
+    assert.ok(userServiceEntity.imports.includes('CreateUserDTO'));
   });
 
   it('should create separate entities when preferClassFile is false', () => {
@@ -270,14 +271,16 @@ describe('TypeScriptToTypedMindConverter', () => {
     assert.notEqual(userDTO, undefined);
     assert.equal(userDTO?.kind, 'DTO');
 
-    const dto = userDTO as any;
-    assert.equal(dto.fields.length, 4);
+    assert.ok(userDTO instanceof DtoNode);
+    assert.equal(userDTO.fields.length, 4);
 
-    const idField = dto.fields.find((f: any) => f.name === 'id');
+    const idField = userDTO.fields.find((field) => field.name === 'id');
+    assert.ok(idField);
     assert.equal(idField.type, 'string');
     assert.equal(idField.isOptional, false);
 
-    const createdAtField = dto.fields.find((f: any) => f.name === 'createdAt');
+    const createdAtField = userDTO.fields.find((field) => field.name === 'createdAt');
+    assert.ok(createdAtField);
     assert.equal(createdAtField.isOptional, true);
   });
 
@@ -326,8 +329,10 @@ describe('TypeScriptToTypedMindConverter', () => {
   it('should skip private members by default', () => {
     const analysis = createMockAnalysis();
 
-    // Add a private method to the class
-    const userServiceClass = analysis.modules[1].classes[0] as any;
+    // Add a private method to the class. The mock fixture types its arrays
+    // `readonly`, but this test intentionally mutates them in place, so
+    // `methods` is cast through a mutable-array shape rather than `any`.
+    const userServiceClass = analysis.modules[1].classes[0] as ParsedClass & { methods: ParsedClass['methods'][number][] };
     userServiceClass.methods.push({
       name: 'privateHelper',
       signature: 'privateHelper() => void',
@@ -343,15 +348,18 @@ describe('TypeScriptToTypedMindConverter', () => {
     const converter = new TypeScriptToTypedMindConverter({ includePrivateMembers: false });
     const result = converter.convert(analysis);
 
-    const userServiceEntity = result.entities.find((e) => e.name === 'UserService') as any;
+    const userServiceEntity = result.entities.find((e) => e.name === 'UserService');
+    assert.ok(userServiceEntity instanceof ClassFileNode);
     assert.ok(!userServiceEntity.methods.includes('privateHelper'));
   });
 
   it('should include private members when requested', () => {
     const analysis = createMockAnalysis();
 
-    // Add a private method to the class
-    const userServiceClass = analysis.modules[1].classes[0] as any;
+    // Add a private method to the class. The mock fixture types its arrays
+    // `readonly`, but this test intentionally mutates them in place, so
+    // `methods` is cast through a mutable-array shape rather than `any`.
+    const userServiceClass = analysis.modules[1].classes[0] as ParsedClass & { methods: ParsedClass['methods'][number][] };
     userServiceClass.methods.push({
       name: 'privateHelper',
       signature: 'privateHelper() => void',
@@ -367,7 +375,8 @@ describe('TypeScriptToTypedMindConverter', () => {
     const converter = new TypeScriptToTypedMindConverter({ includePrivateMembers: true });
     const result = converter.convert(analysis);
 
-    const userServiceEntity = result.entities.find((e) => e.name === 'UserService') as any;
+    const userServiceEntity = result.entities.find((e) => e.name === 'UserService');
+    assert.ok(userServiceEntity instanceof ClassFileNode);
     assert.ok(userServiceEntity.methods.includes('privateHelper'));
   });
 

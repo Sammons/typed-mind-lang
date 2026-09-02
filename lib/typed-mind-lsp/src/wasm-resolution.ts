@@ -21,8 +21,8 @@
 // keeps the dev layout behavior (§2, "the core default already works")
 // unchanged rather than duplicating it here.
 
-import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,14 +30,15 @@ import { fileURLToPath } from 'node:url';
 // so import.meta.url is undefined there. Fall back to __dirname which CJS
 // provides natively. ESM (dev/test via node --test) has import.meta.url but
 // no __dirname — the ternary covers both.
-const thisDir = typeof import.meta.url === 'string'
-  ? dirname(fileURLToPath(import.meta.url))
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- __dirname exists only in CJS; guarded for ESM safety
-  : typeof __dirname === 'string' ? __dirname : process.cwd();
+const thisDir =
+  typeof import.meta.url === 'string'
+    ? dirname(fileURLToPath(import.meta.url))
+    : // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- __dirname exists only in CJS; guarded for ESM safety
+      typeof __dirname === 'string'
+      ? __dirname
+      : process.cwd();
 
-const esmRequire = typeof import.meta.url === 'string'
-  ? createRequire(import.meta.url)
-  : createRequire(__filename);
+const esmRequire = typeof import.meta.url === 'string' ? createRequire(import.meta.url) : createRequire(__filename);
 
 export interface ResolvedWasmPaths {
   readonly wasmPath?: string;

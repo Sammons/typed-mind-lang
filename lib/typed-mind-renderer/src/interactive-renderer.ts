@@ -5,7 +5,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ClassFileNode, DependencyNode, type Diagnostic, FileNode, FunctionNode, type ParseOutput, ProgramNode } from '@sammons/typed-mind';
@@ -34,7 +34,7 @@ export interface ViewState {
 export interface InteractionEvent {
   type: 'selection' | 'filter' | 'zoom' | 'pan' | 'layout' | 'search' | 'focus';
   timestamp: number;
-  data: any;
+  data: unknown;
   state: Partial<ViewState>;
 }
 
@@ -106,21 +106,17 @@ class InteractiveTypedMindRenderer {
         const html = this.getHTML();
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(html);
-      }
-      else if (url === '/interactive-renderer.js') {
+      } else if (url === '/interactive-renderer.js') {
         const js = this.generateInteractiveRendererJS();
         res.writeHead(200, { 'Content-Type': 'application/javascript' });
         res.end(js);
-      }
-      else if (url === '/api/graph') {
+      } else if (url === '/api/graph') {
         const data = this.getGraphData();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(data));
-      }
-      else if (url === '/api/export' && req.method === 'POST') {
+      } else if (url === '/api/export' && req.method === 'POST') {
         this.handleExportRequest(req, res);
-      }
-      else {
+      } else {
         res.writeHead(404);
         res.end('Not found');
       }
@@ -144,7 +140,7 @@ ${this.generateInteractiveRendererJS()}
     return html.replace('<script src="interactive-renderer.js"></script>', inlineScript);
   }
 
-  private handleExportRequest(req: any, res: any): void {
+  private handleExportRequest(req: IncomingMessage, res: ServerResponse): void {
     let body = '';
     req.on('data', (chunk: Buffer) => {
       body += chunk.toString();
@@ -157,16 +153,16 @@ ${this.generateInteractiveRendererJS()}
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
-      }
-      catch (_error) {
+      } catch (_error) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid export request' }));
       }
     });
   }
 
-  private processExport(exportData: any): any {
-    const { format } = exportData;
+  private processExport(exportData: unknown) {
+    // Request body is untrusted JSON; `format` is read defensively and validated by the switch below.
+    const format = (exportData as { format?: unknown } | null)?.format;
     const data = this.getGraphData();
 
     switch (format) {
@@ -179,11 +175,15 @@ ${this.generateInteractiveRendererJS()}
     }
   }
 
-  private convertToCSV(data: any): string {
+  private convertToCSV(data: ReturnType<InteractiveTypedMindRenderer['getGraphData']>): string {
     if (!data.entities || data.entities.length === 0) return '';
 
-    const headers = ['name', 'type', 'path', 'signature', 'description'];
-    const rows = data.entities.map((entity: any) => headers.map((header) => `"${(entity[header] || '').replace(/"/g, '""')}"`).join(','));
+    const headers = ['name', 'type', 'path', 'signature', 'description'] as const;
+    const rows = data.entities.map((entity) =>
+      headers
+        .map((header) => `"${(((entity as unknown as Record<string, unknown>)[header] as string | undefined) || '').replace(/"/g, '""')}"`)
+        .join(','),
+    );
 
     return [headers.join(','), ...rows].join('\n');
   }
@@ -193,8 +193,7 @@ ${this.generateInteractiveRendererJS()}
     const htmlPath = join(srcDir, 'static', 'interactive-index.html');
     try {
       return readFileSync(htmlPath, 'utf-8');
-    }
-    catch {
+    } catch {
       const enhancedHtmlPath = join(srcDir, 'static', 'enhanced-index.html');
       const html = readFileSync(enhancedHtmlPath, 'utf-8');
       return html.replace('enhanced-renderer.js', 'interactive-renderer.js');
@@ -205,9 +204,7 @@ ${this.generateInteractiveRendererJS()}
     const data = this.getGraphData();
     const clientJsDir = join(sourceDir, 'static', 'client-js');
 
-    const classMethods = CLIENT_JS_FRAGMENTS
-      .map(name => readFileSync(join(clientJsDir, name), 'utf-8'))
-      .join('\n');
+    const classMethods = CLIENT_JS_FRAGMENTS.map((name) => readFileSync(join(clientJsDir, name), 'utf-8')).join('\n');
 
     return `
 // Interactive TypedMind Renderer - Full Feature Implementation
@@ -240,7 +237,7 @@ ${classMethods}
 
     const entities = this.graph.entities;
     const byName = new Map(entities.map((entity) => [entity.name, entity]));
-    const links: any[] = [];
+    const links: Array<{ source: string; target: string; type: 'import' | 'export' | 'call' | 'entry' }> = [];
 
     // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — class dispatch over EntityNode
     // subclasses replaces the legacy 'imports' in entity / 'exports' in
@@ -260,8 +257,7 @@ ${classMethods}
             links.push({ source: entity.name, target: exp, type: 'export' });
           }
         }
-      }
-      else if (entity instanceof DependencyNode || entity instanceof ProgramNode) {
+      } else if (entity instanceof DependencyNode || entity instanceof ProgramNode) {
         for (const exp of entity.exports ?? []) {
           if (byName.has(exp)) {
             links.push({ source: entity.name, target: exp, type: 'export' });
@@ -296,11 +292,9 @@ ${classMethods}
     let command: string;
     if (platform === 'darwin') {
       command = `open ${url}`;
-    }
-    else if (platform === 'win32') {
+    } else if (platform === 'win32') {
       command = `start ${url}`;
-    }
-    else {
+    } else {
       command = `xdg-open ${url}`;
     }
 

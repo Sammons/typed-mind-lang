@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
 import { ClassFileNode, DependencyNode, type Diagnostic, FileNode, FunctionNode, type ParseOutput, ProgramNode } from '@sammons/typed-mind';
 
 export interface EnhancedRendererOptions {
@@ -135,7 +136,7 @@ ${this.generateRendererJS()}
     return this.generateOriginalRendererJS(data);
   }
 
-  private generateInteractiveRendererJS(data: any): string {
+  private generateInteractiveRendererJS(data: ReturnType<EnhancedTypedMindRenderer['getGraphData']>): string {
     // Use the comprehensive interactive renderer from interactive-renderer.ts
     try {
       // For now, use a simplified approach that embeds the interactive features
@@ -224,7 +225,7 @@ ${this.generateRendererJS()}
     }
   }
 
-  private generateEnhancedRendererContent(_data: any): string {
+  private generateEnhancedRendererContent(_data: ReturnType<EnhancedTypedMindRenderer['getGraphData']>): string {
     // Extract the core functionality from enhanced renderer for reuse
     return `
     // Core enhanced renderer functionality would be included here
@@ -325,7 +326,7 @@ ${this.generateRendererJS()}
     `;
   }
 
-  private generateEnhancedRendererJS(data: any): string {
+  private generateEnhancedRendererJS(data: ReturnType<EnhancedTypedMindRenderer['getGraphData']>): string {
     return `
 // Enhanced TypedMind Renderer
 (function() {
@@ -1018,7 +1019,7 @@ ${this.generateRendererJS()}
 `;
   }
 
-  private generateOriginalRendererJS(data: any): string {
+  private generateOriginalRendererJS(data: ReturnType<EnhancedTypedMindRenderer['getGraphData']>): string {
     // Return the original renderer for fallback
     return `
 // Original TypedMind Renderer (Fallback)
@@ -1266,7 +1267,7 @@ ${this.generateRendererJS()}
 
     const entities = this.graph.entities;
     const byName = new Map(entities.map((entity) => [entity.name, entity]));
-    const links: any[] = [];
+    const links: Array<{ source: string; target: string; type: 'import' | 'export' | 'call' | 'entry' }> = [];
 
     // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — class dispatch over EntityNode
     // subclasses replaces the legacy 'imports' in entity / 'exports' in

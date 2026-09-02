@@ -49,7 +49,9 @@ describe('TypedMind.create() (built dist layout, new surface smoke)', () => {
   it('parses, checks, and emits the hero fixture from the compiled ESM output', () => {
     // Ensure dist/ reflects the current sources; tsc --build is incremental.
     execFileSync(join(repoRoot, 'node_modules', '.bin', 'tsc'), ['--build'], { cwd: packageDir, encoding: 'utf8' });
-    const stdout = execFileSync(process.execPath, ['--input-type=module', '-e', childScript, distEntryPath, heroPath], { encoding: 'utf8' });
+    const stdout = execFileSync(process.execPath, ['--input-type=module', '-e', childScript, distEntryPath, heroPath], {
+      encoding: 'utf8',
+    });
     const result = JSON.parse(stdout);
     assert.equal(result.linksIsPresent, true);
     assert.equal(typeof result.entityCount, 'number');
