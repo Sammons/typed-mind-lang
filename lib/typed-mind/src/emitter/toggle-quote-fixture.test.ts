@@ -40,6 +40,8 @@ import { TypedMindParser } from '../pipeline/typed-mind-parser.ts';
 import { emitLongform as emitLongformEntity } from './emit-longform.ts';
 import { emitShortform as emitShortformEntity } from './emit-shortform.ts';
 import { suppressionsToLongformBlock, suppressionToShortformLine } from './emit-suppression.ts';
+import { QUOTE_SWAP_CODE } from './emitter-diagnostics.ts';
+import { SyntaxEmitter } from './syntax-emitter.ts';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = join(testDir, '..', '..');
@@ -168,5 +170,62 @@ describe('bucket-b (issue #103 addendum, NOT fixed): TypeDef alias containing a 
       `expected the known #103-family syntax/error to still reproduce, got: ${JSON.stringify(reparsed.diagnostics)}`,
     );
     assert.equal(syntaxDiagnostics[0]?.code, 'syntax/error');
+  });
+});
+
+// Issue #130 (git.tail4ea214.ts.net/sammons/typed-mind-lang), disposition
+// (b) — the toggle-fidelity harness case for the fix above: the quote swap
+// this file's first describe block confirms is no longer CORRUPTING must
+// now also no longer be SILENT. `toggleFormatWithDiagnostics` is the surface
+// the LSP's toggle-format command (lib/typed-mind-lsp/src/toggle-format.ts)
+// calls; this asserts the warning actually reaches that surface end to end
+// (a ParseOutcome carrying a description with an embedded `"` -> toggleFormat
+// -> Diagnostic), not just the lower-level quoteSwapDiagnosticsFor unit
+// (emitter-diagnostics.test.ts covers that unit in isolation). The entity is
+// constructed directly rather than parsed from `.tmd` source text, matching
+// this file's own first describe block: an embedded `"` is structurally
+// UNREPRESENTABLE in the grammar's string token (this file's header
+// comment), so no `.tmd` source string could ever produce one — the AST is
+// the only way this shape reaches the emitter, exactly the scenario this
+// fix protects against.
+describe('bucket-a fix, issue #130: the quote swap now surfaces a warning instead of staying silent', () => {
+  it('toggling a shortform-authored description containing a double quote to longform reports emitter/quote-swap', () => {
+    const dto = new DtoNode({
+      name: 'Foo',
+      span: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
+      raw: '',
+      sourceForm: 'shortform',
+      purpose: 'the "canonical" name',
+      fields: [],
+    });
+    const outcome = { entities: [dto], imports: [], suppressions: [], diagnostics: [] };
+    const emitter = new SyntaxEmitter();
+    const { text: longform, diagnostics } = emitter.toggleFormatWithDiagnostics(outcome, 'shortform');
+    const quoteSwapDiagnostics = diagnostics.filter((diagnostic) => diagnostic.code === QUOTE_SWAP_CODE);
+    assert.equal(quoteSwapDiagnostics.length, 1, `expected exactly one quote-swap warning, got: ${JSON.stringify(diagnostics)}`);
+    assert.equal(quoteSwapDiagnostics[0]?.severity, 'warning');
+    assert.match(quoteSwapDiagnostics[0]?.message ?? '', /'Foo'/);
+    assert.match(quoteSwapDiagnostics[0]?.message ?? '', /rewritten to a single quote/);
+    // The emitted text itself is unchanged by this fix (disposition (b) keeps
+    // the swap, it only stops the silence) — still reparses clean.
+    assert.match(longform, /description: "the 'canonical' name"/);
+  });
+
+  it('toggling a description with no double quote reports zero emitter/quote-swap diagnostics', () => {
+    const dto = new DtoNode({
+      name: 'Foo',
+      span: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
+      raw: '',
+      sourceForm: 'shortform',
+      purpose: 'the canonical name',
+      fields: [],
+    });
+    const outcome = { entities: [dto], imports: [], suppressions: [], diagnostics: [] };
+    const emitter = new SyntaxEmitter();
+    const { diagnostics } = emitter.toggleFormatWithDiagnostics(outcome, 'shortform');
+    assert.deepEqual(
+      diagnostics.filter((diagnostic) => diagnostic.code === QUOTE_SWAP_CODE),
+      [],
+    );
   });
 });

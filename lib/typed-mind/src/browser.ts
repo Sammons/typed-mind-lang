@@ -124,6 +124,16 @@ export class TypedMindBrowser {
     return this.#emitter.toggleFormat(outcome, format);
   }
 
+  // Issue #130, disposition (b) — mirrors typed-mind.ts's
+  // `toggleFormatWithDiagnostics`: same quote-swap `Diagnostic`s
+  // (emitter-diagnostics.ts), no filePath parameter (same browser-facade
+  // constraint as every other method on this class).
+  toggleFormatWithDiagnostics(source: string): { text: string; diagnostics: Diagnostic[] } {
+    const outcome = this.#parser.parse(source);
+    const { format } = detectFormat(source);
+    return this.#emitter.toggleFormatWithDiagnostics(outcome, format);
+  }
+
   detectFormat(source: string): FormatDetectionResult {
     return detectFormat(source);
   }

@@ -18,13 +18,14 @@
 // fires, THIS entity emits longform regardless of `forceForm`, while every
 // other entity in the document still honors the caller's forced form — the
 // exception is per-entity, not a silent downgrade of the whole document.
+import type { Diagnostic } from '../ast/diagnostic.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import type { SuppressionNode } from '../ast/suppression-node.ts';
 import type { ParseOutcome } from '../pipeline/parse-outcome.ts';
 import { detectFormat, type FormatDetectionResult, type SyntaxFormat } from './detect-format.ts';
-import { emitLongform } from './emit-longform.ts';
-import { emitShortform, shortformCannotExpress } from './emit-shortform.ts';
-import { suppressionsToLongformBlock, suppressionToShortformLine } from './emit-suppression.ts';
+import { emitLongform, emitLongformWithDiagnostics } from './emit-longform.ts';
+import { emitShortform, emitShortformWithDiagnostics, shortformCannotExpress } from './emit-shortform.ts';
+import { quoteSwapDiagnosticsForSuppressions, suppressionsToLongformBlock, suppressionToShortformLine } from './emit-suppression.ts';
 
 export type { FormatDetectionResult, SyntaxFormat };
 export { detectFormat };
@@ -39,10 +40,22 @@ export interface EmitOptions {
   readonly forceForm?: SyntaxFormat;
 }
 
-const emitEntity = (entity: EntityNode, options: EmitOptions): string[] => {
+const resolvedFormFor = (entity: EntityNode, options: EmitOptions): SyntaxFormat => {
   const requestedForm = options.forceForm ?? entity.sourceForm;
-  const form = requestedForm === 'shortform' && shortformCannotExpress(entity) ? 'longform' : requestedForm;
+  return requestedForm === 'shortform' && shortformCannotExpress(entity) ? 'longform' : requestedForm;
+};
+
+const emitEntity = (entity: EntityNode, options: EmitOptions): string[] => {
+  const form = resolvedFormFor(entity, options);
   return form === 'longform' ? emitLongform(entity) : emitShortform(entity);
+};
+
+// Issue #130, disposition (b) — same per-entity form resolution as
+// `emitEntity`, additionally collecting the quote-swap diagnostics each
+// entity's emission produced.
+const emitEntityWithDiagnostics = (entity: EntityNode, options: EmitOptions): { lines: string[]; diagnostics: Diagnostic[] } => {
+  const form = resolvedFormFor(entity, options);
+  return form === 'longform' ? emitLongformWithDiagnostics(entity) : emitShortformWithDiagnostics(entity);
 };
 
 // RFC-TM-8 §7 (rfc-tm-8-diamond.md, X-SUPP-4): suppressions carry no
@@ -91,5 +104,42 @@ export class SyntaxEmitter {
   toggleFormat(outcome: ParseOutcome, currentFormat: SyntaxFormat): string {
     const targetForm: SyntaxFormat = currentFormat === 'longform' ? 'shortform' : 'longform';
     return this.emit(outcome, { forceForm: targetForm });
+  }
+
+  // Issue #130, disposition (b) — sibling of `emit` that additionally
+  // collects every quote-swap `Diagnostic` (emitter-diagnostics.ts) produced
+  // while quoting free-text fields. Added as a new method rather than
+  // changing `emit`'s own return shape so every existing caller of
+  // `emit`/`emitShortform`/`emitLongform`/`toggleFormat` keeps compiling and
+  // behaving unchanged; a caller that wants the warnings opts into this
+  // parallel surface instead.
+  emitWithDiagnostics(outcome: ParseOutcome, options: EmitOptions = {}): { text: string; diagnostics: Diagnostic[] } {
+    const diagnostics: Diagnostic[] = [];
+    const entityBlocks = outcome.entities.map((entity) => {
+      const result = emitEntityWithDiagnostics(entity, options);
+      diagnostics.push(...result.diagnostics);
+      return result.lines.join('\n');
+    });
+    const suppressionForm: SyntaxFormat = options.forceForm ?? 'shortform';
+    const suppressionLines = emitSuppressions(outcome.suppressions, suppressionForm);
+    diagnostics.push(...quoteSwapDiagnosticsForSuppressions(outcome.suppressions));
+    const blocks = suppressionLines.length === 0 ? entityBlocks : [...entityBlocks, suppressionLines.join('\n')];
+    return { text: blocks.join('\n\n').trim(), diagnostics };
+  }
+
+  emitShortformWithDiagnostics(outcome: ParseOutcome): { text: string; diagnostics: Diagnostic[] } {
+    return this.emitWithDiagnostics(outcome, { forceForm: 'shortform' });
+  }
+
+  emitLongformWithDiagnostics(outcome: ParseOutcome): { text: string; diagnostics: Diagnostic[] } {
+    return this.emitWithDiagnostics(outcome, { forceForm: 'longform' });
+  }
+
+  // Same honest-toggle contract as `toggleFormat`, additionally surfacing
+  // the quote-swap diagnostics for the caller to display (LSP toggle-format
+  // command, playground, a future CLI emission surface).
+  toggleFormatWithDiagnostics(outcome: ParseOutcome, currentFormat: SyntaxFormat): { text: string; diagnostics: Diagnostic[] } {
+    const targetForm: SyntaxFormat = currentFormat === 'longform' ? 'shortform' : 'longform';
+    return this.emitWithDiagnostics(outcome, { forceForm: targetForm });
   }
 }

@@ -17,6 +17,7 @@ import type { ClassFileNode } from '../ast/class-file-node.ts';
 import type { ClassNode } from '../ast/class-node.ts';
 import type { ConstantsNode } from '../ast/constants-node.ts';
 import type { DependencyNode } from '../ast/dependency-node.ts';
+import type { Diagnostic } from '../ast/diagnostic.ts';
 import type { DtoNode } from '../ast/dto-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import type { FileNode } from '../ast/file-node.ts';
@@ -25,6 +26,7 @@ import type { ProgramNode } from '../ast/program-node.ts';
 import type { RunParameterNode } from '../ast/run-parameter-node.ts';
 import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
+import { quoteSwapDiagnosticsFor } from './emitter-diagnostics.ts';
 import { printTypeExpr } from './print-type-expr.ts';
 import { quoteStringLiteral } from './quote-string-literal.ts';
 
@@ -400,4 +402,14 @@ export const emitShortform = (entity: EntityNode): string[] => {
   })();
   const commentToEmit = entity.comment === bodyAlreadyShows(entity) ? undefined : entity.comment;
   return withInlineComment(body, commentToEmit);
+};
+
+// Issue #130, disposition (b) — sibling of `emitShortform` that additionally
+// reports every quote-swap `quoteStringLiteral` performed while producing
+// these lines, as structured `Diagnostic`s (emitter-diagnostics.ts). Added
+// rather than changing `emitShortform`'s own return shape so every existing
+// caller (emit-longform.ts's sibling functions do not call this one, but
+// syntax-emitter.ts and every downstream facade do) keeps working unchanged.
+export const emitShortformWithDiagnostics = (entity: EntityNode): { lines: string[]; diagnostics: Diagnostic[] } => {
+  return { lines: emitShortform(entity), diagnostics: quoteSwapDiagnosticsFor(entity, 'shortform') };
 };

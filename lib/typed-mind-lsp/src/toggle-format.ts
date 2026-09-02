@@ -26,8 +26,17 @@
 // corrupting it. Import resolution is correct only when the toggled text is
 // the whole document; a selection falls back to single-document mode.
 
+// Issue #130, disposition (b) (git.tail4ea214.ts.net/sammons/typed-mind-lang)
+// — `newText` above may still contain a `"` swapped to a `'` (quoteStringLiteral,
+// lib/typed-mind's emitter/quote-string-literal.ts): the grammar has no
+// escaped-quote production, so the swap is the only mechanically-safe move
+// today (disposition (a), a grammar-level fix, remains open design work).
+// `diagnostics` names every entity/property that swap touched via
+// `typedMind.toggleFormatWithDiagnostics`, so this handler no longer stays
+// silent about a rewrite it already knew about.
+
 import { fileURLToPath } from 'node:url';
-import type { TypedMind } from '@sammons/typed-mind';
+import type { Diagnostic, TypedMind } from '@sammons/typed-mind';
 
 export interface ToggleFormatParams {
   readonly uri: string;
@@ -37,6 +46,7 @@ export interface ToggleFormatParams {
 export interface ToggleFormatResult {
   readonly newText: string;
   readonly error?: string;
+  readonly diagnostics?: readonly Diagnostic[];
 }
 
 export const handleToggleFormat = (typedMind: TypedMind, fullText: string, params: ToggleFormatParams): ToggleFormatResult => {
@@ -50,8 +60,8 @@ export const handleToggleFormat = (typedMind: TypedMind, fullText: string, param
     }
   }
   const filePath = params.range === undefined ? toFilePathOrUndefined(params.uri) : undefined;
-  const newText = typedMind.toggleFormat(textToProcess, filePath);
-  return { newText };
+  const { text: newText, diagnostics } = typedMind.toggleFormatWithDiagnostics(textToProcess, filePath);
+  return diagnostics.length === 0 ? { newText } : { newText, diagnostics };
 };
 
 const toFilePathOrUndefined = (uri: string): string | undefined => {
