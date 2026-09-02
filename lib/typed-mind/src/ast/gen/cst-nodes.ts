@@ -566,6 +566,9 @@ export class CstFreetextValue extends CstNode {
   constructor(syntaxNode: SyntaxNode) {
     super(syntaxNode, CstFreetextValue.nodeTypes);
   }
+  stringChildren(): CstString[] {
+    return this.childrenOfTypes(['string'], CstString);
+  }
 }
 
 export class CstFunctionDeclaration extends CstNode {

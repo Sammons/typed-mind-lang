@@ -131,20 +131,24 @@ describe('RFC-TM-10 Q3 check — D-LEG-6: traversal-enqueue makes the handler mo
     //     (`ast-validator.test.ts:366-380`, an import-then-export exporter
     //     with no Program involved) and bounded by a dedicated negative
     //     fixture (`ast-validator.test.ts`, "Program-scoped exposure bound").
-    //   - `syntax/error` x2 — UNCHANGED, out of this amendment's scope: the
-    //     same pre-existing gap named in the prior pin
-    //     (`isDTOLikeType`-classified `Promise<{ statusCode: number }>`
-    //     routing an inline object-literal return type raw through
-    //     `output`). Re-confirmed live and out of scope for BOTH #86 (fixed
-    //     this same increment — that fix is the newline-collapse only, and
-    //     this shape is a single-line object-literal, unrelated) and this
-    //     amendment. Filed as a new issue alongside #86's own disclosed
-    //     residuals (see this PR's body / the vault delta note) — not fixed
-    //     here.
+    //   - `syntax/error` x2 — RESOLVED (issue #103). The prior pin named the
+    //     cause as `isDTOLikeType`-classified `Promise<{ statusCode: number }>`
+    //     routing an inline object-literal return type raw through `output`,
+    //     and held it out of scope. The real defect was one layer down, in
+    //     the grammar: this assertion reaches the parser through
+    //     `checkViaLongform`, so the signature text lands in a longform
+    //     `signature:` property (P7 `property_freetext`) rather than the
+    //     shortform `Name :: signature` production. `freetext_value` could
+    //     not represent what `signature` could, and P3 `property_identifier`
+    //     stole any value whose first whitespace-delimited chunk was a bare
+    //     identifier — so this fixture's `async handler(...)` signature
+    //     ERRORed in longform while parsing clean in shortform. Fixed in
+    //     `lib/typed-mind/grammar/grammar.js` (issue #103); the residual set
+    //     is now empty, and this pin is the cause-linked update.
     const { result: checkResult } = await checkViaLongform(result.entities);
     assert.deepEqual(
       checkResult.diagnostics.map((d) => d.code).sort(),
-      ['syntax/error', 'syntax/error'].sort(),
+      [],
       'residual diagnostics are the named, pre-existing set only — a NEW code here is a regression this fixture must catch',
     );
   });
