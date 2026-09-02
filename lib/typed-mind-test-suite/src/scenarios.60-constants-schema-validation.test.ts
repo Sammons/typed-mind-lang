@@ -83,12 +83,7 @@ describe('Scenario 60: Constants schema validation', () => {
       true,
     );
 
-    const links = computeLinks(outcome.entities);
-    const validation = new AstValidator().validate(outcome, links);
-    const errors = validation.findings.map((e) => e.message);
-
     // Circular references in DTOs might be flagged
-    const _circularErrors = errors.filter((e) => e.includes('Circular'));
     // The validator may or may not catch this - it depends on implementation
   });
 

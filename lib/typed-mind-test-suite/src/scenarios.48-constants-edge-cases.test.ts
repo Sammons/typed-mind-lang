@@ -29,7 +29,6 @@ describe('Scenario 48: Constants Edge Cases', () => {
 
     // Constants with non-existent schema should be valid but the schema should not be found
     // (but the validator might not specifically flag this as missing schema anymore)
-    const _schemaErrors = result.diagnostics.filter((diagnostic) => diagnostic.message.includes('NonExistentSchema'));
     // We may or may not get a specific "NonExistentSchema not found" error
 
     // Constants without schema should be valid (no error)

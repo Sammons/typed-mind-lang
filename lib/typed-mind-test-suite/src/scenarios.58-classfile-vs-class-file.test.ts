@@ -149,8 +149,11 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
     assert.deepEqual(dataFile?.imports, ['Database']);
     assert.deepEqual(dataFile?.exports, ['DataClass', 'DataFile']);
 
-    // Classes can't have paths (@ syntax)
+    // Classes can't have paths (@ syntax) -- ClassNode has no `path` field at all (F3
+    // disposition, RFC-TM-3 §2.2), so the absence is a compile-time guarantee, not a
+    // runtime check. `in` proves the field is absent without accessing a nonexistent property.
     const dataClass = entitiesArray.find((e): e is ClassNode => e instanceof ClassNode && e.name === 'DataClass');
-    assert.equal(dataClass?.path, undefined);
+    assert.notEqual(dataClass, undefined);
+    assert.equal(dataClass ? 'path' in dataClass : true, false);
   });
 });

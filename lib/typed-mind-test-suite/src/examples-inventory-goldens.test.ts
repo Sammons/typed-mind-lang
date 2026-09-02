@@ -166,7 +166,10 @@ describe('examples inventory golden diagnostics (S-TEST-4)', () => {
       }
 
       const links = computeLinks(entities);
-      const validation = new AstValidator().validate({ entities, imports: outcome.imports, diagnostics }, links);
+      const validation = new AstValidator().validate(
+        { entities, imports: outcome.imports, suppressions: outcome.suppressions, diagnostics },
+        links,
+      );
       const allDiagnostics = [...diagnostics, ...toDiagnostics(validation.findings)];
       const valid = allDiagnostics.every((diagnostic) => diagnostic.severity !== 'error');
 
