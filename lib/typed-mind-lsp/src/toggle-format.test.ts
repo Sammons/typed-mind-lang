@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { TypedMind } from '@sammons/typed-mind';
+import { QUOTE_SWAP_CODE, TypedMind } from '@sammons/typed-mind';
 import { handleToggleFormat } from './toggle-format.ts';
 
 const SOURCE = `AppEntry @ src/index.ts:
@@ -81,5 +81,57 @@ describe('handleToggleFormat (RFC-TM-5 §1)', () => {
     // scenario-20 also references locally) — its absence proves imports
     // stayed unresolved rather than the conversion silently succeeding.
     assert.equal(result.newText.includes('AuthFile'), false);
+  });
+
+  // Issue #130, PR #141 review blocker 2 — the response.diagnostics field
+  // was computed and forwarded but nothing downstream ever read it (the
+  // VS Code extension's response type omitted the field entirely). This
+  // guards the handler's OWN forwarding contract in isolation: given a
+  // toggleFormatWithDiagnostics call that returns diagnostics, the request
+  // response must carry them verbatim.
+  //
+  // A real quote-swap cannot be driven end-to-end from PARSED `.tmd` source
+  // here: the grammar's string token has no escape production at all (per
+  // quote-string-literal.ts's own header comment), so no source text this
+  // handler could parse ever contains the embedded `"` the swap fires on —
+  // confirmed by direct probe (`Status = "he said \"hi\""` fails to parse
+  // with a `syntax/error`, never reaches the emitter). The swap is reachable
+  // only via a synthetically-constructed AST (a converter, an LSP code
+  // action), which `TypedMind.toggleFormatWithDiagnostics` cannot be handed
+  // directly (it always parses `source` itself). A minimal fake standing in
+  // for the one method `handleToggleFormat` actually calls is therefore the
+  // right shape for this unit: it proves the PLUMBING (forward whatever the
+  // facade returns), which is exactly what blocker 2 found broken — the
+  // emitter-diagnostics.test.ts / toggle-quote-fixture.test.ts suites in
+  // lib/typed-mind already prove the facade computes real diagnostics for a
+  // real (AST-constructed) swap.
+  it('forwards diagnostics from toggleFormatWithDiagnostics verbatim onto the response', () => {
+    const fakeDiagnostic = {
+      code: QUOTE_SWAP_CODE,
+      severity: 'warning' as const,
+      span: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
+      message:
+        "'purpose' on 'Foo' contained a double quote, which was rewritten to a single quote — the grammar has no escaped-quote form, so this emission cannot preserve the original character",
+    };
+    const fakeTypedMind = {
+      toggleFormatWithDiagnostics: () => ({ text: 'Foo % "a quoted phrase"', diagnostics: [fakeDiagnostic] }),
+      // Cast: handleToggleFormat's only call against `typedMind` is
+      // `toggleFormatWithDiagnostics` — this fake stands in for exactly that
+      // one method rather than constructing a real TypedMind (which always
+      // re-parses `source` itself and so cannot be made to return a
+      // synthetic diagnostic for real parsed input, per this test's own
+      // header comment).
+    } as unknown as TypedMind;
+    const result = handleToggleFormat(fakeTypedMind, SOURCE, { uri: 'file:///test.tmd' });
+    assert.deepEqual(result, { newText: 'Foo % "a quoted phrase"', diagnostics: [fakeDiagnostic] });
+  });
+
+  it('omits diagnostics from the response entirely when toggleFormatWithDiagnostics returns none (keeps the response shape minimal)', () => {
+    const fakeTypedMind = {
+      toggleFormatWithDiagnostics: () => ({ text: 'Foo % "a phrase"', diagnostics: [] }),
+    } as unknown as TypedMind;
+    const result = handleToggleFormat(fakeTypedMind, SOURCE, { uri: 'file:///test.tmd' });
+    assert.deepEqual(result, { newText: 'Foo % "a phrase"' });
+    assert.equal('diagnostics' in result, false);
   });
 });
