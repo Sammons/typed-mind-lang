@@ -142,6 +142,14 @@ const functionToLongform = (entity: FunctionNode): string[] => {
   if (entity.consumes !== undefined && entity.consumes.length > 0) {
     body.push(`consumes: [${entity.consumes.join(', ')}]`);
   }
+  // Issue #121: pendingDependencies is the unresolved residue of a shortform
+  // `<- [...]` import-list continuation after Q4's forward-semantics
+  // distribution (RFC-TM-3 §3.4) sorts resolvable names into
+  // calls/affects/consumes/input. `dependencies` mirrors those siblings'
+  // bare-plural-noun naming and was unused as a longform key before this fix.
+  if (entity.pendingDependencies.length > 0) {
+    body.push(`dependencies: [${entity.pendingDependencies.join(', ')}]`);
+  }
   return [`function ${entity.name} {`, ...indent(body), '}'];
 };
 
