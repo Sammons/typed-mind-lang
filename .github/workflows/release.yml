@@ -222,18 +222,55 @@ jobs:
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
+      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
+      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml). Mirrors
+      # .gitea/workflows/ci.yml's mise setup shape.
+      - name: Install mise
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install toolchain
+        run: mise install
+
+      - name: Install pnpm
+        run: |
+          mise exec -- corepack enable
+          mise exec -- corepack prepare pnpm@11 --activate
+
+      - name: Install dependencies
+        run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts
+
+      # A committed lib/typed-mind-vscode-extension/lsp-bundled/ can drift from
+      # what the pinned toolchain produces (PR #138) because nothing forced a
+      # rebuild before packaging — vsce packages whatever bytes are on disk,
+      # not what the LSP source currently compiles to. Rebuilding here and
+      # then asserting a clean tree makes a stale-bundle publish fail loudly
+      # instead of silently shipping bytes CI never validated.
+      - name: Rebuild bundled LSP for the extension
+        run: mise exec -- pnpm --filter typed-mind run bundle-lsp
+
+      - name: Verify bundled LSP output matches the committed tree
+        run: |
+          STATUS=$(git status --porcelain -- lib/typed-mind-lsp/dist-bundled lib/typed-mind-vscode-extension/lsp-bundled)
+          if [ -n "$STATUS" ]; then
+            echo "Error: rebuilding the bundled LSP produced changes not present in the commit being published."
+            echo "$STATUS"
+            echo "This means the committed lsp-bundled/ was stale. Rebuild and commit before publishing."
+            exit 1
+          fi
+
       - name: Package VS Code extension
         run: |
           cd lib/typed-mind-vscode-extension
-          pnpm install
-          pnpm exec vsce package --no-dependencies
+          mise exec -- pnpm exec vsce package --no-dependencies
           echo "VSIX_FILE=$(ls *.vsix)" >> $GITHUB_ENV
           cd ../..
 
       - name: Publish to VS Code Marketplace
         run: |
           cd lib/typed-mind-vscode-extension
-          pnpm exec vsce publish --pat ${{ secrets.VSCE_PAT }} --no-dependencies
+          mise exec -- pnpm exec vsce publish --pat ${{ secrets.VSCE_PAT }} --no-dependencies
           cd ../..
 
       - name: Upload VSIX artifact

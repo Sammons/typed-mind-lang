@@ -115,21 +115,48 @@ jobs:
       - name: Install toolchain
         run: mise install
 
+      - name: Install pnpm
+        run: |
+          mise exec -- corepack enable
+          mise exec -- corepack prepare pnpm@11 --activate
+
+      - name: Install dependencies
+        run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts
+
       - name: Build TypedMind packages
         run: |
           # Build only the extension and its dependencies
           cd lib/typed-mind-vscode-extension
-          pnpm run build
+          mise exec -- pnpm run build
+
+      # A committed lib/typed-mind-vscode-extension/lsp-bundled/ can drift from
+      # what the pinned toolchain produces (PR #138) because nothing forced a
+      # rebuild before packaging — vsce packages whatever bytes are on disk,
+      # not what the LSP source currently compiles to. Rebuilding here and
+      # then asserting a clean tree makes a stale-bundle publish fail loudly
+      # instead of silently shipping bytes CI never validated.
+      - name: Rebuild bundled LSP for the extension
+        run: mise exec -- pnpm --filter typed-mind run bundle-lsp
+
+      - name: Verify bundled LSP output matches the committed tree
+        run: |
+          STATUS=$(git status --porcelain -- lib/typed-mind-lsp/dist-bundled lib/typed-mind-vscode-extension/lsp-bundled)
+          if [ -n "$STATUS" ]; then
+            echo "Error: rebuilding the bundled LSP produced changes not present in the commit being published."
+            echo "$STATUS"
+            echo "This means the committed lsp-bundled/ was stale. Rebuild and commit before publishing."
+            exit 1
+          fi
 
       - name: Package extension
         run: |
           cd lib/typed-mind-vscode-extension
-          
-          
-          
-          
+
+
+
+
           # Package the extension
-          pnpm exec vsce package --no-dependencies
+          mise exec -- pnpm exec vsce package --no-dependencies
           
           # Verify VSIX was created
           VSIX_FILE=$(ls *.vsix | head -1)
