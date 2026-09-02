@@ -19,7 +19,7 @@ import { homedir, platform } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const EXPECTED_TREE_SITTER_VERSION = '0.26.13';
+const EXPECTED_TREE_SITTER_VERSION = '0.27.0';
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 class ToolchainCheckError extends Error {}
