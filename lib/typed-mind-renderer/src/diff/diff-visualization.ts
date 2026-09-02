@@ -33,8 +33,8 @@ export interface EntityDiff {
 export interface FieldDiff {
   fieldName: string;
   changeType: DiffChangeType;
-  oldValue?: any;
-  newValue?: any;
+  oldValue?: unknown;
+  newValue?: unknown;
   significance: 'minor' | 'moderate' | 'major' | 'breaking';
 }
 
@@ -46,8 +46,8 @@ export interface RelationshipDiff {
   relationshipType: string;
   fromEntity: string;
   toEntity: string;
-  oldRelationship?: any;
-  newRelationship?: any;
+  oldRelationship?: unknown;
+  newRelationship?: unknown;
 }
 
 /**
@@ -314,8 +314,9 @@ export class ArchitectureDiffAnalyzer {
     const allFields = new Set([...Object.keys(oldEntity), ...Object.keys(newEntity)]);
 
     for (const field of allFields) {
-      const oldValue = (oldEntity as any)[field];
-      const newValue = (newEntity as any)[field];
+      // EntityNode has no index signature; iterating Object.keys() requires a dynamic-key read
+      const oldValue = (oldEntity as unknown as Record<string, unknown>)[field];
+      const newValue = (newEntity as unknown as Record<string, unknown>)[field];
 
       if (!this.isEqual(oldValue, newValue)) {
         fieldDiffs.push({
@@ -338,8 +339,11 @@ export class ArchitectureDiffAnalyzer {
     const relationshipFields = ['imports', 'exports', 'calls', 'affects', 'consumes', 'implements'];
 
     for (const field of relationshipFields) {
-      const oldRels = (oldEntity as any)[field] || [];
-      const newRels = (newEntity as any)[field] || [];
+      // EntityNode subclasses (not the base) carry these fields as string[]; base EntityNode has no index signature
+      const oldRelsRaw = (oldEntity as unknown as Record<string, unknown>)[field];
+      const newRelsRaw = (newEntity as unknown as Record<string, unknown>)[field];
+      const oldRels = Array.isArray(oldRelsRaw) ? (oldRelsRaw as string[]) : [];
+      const newRels = Array.isArray(newRelsRaw) ? (newRelsRaw as string[]) : [];
 
       const changes = this.compareArrays(oldRels, newRels);
       for (const change of changes) {
@@ -347,7 +351,7 @@ export class ArchitectureDiffAnalyzer {
           changeType: change.type,
           relationshipType: field,
           fromEntity: oldEntity.name,
-          toEntity: change.value,
+          toEntity: change.value as string,
           oldRelationship: change.type === 'removed' ? change.value : undefined,
           newRelationship: change.type === 'added' ? change.value : undefined,
         });
@@ -466,17 +470,17 @@ export class ArchitectureDiffAnalyzer {
   }
 
   // Helper methods
-  private isEqual(a: any, b: any): boolean {
+  private isEqual(a: unknown, b: unknown): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
   }
 
-  private getFieldChangeType(oldValue: any, newValue: any): DiffChangeType {
+  private getFieldChangeType(oldValue: unknown, newValue: unknown): DiffChangeType {
     if (oldValue === undefined) return 'added';
     if (newValue === undefined) return 'removed';
     return 'modified';
   }
 
-  private assessFieldSignificance(field: string, _oldValue: any, _newValue: any): FieldDiff['significance'] {
+  private assessFieldSignificance(field: string, _oldValue: unknown, _newValue: unknown): FieldDiff['significance'] {
     const criticalFields = ['type', 'signature', 'path'];
     const majorFields = ['name', 'imports', 'exports'];
 
@@ -485,8 +489,8 @@ export class ArchitectureDiffAnalyzer {
     return 'minor';
   }
 
-  private compareArrays(oldArray: any[], newArray: any[]): Array<{ type: DiffChangeType; value: any }> {
-    const changes: Array<{ type: DiffChangeType; value: any }> = [];
+  private compareArrays(oldArray: unknown[], newArray: unknown[]): Array<{ type: DiffChangeType; value: unknown }> {
+    const changes: Array<{ type: DiffChangeType; value: unknown }> = [];
     const oldSet = new Set(oldArray);
     const newSet = new Set(newArray);
 

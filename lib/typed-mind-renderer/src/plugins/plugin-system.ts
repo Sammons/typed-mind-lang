@@ -48,7 +48,7 @@ export interface PluginContext {
     theme: ThemeApi;
     metrics: MetricsApi;
   };
-  readonly config: Record<string, any>;
+  readonly config: Record<string, unknown>;
 }
 
 /**
@@ -61,12 +61,16 @@ export interface EntityRendererPlugin extends Plugin {
   /**
    * Render entity in SVG
    */
-  renderEntity(entity: EntityNode, group: d3.Selection<SVGGElement, any, any, any>, context: EntityRenderContext): EntityRenderResult;
+  renderEntity(
+    entity: EntityNode,
+    group: d3.Selection<SVGGElement, unknown, null, undefined>,
+    context: EntityRenderContext,
+  ): EntityRenderResult;
 
   /**
    * Update entity visual state
    */
-  updateEntity?(entity: EntityNode, group: d3.Selection<SVGGElement, any, any, any>, context: EntityRenderContext): void;
+  updateEntity?(entity: EntityNode, group: d3.Selection<SVGGElement, unknown, null, undefined>, context: EntityRenderContext): void;
 
   /**
    * Get entity bounds for layout calculations
@@ -199,7 +203,7 @@ export interface EntityRenderContext {
   viewport: { x: number; y: number; width: number; height: number };
   selected: boolean;
   highlighted: boolean;
-  theme: Record<string, any>;
+  theme: Record<string, unknown>;
   lodLevel: number;
 }
 
@@ -207,7 +211,7 @@ export interface EntityRenderResult {
   width: number;
   height: number;
   anchorPoints?: { x: number; y: number; type: string }[];
-  customData?: Record<string, any>;
+  customData?: Record<string, unknown>;
 }
 
 export interface EntityInteractionEvent {
@@ -222,7 +226,7 @@ export interface LayoutLink {
   target: string;
   type: string;
   weight?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface LayoutConstraints {
@@ -253,12 +257,12 @@ export interface LayoutResult {
 export interface LayoutChange {
   type: 'add' | 'remove' | 'update';
   entityId: string;
-  data?: any;
+  data?: unknown;
 }
 
 export interface InteractionEvent {
   type: string;
-  data: any;
+  data: unknown;
   preventDefault: () => void;
   stopPropagation: () => void;
 }
@@ -301,10 +305,10 @@ export interface DataProcessorContext {
 
 export interface ProcessorResult {
   type: string;
-  data: any;
+  data: unknown;
   visualizations?: Array<{
     type: 'chart' | 'table' | 'metric' | 'graph';
-    data: any;
+    data: unknown;
     title: string;
   }>;
   recommendations?: string[];
@@ -320,7 +324,7 @@ export interface ThemeDefinition {
       fill: string;
       stroke: string;
       strokeWidth?: number;
-      [key: string]: any;
+      [key: string]: unknown;
     }
   >;
   linkStyles?: Record<
@@ -329,7 +333,7 @@ export interface ThemeDefinition {
       stroke: string;
       strokeWidth?: number;
       strokeDasharray?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     }
   >;
 }
@@ -340,13 +344,13 @@ export interface ExportContext {
   selectedEntities: Set<string>;
   viewport: { x: number; y: number; width: number; height: number; scale: number };
   theme: ThemeDefinition;
-  options: Record<string, any>;
+  options: Record<string, unknown>;
 }
 
 export interface ExportResult {
   data: Blob | string | ArrayBuffer;
   filename: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PluginConfigSchema {
@@ -356,11 +360,11 @@ export interface PluginConfigSchema {
     {
       type: 'string' | 'number' | 'boolean' | 'array' | 'object';
       description: string;
-      default?: any;
-      enum?: any[];
+      default?: unknown;
+      enum?: unknown[];
       minimum?: number;
       maximum?: number;
-      items?: any;
+      items?: unknown;
     }
   >;
   required?: string[];
@@ -386,15 +390,15 @@ export interface D3Api {
 }
 
 export interface EventApi {
-  on(event: string, handler: (...args: any[]) => void): void;
-  off(event: string, handler?: (...args: any[]) => void): void;
-  emit(event: string, ...args: any[]): void;
-  once(event: string, handler: (...args: any[]) => void): void;
+  on(event: string, handler: (...args: unknown[]) => void): void;
+  off(event: string, handler?: (...args: unknown[]) => void): void;
+  emit(event: string, ...args: unknown[]): void;
+  once(event: string, handler: (...args: unknown[]) => void): void;
 }
 
 export interface StorageApi {
-  get<T = any>(key: string): T | null;
-  set<T = any>(key: string, value: T): void;
+  get<T = unknown>(key: string): T | null;
+  set<T = unknown>(key: string, value: T): void;
   remove(key: string): void;
   clear(): void;
   keys(): string[];
@@ -403,8 +407,8 @@ export interface StorageApi {
 export interface ThemeApi {
   getCurrentTheme(): ThemeDefinition;
   setTheme(theme: ThemeDefinition): void;
-  getEntityStyle(entityType: EntityKind): Record<string, any>;
-  getLinkStyle(linkType: string): Record<string, any>;
+  getEntityStyle(entityType: EntityKind): Record<string, unknown>;
+  getLinkStyle(linkType: string): Record<string, unknown>;
 }
 
 export interface MetricsApi {
@@ -431,7 +435,7 @@ export class PluginManager {
   /**
    * Register a plugin
    */
-  async registerPlugin(plugin: Plugin, config: Record<string, any> = {}): Promise<void> {
+  async registerPlugin(plugin: Plugin, config: Record<string, unknown> = {}): Promise<void> {
     if (this.plugins.has(plugin.id)) {
       throw new Error(`Plugin ${plugin.id} is already registered`);
     }
@@ -504,8 +508,11 @@ export class PluginManager {
       throw new Error(`Cannot activate plugin ${pluginId}: dependencies not met`);
     }
 
-    const plugin = this.plugins.get(pluginId)!;
-    const context = this.pluginContexts.get(pluginId)!;
+    const plugin = this.plugins.get(pluginId);
+    const context = this.pluginContexts.get(pluginId);
+    if (!plugin || !context) {
+      throw new Error(`Cannot activate plugin ${pluginId}: not registered`);
+    }
 
     await plugin.initialize(context);
     this.activePlugins.add(pluginId);
@@ -533,7 +540,10 @@ export class PluginManager {
       }
     }
 
-    const plugin = this.plugins.get(pluginId)!;
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin) {
+      throw new Error(`Cannot deactivate plugin ${pluginId}: not registered`);
+    }
     if (plugin.cleanup) {
       await plugin.cleanup();
     }
@@ -548,8 +558,8 @@ export class PluginManager {
     const result: T[] = [];
 
     for (const pluginId of this.activePlugins) {
-      const plugin = this.plugins.get(pluginId)!;
-      if (!type || plugin.type === type) {
+      const plugin = this.plugins.get(pluginId);
+      if (plugin && (!type || plugin.type === type)) {
         result.push(plugin as T);
       }
     }
@@ -574,7 +584,7 @@ export class PluginManager {
   /**
    * Update plugin configuration
    */
-  updatePluginConfig(pluginId: string, config: Record<string, any>): void {
+  updatePluginConfig(pluginId: string, config: Record<string, unknown>): void {
     const context = this.pluginContexts.get(pluginId);
     if (context) {
       Object.assign(context.config, config);
@@ -625,11 +635,11 @@ export class PluginManager {
 /**
  * Built-in plugin registry for common functionality
  */
-export class BuiltInPluginRegistry {
+export const BuiltInPluginRegistry = {
   /**
    * Create a simple entity renderer plugin
    */
-  static createEntityRenderer(
+  createEntityRenderer(
     id: string,
     name: string,
     entityTypes: EntityKind[],
@@ -647,12 +657,12 @@ export class BuiltInPluginRegistry {
       renderEntity: renderer,
       getEntityBounds: (_entity) => ({ width: 100, height: 50 }), // Default bounds
     };
-  }
+  },
 
   /**
    * Create a simple layout plugin
    */
-  static createLayoutPlugin(id: string, name: string, layoutType: string, algorithm: LayoutPlugin['calculateLayout']): LayoutPlugin {
+  createLayoutPlugin(id: string, name: string, layoutType: string, algorithm: LayoutPlugin['calculateLayout']): LayoutPlugin {
     return {
       id,
       name,
@@ -664,12 +674,12 @@ export class BuiltInPluginRegistry {
       initialize: async () => {},
       calculateLayout: algorithm,
     };
-  }
+  },
 
   /**
    * Create a simple theme plugin
    */
-  static createThemePlugin(id: string, name: string, themeName: string, definition: ThemeDefinition): ThemePlugin {
+  createThemePlugin(id: string, name: string, themeName: string, definition: ThemeDefinition): ThemePlugin {
     return {
       id,
       name,
@@ -686,5 +696,5 @@ export class BuiltInPluginRegistry {
         }
       },
     };
-  }
-}
+  },
+};

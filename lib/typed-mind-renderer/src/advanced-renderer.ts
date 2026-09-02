@@ -5,11 +5,12 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
 import type { Diagnostic, ParseOutput } from '@sammons/typed-mind';
 import { type CodeGenConfig, CodeGenerationEngine, type CodePreview } from './codegen/code-generation.ts';
 import { type ArchitectureDiff, ArchitectureDiffAnalyzer, type DiffOptions } from './diff/diff-visualization.ts';
@@ -23,7 +24,7 @@ import {
   type ViewportInfo,
   VirtualizationManager,
 } from './performance/spatial-index.ts';
-import { type Plugin, type PluginContext, PluginManager } from './plugins/plugin-system.ts';
+import { type D3Api, type Plugin, type PluginContext, PluginManager } from './plugins/plugin-system.ts';
 import { type EnhancedValidationError, ErrorVisualizationRenderer, ValidationErrorProcessor } from './validation/error-visualization.ts';
 
 /**
@@ -111,7 +112,7 @@ interface AdvancedRendererEvents {
 
   // Performance events
   'viewport-changed': { viewport: ViewportInfo };
-  'performance-update': { metrics: Record<string, any> };
+  'performance-update': { metrics: Record<string, unknown> };
 
   // Analysis events
   'health-score-calculated': { score: HealthScore };
@@ -135,6 +136,7 @@ interface AdvancedRendererEvents {
 class AdvancedTypedMindRenderer {
   private options: Required<AdvancedRendererOptions>;
   private state: AdvancedRendererState;
+  // biome-ignore lint/suspicious/noExplicitAny: type-erased storage; on/off/emit re-establish the per-event type via AdvancedRendererEvents[K]
   private eventListeners = new Map<keyof AdvancedRendererEvents, Array<(data: any) => void>>();
 
   // Advanced system instances
@@ -407,7 +409,7 @@ class AdvancedTypedMindRenderer {
     this.virtualizationManager.updateIndex(spatialItems);
   }
 
-  private calculateGraphBounds(entities: readonly any[]): { x: number; y: number; width: number; height: number } {
+  private calculateGraphBounds(entities: readonly unknown[]): { x: number; y: number; width: number; height: number } {
     const nodeCount = entities.length;
     const estimatedArea = nodeCount * 15000; // Rough estimate
     const aspectRatio = 16 / 9;
@@ -433,7 +435,10 @@ class AdvancedTypedMindRenderer {
             return document.querySelector<T>(selector);
           },
           querySelectorAll: <T extends Element = Element>(selector: string) => {
-            if (typeof document === 'undefined') return [] as any;
+            if (typeof document === 'undefined') {
+              // biome-ignore lint/suspicious/noExplicitAny: server-side fallback has no real NodeList to construct; DOMApi requires NodeListOf<T>
+              return [] as any;
+            }
             return document.querySelectorAll<T>(selector);
           },
           appendChild: (parent: Element, child: Element) => {
@@ -444,27 +449,33 @@ class AdvancedTypedMindRenderer {
           },
         },
         d3: {
-          select: (selector: any) => {
+          select: ((selector: unknown) => {
             // Server-side fallback - return minimal d3 Selection-like object
             if (typeof window === 'undefined') return { attr: () => ({}), selectAll: () => ({ data: () => ({}) }) };
-            return (globalThis as any).d3?.select?.(selector) || {};
-          },
-          selectAll: (_selector: any) => ({ data: () => ({}) }) as any,
-          scaleOrdinal: () => ({ range: () => ({}), domain: () => ({}) }) as any,
-          scaleLinear: () => ({ range: () => ({}), domain: () => ({}) }) as any,
-          interpolate: (a: any, _b: any) => () => a,
-          transition: () => ({ duration: () => ({}) }) as any,
+            const globalD3 = (globalThis as { d3?: { select?: (s: unknown) => unknown } }).d3;
+            return globalD3?.select?.(selector) || {};
+          }) as D3Api['select'],
+          // biome-ignore lint/suspicious/noExplicitAny: server-side stub cannot satisfy the real `typeof d3.selectAll` signature
+          selectAll: (() => ({ data: () => ({}) })) as any,
+          // biome-ignore lint/suspicious/noExplicitAny: server-side stub cannot satisfy the real `typeof d3.scaleOrdinal` signature
+          scaleOrdinal: (() => ({ range: () => ({}), domain: () => ({}) })) as any,
+          // biome-ignore lint/suspicious/noExplicitAny: server-side stub cannot satisfy the real `typeof d3.scaleLinear` signature
+          scaleLinear: (() => ({ range: () => ({}), domain: () => ({}) })) as any,
+          interpolate: ((a: unknown) => () => a) as D3Api['interpolate'],
+          // biome-ignore lint/suspicious/noExplicitAny: server-side stub cannot satisfy the real `typeof d3.transition` signature
+          transition: (() => ({ duration: () => ({}) })) as any,
         },
         events: {
-          on: (event, handler) => this.on(event as any, handler),
-          off: (event, handler) => this.off(event as any, handler),
-          emit: (event, ...args) => this.emit(event as any, args[0]),
+          on: (event, handler) => this.on(event as keyof AdvancedRendererEvents, handler),
+          off: (event, handler) => this.off(event as keyof AdvancedRendererEvents, handler),
+          emit: (event, ...args) =>
+            this.emit(event as keyof AdvancedRendererEvents, args[0] as AdvancedRendererEvents[keyof AdvancedRendererEvents]),
           once: (event, handler) => {
-            const onceHandler = (data: any) => {
+            const onceHandler = (data: unknown) => {
               handler(data);
-              this.off(event as any, onceHandler);
+              this.off(event as keyof AdvancedRendererEvents, onceHandler);
             };
-            this.on(event as any, onceHandler);
+            this.on(event as keyof AdvancedRendererEvents, onceHandler);
           },
         },
         storage: {
@@ -477,7 +488,7 @@ class AdvancedTypedMindRenderer {
               return null;
             }
           },
-          set: (key: string, value: any) => {
+          set: (key: string, value: unknown) => {
             try {
               if (typeof localStorage !== 'undefined') {
                 localStorage.setItem(key, JSON.stringify(value));
@@ -531,13 +542,13 @@ class AdvancedTypedMindRenderer {
     this.state.pluginsLoaded = true;
   }
 
-  private async handleMainPage(_req: any, res: any): Promise<void> {
+  private async handleMainPage(_req: IncomingMessage, res: ServerResponse): Promise<void> {
     const html = this.getAdvancedHTML();
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(html);
   }
 
-  private async handleApiRequest(_req: any, res: any, url: string): Promise<void> {
+  private async handleApiRequest(_req: IncomingMessage, res: ServerResponse, url: string): Promise<void> {
     const path = url.replace('/api/', '');
 
     switch (path) {
@@ -572,7 +583,7 @@ class AdvancedTypedMindRenderer {
     }
   }
 
-  private async handleStaticAssets(_req: any, res: any, url: string): Promise<void> {
+  private async handleStaticAssets(_req: IncomingMessage, res: ServerResponse, url: string): Promise<void> {
     // Serve static files (CSS, JS, images)
     const filePath = url.replace('/static/', '');
 
@@ -776,11 +787,11 @@ class AdvancedTypedMindRenderer {
    * caller is the published VS Code extension; populating the stub is out
    * of this RFC's migration mandate per the doc's FAQ Q5).
    */
-  getGraphSnapshot(): any {
+  getGraphSnapshot() {
     return this.getGraphData();
   }
 
-  private getGraphData(): any {
+  private getGraphData() {
     if (!this.state.graph) {
       return { entities: [], links: [], errors: [] };
     }

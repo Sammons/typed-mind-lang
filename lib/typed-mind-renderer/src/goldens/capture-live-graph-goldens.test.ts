@@ -16,8 +16,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { TypedMind } from '@sammons/typed-mind';
+import { DtoNode, TypedMind } from '@sammons/typed-mind';
 import { AdvancedTypedMindRenderer } from '../advanced-renderer.ts';
+import type { CodeGenConfig } from '../codegen/code-generation.ts';
 import { CodeGenerationEngine } from '../codegen/code-generation.ts';
 import { EnhancedTypedMindRenderer } from '../enhanced-index.ts';
 import { InteractiveTypedMindRenderer } from '../interactive-renderer.ts';
@@ -199,5 +200,53 @@ describe('RFC-TM-6 Q2 — flipped-renderer graph/metrics/dependency-branch golde
     }
 
     writeLiveGolden(join(liveDir, 'dependency-branches', 'tm6-branches.json'), dependencyLists);
+  });
+
+  // Regression for the DtoFieldNode.isOptional read in generateDTOInterface
+  // (codegen/code-generation.ts): the generator used to read the nonexistent
+  // `field.optional`, so no generated DTO interface ever emitted a `?`
+  // marker. UserDTO below carries one optional field (email) and one
+  // required field (id) so both branches of the ternary are exercised.
+  it('emits a ? marker only for optional DTO fields in the generated TypeScript interface', async () => {
+    const source = `UserDTO % "User data transfer object"\n  - id: string "User ID"\n  - email: string "Email address" (optional)\n`;
+    const absPath = join(fixturesDir, 'dto-optional-field.tmd');
+    const typedMind = await TypedMind.create();
+    const graph = typedMind.parse(source, absPath);
+
+    const dto = graph.entities.find((candidate) => candidate.name === 'UserDTO');
+    assert.ok(dto instanceof DtoNode, 'fixture must define UserDTO as a DTO entity');
+
+    const config: CodeGenConfig = {
+      language: 'typescript',
+      framework: 'none',
+      outputDirectory: 'src',
+      includeTests: false,
+      includeComments: false,
+      includeTypeDefinitions: false,
+      codeStyle: {
+        indentation: 'spaces',
+        indentSize: 2,
+        quotes: 'single',
+        semicolons: true,
+        trailingCommas: true,
+        maxLineLength: 120,
+      },
+      patterns: {
+        useInterfaces: true,
+        useAbstractClasses: false,
+        useDependencyInjection: false,
+        useAsyncAwait: true,
+      },
+    };
+
+    const engine = new CodeGenerationEngine();
+    const generated = await engine.generateEntity(dto, config, graph);
+    const [file] = generated.files;
+    assert.ok(file, 'TypeScript generator must emit one file for a DTO entity');
+
+    const idLine = file.content.split('\n').find((line) => line.includes('id:'));
+    const emailLine = file.content.split('\n').find((line) => line.includes('email'));
+    assert.equal(idLine, '  id: string;');
+    assert.equal(emailLine, '  email?: string;');
   });
 });

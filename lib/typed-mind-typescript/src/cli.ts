@@ -64,6 +64,11 @@ const options = {
   },
 };
 
+// Shared shape for the parsed `--flag` values passed to each command handler
+// and to `parseRecognizers`, derived from `options` above so a new flag's
+// type flows through without a hand-maintained duplicate interface.
+type CliValues = ReturnType<typeof parseArgs<{ options: typeof options; allowPositionals: true }>>['values'];
+
 function showHelp(): void {
   console.log(`
 TypedMind TypeScript Bridge - Extract architecture from TypeScript codebases
@@ -244,8 +249,9 @@ function resolveEntrypoint(projectPath: string, entrypointParam: string): string
 // table is fixed, and a typo'd flag value should not silently no-op).
 const KNOWN_RECOGNIZER_NAMES: readonly RecognizerName[] = ['sst-handler'];
 
-function parseRecognizers(values: { recognize?: readonly string[] }): RecognizerName[] {
-  const raw = values.recognize ?? [];
+function parseRecognizers(values: { recognize?: string | readonly string[] }): RecognizerName[] {
+  const rawValue = values.recognize ?? [];
+  const raw = typeof rawValue === 'string' ? [rawValue] : rawValue;
   const recognizers: RecognizerName[] = [];
   for (const name of raw) {
     if (!(KNOWN_RECOGNIZER_NAMES as readonly string[]).includes(name)) {
@@ -256,7 +262,7 @@ function parseRecognizers(values: { recognize?: readonly string[] }): Recognizer
   return recognizers;
 }
 
-async function handleExport(values: any): Promise<void> {
+async function handleExport(values: CliValues): Promise<void> {
   const { projectPath, configPath } = resolveProjectPath(values.project as string);
   const resolvedEntrypoint = resolveEntrypoint(projectPath, values.entrypoint as string);
   const outputPath = values.output as string | undefined;
@@ -362,7 +368,7 @@ async function handleExport(values: any): Promise<void> {
   }
 }
 
-async function handleAssert(values: any): Promise<void> {
+async function handleAssert(values: CliValues): Promise<void> {
   if (!values.input) {
     throw new Error('Assert command requires --input <file> parameter');
   }
@@ -455,7 +461,7 @@ async function handleAssert(values: any): Promise<void> {
   }
 }
 
-async function handleCheck(values: any): Promise<void> {
+async function handleCheck(values: CliValues): Promise<void> {
   const { projectPath, configPath } = resolveProjectPath(values.project as string);
   const resolvedEntrypoint = resolveEntrypoint(projectPath, values.entrypoint as string);
 

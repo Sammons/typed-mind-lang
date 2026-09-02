@@ -39,7 +39,7 @@ export interface Metric {
     critical: number;
   };
   trend?: 'improving' | 'stable' | 'degrading';
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export interface HealthScore {
@@ -91,7 +91,7 @@ export class GraphMetricsAnalyzer {
   analyzeGraph(): {
     healthScore: HealthScore;
     categories: MetricCategory[];
-    detailedMetrics: Record<string, any>;
+    detailedMetrics: Record<string, unknown>;
   } {
     const categories = [
       this.analyzeComplexity(),
@@ -461,7 +461,10 @@ export class GraphMetricsAnalyzer {
   }
 
   private addDependenciesForEntity(entity: EntityNode): void {
-    const deps = this.dependencyGraph.get(entity.name)!;
+    const deps = this.dependencyGraph.get(entity.name);
+    if (!deps) {
+      throw new Error(`buildDependencyGraphs invariant violated: no dependency set initialized for ${entity.name}`);
+    }
     const addDependency = (target: string) => {
       if (this.entityMap.has(target)) {
         deps.add(target);
@@ -619,7 +622,7 @@ export class GraphMetricsAnalyzer {
   // Additional helper methods would continue here...
   // For brevity, I'm including placeholder implementations
 
-  private detectLayerViolations(): any[] {
+  private detectLayerViolations(): unknown[] {
     return [];
   }
   private detectDeadCode(): string[] {
@@ -630,7 +633,7 @@ export class GraphMetricsAnalyzer {
       })
       .map((entity) => entity.name);
   }
-  private detectMissingAbstractions(): any[] {
+  private detectMissingAbstractions(): unknown[] {
     return [];
   }
   private calculateCohesionScore(): number {
@@ -691,7 +694,7 @@ export class GraphMetricsAnalyzer {
     return [];
   }
 
-  private generateDetailedMetrics(): Record<string, any> {
+  private generateDetailedMetrics(): Record<string, unknown> {
     return {
       entityTypes: this.getEntityTypeDistribution(),
       dependencyMatrix: this.generateDependencyMatrix(),

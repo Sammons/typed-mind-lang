@@ -45,10 +45,7 @@ const resolveDefaultWasmPath = async () => {
   const { join, dirname } = await import('node:path');
   const { existsSync } = await import('node:fs');
   const thisDir = dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    join(thisDir, '..', '..', 'grammar', 'grammar.wasm'),
-    join(thisDir, '..', '..', 'grammar.wasm'),
-  ];
+  const candidates = [join(thisDir, '..', '..', 'grammar', 'grammar.wasm'), join(thisDir, '..', '..', 'grammar.wasm')];
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
       return candidate;
@@ -80,7 +77,7 @@ export class TypedMindParser {
       const runtimeWasmPath = options.runtimeWasmPath;
       await Parser.init({ locateFile: () => runtimeWasmPath });
     }
-    const wasmSource = options.wasmBytes ?? options.wasmPath ?? await resolveDefaultWasmPath();
+    const wasmSource = options.wasmBytes ?? options.wasmPath ?? (await resolveDefaultWasmPath());
     const language = await Language.load(wasmSource);
     const parser = new Parser();
     parser.setLanguage(language);

@@ -18,7 +18,9 @@
       "!lib/typed-mind-vscode-extension/lsp-bundled",
       "!lib/typed-mind-static-website/assets",
       "!**/*.html",
-      "!lib/typed-mind-typescript/tests/ladder/repros-analyzer"
+      "!lib/typed-mind-typescript/tests/ladder/repros-analyzer",
+      "!lib/typed-mind-renderer/src/static/client-js",
+      "!.claude"
     ]
   },
   "formatter": {

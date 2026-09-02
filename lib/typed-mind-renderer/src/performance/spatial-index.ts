@@ -19,7 +19,7 @@ export interface BoundingBox {
 export interface SpatialItem {
   id: string;
   bounds: BoundingBox;
-  data: any;
+  data: unknown;
 }
 
 export interface ViewportInfo {
@@ -234,11 +234,12 @@ export class PerformanceMonitor {
   private maxSamples = 100;
 
   recordMetric(name: string, value: number): void {
-    if (!this.metrics.has(name)) {
-      this.metrics.set(name, []);
+    let samples = this.metrics.get(name);
+    if (!samples) {
+      samples = [];
+      this.metrics.set(name, samples);
     }
 
-    const samples = this.metrics.get(name)!;
     samples.push(value);
 
     if (samples.length > this.maxSamples) {

@@ -27,6 +27,7 @@ import type {
   ParsedClass,
   ParsedExport,
   ParsedFunction,
+  ParsedImport,
   ParsedInterface,
   ParsedModule,
   SstHandlerReference,
@@ -562,7 +563,9 @@ export class TypeScriptToTypedMindConverter {
     this.moduleGraphResolution.clear();
 
     // Clear two-pass registries
-    Object.keys(this.exportRegistry).forEach((key) => delete this.exportRegistry[key]);
+    Object.keys(this.exportRegistry).forEach((key) => {
+      delete this.exportRegistry[key];
+    });
     this.entityRegistry.functions.clear();
     this.entityRegistry.classes.clear();
     this.entityRegistry.interfaces.clear();
@@ -852,8 +855,8 @@ export class TypeScriptToTypedMindConverter {
     // during the second phase when we have full access to the analysis
 
     // Add a warning if the re-export source might not be included
-    if (!this.isExternalPackage(reExport.source!)) {
-      const sourceModulePath = this.resolveModulePath(reExport.source!, path.dirname(module.filePath));
+    if (reExport.source !== undefined && !this.isExternalPackage(reExport.source)) {
+      const sourceModulePath = this.resolveModulePath(reExport.source, path.dirname(module.filePath));
       if (!sourceModulePath || !fs.existsSync(sourceModulePath)) {
         this.warnings.push({
           message: `Re-export source module not found: ${reExport.source} (re-exporting ${reExport.name})`,
@@ -2675,7 +2678,7 @@ export class TypeScriptToTypedMindConverter {
   // `resolveImportToEntity` so it can key `moduleGraphResolution` by
   // `(sourceModule, specifier)` — the analyzer records that edge per
   // IMPORTING module, so the specifier alone is not enough to look it up.
-  private convertImports(importerFilePath: string, imports: readonly any[], moduleExports?: readonly ParsedExport[]): string[] {
+  private convertImports(importerFilePath: string, imports: readonly ParsedImport[], moduleExports?: readonly ParsedExport[]): string[] {
     const importNames: string[] = [];
 
     // Process regular imports
@@ -2872,7 +2875,7 @@ export class TypeScriptToTypedMindConverter {
     return { exportNames, reExportNames };
   }
 
-  private isReExport(exportItem: any): boolean {
+  private isReExport(exportItem: ParsedExport): boolean {
     // Check if this export has a source (indicating it's a re-export)
     return exportItem.source !== undefined;
   }

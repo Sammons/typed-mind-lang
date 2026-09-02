@@ -28,14 +28,14 @@ describe('Scenario 46: Function Undefined Method Calls', () => {
     // Should find undefined UndefinedService
     const undefinedServiceError = diagnostics.find((diagnostic) => diagnostic.message.includes('UndefinedService'));
     assert.notEqual(undefinedServiceError, undefined);
-    assert.ok((undefinedServiceError?.message).includes("references unknown entity 'UndefinedService'"));
+    assert.ok(undefinedServiceError?.message.includes("references unknown entity 'UndefinedService'"));
     assert.equal(undefinedServiceError?.severity, 'error');
     assert.equal(undefinedServiceError?.span.start.line, 8); // Line where processData function is defined
 
     // Should find undefined NonExistentClass
     const nonExistentClassError = diagnostics.find((diagnostic) => diagnostic.message.includes('NonExistentClass'));
     assert.notEqual(nonExistentClassError, undefined);
-    assert.ok((nonExistentClassError?.message).includes("references unknown entity 'NonExistentClass'"));
+    assert.ok(nonExistentClassError?.message.includes("references unknown entity 'NonExistentClass'"));
     assert.equal(nonExistentClassError?.severity, 'error');
     assert.equal(nonExistentClassError?.span.start.line, 8); // Line where processData function is defined
 
@@ -44,7 +44,7 @@ describe('Scenario 46: Function Undefined Method Calls', () => {
       (diagnostic) => diagnostic.message.includes('RequestDTO') && diagnostic.message.includes('Cannot call method'),
     );
     assert.notEqual(requestDTOError, undefined);
-    assert.ok((requestDTOError?.message).includes("Cannot call method 'handle' on DTO 'RequestDTO'"));
+    assert.ok(requestDTOError?.message.includes("Cannot call method 'handle' on DTO 'RequestDTO'"));
     assert.equal(requestDTOError?.severity, 'error');
     assert.equal(requestDTOError?.span.start.line, 14); // Line where handleRequest function is defined
 
@@ -56,14 +56,14 @@ describe('Scenario 46: Function Undefined Method Calls', () => {
       (diagnostic) => diagnostic.message.includes('someConstant') && diagnostic.message.includes('references unknown entity'),
     );
     assert.notEqual(constantError, undefined);
-    assert.ok((constantError?.message).includes("references unknown entity 'someConstant'"));
+    assert.ok(constantError?.message.includes("references unknown entity 'someConstant'"));
     assert.equal(constantError?.severity, 'error');
     assert.equal(constantError?.span.start.line, 14); // Line where handleRequest function is defined
 
     // Should find undefined InvalidClass
     const invalidClassError = diagnostics.find((diagnostic) => diagnostic.message.includes('InvalidClass'));
     assert.notEqual(invalidClassError, undefined);
-    assert.ok((invalidClassError?.message).includes("references unknown entity 'InvalidClass'"));
+    assert.ok(invalidClassError?.message.includes("references unknown entity 'InvalidClass'"));
     assert.equal(invalidClassError?.severity, 'error');
     assert.equal(invalidClassError?.span.start.line, 20); // Line where validateInput function is defined
   });

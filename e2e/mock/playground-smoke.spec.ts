@@ -91,12 +91,20 @@ test.describe('TypedMind playground browser smoke', () => {
     await waitForReady(page);
 
     const goodResult = await page.evaluate((source) => {
-      return (window as unknown as PlaygroundWindow).typedMindBrowser!.check(source);
+      const browser = (window as unknown as PlaygroundWindow).typedMindBrowser;
+      if (!browser) {
+        throw new Error('typedMindBrowser missing after waitForReady');
+      }
+      return browser.check(source);
     }, KNOWN_GOOD_SNIPPET);
     expect(goodResult.valid).toBe(true);
 
     const badResult = await page.evaluate((source) => {
-      return (window as unknown as PlaygroundWindow).typedMindBrowser!.check(source);
+      const browser = (window as unknown as PlaygroundWindow).typedMindBrowser;
+      if (!browser) {
+        throw new Error('typedMindBrowser missing after waitForReady');
+      }
+      return browser.check(source);
     }, KNOWN_BAD_SNIPPET);
     expect(badResult.valid).toBe(false);
 
@@ -124,8 +132,11 @@ test.describe('TypedMind playground browser smoke', () => {
 
     const result = await page.evaluate(() => {
       const win = window as unknown as PlaygroundWindow;
-      const source = win.typedMindEditor!.getValue();
-      return win.typedMindBrowser!.check(source);
+      if (!win.typedMindEditor || !win.typedMindBrowser) {
+        throw new Error('typedMindEditor/typedMindBrowser missing after waitForReady');
+      }
+      const source = win.typedMindEditor.getValue();
+      return win.typedMindBrowser.check(source);
     });
 
     const unsuppressed = result.diagnostics.filter((diagnostic) => diagnostic.suppression === undefined);
@@ -140,7 +151,13 @@ test.describe('TypedMind playground browser smoke', () => {
   test('all four Load Example samples are distinct and parse clean', async ({ page }) => {
     await waitForReady(page);
 
-    const examples = await page.evaluate(() => (window as unknown as PlaygroundWindow).PLAYGROUND_EXAMPLES!);
+    const examples = await page.evaluate(() => {
+      const win = window as unknown as PlaygroundWindow;
+      if (!win.PLAYGROUND_EXAMPLES) {
+        throw new Error('PLAYGROUND_EXAMPLES missing after waitForReady');
+      }
+      return win.PLAYGROUND_EXAMPLES;
+    });
     const keys = ['todo-app', 'microservices', 'react-app', 'api-gateway'];
     expect(Object.keys(examples).sort()).toEqual(keys.sort());
 
@@ -152,9 +169,18 @@ test.describe('TypedMind playground browser smoke', () => {
       expect(unique.size).toBe(keys.length);
 
       for (const key of keys) {
-        const result = await page.evaluate(({ src }) => (window as unknown as PlaygroundWindow).typedMindBrowser!.check(src), {
-          src: examples[key][form],
-        });
+        const result = await page.evaluate(
+          ({ src }) => {
+            const browser = (window as unknown as PlaygroundWindow).typedMindBrowser;
+            if (!browser) {
+              throw new Error('typedMindBrowser missing after waitForReady');
+            }
+            return browser.check(src);
+          },
+          {
+            src: examples[key][form],
+          },
+        );
         expect(result.diagnostics, `${key} (${form}) should parse with zero diagnostics`).toEqual([]);
       }
     }
@@ -183,8 +209,11 @@ test.describe('TypedMind playground browser smoke', () => {
       );
       const { detected, loaded } = await page.evaluate(() => {
         const win = window as unknown as PlaygroundWindow;
-        const source = win.typedMindEditor!.getValue();
-        return { detected: win.typedMindBrowser!.detectFormat(source).format, loaded: source };
+        if (!win.typedMindEditor || !win.typedMindBrowser) {
+          throw new Error('typedMindEditor/typedMindBrowser missing after waitForReady');
+        }
+        const source = win.typedMindEditor.getValue();
+        return { detected: win.typedMindBrowser.detectFormat(source).format, loaded: source };
       });
       expect(loaded.length, `${key} should have loaded non-empty content`).toBeGreaterThan(0);
       expect(detected, `${key}: loaded content's detected format should match the active toggle (${activeSyntax})`).toBe(activeSyntax);
@@ -197,9 +226,19 @@ test.describe('TypedMind playground browser smoke', () => {
     await waitForReady(page);
 
     await page.evaluate(() => {
-      (window as unknown as PlaygroundWindow).typedMindEditor!.setValue('');
+      const editor = (window as unknown as PlaygroundWindow).typedMindEditor;
+      if (!editor) {
+        throw new Error('typedMindEditor missing after waitForReady');
+      }
+      editor.setValue('');
     });
-    const beforeToggle = await page.evaluate(() => (window as unknown as PlaygroundWindow).typedMindEditor!.getValue());
+    const beforeToggle = await page.evaluate(() => {
+      const editor = (window as unknown as PlaygroundWindow).typedMindEditor;
+      if (!editor) {
+        throw new Error('typedMindEditor missing after waitForReady');
+      }
+      return editor.getValue();
+    });
     expect(beforeToggle).toBe('');
 
     // Click whichever toggle button isn't already active.
@@ -212,7 +251,13 @@ test.describe('TypedMind playground browser smoke', () => {
       target?.click();
     });
 
-    const afterToggle = await page.evaluate(() => (window as unknown as PlaygroundWindow).typedMindEditor!.getValue());
+    const afterToggle = await page.evaluate(() => {
+      const editor = (window as unknown as PlaygroundWindow).typedMindEditor;
+      if (!editor) {
+        throw new Error('typedMindEditor missing after waitForReady');
+      }
+      return editor.getValue();
+    });
     expect(afterToggle).toBe('');
   });
 
@@ -241,7 +286,11 @@ dto Todo {
 `;
 
     await page.evaluate((source) => {
-      (window as unknown as PlaygroundWindow).typedMindEditor!.setValue(source);
+      const editor = (window as unknown as PlaygroundWindow).typedMindEditor;
+      if (!editor) {
+        throw new Error('typedMindEditor missing after waitForReady');
+      }
+      editor.setValue(source);
     }, brokenEntryDoc);
 
     // Ensure Longform is the active/current form so the toggle click below
@@ -254,7 +303,13 @@ dto Todo {
 
     await page.click('.syntax-toggle .toggle-btn[data-syntax="shortform"]');
 
-    const afterToggle = await page.evaluate(() => (window as unknown as PlaygroundWindow).typedMindEditor!.getValue());
+    const afterToggle = await page.evaluate(() => {
+      const editor = (window as unknown as PlaygroundWindow).typedMindEditor;
+      if (!editor) {
+        throw new Error('typedMindEditor missing after waitForReady');
+      }
+      return editor.getValue();
+    });
 
     // Never the exact corrupted tokens #126 reported: shortform emission
     // used to glue an unseparated `v` onto the version (`->  v1.0.0`, note

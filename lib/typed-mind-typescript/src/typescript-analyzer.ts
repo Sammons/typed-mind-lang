@@ -243,7 +243,10 @@ export class TypeScriptAnalyzer {
     const traverseQueue: string[] = [absoluteEntryPath];
 
     while (traverseQueue.length > 0) {
-      const currentPath = traverseQueue.shift()!;
+      const currentPath = traverseQueue.shift();
+      if (currentPath === undefined) {
+        break;
+      }
 
       if (visitedModules.has(currentPath)) {
         continue;

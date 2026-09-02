@@ -38,7 +38,9 @@ describe('TypedMindParser (built dist layout, default import.meta.url wasm resol
   it('parses the hero fixture from the compiled ESM output with no wasm override', () => {
     // Ensure dist/ reflects the current sources; tsc --build is incremental.
     execFileSync(join(repoRoot, 'node_modules', '.bin', 'tsc'), ['--build'], { cwd: packageDir, encoding: 'utf8' });
-    const stdout = execFileSync(process.execPath, ['--input-type=module', '-e', childScript, distParserPath, heroPath], { encoding: 'utf8' });
+    const stdout = execFileSync(process.execPath, ['--input-type=module', '-e', childScript, distParserPath, heroPath], {
+      encoding: 'utf8',
+    });
     assert.deepEqual(JSON.parse(stdout), {
       headers: ['TodoApp', 'left-pad'],
       dtoConcreteType: 'dto_declaration_final',
