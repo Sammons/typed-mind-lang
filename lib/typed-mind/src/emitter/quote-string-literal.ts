@@ -22,3 +22,13 @@
 // corrupt output for every AST field that happens to carry a literal quote,
 // regardless of how that field's value was constructed.
 export const quoteStringLiteral = (text: string): string => `"${text.replace(/"/g, "'")}"`;
+
+// Issue #130 (git.tail4ea214.ts.net/sammons/typed-mind-lang) — disposition
+// (b): the substitution above is meaning-preserving at the grammar level
+// (the string token can carry `'`, not `"`), but it is still a silent
+// rewrite of user-authored content. Disposition (a) — a grammar-level
+// escaped-quote production that would make the swap unnecessary — remains
+// open design work (tracked on the issue). This function is the narrower
+// fix: report the mutation as a structured diagnostic instead of staying
+// silent about it, without changing what gets emitted.
+export const quoteSwapOccurred = (text: string): boolean => text.includes('"');

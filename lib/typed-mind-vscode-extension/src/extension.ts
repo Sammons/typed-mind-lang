@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { TypedMind } from '@sammons/typed-mind';
+import { type Diagnostic, TypedMind } from '@sammons/typed-mind';
 import { AdvancedTypedMindRenderer } from '@sammons/typed-mind-renderer';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions, TransportKind } from 'vscode-languageclient/node';
 
@@ -266,10 +266,13 @@ async function handleToggleFormat(client: LanguageClient): Promise<void> {
         progress.report({ increment: 30 });
 
         // Send request to LSP server
-        const response = await client.sendRequest<{ newText: string; error?: string }>('typedmind/toggleFormat', {
-          uri: editor.document.uri.toString(),
-          range: range,
-        });
+        const response = await client.sendRequest<{ newText: string; error?: string; diagnostics?: Diagnostic[] }>(
+          'typedmind/toggleFormat',
+          {
+            uri: editor.document.uri.toString(),
+            range: range,
+          },
+        );
 
         progress.report({ increment: 70 });
 
@@ -293,7 +296,27 @@ async function handleToggleFormat(client: LanguageClient): Promise<void> {
             editor.selection = new vscode.Selection(newPosition, newPosition);
           }
 
-          vscode.window.showInformationMessage('TypedMind format toggled successfully');
+          // Issue #130, PR #141 review blocker 2 — `response.diagnostics`
+          // (emitter/quote-swap warnings, populated via
+          // `typedMind.toggleFormatWithDiagnostics` on the server side) was
+          // computed and silently dropped here before this fix. Surfaced via
+          // `showWarningMessage`, matching the existing pattern this file
+          // already uses for one-off command-triggered notices (e.g. the
+          // preview command's "validation errors, preview anyway?" warning
+          // above) rather than publishing to the Problems panel via
+          // `sendDiagnostics`: the `applyEdit` above re-triggers the
+          // server's own `validateTextDocument`, which republishes ONLY
+          // `typedMind.check(text).diagnostics` (a check-pipeline result
+          // that never runs the emitter) and would immediately clear any
+          // Problems-panel entry this command tried to publish itself — a
+          // one-shot message survives that race, a published diagnostic
+          // would not.
+          if (response.diagnostics !== undefined && response.diagnostics.length > 0) {
+            const summary = response.diagnostics.map((diagnostic) => diagnostic.message).join('\n');
+            vscode.window.showWarningMessage(`TypedMind format toggled with warnings:\n${summary}`);
+          } else {
+            vscode.window.showInformationMessage('TypedMind format toggled successfully');
+          }
         } else {
           vscode.window.showErrorMessage('Failed to apply format changes');
         }

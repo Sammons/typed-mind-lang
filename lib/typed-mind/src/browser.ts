@@ -124,6 +124,32 @@ export class TypedMindBrowser {
     return this.#emitter.toggleFormat(outcome, format);
   }
 
+  // Issue #130, disposition (b) — mirrors typed-mind.ts's
+  // `toggleFormatWithDiagnostics`/`emitShortformWithDiagnostics`/
+  // `emitLongformWithDiagnostics`: same quote-swap `Diagnostic`s
+  // (emitter-diagnostics.ts), no filePath parameter (same browser-facade
+  // constraint as every other method on this class). PR #141 review
+  // (non-blocking finding): an earlier version of this file added only
+  // `toggleFormatWithDiagnostics`, diverging from typed-mind.ts's full set
+  // of three siblings — the playground's only caller today is
+  // `toggleFormat` (typedmind-monaco-simple.js), so nothing was broken, but
+  // the two facades now match again.
+  toggleFormatWithDiagnostics(source: string): { text: string; diagnostics: Diagnostic[] } {
+    const outcome = this.#parser.parse(source);
+    const { format } = detectFormat(source);
+    return this.#emitter.toggleFormatWithDiagnostics(outcome, format);
+  }
+
+  emitShortformWithDiagnostics(source: string): { text: string; diagnostics: Diagnostic[] } {
+    const outcome = this.#parser.parse(source);
+    return this.#emitter.emitShortformWithDiagnostics(outcome);
+  }
+
+  emitLongformWithDiagnostics(source: string): { text: string; diagnostics: Diagnostic[] } {
+    const outcome = this.#parser.parse(source);
+    return this.#emitter.emitLongformWithDiagnostics(outcome);
+  }
+
   detectFormat(source: string): FormatDetectionResult {
     return detectFormat(source);
   }

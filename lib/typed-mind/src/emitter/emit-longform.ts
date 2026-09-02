@@ -25,6 +25,7 @@ import type { ClassFileNode } from '../ast/class-file-node.ts';
 import type { ClassNode } from '../ast/class-node.ts';
 import type { ConstantsNode } from '../ast/constants-node.ts';
 import type { DependencyNode } from '../ast/dependency-node.ts';
+import type { Diagnostic } from '../ast/diagnostic.ts';
 import type { DtoNode } from '../ast/dto-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import type { FileNode } from '../ast/file-node.ts';
@@ -33,6 +34,7 @@ import type { ProgramNode } from '../ast/program-node.ts';
 import type { RunParameterNode } from '../ast/run-parameter-node.ts';
 import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
+import { quoteSwapDiagnosticsFor } from './emitter-diagnostics.ts';
 import { printTypeExpr } from './print-type-expr.ts';
 import { quoteStringLiteral } from './quote-string-literal.ts';
 
@@ -388,4 +390,10 @@ export const emitLongform = (entity: EntityNode): string[] => {
     case 'TypeDef':
       return typeDefToLongform(entity as TypeDefNode);
   }
+};
+
+// Issue #130, disposition (b) — sibling of `emitLongform`, same shape and
+// rationale as emit-shortform.ts's `emitShortformWithDiagnostics`.
+export const emitLongformWithDiagnostics = (entity: EntityNode): { lines: string[]; diagnostics: Diagnostic[] } => {
+  return { lines: emitLongform(entity), diagnostics: quoteSwapDiagnosticsFor(entity, 'longform') };
 };

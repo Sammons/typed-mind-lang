@@ -61,6 +61,16 @@ export { TypeDefNode } from './ast/type-def-node.ts';
 // into lib/typed-mind/src for sibling workspace packages).
 export type { TypeExprNode } from './ast/type-expr-node.ts';
 export { UiComponentNode } from './ast/ui-component-node.ts';
+// Issue #130 (git.tail4ea214.ts.net/sammons/typed-mind-lang), PR #141 review
+// blocker 3 — `QUOTE_SWAP_CODE` ('emitter/quote-swap') joins `Diagnostic`
+// (already exported above) on the public surface so a consumer can filter
+// for this code (`diagnostics.filter((d) => d.code === QUOTE_SWAP_CODE)`)
+// without string-matching a literal the package could rename without
+// warning. Same no-barrel-house-rule rationale as every other targeted
+// re-export in this file: index.ts is the only path into lib/typed-mind/src
+// for sibling workspace packages (the LSP, the VS Code extension) and for
+// external consumers.
+export { QUOTE_SWAP_CODE } from './emitter/emitter-diagnostics.ts';
 // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — the TypeScript converter builds a
 // synthetic ParseOutcome directly (it never runs source through the parser),
 // so it needs SyntaxEmitter itself rather than going through TypedMind's

@@ -182,6 +182,29 @@ export class TypedMind {
     return this.#emitter.toggleFormat(outcome, format);
   }
 
+  // Issue #130, disposition (b) — sibling of `toggleFormat` that additionally
+  // returns the quote-swap `Diagnostic`s (emitter-diagnostics.ts) produced
+  // while quoting free-text fields, so a caller (the LSP toggle-format
+  // command, `lib/typed-mind-lsp/src/toggle-format.ts`) can surface the
+  // warning instead of the mutation staying silent. Same filePath/resolution
+  // wiring as `toggleFormat`; added rather than changing that method's
+  // return shape so every existing `toggleFormat` caller keeps compiling.
+  toggleFormatWithDiagnostics(source: string, filePath?: string): { text: string; diagnostics: Diagnostic[] } {
+    const outcome = resolveImportsInto(this.#parser, this.#parser.parse(source), filePath);
+    const { format } = detectFormat(source);
+    return this.#emitter.toggleFormatWithDiagnostics(outcome, format);
+  }
+
+  emitShortformWithDiagnostics(source: string, filePath?: string): { text: string; diagnostics: Diagnostic[] } {
+    const outcome = resolveImportsInto(this.#parser, this.#parser.parse(source), filePath);
+    return this.#emitter.emitShortformWithDiagnostics(outcome);
+  }
+
+  emitLongformWithDiagnostics(source: string, filePath?: string): { text: string; diagnostics: Diagnostic[] } {
+    const outcome = resolveImportsInto(this.#parser, this.#parser.parse(source), filePath);
+    return this.#emitter.emitLongformWithDiagnostics(outcome);
+  }
+
   detectFormat(source: string): FormatDetectionResult {
     return detectFormat(source);
   }
