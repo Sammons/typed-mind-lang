@@ -331,6 +331,14 @@ const applyProperties = (accumulator: EntityAccumulator, collected: CollectedPro
       if (consumes !== undefined) {
         slots.consumes = consumes;
       }
+      // Issue #121: `dependencies:` is functionToLongform's counterpart to
+      // the shortform `<- [...]` residue (see FunctionNode's own
+      // pendingDependencies doc comment). Reads a list like every other
+      // Function relationship key; EntityAccumulator defaults it to `[]`.
+      const dependencies = list('dependencies');
+      if (dependencies !== undefined) {
+        slots.pendingDependencies = dependencies;
+      }
       break;
     }
     case 'Class': {

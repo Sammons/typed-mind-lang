@@ -91,40 +91,37 @@ const enumerateCorpus = (): string[] => {
 //   (S-CORE-2a's scenario-31 check, round-trip.test.ts, which calls plain
 //   emit() — per-entity form-preserving — never toggleFormat).
 //
-// - scenario-47-function-mixed-dependencies.tmd: a REAL bucket-b design gap
-//   (NOT cosmetic like the two above) — see the design-gap inventory in the
-//   vault note. Function.pendingDependencies (the unresolved `<- [...]`
-//   residue the validator's "Function dependency not found" check consumes)
-//   has no reserved longform property key at all (longform-builder.ts's
-//   Function case never reads or assigns pendingDependencies; it always
-//   defaults to `[]`, entity-accumulator.ts). Toggling a shortform Function
-//   with a non-empty pendingDependencies list through longform silently
-//   drops it — a genuine data-loss bug, structurally identical in shape to
-//   RC-C (issue #102) but requiring a NEW grammar-recognized property key
-//   (not fixable by promoting the entity to a form it's already declaring),
-//   so it needs its own issue rather than a mechanical emitter fix.
+// - scenario-47-function-mixed-dependencies.tmd: FIXED (issue #121).
+//   Function.pendingDependencies (the unresolved `<- [...]` residue the
+//   validator's "Function dependency not found" check consumes) now has a
+//   `dependencies: [...]` longform property key, symmetric with the
+//   existing calls/affects/consumes list keys (emit-longform.ts's
+//   functionToLongform emits it, longform-builder.ts's Function case reads
+//   it). See PENDING_DEPENDENCIES_FIXTURES below for the targeted
+//   regression test using the issue's own repro. Promoted out of this
+//   exception set.
 //
 // - scenario-55-common-validation-mistakes.tmd: a REAL bucket-b design gap,
-//   same shape as the pendingDependencies gap above. `RunParameter` (and
-//   the other three kinds with no separate purpose key — Function, Asset,
-//   UIComponent, per emit-longform.ts's own header comment) has exactly
-//   ONE longform free-text slot (`description:`), which the parser sets
-//   BOTH `comment` and `description` from identically. A shortform-authored
-//   entity of one of these four kinds CAN legally carry a comment
-//   GENUINELY DISTINCT from its description/purpose (`API_KEY $secret "API
-//   key" # Wrong type comment` — two separate string values on parse, see
-//   honest-fields.ts's honestFieldsAcrossToggleOf doc comment) — but
-//   forcing it through longform has no property key to carry the distinct
-//   comment alongside the description, so it is silently dropped. Same
-//   missing-schema-slot mechanism as pendingDependencies; not filed as a
-//   separate issue from #121 since the fix (reserve a `comment:`-equivalent
-//   longform property for these four kinds) is the same class of change —
-//   noted in issue #121's own scope for the eventual fix to consider.
+//   same shape as the (now-fixed) pendingDependencies gap above.
+//   `RunParameter` (and the other three kinds with no separate purpose key —
+//   Function, Asset, UIComponent, per emit-longform.ts's own header comment)
+//   has exactly ONE longform free-text slot (`description:`), which the
+//   parser sets BOTH `comment` and `description` from identically. A
+//   shortform-authored entity of one of these four kinds CAN legally carry
+//   a comment GENUINELY DISTINCT from its description/purpose (`API_KEY
+//   $secret "API key" # Wrong type comment` — two separate string values on
+//   parse, see honest-fields.ts's honestFieldsAcrossToggleOf doc comment) —
+//   but forcing it through longform has no property key to carry the
+//   distinct comment alongside the description, so it is silently dropped.
+//   Same missing-schema-slot mechanism pendingDependencies had; noted in
+//   issue #121's own comments as follow-up scope (reserve a
+//   `comment:`-equivalent longform property for these four kinds) rather
+//   than fixed in the same change, since it is a distinct field on a
+//   distinct set of entity kinds.
 const KNOWN_CORPUS_TOGGLE_EXCEPTIONS: ReadonlySet<string> = new Set([
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-61-multiple-dtos-function-deps.tmd'),
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-49-dto-complex-structures.tmd'),
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-31-mixed-syntax.tmd'),
-  join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-47-function-mixed-dependencies.tmd'),
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-55-common-validation-mistakes.tmd'),
 ]);
 
@@ -312,6 +309,19 @@ const QUOTED_DESCRIPTION_FIXTURES: readonly ToggleFixture[] = [
   },
 ];
 
+// Issue #121: Function.pendingDependencies — the unresolved `<- [...]`
+// residue after Q4's forward-semantics distribution sorts resolvable names
+// into calls/affects/consumes/input — now has a `dependencies: [...]`
+// longform property key, symmetric with those siblings. Repro is the
+// issue's own fixture.
+const PENDING_DEPENDENCIES_FIXTURES: readonly ToggleFixture[] = [
+  {
+    name: 'Function.pendingDependencies survives shortform -> longform -> shortform',
+    source:
+      'processData :: (input: InputData) => OutputData\n  <- [DashboardUI, IconAsset, InputData, transformData, lodash, AppConfig]\n  <- InputData\n  -> OutputData\n',
+  },
+];
+
 const ALL_TARGETED_FIXTURES: readonly ToggleFixture[] = [
   ...TYPE_EXPR_KIND_FIXTURES,
   ...TYPEDEF_ENUM_FIXTURES,
@@ -319,6 +329,7 @@ const ALL_TARGETED_FIXTURES: readonly ToggleFixture[] = [
   ...REEXPORT_FIXTURES,
   ...RC_C_PROMOTION_FIXTURES,
   ...QUOTED_DESCRIPTION_FIXTURES,
+  ...PENDING_DEPENDENCIES_FIXTURES,
 ];
 
 describe('toggle round-trip: targeted fixtures for surfaces the standard corpus does not exercise', () => {

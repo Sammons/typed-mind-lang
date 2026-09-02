@@ -56,6 +56,26 @@ function createUser {
 }
 ```
 
+A shortform `<- [...]` import-list continuation can carry names the parser
+cannot yet resolve into `calls`/`affects`/`consumes`/`input`; that unresolved
+residue round-trips through a `dependencies: [...]` longform key:
+
+```tmd
+# Shortform
+processData :: (input: InputData) => OutputData
+  <- [DashboardUI, IconAsset, InputData, transformData, lodash, AppConfig]
+  <- InputData
+  -> OutputData
+
+# Longform
+function processData {
+  signature: "(input: InputData) => OutputData"
+  input: InputData
+  output: OutputData
+  dependencies: [DashboardUI, IconAsset, InputData, transformData, lodash, AppConfig]
+}
+```
+
 ### Class Declaration
 ```tmd
 # Shortform
