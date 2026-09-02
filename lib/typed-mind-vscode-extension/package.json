@@ -158,6 +158,7 @@
     "package": "vsce package --no-dependencies",
     "test": "node --test 'src/**/*.test.ts'",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
+    "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist lsp-dist lsp-bundled node_modules *.vsix"
   },
   "dependencies": {
@@ -171,7 +172,7 @@
     "@types/vscode": "^1.99.0",
     "@vscode/vsce": "^3.2.1",
     "tsup": "^8.3.5",
-    "typescript": "^5.9.2",
+    "typescript": "^6.0.3",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.2"
   }
