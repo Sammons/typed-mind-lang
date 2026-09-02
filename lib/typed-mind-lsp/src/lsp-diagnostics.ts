@@ -6,7 +6,7 @@
 // (typed-mind-parser.ts §3.3), so there is no catch arm left to collapse.
 
 import type { Diagnostic as TypedMindDiagnostic } from '@sammons/typed-mind';
-import { DiagnosticSeverity, type Diagnostic as LspDiagnostic } from 'vscode-languageserver/node.js';
+import { DiagnosticSeverity, type Diagnostic as LspDiagnostic } from 'vscode-languageserver/node';
 
 // Span is 1-based on both axes (rfc-tm-3-diamond.md §3.2); LSP Position is
 // 0-based on both axes. The only arithmetic this module performs is that

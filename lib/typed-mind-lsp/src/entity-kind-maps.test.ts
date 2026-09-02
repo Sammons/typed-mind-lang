@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { EntityKind } from '@sammons/typed-mind';
-import { CompletionItemKind } from 'vscode-languageserver/node.js';
+import { CompletionItemKind } from 'vscode-languageserver/node';
 import { getCompletionItemKind, getSemanticTokenType, SEMANTIC_TOKEN_LEGEND } from './entity-kind-maps.ts';
 
 const ALL_KINDS: readonly EntityKind[] = [

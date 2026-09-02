@@ -164,7 +164,7 @@
     "@sammons/typed-mind": "workspace:*",
     "@sammons/typed-mind-lsp": "workspace:*",
     "@sammons/typed-mind-renderer": "workspace:*",
-    "vscode-languageclient": "^9.0.1"
+    "vscode-languageclient": "^10.1.1"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

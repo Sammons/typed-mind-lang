@@ -3,7 +3,7 @@
 // server.ts:507-530) is deleted; occurrence boundaries come from the grammar
 // via NameOccurrenceIndex, not a hand-rolled word-boundary character class.
 
-import type { Location } from 'vscode-languageserver/node.js';
+import type { Location } from 'vscode-languageserver/node';
 import type { NameOccurrence, NameOccurrenceIndex } from './name-occurrence-index.ts';
 
 export const toLspLocation = (uri: string, occurrence: NameOccurrence): Location => {

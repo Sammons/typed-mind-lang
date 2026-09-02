@@ -20,8 +20,8 @@ import type {
   SemanticTokens,
   SemanticTokensParams,
   TextDocumentPositionParams,
-} from 'vscode-languageserver/node.js';
-import { createConnection, MarkupKind, ProposedFeatures, TextDocumentSyncKind, TextDocuments } from 'vscode-languageserver/node.js';
+} from 'vscode-languageserver/node';
+import { createConnection, MarkupKind, ProposedFeatures, TextDocumentSyncKind, TextDocuments } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { provideCompletionsForEntities } from './completions.ts';
 import { buildDocumentState, type DocumentState } from './document-state.ts';

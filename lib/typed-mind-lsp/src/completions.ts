@@ -4,7 +4,7 @@
 // (RFC-TM-5 §1 leaf d — ClassFile now included, no default-arm fallthrough).
 
 import type { EntityNode } from '@sammons/typed-mind';
-import { type CompletionItem, CompletionItemKind } from 'vscode-languageserver/node.js';
+import { type CompletionItem, CompletionItemKind } from 'vscode-languageserver/node';
 import { getCompletionItemKind } from './entity-kind-maps.ts';
 
 const ENTITY_TYPE_ITEMS: readonly CompletionItem[] = [
