@@ -119,7 +119,7 @@ const findWorkspaceProtocolLeaks = (manifest: PackedManifest): string[] => {
 const checkPublishAccess = (manifest: PackedManifest): string | undefined => {
   const publishConfig = manifest.publishConfig;
   const access =
-    typeof publishConfig === 'object' && publishConfig !== null ? (publishConfig as Record<string, unknown>).access : undefined;
+    typeof publishConfig === 'object' && publishConfig !== null ? (publishConfig as Record<string, unknown>)['access'] : undefined;
   if (access !== REQUIRED_PUBLISH_ACCESS) {
     return `publishConfig.access is ${JSON.stringify(access)}, expected ${JSON.stringify(REQUIRED_PUBLISH_ACCESS)}`;
   }

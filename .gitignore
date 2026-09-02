@@ -12,6 +12,7 @@ coverage/
 .vscode/
 .idea/
 .DS_Store
+.claude/worktrees/
 
 # Generated documentation
 lib/typed-mind/grammar.json
