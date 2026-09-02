@@ -72,7 +72,6 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     assert.ok(mixedConsumer?.calls.includes('helperFunction'));
 
     // DataService (ClassFile) - might be in calls or its methods
-    const _hasDataService = mixedConsumer?.calls.includes('DataService') || mixedConsumer?.calls.includes('getData');
   });
 
   it('should handle ClassFile importing dependencies', async () => {
@@ -120,8 +119,6 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     );
 
     // UIComponent can't be consumed via $<
-    const _invalidConsumer = outcome.entities.find((e): e is FunctionNode => e instanceof FunctionNode && e.name === 'invalidConsumer');
-
     // Check if validator catches these invalid consumptions
     assert.equal(
       errors.some((e) => e.includes('invalidConsumer') || (e.includes('AppUI') && e.includes('consume'))),

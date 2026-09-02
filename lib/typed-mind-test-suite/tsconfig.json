@@ -3,8 +3,13 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "module": "ES2022",
-    "moduleResolution": "node"
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [{ "path": "../typed-mind" }]
 }

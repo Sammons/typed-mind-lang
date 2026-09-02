@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test 'src/*.test.ts'"
+    "test": "node --test 'src/*.test.ts'",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@sammons/typed-mind": "workspace:*"

@@ -66,8 +66,6 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
     assert.equal(explicitFunction?.output, 'ResponseDTO');
 
     // ConfigDTO and StateDTO should be in dependencies somewhere
-    const _deps = [...(explicitFunction?.consumes ?? []), ...(explicitFunction?.calls ?? [])];
-
     // They might be treated as consumed or called
   });
 
@@ -109,10 +107,6 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
     assert.ok(mixedDependencies?.calls.includes('helperFunction'));
 
     // DataProcessor might be in calls (for its methods)
-    const _hasDataProcessor =
-      mixedDependencies?.calls.includes('DataProcessor') ||
-      mixedDependencies?.calls.includes('process') ||
-      mixedDependencies?.calls.includes('validate');
 
     assert.ok(mixedDependencies?.consumes?.includes('DATABASE_URL'));
   });
@@ -141,7 +135,6 @@ describe('Scenario 61: Multiple DTOs in function dependencies', () => {
     const nestedInput = outcome.entities.find((e): e is DtoNode => e instanceof DtoNode && e.name === 'NestedInput');
     const outerDTO = outcome.entities.find((e): e is DtoNode => e instanceof DtoNode && e.name === 'OuterDTO');
     const middleDTO = outcome.entities.find((e): e is DtoNode => e instanceof DtoNode && e.name === 'MiddleDTO');
-    const _innerDTO = outcome.entities.find((e): e is DtoNode => e instanceof DtoNode && e.name === 'InnerDTO');
 
     assert.equal(
       nestedInput?.fields.some((f) => f.type === 'OuterDTO'),

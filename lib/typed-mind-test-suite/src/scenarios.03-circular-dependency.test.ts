@@ -23,6 +23,8 @@ describe('scenario-03-circular-dependency', () => {
     assert.equal(result.diagnostics.length, 1);
 
     const diagnostic = result.diagnostics[0];
+    assert.notEqual(diagnostic, undefined);
+    assert.ok(diagnostic);
 
     // Check diagnostic properties
     assert.equal(diagnostic.span.start.line, 3);

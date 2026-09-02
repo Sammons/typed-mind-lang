@@ -21,7 +21,6 @@ describe('Scenario 52: Empty Entities Validation', () => {
 
     // Count warnings vs errors
     const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
-    const _warnings = result.diagnostics.filter((diagnostic) => diagnostic.severity === 'warning');
 
     // Empty arrays should generally be valid
     // No errors expected for empty imports, exports, methods, calls, contains
@@ -54,9 +53,6 @@ describe('Scenario 52: Empty Entities Validation', () => {
     }
 
     // Empty MainFile exports might be questionable
-    const _mainFileEmptyExports = result.diagnostics.find(
-      (diagnostic) => diagnostic.message.includes('MainFile') && diagnostic.message.includes('export'),
-    );
     // This could be a warning or error depending on design
 
     // Overall, empty entities should mostly be valid
