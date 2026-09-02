@@ -6,6 +6,7 @@
     "composite": true,
     "module": "commonjs",
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
     "verbatimModuleSyntax": false,
     "erasableSyntaxOnly": false,
     "lib": ["ES2024"],
