@@ -46,7 +46,8 @@
     "typecheck": "tsc --noEmit",
     "generate-grammar-docs": "node grammar/codegen/generate-grammar-docs.mjs",
     "prepack": "node scripts/build-wasm.mjs && node scripts/stage-published-wasm.mjs",
-    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
+    "guard:npm-publish": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\"",
+    "prepublishOnly": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\" && pnpm run clean && pnpm run build && pnpm test"
   },
   "devDependencies": {
     "@types/node": "^26.4.0"

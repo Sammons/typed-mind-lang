@@ -85,7 +85,8 @@
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "check:golden-deltas": "node scripts/check-golden-deltas.mjs",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test"
+    "guard:npm-publish": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\"",
+    "prepublishOnly": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\" && pnpm run clean && pnpm run build && pnpm test"
   },
   "dependencies": {
     "@sammons/typed-mind": "workspace:*"

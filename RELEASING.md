@@ -115,6 +115,41 @@ Two independent layers stop a wasm-less publish:
    even though `prepack` staged the file correctly on disk, and it catches a
    `prepack` bypass (e.g. `--ignore-scripts`).
 
+## Publishing tool guard: pnpm, never npm
+
+This is a pnpm workspace: internal dependencies between the five published
+packages use the `workspace:*` protocol (e.g. `@sammons/typed-mind-cli`
+depends on `"@sammons/typed-mind": "workspace:*"`). `npm publish` and
+`npm pack` copy `package.json` into the tarball verbatim — npm does not
+implement the workspace protocol and never rewrites it. Only `pnpm publish`
+(and `pnpm pack`) rewrite `workspace:*` to the real version at pack time.
+
+Three prior releases (`@sammons/typed-mind-renderer` 0.2.1,
+`@sammons/typed-mind-lsp` 0.1.8, `@sammons/typed-mind-cli` 0.1.8) shipped to
+npm with a literal `workspace:*` in their `dependencies`, making them
+uninstallable (`EUNSUPPORTEDPROTOCOL`) for every npm consumer. Always
+publish with `pnpm publish`, never `npm publish` or `npm pack`.
+
+Three independent layers stop a repeat:
+
+1. **`prepublishOnly` guard** on each of the five published packages
+   (`lib/typed-mind`, `lib/typed-mind-cli`, `lib/typed-mind-lsp`,
+   `lib/typed-mind-renderer`, `lib/typed-mind-typescript`) checks
+   `npm_config_user_agent` and exits nonzero unless it starts with `pnpm/`.
+   This fires the moment `npm publish` runs, before any build or test step.
+2. **`pnpm run check:release-manifests`** (`scripts/check-release-manifests.ts`,
+   wired into `pnpm run ci` right after `check:pack`) packs every published
+   package with `pnpm pack`, extracts the tarball's `package/package.json`,
+   and fails if any `dependencies` / `peerDependencies` /
+   `optionalDependencies` value starts with `workspace:`, or if
+   `publishConfig.access` is not `"public"`.
+3. **`pnpm run release`** — the sanctioned top-level release command — runs
+   `pnpm run validate && pnpm run check:release-manifests && pnpm -r --filter
+   './lib/*' publish --access public`. It never shells out to `npm publish`.
+
+`pnpm run check:release-manifests` does not check version equality across
+packages — `pnpm run check:version-lockstep` already owns that check.
+
 ## What this procedure does not do
 
 Neither `version-bump.yml` nor any check in `pnpm run ci` performs the bump
