@@ -259,6 +259,32 @@ const TYPE_EXPR_KIND_FIXTURES: readonly ToggleFixture[] = [
   },
 ];
 
+// Issue #103's own two named shapes, as round-trip fixtures. Both are
+// Function signatures, so `functionToLongform` emits them into a longform
+// `signature:` property (P7 `property_freetext`) — the position that
+// ERRORed while the identical text parsed clean through the shortform
+// `Name :: signature` production. Fixed in grammar.js by giving
+// `freetext_value` the same `$.string` alternative `signature` has, plus
+// the `_freetext_open` / `_freetext_open_string` longest-match opening
+// tokens that stop P3 `property_identifier` stealing a multi-chunk value.
+const FUNCTION_SIGNATURE_FIXTURES: readonly ToggleFixture[] = [
+  {
+    name: 'issue #103 shape 1: signature with an inline object-literal parameter type',
+    source: 'StorePayload :: async storePayload(opts: { s3Key: string; body: Buffer; contentType: string; }) => Promise<void>\n',
+  },
+  {
+    name: 'issue #103 shape 2: signature with a quoted-string-literal union parameter type',
+    source: 'SetMode :: setMode(mode: "read" | "write" | "admin") => void\n',
+  },
+  {
+    // The narrower trigger the reproduction isolated: the defect is a bare
+    // identifier as the value's FIRST whitespace-delimited chunk, not the
+    // brace or the quote. `async` alone is enough to reproduce it.
+    name: 'issue #103 minimal trigger: signature whose first chunk is a bare identifier',
+    source: 'Run :: async run\n',
+  },
+];
+
 const TYPEDEF_ENUM_FIXTURES: readonly ToggleFixture[] = [
   { name: 'typedef enum: shortform-sourced', source: 'Status = enum [Active, Done, Archived]\n' },
   {
@@ -324,6 +350,7 @@ const PENDING_DEPENDENCIES_FIXTURES: readonly ToggleFixture[] = [
 
 const ALL_TARGETED_FIXTURES: readonly ToggleFixture[] = [
   ...TYPE_EXPR_KIND_FIXTURES,
+  ...FUNCTION_SIGNATURE_FIXTURES,
   ...TYPEDEF_ENUM_FIXTURES,
   ...SUPPRESSION_FIXTURES,
   ...REEXPORT_FIXTURES,

@@ -646,3 +646,126 @@ dto Foo {
     (block_header
       (block_kw)
       name: (header_name_rest))))
+
+============================================================
+issue #103 shape 1: a longform `signature:` whose value opens with a bare
+identifier chunk (`async`) and carries an inline object-literal parameter
+type parses as P7 property_freetext — P3 property_identifier no longer
+steals the leading chunk and strands the rest of the line
+============================================================
+
+function StorePayload {
+  signature: async storePayload(opts: { s3Key: string; body: Buffer; contentType: string; }) => Promise<void>
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_freetext
+        (property_key)
+        (freetext_value)))))
+
+============================================================
+issue #103 shape 2: a longform `signature:` carrying a quoted-string-literal
+union parses as P7 property_freetext — freetext_value's `_sig_chunk` alone
+(`[^ \t\n"]+`) could not represent a quote AT ALL, so this shape was
+structurally unrepresentable in longform while parsing clean in shortform.
+Two string nodes, not three: the first literal is absorbed into the opaque
+`_freetext_open_string` opening token (see its grammar.js comment), which is
+invisible to every consumer because `longform-builder.ts` reads
+freetext_value's whole `.text` and never walks its children.
+============================================================
+
+function SetMode {
+  signature: setMode(mode: "read" | "write" | "admin") => void
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_freetext
+        (property_key)
+        (freetext_value
+          (string)
+          (string))))))
+
+============================================================
+issue #103 conservation: P3 property_identifier still owns a value that is
+a LONE identifier (`entry: cli`, `extends: Base`) — the freetext
+longest-match tokens only exist when the value continues past its first chunk
+============================================================
+
+program App {
+  entry: cli
+  extends: Base
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_identifier
+        (property_key)
+        (entity_name)))
+    (block_property
+      (property_identifier
+        (property_key)
+        (entity_name)))))
+
+============================================================
+issue #103 conservation: P1 property_string still owns a bare-quoted value
+(`description: "text"`) — freetext_value must never match a lone string, or
+the two productions are genuinely ambiguous
+============================================================
+
+function Fn {
+  description: "a description"
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))))
+
+============================================================
+issue #103 boundary: a freetext value whose SECOND chunk is a string
+(`signature: setMode "read"`) routes through _freetext_open_string, which
+spans the whole literal rather than swallowing its opening quote
+============================================================
+
+function Fn {
+  signature: setMode "read" rest
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      name: (header_name_rest))
+    (block_property
+      (property_freetext
+        (property_key)
+        (freetext_value)))))
