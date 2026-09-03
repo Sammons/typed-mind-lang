@@ -1,0 +1,14 @@
+[
+  {
+    "sourceModule": "src/index.ts",
+    "specifier": "./cli-argument-parser.ts",
+    "resolvedTarget": "src/cli-argument-parser.ts",
+    "classification": "internal"
+  },
+  {
+    "sourceModule": "src/index.ts",
+    "specifier": "./file-processor.ts",
+    "resolvedTarget": "src/file-processor.ts",
+    "classification": "internal"
+  }
+]

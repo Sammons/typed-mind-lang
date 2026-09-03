@@ -1,0 +1,8 @@
+[
+  {
+    "sourceModule": "src/index.ts",
+    "specifier": "./formatter.ts",
+    "resolvedTarget": "src/formatter.ts",
+    "classification": "internal"
+  }
+]

@@ -6,9 +6,12 @@ program Main__App {
 }
 
 MainFile @ src/main.ts:
+  <- [LibFile]
   -> [mainFn]
 
 LibFile @ src/lib.ts:
+  <- [WidgetFile]
+  <-> [makeWidget]
 
 WidgetFile @ src/widget.ts:
   -> [makeWidget]

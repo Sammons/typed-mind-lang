@@ -1,0 +1,8 @@
+[
+  {
+    "sourceModule": "../src/index.ts",
+    "specifier": "@fixture/core",
+    "resolvedTarget": "../../core/dist/index.d.ts",
+    "classification": "external"
+  }
+]

@@ -91,6 +91,115 @@ class TextCursor {
   }
 }
 
+// An opaque leaf's text is emitted verbatim into a single grammar token, and
+// every text-carrying token in that family excludes '\n' (see TextCursor.
+// positionAt's own note). A multi-line source type — a function type authored
+// across lines, the corpus shape from sammons/code-outline-cli's
+// `tree-utils.ts` — must therefore collapse to one line before it can be
+// re-parsed. Runs of whitespace (including newlines) become a single space,
+// which preserves token separation without inventing or dropping any text.
+//
+// The single space is then REMOVED immediately inside a PAREN or BRACKET pair
+// and before a comma: the grammar's own opaque-run tokens reject `( a: T )`
+// and `(a: T , b: U)` while accepting `(a: T, b: U)` (verified against the
+// checker). Collapsing a newline to a space is what makes the text
+// single-line; dropping the space at those positions is what keeps it inside
+// the token the grammar actually accepts. Whitespace BETWEEN tokens (`=> T`,
+// `A | B`) is preserved, since the grammar requires it there.
+//
+// BRACES are deliberately excluded from that tightening: an inline object
+// literal's canonical spelling in this codebase is `{ a: string, b: number }`
+// WITH the inner spaces (see type-expr-from-text.test.ts's object-literal
+// cases and lib/typed-mind-typescript/architecture.tmd:102), so stripping
+// them would rewrite a shape the corpus already fixes.
+//
+// The whole transform is a NO-OP unless the text actually spans lines. A
+// single-line opaque leaf is already inside the grammar's token — it only
+// needs the pre-existing `trim()`. Scoping the rewrite to the multi-line case
+// keeps this fix confined to the shape it exists for and leaves every
+// already-correct single-line spelling byte-identical.
+//
+// LITERAL-AWARENESS (PR #156 review finding): the rewrite is a single
+// left-to-right scan, not a chain of text-blind regexes. A regex pass cannot
+// tell a structural bracket from one INSIDE a string literal, so
+// `'( x )' | Foo` (a legal literal-type member whose own text carries spaces
+// next to brackets) would silently become `'(x)' | Foo` — changing the type's
+// MEANING, since a string-literal type's value is its exact characters. This
+// scan copies any single-quoted, double-quoted, or backtick-quoted span
+// through byte-for-byte (honoring backslash escapes) and applies whitespace
+// rules only to the structural text between literals.
+const isWhitespaceChar = (char: string): boolean => {
+  return char === ' ' || char === '\t' || char === '\n' || char === '\r';
+};
+
+const normalizeOpaqueWhitespace = (text: string): string => {
+  if (!/[\n\r]/.test(text)) {
+    return text.trim();
+  }
+
+  const trimmed = text.trim();
+  let result = '';
+  let index = 0;
+
+  while (index < trimmed.length) {
+    const char = trimmed[index];
+    if (char === undefined) {
+      break;
+    }
+
+    // A quoted span is copied verbatim — including its own whitespace and
+    // brackets — so literal text is byte-preserved.
+    if (char === "'" || char === '"' || char === '`') {
+      const quote = char;
+      let cursor = index + 1;
+      while (cursor < trimmed.length) {
+        const inner = trimmed[cursor];
+        if (inner === '\\') {
+          cursor += 2;
+          continue;
+        }
+        if (inner === quote) {
+          cursor += 1;
+          break;
+        }
+        cursor += 1;
+      }
+      result += trimmed.slice(index, Math.min(cursor, trimmed.length));
+      index = Math.min(cursor, trimmed.length);
+      continue;
+    }
+
+    if (isWhitespaceChar(char)) {
+      // Collapse the whole run, then decide whether it survives at all.
+      let cursor = index;
+      while (cursor < trimmed.length) {
+        const runChar = trimmed[cursor];
+        if (runChar === undefined || !isWhitespaceChar(runChar)) {
+          break;
+        }
+        cursor += 1;
+      }
+      const previousChar = result[result.length - 1];
+      const nextChar = trimmed[cursor];
+      // Drop the space just inside a paren/bracket pair and before a comma —
+      // the grammar's opaque-run tokens reject `( a: T )` and `(a: T , b: U)`.
+      // Braces are excluded on purpose (see the object-literal note above).
+      const dropsBefore = nextChar === ')' || nextChar === ']' || nextChar === ',';
+      const dropsAfter = previousChar === '(' || previousChar === '[';
+      if (nextChar !== undefined && !dropsBefore && !dropsAfter) {
+        result += ' ';
+      }
+      index = cursor;
+      continue;
+    }
+
+    result += char;
+    index += 1;
+  }
+
+  return result;
+};
+
 const spanFrom = (cursor: TextCursor, startIndex: number, endIndex: number): Span => {
   return { start: cursor.positionAt(startIndex), end: cursor.positionAt(endIndex) };
 };
@@ -284,12 +393,37 @@ const parseAtom = (cursor: TextCursor, inGenericArgs = false): TypeExprNode => {
     cursor.skipWhitespace();
     if (cursor.startsWith(')')) {
       cursor.index += 1;
+      // A `(`-led run is a parenthesized type GROUP only when nothing
+      // follows it; when the next token is `=>`, the parens were a function
+      // type's PARAMETER LIST, not a group (`(node: NodeInfo) => T`).
+      // Returning `inner` there silently dropped both the parens and the
+      // `=> T` return type into `remainder`, which every caller discards
+      // (`parseTypeExprText(...).typeExpr`) — the module's own doc comment
+      // states a non-empty remainder "signals a parser bug". The observable
+      // damage: a function-type alias emitted its bare parameter text as the
+      // whole TypeDef (`TreeVisitor = node: NodeInfo,` + two orphan lines),
+      // which the grammar then rejected as `syntax/error`. Corpus:
+      // sammons/code-outline-cli `packages/parser/src/tree-utils.ts`
+      // (`TreeVisitor`, `NodePredicate`).
+      //
+      // A function type has no structured kind in this grammar (RFC-TM-8 §1
+      // lists arrow-function types as a corpus-confirmed OPAQUE category),
+      // so the whole `(params) => Return` run is rescanned as one opaque
+      // leaf from the original `(`.
+      const afterGroupIndex = cursor.index;
+      cursor.skipWhitespace();
+      if (cursor.startsWith('=>')) {
+        cursor.index = startIndex;
+        const text = scanOpaqueRun(cursor, inGenericArgs);
+        return { kind: 'opaque', text: normalizeOpaqueWhitespace(text), span: spanFrom(cursor, startIndex, cursor.index) };
+      }
+      cursor.index = afterGroupIndex;
       return inner;
     }
     // Unbalanced — fall through to opaque scanning from the original start.
     cursor.index = startIndex;
     const text = scanOpaqueRun(cursor, inGenericArgs);
-    return { kind: 'opaque', text: text.trim(), span: spanFrom(cursor, startIndex, cursor.index) };
+    return { kind: 'opaque', text: normalizeOpaqueWhitespace(text), span: spanFrom(cursor, startIndex, cursor.index) };
   }
   const stringLiteral = parseStringLiteral(cursor);
   if (stringLiteral !== undefined) {
@@ -348,7 +482,7 @@ const parseAtom = (cursor: TextCursor, inGenericArgs = false): TypeExprNode => {
     cursor.index += 1;
     return { kind: 'opaque', text: cursor.text.slice(startIndex, cursor.index), span: spanFrom(cursor, startIndex, cursor.index) };
   }
-  return { kind: 'opaque', text: text.trim(), span: spanFrom(cursor, startIndex, cursor.index) };
+  return { kind: 'opaque', text: normalizeOpaqueWhitespace(text), span: spanFrom(cursor, startIndex, cursor.index) };
 };
 
 const parsePostfix = (cursor: TextCursor, inGenericArgs = false): TypeExprNode => {

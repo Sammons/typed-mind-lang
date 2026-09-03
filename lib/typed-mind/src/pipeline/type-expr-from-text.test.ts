@@ -320,4 +320,124 @@ describe('parseTypeExprText: the shared string-based type-expression parser', ()
       }
     });
   });
+
+  // PR #156 (ladder rung: sammons/code-outline-cli) — a MULTI-LINE opaque
+  // leaf. `packages/parser/src/tree-utils.ts` authors `TreeVisitor` /
+  // `NodePredicate` as function types spread across lines. Two defects met
+  // there: (a) the `(` branch treated the function's PARAMETER LIST as a
+  // parenthesized type GROUP, returning the inner type and leaving `) => T`
+  // in the discarded `remainder`; (b) an opaque leaf's text is emitted into
+  // one grammar token and every text-carrying token in that family excludes
+  // '\n', so a multi-line leaf has to collapse to a single line.
+  describe('multi-line opaque leaves (PR #156)', () => {
+    it('keeps a multi-line function type whole: parameter list and return type both survive', () => {
+      const result = parseTypeExprText('(\n  node: NodeInfo,\n  depth: number,\n  parent?: NodeInfo\n) => T');
+      assert.equal(result.remainder, '', 'a non-empty remainder signals a parser bug (this module’s own doc comment)');
+      assert.equal(result.typeExpr.kind, 'opaque');
+      if (result.typeExpr.kind === 'opaque') {
+        assert.equal(result.typeExpr.text, '(node: NodeInfo, depth: number, parent?: NodeInfo) => T');
+      }
+    });
+
+    it('collapses a multi-line parenthesized union to one line and keeps the union structure', () => {
+      const result = parseTypeExprText('(\n  Alpha |\n  Beta\n)');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'union');
+      if (result.typeExpr.kind === 'union') {
+        // The union SHAPE survives across lines. Each member degrades to an
+        // opaque leaf rather than a `named` one, because `skipWhitespace`
+        // advances over spaces and tabs only — a member preceded by a newline
+        // never reaches `parseNamed`. That is pre-existing behaviour this
+        // change does not alter; what it DOES guarantee is that each leaf's
+        // text is collapsed to a single line and carries no stray whitespace.
+        assert.deepEqual(
+          result.typeExpr.members.map((member) => (member.kind === 'opaque' ? member.text : member.kind)),
+          ['Alpha', 'Beta'],
+        );
+      }
+    });
+
+    it('collapses a multi-line generic and preserves its argument structure', () => {
+      const result = parseTypeExprText('Record<\n  string,\n  number\n>');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'generic');
+      if (result.typeExpr.kind === 'generic') {
+        assert.equal(result.typeExpr.base.name, 'Record');
+        // Same pre-existing newline/`skipWhitespace` interaction as the union
+        // case above: the generic's ARGUMENT COUNT and ordering survive, and
+        // each argument's text is single-line and clean.
+        assert.deepEqual(
+          result.typeExpr.args.map((arg) => (arg.kind === 'opaque' ? arg.text : arg.kind)),
+          ['string', 'number'],
+        );
+      }
+    });
+
+    // Review finding (PR #156): the whitespace collapse must be LITERAL-AWARE.
+    // A text-blind regex pass cannot tell a structural bracket from one inside
+    // a string literal, so `'( x )'` would become `'(x)'` — changing the
+    // type's MEANING, since a string-literal type's value is its exact
+    // characters.
+    it('preserves a string literal’s own spaces next to ( ) , [ ] while collapsing the structure around it', () => {
+      const result = parseTypeExprText("(\n  label: '( x , y )',\n  bounds: '[ a , b ]'\n) => void");
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'opaque');
+      if (result.typeExpr.kind === 'opaque') {
+        assert.equal(
+          result.typeExpr.text,
+          "(label: '( x , y )', bounds: '[ a , b ]') => void",
+          'literal text is byte-preserved; only the structural whitespace between literals collapses',
+        );
+      }
+    });
+
+    it('preserves double-quoted and backtick literals the same way', () => {
+      const result = parseTypeExprText('(\n  a: "( kept )",\n  b: `[ kept ]`\n) => void');
+      assert.equal(result.typeExpr.kind, 'opaque');
+      if (result.typeExpr.kind === 'opaque') {
+        assert.equal(result.typeExpr.text, '(a: "( kept )", b: `[ kept ]`) => void');
+      }
+    });
+
+    it('does not end a literal on an escaped quote', () => {
+      const result = parseTypeExprText("(\n  a: '( \\' , x )'\n) => void");
+      assert.equal(result.typeExpr.kind, 'opaque');
+      if (result.typeExpr.kind === 'opaque') {
+        assert.equal(result.typeExpr.text, "(a: '( \\' , x )') => void");
+      }
+    });
+
+    // The transform is scoped to the multi-line case precisely so every
+    // already-correct single-line spelling stays byte-identical.
+    it('single-line inputs are byte-identical: the collapse is a no-op without a newline', () => {
+      const singleLineCases = [
+        '(node: NodeInfo, depth: number) => T',
+        '{ a: string, b: number }',
+        "'( x )' | Foo",
+        '( spaced )',
+        'Record<string, (result: string) => void>',
+      ];
+      for (const source of singleLineCases) {
+        const viaParser = parseTypeExprText(source);
+        assert.equal(viaParser.remainder, '', `unexpected remainder for ${source}`);
+      }
+
+      // The two opaque shapes above assert their exact text, which is what
+      // "byte-identical" means for this transform.
+      const arrow = parseTypeExprText('(node: NodeInfo, depth: number) => T');
+      assert.equal(arrow.typeExpr.kind === 'opaque' ? arrow.typeExpr.text : undefined, '(node: NodeInfo, depth: number) => T');
+      const objectLiteral = parseTypeExprText('{ a: string, b: number }');
+      assert.equal(objectLiteral.typeExpr.kind === 'opaque' ? objectLiteral.typeExpr.text : undefined, '{ a: string, b: number }');
+      const spaced = parseTypeExprText('( spaced )');
+      assert.equal(spaced.typeExpr.kind === 'named' ? spaced.typeExpr.name : undefined, 'spaced');
+    });
+
+    it('braces keep their inner spacing when collapsing (object-literal corpus spelling)', () => {
+      const result = parseTypeExprText('{\n  a: string,\n  b: number\n}');
+      assert.equal(result.typeExpr.kind, 'opaque');
+      if (result.typeExpr.kind === 'opaque') {
+        assert.equal(result.typeExpr.text, '{ a: string, b: number }');
+      }
+    });
+  });
 });

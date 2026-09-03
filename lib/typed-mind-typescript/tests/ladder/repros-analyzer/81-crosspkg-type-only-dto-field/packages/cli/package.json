@@ -1,0 +1,6 @@
+{
+  "name": "@fixture/cli",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": { "@fixture/core": "workspace:*" }
+}

@@ -1,0 +1,29 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [run]
+}
+
+IndexFile @ src/index.ts:
+  <- [CliArgumentParser, FileProcessor]
+  -> [run]
+
+CliArgumentParser #: src/cli-argument-parser.ts
+  <- [Error]
+  => [parse]
+  -> [CliArgumentError, Error, CliArgumentParser]
+
+FileProcessor #: src/file-processor.ts
+  <- [Error]
+  => [process]
+  -> [FileProcessorError, FileProcessor]
+
+Error <:
+  "Ambient global error type"
+
+CliArgumentError <: Error
+
+FileProcessorError <: Error
+
+run :: run() => string

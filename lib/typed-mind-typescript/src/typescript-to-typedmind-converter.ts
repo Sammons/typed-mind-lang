@@ -377,6 +377,28 @@ export class TypeScriptToTypedMindConverter {
 
   // Two-pass architecture registries
   private readonly exportRegistry: ExportRegistry = {};
+
+  // X-AN-3 residual — `export * from '<source>'` edges, keyed by the
+  // ABSOLUTE path of the barrel module that declares them, valued by the
+  // written specifiers it stars. `registerModuleExports` is the only writer
+  // (it is the one place holding both the module and its ParsedExports);
+  // `resolveStarReExportNames` is the only reader. Kept separate from
+  // `exportRegistry` because that registry is keyed by SPECIFIER (many keys
+  // per module) and stores only names, so it cannot answer "which source
+  // does this module's star point at?".
+  private readonly starReExportSources = new Map<string, string[]>();
+
+  // Ladder rung (sammons/code-outline-cli `packages/cli`) — the set of
+  // builtin-extends / namespace-implements stub names that have already been
+  // claimed by SOME file's `exports:` list. `ensureBuiltinExtendsStub` is
+  // idempotent (one shared `Error` ClassNode for every class extending it),
+  // but every ClassFile whose module extends it used to fold that ONE name
+  // into its OWN `exports` list — so two modules each declaring an
+  // `X extends Error` both claimed to export `Error` and the checker fired
+  // `checker/multi-exported`. A stub is a single entity and can have exactly
+  // one exporter; the first claimant wins and later files import it without
+  // re-exporting.
+  private readonly claimedStubExportNames = new Set<string>();
   private readonly entityRegistry: EntityRegistry = {
     functions: new Map(),
     classes: new Map(),
@@ -460,6 +482,13 @@ export class TypeScriptToTypedMindConverter {
       // re-exporting File's `reExports` and its own entity name are only
       // guaranteed final once `convertModules` has finished.
       this.foldReExportedNamesIntoImporterFiles(filteredModules);
+
+      // X-AN-3 residual (ladder rung: sammons/code-outline-cli) — the
+      // barrel->source direction of the same "a re-export is a real edge"
+      // principle: `export * from '<source>'` emits no ImportDeclaration, so
+      // nothing else in this converter records that the barrel references
+      // the starred module.
+      this.foldStarReExportImportsIntoBarrelFiles(filteredModules);
 
       // Generate program entities if requested (after other entities are created)
       if (this.options.generatePrograms) {
@@ -640,6 +669,8 @@ export class TypeScriptToTypedMindConverter {
     this.namespaceImplementsStubNames.clear();
     this.typesRegistryPredictedKind.clear();
     this.moduleGraphResolution.clear();
+    this.starReExportSources.clear();
+    this.claimedStubExportNames.clear();
 
     // Clear two-pass registries
     Object.keys(this.exportRegistry).forEach((key) => {
@@ -859,6 +890,17 @@ export class TypeScriptToTypedMindConverter {
         moduleExports.defaultExport = exp.name;
       } else {
         moduleExports.namedExports.add(exp.name);
+      }
+
+      // X-AN-3 residual — record the star's SOURCE specifier so
+      // `resolveStarReExportNames` can expand the `'*'` placeholder into the
+      // real names later, once every module is registered. Recorded here
+      // because this is the only point that sees the ParsedExport's
+      // `source` alongside the declaring module's own path.
+      if (exp.type === 'namespace-reexport' && exp.source !== undefined) {
+        const existing = this.starReExportSources.get(module.filePath) ?? [];
+        existing.push(exp.source);
+        this.starReExportSources.set(module.filePath, existing);
       }
 
       // Handle re-exports: if export has a source, treat it as import-then-export
@@ -1558,7 +1600,7 @@ export class TypeScriptToTypedMindConverter {
       implements: this.convertImplementsList(primaryClass.extends.slice(1), primaryClass.implements),
       methods: this.convertMethods(primaryClass),
       imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
-      exports: [...this.convertExports(module, entityName).exportNames, ...stubNames],
+      exports: [...this.convertExports(module, entityName).exportNames, ...this.claimStubExportNames(stubNames)],
       purpose: primaryClass.description ? collapseDescription(primaryClass.description) : undefined,
     });
 
@@ -1657,7 +1699,7 @@ export class TypeScriptToTypedMindConverter {
         sourceForm: 'shortform',
         path: this.getRelativePath(module.filePath),
         imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
-        exports: [...exportNames, ...stubNames],
+        exports: [...exportNames, ...this.claimStubExportNames(stubNames)],
         reExports: reExportNames,
       });
 
@@ -2879,6 +2921,31 @@ export class TypeScriptToTypedMindConverter {
 
     // Add all named exports
     for (const namedExport of moduleExports.namedExports) {
+      // X-AN-3 residual (ladder rung: sammons/code-outline-cli
+      // `packages/formatter/src/index.ts`, whose entire body is
+      // `export * from './formatter.ts'`). `parseExportDeclaration` models
+      // `export * from '<source>'` as a ParsedExport whose `name` is the
+      // literal `'*'`, and `registerModuleExports` adds that name to the
+      // module's `namedExports` set like any other. When the barrel is a
+      // NON-entrypoint (the 10-export-star fixture's shape) the `'*'` never
+      // leaves the registry, so the defect stayed invisible; when the
+      // barrel IS the entrypoint, this method pushed `'*'` straight into
+      // Program.exports and the emitter produced the ungrammatical
+      // `exports: [*]` — a `syntax/error` on the extractor's own output.
+      //
+      // `'*'` is not a name any entity can carry, so it is never a legal
+      // member of an `exports:` list. Expand it to the star's real
+      // transitive export names instead of dropping it: the barrel's public
+      // surface IS the source module's surface, which is what a consumer of
+      // this Program actually gets.
+      if (namedExport === '*') {
+        for (const starName of this.resolveStarReExportNames(moduleExports.filePath)) {
+          if (!this.isPredictedTypeDef(starName)) {
+            publicExports.push(starName);
+          }
+        }
+        continue;
+      }
       if (!this.isPredictedTypeDef(namedExport)) {
         publicExports.push(namedExport);
       }
@@ -2890,6 +2957,157 @@ export class TypeScriptToTypedMindConverter {
     }
 
     return publicExports;
+  }
+
+  // X-AN-3 residual — a bare `export * from '<source>'` produces NO
+  // `ImportDeclaration`, so `convertImports` (which walks `module.imports`)
+  // records no edge for it and the starred source File is left with no
+  // importer at all -> `checker/orphaned-file`, plus the Program-scoped
+  // `multi-exported` exemption (ast-validator: "a Program exporting a name
+  // whose declaring File is reachable from the entry is NOT multi-exported")
+  // never engages, because the declaring File is unreachable.
+  //
+  // The edge is a true statement about the source: the barrel names the
+  // source module's path in its own `export * from` specifier, so recording
+  // "the barrel imports the source File" invents nothing — the same
+  // justification RX-6's `foldReExportedNamesIntoImporterFiles` uses for the
+  // importer->barrel direction. This method covers the barrel->source
+  // direction that fold does not reach.
+  // Runs as a POST-PASS (same ordering rationale as the two folds above):
+  // `fileEntityNameByRelativePath` is populated per-module as
+  // `convertModules` iterates, so a barrel converted BEFORE its starred
+  // source would resolve nothing if this ran inline at File construction.
+  private foldStarReExportImportsIntoBarrelFiles(modules: readonly ParsedModule[]): void {
+    for (const module of modules) {
+      const sources = this.starReExportSources.get(module.filePath);
+      if (sources === undefined) {
+        continue;
+      }
+
+      const barrelEntityName = this.fileEntityNameByModulePath.get(module.filePath);
+      if (barrelEntityName === undefined) {
+        continue;
+      }
+
+      const barrelIndex = this.entities.findIndex((entity) => entity.name === barrelEntityName);
+      const barrelEntity = this.entities[barrelIndex];
+      if (barrelIndex === -1 || !(barrelEntity instanceof FileNode)) {
+        // ClassFile is out of scope for the same RX-1 reason the sibling
+        // fold documents: it auto-self-exports and never routes through
+        // `isFileConsumed`, so a folded import would have no consumer.
+        continue;
+      }
+
+      const newNames: string[] = [];
+      for (const source of sources) {
+        if (this.isExternalPackage(source)) {
+          continue;
+        }
+        const resolvedTarget = this.moduleGraphResolution.get(
+          TypeScriptToTypedMindConverter.moduleGraphResolutionKey(this.getRelativePath(module.filePath), source),
+        );
+        const targetRelativePath =
+          resolvedTarget !== undefined ? this.stripKnownSourceExtension(resolvedTarget) : this.stripKnownSourceExtension(source);
+        const targetFileEntityName = this.fileEntityNameByRelativePath.get(targetRelativePath);
+        if (
+          targetFileEntityName !== undefined &&
+          !barrelEntity.imports.includes(targetFileEntityName) &&
+          !newNames.includes(targetFileEntityName)
+        ) {
+          newNames.push(targetFileEntityName);
+        }
+      }
+
+      if (newNames.length === 0) {
+        continue;
+      }
+
+      this.entities[barrelIndex] = new FileNode({
+        name: barrelEntity.name,
+        span: barrelEntity.span,
+        raw: barrelEntity.raw,
+        comment: barrelEntity.comment,
+        sourceForm: barrelEntity.sourceForm,
+        path: barrelEntity.path,
+        imports: [...barrelEntity.imports, ...newNames],
+        exports: barrelEntity.exports,
+        reExports: barrelEntity.reExports,
+        purpose: barrelEntity.purpose,
+      });
+    }
+  }
+
+  // X-AN-3 residual — expand one barrel module's `export * from '<source>'`
+  // edges into the real names the star re-exports. Transitive (a barrel of
+  // barrels is the corpus shape: code-outline-cli's `packages/parser/src/
+  // index.ts` stars 7 sibling modules, any of which may itself star), with a
+  // visited-set cycle guard mirroring `unionFileNamesAcrossReferences`'s own
+  // guard — a mutual `export *` pair is legal TypeScript and must not spin.
+  //
+  // A star whose source does not resolve to a module in this analysis
+  // (an external package, or an unresolved specifier) contributes NOTHING
+  // rather than a fabricated name: the barrel genuinely re-exports names
+  // this extraction cannot see, and inventing them would put unresolvable
+  // references in `exports:`. That is the `degrade, never discard` reading
+  // (I-13) — the Program keeps every name we CAN prove.
+  private resolveStarReExportNames(barrelFilePath: string, visited: Set<string> = new Set()): string[] {
+    if (visited.has(barrelFilePath)) {
+      return [];
+    }
+    visited.add(barrelFilePath);
+
+    const sources = this.starReExportSources.get(barrelFilePath);
+    if (sources === undefined) {
+      return [];
+    }
+
+    const names: string[] = [];
+    for (const source of sources) {
+      // Same resolution chain `resolveImportToEntity` uses: the analyzer's
+      // own `ts.resolveModuleName` result first (keyed per importing
+      // module), then the guessed-specifier fallback.
+      const resolvedTarget = this.moduleGraphResolution.get(
+        TypeScriptToTypedMindConverter.moduleGraphResolutionKey(this.getRelativePath(barrelFilePath), source),
+      );
+      const sourceExports =
+        (resolvedTarget !== undefined ? this.exportRegistry[this.stripKnownSourceExtension(resolvedTarget)] : undefined) ??
+        this.exportRegistry[source] ??
+        this.exportRegistry[this.stripKnownSourceExtension(source)];
+
+      if (sourceExports === undefined) {
+        continue;
+      }
+
+      for (const name of sourceExports.namedExports) {
+        if (name === '*') {
+          names.push(...this.resolveStarReExportNames(sourceExports.filePath, visited));
+          continue;
+        }
+        names.push(name);
+      }
+    }
+
+    return names;
+  }
+
+  // Returns the subset of `stubNames` this caller may list in its own
+  // `exports:`, claiming each for the FIRST file that asks. Every file that
+  // extends the builtin still IMPORTS the stub (its own `imports:` list is
+  // unfiltered), so the reference edge the orphan check needs survives on
+  // every file; only the single export claim is exclusive.
+  //
+  // `checkClassAndFunctionExports` requires each plain ClassNode to be
+  // exported by SOME file — satisfied because the first claimant keeps it.
+  private claimStubExportNames(stubNames: readonly string[]): string[] {
+    const claimed: string[] = [];
+    for (const stubName of stubNames) {
+      if (this.claimedStubExportNames.has(stubName)) {
+        continue;
+      }
+      this.claimedStubExportNames.add(stubName);
+      claimed.push(stubName);
+    }
+    return claimed;
   }
 
   private convertMethods(cls: ParsedClass): string[] {
@@ -3075,6 +3293,27 @@ export class TypeScriptToTypedMindConverter {
     const seenNames = new Set<string>();
 
     for (const exp of module.exports) {
+      // X-AN-3 residual — `export * from '<source>'` carries the literal
+      // name `'*'`, which `isValidEntityName` rejects, so the star used to
+      // contribute NOTHING to this File's `reExports`. That starved the two
+      // consumers of that list: RX-6's `foldReExportedNamesIntoImporterFiles`
+      // (so a real importer of a starred name never marked the barrel
+      // consumed -> `checker/orphaned-file`) and `isFileConsumed`'s own
+      // `reExports` branch. Expanding the star here routes the real names
+      // through the EXISTING re-export machinery rather than adding a
+      // parallel path. `reExports` is the correct list (not `exports`): the
+      // names are declared by the source module, and listing them under the
+      // barrel's `exports:` would claim two files export the same entity —
+      // exactly the `checker/multi-exported` this expansion must not cause.
+      if (exp.name === '*' && this.isReExport(exp)) {
+        for (const starName of this.resolveStarReExportNames(module.filePath)) {
+          if (starName !== excludeName && this.isValidEntityName(starName) && !seenNames.has(starName)) {
+            seenNames.add(starName);
+            reExportNames.push(starName);
+          }
+        }
+        continue;
+      }
       if (exp.name !== excludeName && this.isValidEntityName(exp.name) && !seenNames.has(exp.name)) {
         if (this.isReExport(exp)) {
           reExportNames.push(exp.name);

@@ -225,6 +225,43 @@ const cases: readonly FixtureCase[] = [
   // every component file read as orphaned. 18 false orphaned-file
   // diagnostics on the target's web entrypoint.
   { fixture: '72-side-effect-import', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  // NEW — the sammons/code-outline-cli ladder rung (fixtures 78-81, see
+  // rung-code-outline-cli.test.ts). 78 checks clean end to end: an
+  // entrypoint that is itself an `export *` barrel now expands the star to
+  // the source's real names AND records the barrel->source edge.
+  {
+    fixture: '78-entrypoint-barrel-star-export',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
+  // 79 records `false`: every `syntax/error` is fixed (the function-type
+  // alias round-trips), but `TreeVisitor`/`NodePredicate` are referenced
+  // only from a function SIGNATURE, which lands on the deferred
+  // call-graph-vs-import-graph orphan class
+  // (ladder-diagnostic-disposition-r3-2026-08-29.md rank 5, TRUE under the
+  // frozen RFC-TM-4 rule). The rung test asserts the syntax half directly.
+  {
+    fixture: '79-function-type-alias-remainder',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
+  // 80 records `false` for the same deferred reason: `checker/multi-exported`
+  // on the shared `Error` stub IS fixed (asserted in the rung test), and the
+  // two residual findings are `CliArgumentError`/`FileProcessorError` —
+  // declared-but-never-referenced error classes, the same rank-5 class.
+  {
+    fixture: '80-shared-builtin-extends-stub',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
+  // 81 is deliberately absent: it is a two-package mini-workspace whose
+  // entrypoint sits under `packages/cli/` with its own tsconfig, which this
+  // harness's fixture-root-as-project-dir shape cannot express. Its goldens
+  // and knownGap disposition live in rung-code-outline-cli.test.ts and
+  // repros-analyzer/81-crosspkg-type-only-dto-field/README.md.
 ];
 
 describe('RFC-TM-9 Q1 — .tmd goldens against the current language (per-fixture, RFC §8 golden discipline)', () => {
