@@ -56,16 +56,16 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Lint
-        run: pnpm lint
+        run: mise exec -- pnpm lint
 
       - name: Test
         if: ${{ github.event.inputs.skip_tests != 'true' }}
-        run: pnpm test
+        run: mise exec -- pnpm test
 
       - name: Build publishable packages only
         run: |
           # Build only the packages that will be published to NPM
-          pnpm --filter "@sammons/typed-mind" \
+          mise exec -- pnpm --filter "@sammons/typed-mind" \
                --filter "@sammons/typed-mind-renderer" \
                --filter "@sammons/typed-mind-cli" \
                --filter "@sammons/typed-mind-lsp" \
@@ -74,7 +74,7 @@ jobs:
       - name: Check packages to publish
         id: check
         run: |
-          PACKAGES=$(.github/scripts/check-npm-packages.sh)
+          PACKAGES=$(mise exec -- bash .github/scripts/check-npm-packages.sh)
           if [ -z "$PACKAGES" ]; then
             echo "No packages need publishing"
             echo "packages=" >> $GITHUB_OUTPUT
@@ -106,7 +106,7 @@ jobs:
       - name: Build publishable packages only
         run: |
           # Build only the packages that will be published to NPM
-          pnpm --filter "@sammons/typed-mind" \
+          mise exec -- pnpm --filter "@sammons/typed-mind" \
                --filter "@sammons/typed-mind-renderer" \
                --filter "@sammons/typed-mind-cli" \
                --filter "@sammons/typed-mind-lsp" \
@@ -115,14 +115,14 @@ jobs:
       - name: Configure npm authentication
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          pnpm whoami
+          mise exec -- pnpm whoami
 
       - name: Publish packages
         run: |
           if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
-            .github/scripts/publish-npm-packages.sh --dry-run
+            mise exec -- bash .github/scripts/publish-npm-packages.sh --dry-run
           else
-            .github/scripts/publish-npm-packages.sh
+            mise exec -- bash .github/scripts/publish-npm-packages.sh
           fi
 
       - name: Verify published packages
@@ -133,7 +133,7 @@ jobs:
               package_name=$(jq -r '.name' "$package_dir/package.json")
               version=$(jq -r '.version' "$package_dir/package.json")
               echo "Verifying $package_name@$version..."
-              pnpm view "$package_name@$version" version || exit 1
+              mise exec -- pnpm view "$package_name@$version" version || exit 1
             fi
           done
 

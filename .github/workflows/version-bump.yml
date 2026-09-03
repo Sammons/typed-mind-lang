@@ -77,7 +77,7 @@ jobs:
           .github/scripts/version-sync.sh "$VERSION"
 
       - name: Update lock file
-        run: pnpm install --lockfile-only
+        run: mise exec -- pnpm install --lockfile-only
 
       - name: Create branch
         if: ${{ github.event.inputs.create_pr == 'true' }}

@@ -1,5 +1,5 @@
 name: 'Setup Node and pnpm'
-description: 'Setup Node.js and pnpm via mise + corepack, matching .gitea/workflows/ci.yml'
+description: 'Setup Node.js and pnpm via mise, matching .gitea/workflows/ci.yml'
 inputs:
   cache-dependency-path:
     description: 'Path to pnpm-lock.yaml'
@@ -12,10 +12,19 @@ inputs:
 runs:
   using: composite
   steps:
-    # Node version is NOT duplicated here. mise.toml is the single source of
-    # truth (root mise.toml pins node = "26"); this mirrors
-    # .gitea/workflows/ci.yml's setup shape exactly so GitHub and Gitea CI
-    # install the identical toolchain from the identical file.
+    # Node AND pnpm versions are NOT duplicated here. Root mise.toml pins
+    # both (`node = "26"`, `pnpm = "11.15.1"`) and scripts/check-toolchain.mjs
+    # asserts the pnpm pin matches package.json's `packageManager` field, so
+    # there is exactly one place either version can be bumped. This mirrors
+    # .gitea/workflows/ci.yml's and .gitea/workflows/deploy-static-site.yml's
+    # setup shape exactly — all three CI surfaces install pnpm the same way.
+    #
+    # pnpm does NOT come from corepack: Node 26 no longer ships it
+    # (nodejs/node#57617 "stop distributing Corepack", #59835 dropped the
+    # corepack tarballs too), so `corepack enable`/`prepare` fails on a clean
+    # Node-26 runner with no other corepack on PATH. mise's own `pnpm` tool
+    # backend is what provisions pnpm here (verified locally: `mise install`
+    # against this pin, then `mise exec -- pnpm --version` prints 11.15.1).
     - name: Install mise
       shell: bash
       run: |
@@ -26,26 +35,14 @@ runs:
       shell: bash
       run: mise install
 
-    # pnpm version is NOT pinned here either. corepack reads the
-    # `packageManager` field in package.json (pnpm@11.15.1), so this is the
-    # only place a pnpm version can drift from — and it can't, since it's
-    # read from the same file `pnpm install` itself already trusts. Passing
-    # a `version:` here (as the old pnpm/action-setup step did) is what
-    # produced "Multiple versions of pnpm specified" against packageManager.
-    #
-    # corepack enable/prepare must run through `mise exec --` so they see the
-    # mise-installed node — corepack itself is not a mise shim. Once
-    # `corepack prepare --activate` writes the pnpm@11.15.1 shim into mise's
-    # shim dir, bare `node`/`pnpm` calls in later workflow steps resolve
-    # correctly without needing `mise exec --` (verified locally: mise
-    # install + `mise exec -- corepack enable && mise exec -- corepack
-    # prepare --activate` leaves `pnpm --version` on plain PATH at 11.15.1).
-    - name: Install pnpm
+    # Convenience only — later `run:` steps in the calling workflows do NOT
+    # rely on this. Every step that invokes pnpm or node is prefixed with
+    # `mise exec --`, matching the only pattern actually proven to work in
+    # this repo (.gitea/workflows/ci.yml, .gitea/workflows/deploy-static-site.yml
+    # never trust bare PATH resolution either).
+    - name: Add mise shims to PATH (convenience only, not relied upon)
       shell: bash
-      run: |
-        mise exec -- corepack enable
-        mise exec -- corepack prepare --activate
-        echo "$HOME/.local/share/mise/shims" >> "$GITHUB_PATH"
+      run: echo "$HOME/.local/share/mise/shims" >> "$GITHUB_PATH"
 
     - name: Get pnpm store directory
       id: pnpm-cache

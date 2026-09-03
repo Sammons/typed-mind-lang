@@ -130,13 +130,13 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Lint
-        run: pnpm lint
+        run: mise exec -- pnpm lint
 
       - name: Test
-        run: pnpm test
+        run: mise exec -- pnpm test
 
       - name: Build
-        run: pnpm build
+        run: mise exec -- pnpm build
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
@@ -176,20 +176,20 @@ jobs:
       - name: Configure npm authentication
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          pnpm whoami
+          mise exec -- pnpm whoami
 
       - name: Publish packages
-        run: .github/scripts/publish-npm-packages.sh
+        run: mise exec -- bash .github/scripts/publish-npm-packages.sh
 
       - name: Verify published packages
         run: |
           VERSION="${{ needs.validate.outputs.version }}"
-          
+
           for package_json in lib/typed-mind*/package.json lib/typed-mind-*/package.json; do
             if [ -f "$package_json" ] && [[ "$package_json" != *"vscode-extension"* ]] && [[ "$package_json" != *"static-website"* ]] && [[ "$package_json" != *"test-suite"* ]]; then
               PACKAGE_NAME=$(jq -r '.name' "$package_json")
               echo "Verifying $PACKAGE_NAME@$VERSION..."
-              pnpm view "$PACKAGE_NAME@$VERSION" version || exit 1
+              mise exec -- pnpm view "$PACKAGE_NAME@$VERSION" version || exit 1
             fi
           done
 
@@ -295,7 +295,7 @@ jobs:
       - name: Create release artifacts
         run: |
           VERSION="${{ needs.validate.outputs.version }}"
-          .github/scripts/create-release-artifacts.sh "$VERSION"
+          mise exec -- bash .github/scripts/create-release-artifacts.sh "$VERSION"
 
       - name: Generate changelog
         id: changelog
@@ -386,7 +386,7 @@ jobs:
       - name: Build documentation site
         run: |
           cd lib/typed-mind-static-website
-          pnpm run build
+          mise exec -- pnpm run build
           cd ../..
 
       - name: Setup Pages
