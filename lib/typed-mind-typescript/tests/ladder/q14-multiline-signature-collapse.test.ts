@@ -101,25 +101,27 @@ describe('RFC-TM-10 follow-up check — issue #86: multi-line-authored signature
     assert.equal(signatureLines.length, 1, 'widgetTransform signature must be exactly one emitted line');
     assert.ok(!signatureLines[0]?.includes('\n'), 'signature line must not contain an embedded newline');
 
-    // Disclosed, OUT OF SCOPE for issue #86: `output` classification reads
-    // `func.returnType` RAW (multi-line-aware, per this fix's own design —
-    // it never touches classification, only the signature TEXT), and
-    // `extractOutputDTO`'s `Promise<(.+)>` strip plus `isBareEntityName`
-    // guard (issue #77) both operate on that raw string. A multi-line-
-    // authored `Promise<\n  WidgetList\n>` strips to `\n  WidgetList\n`
-    // (leading/trailing whitespace survives the strip), which
-    // `isBareEntityName`'s `/^[A-Za-z_]\w*$/` correctly rejects — so
-    // `output` stays `undefined` here even though the NAMED type resolves
-    // fine on a single line. This is the same defect FAMILY as issue #77
-    // (raw multi-line/whitespace text hitting a bare-identifier-only
-    // classification guard), confirmed live by this investigation and
-    // filed as a follow-up rather than silently fixed here (#86's own
-    // scope is the signature TEXT, not classification) — see the
-    // tm10-inc3a delta note.
+    // The #86 follow-up this test used to pin as a gap. `output`
+    // classification reads `func.returnType` RAW, and `extractOutputDTO`'s
+    // `Promise<(.+)>` strip plus `isBareEntityName` guard (issue #77) both
+    // operate on that raw string. A multi-line-authored
+    // `Promise<\n  WidgetList\n>` never matched the anchored strip at all
+    // (`.` does not match a newline), so the wrapper survived into
+    // `isBareEntityName`'s `/^[A-Za-z_]\w*$/`, which correctly rejected it —
+    // dropping the `output` edge for a type that resolves fine when authored
+    // on one line. Same defect FAMILY as issue #77: raw multi-line text
+    // hitting a bare-identifier-only classification guard.
+    //
+    // `extractOutputDTO` now applies `collapseTypeWhitespace` on both sides
+    // of the strip, the same meaning-preserving normalization #86 applied to
+    // signature text. Whitespace is insignificant between type tokens, so
+    // this recovers the edge WITHOUT widening what counts as a bare entity
+    // name — `Widget | null` still fails the guard, as the sibling
+    // assertions below and the #77 fixtures confirm.
     assert.equal(
       widgetTransform?.output,
-      undefined,
-      'output classification on a multi-line-authored Promise<...> wrapper is a disclosed, separately-tracked gap (not fixed by #86)',
+      'WidgetList',
+      'output must resolve through a multi-line-authored Promise<...> wrapper, same as the single-line spelling',
     );
   });
 

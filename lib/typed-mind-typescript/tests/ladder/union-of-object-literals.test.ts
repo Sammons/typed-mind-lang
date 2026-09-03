@@ -55,6 +55,11 @@ describe('issue #114: a union-of-object-literals type alias degrades honestly in
       undefined,
       `must not emit the union as a broken bare field line, got: ${JSON.stringify(brokenFieldLine)}`,
     );
+    // Quoted is the DEFAULT spelling for a longform `type:` value
+    // (`longformTypeValue`, emit-longform.ts). This shape's printed text
+    // carries no double quote of its own, so it takes that default — the
+    // narrow unquoted exception applies only where quoting would double-wrap
+    // an embedded `"`. Unchanged from main.
     assert.ok(
       longform.includes('type: "{ tagged: false } | { tagged: true; label: string }"'),
       `expected the whole union inside one well-formed quoted type string, got:\n${longform}`,

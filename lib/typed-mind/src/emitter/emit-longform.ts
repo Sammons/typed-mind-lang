@@ -203,6 +203,47 @@ const constantsToLongform = (entity: ConstantsNode): string[] => {
   return [`constants ${entity.name} {`, ...indent(body), '}'];
 };
 
+// The shared spelling rule for BOTH longform `type:` slots — a DTO field's
+// type and a TypeDef alias's aliasType. The grammar treats the two positions
+// identically, so they must not drift apart.
+//
+// QUOTED is the default. The quoted value routes through P1
+// `property_string`, whose `unquote`d text goes to `type-expr-from-text.ts`,
+// a reparser that accepts every shape the emitter can print — including
+// shapes the grammar's own P7 `freetext_value` cannot represent at all. A
+// leading `[` (a tuple, `[string, number]`) is the load-bearing example: PR
+// #142's `_freetext_open` / `_freetext_open_string` tokens cover a leading
+// bare identifier and a leading `{`, but never a leading `[`. Unquoted, such
+// a value is not captured as a `type` scalar at all, and
+// `longform-builder.ts`'s fallback default absorbs the miss into a
+// plausible-looking escape-hatch-typed `named` leaf with ZERO diagnostics.
+// Silent AST corruption is strictly worse than a loud parse error.
+//
+// UNQUOTED only when the text carries its own `"` AND does not OPEN with one
+// (nor with a `[`). Quoting a value that already contains a `"` double-wraps
+// it (`type: "Pick<S3Client, "send">"`), which is unparsable — P1 commits to
+// the first `"..."` and ERRORs on the rest. For that class unquoted is both
+// parseable and byte-exact, because the value's first chunk is a bare
+// identifier, so `_freetext_open` out-lengths P3's `entity_name`.
+//
+// Both exclusions are load-bearing. Without the leading-`"` exclusion, a lone
+// string literal (`"active"`) goes unquoted, P1 claims it, and `unquote`
+// strips the delimiters — reparsing `literal`/literalKind:'string' to a
+// `named` leaf with zero diagnostics. The checker DISTINGUISHES those kinds
+// (`check-dto-fields.ts:181` gates `checker/enum-literal-outside-members` on
+// `literalKind === 'string'`), so that is a semantic change, not a spelling
+// nicety. Keeping the class quoted keeps the failure LOUD;
+// `emitter/unrepresentable-alias` (emitter-diagnostics.ts) reports it at emit
+// time as well.
+const longformTypeValue = (printed: string): string => {
+  const leading = printed.trimStart();
+  const unquotedIsRepresentable = !leading.startsWith('"') && !leading.startsWith('[');
+  if (printed.includes('"') && unquotedIsRepresentable) {
+    return printed;
+  }
+  return `"${printed}"`;
+};
+
 // toggle-fidelity audit (2026-08-31, claude-home knowledge/projects/typedmind/
 // toggle-fidelity-audit-2026-08-31.md) — longform-builder.ts's own comment
 // (buildFromLongformBlock's field walker) states the canonical spelling:
@@ -218,19 +259,20 @@ const constantsToLongform = (entity: ConstantsNode): string[] => {
 // targeted union-type fixture is what surfaces it. Quoting matches the
 // documented canonical form and what real corpus fixtures already do.
 //
-// Embedded-quote caveat (same analysis as typeDefToLongform's aliasType,
-// above): if `field.type`'s raw text itself contains a literal `"` (a
-// string-literal-union DTO field type, e.g. `"active" | "inactive"`), the
-// SAME quoteStringLiteral substitution used everywhere else in this module
-// is unsafe here too — a DTO field's `type:` value is also reparsed as a
+// Embedded-quote caveat: if `field.type`'s raw text itself contains a literal
+// `"` (a string-literal-union DTO field type, e.g. `"active" | "inactive"`),
+// the SAME quoteStringLiteral substitution used everywhere else in this
+// module is unsafe here — a DTO field's `type:` value is also reparsed as a
 // structured TypeExprNode via type-expr-from-text.ts, whose
-// parseStringLiteral only recognizes `"`. Quoting without substitution
-// still leaves that narrower case as a known #103-family gap (documented in
-// toggle-round-trip.test.ts's TYPE_EXPR_KIND_FIXTURES), but it is a strict
-// improvement over the prior unquoted behavior, which broke on EVERY
-// multi-token type, not just ones containing an embedded literal.
+// parseStringLiteral only recognizes `"`. That is why this slot routes
+// through `longformTypeValue` (below) rather than an unconditional `"..."`
+// wrap: the two `type:` slots in this file (this one and typeDefToLongform's
+// aliasType) share ONE rule, because the grammar treats them identically.
+// Verified: for every shape class in this PR's review table, a DTO field's
+// `type:` value and a TypeDef's alias `type:` value parse the same way in
+// both spellings — same tuple corruption unquoted, same double-wrap quoted.
 const dtoFieldToLongform = (field: DtoNode['fields'][number]): string[] => {
-  const body: string[] = [`type: "${field.type}"`];
+  const body: string[] = [`type: ${longformTypeValue(field.type)}`];
   if (field.description !== undefined) {
     body.push(`description: ${quoteStringLiteral(field.description)}`);
   }
@@ -320,44 +362,69 @@ const dependencyToLongform = (entity: DependencyNode): string[] => {
 // `type: TypeDef` line would collide with and overwrite the real aliasType on
 // reparse. `variant:` defaults to alias when unspelled (applyProperties
 // mirrors this same default on parse), so a re-emitted alias round-trips
-// without ever printing a redundant `variant: alias` line. The alias type is
-// emitted QUOTED (`type: "..."`), matching a DTO field's longform
-// `type: "string[]"` spelling (§6): a bare, unquoted multi-part type
-// (`type: string | number`) does not survive P3's property_identifier
-// (grammar.js block_property choice order) trying first and matching only
-// the leading `string`, stranding `| number` as unparsable text — quoting
-// routes it through the SAME string-based re-parse path
-// (type-expr-from-text.ts) longform-builder.ts's dtoFieldOf already uses.
+// without ever printing a redundant `variant: alias` line.
 //
-// toggle-fidelity audit (2026-08-31, issue #103 addendum, claude-home
-// knowledge/projects/typedmind/toggle-fidelity-audit-2026-08-31.md) — a
-// printed type containing its OWN string-literal spelling (a literal member,
-// e.g. `"active" | "inactive"`, or a generic's string-literal argument, e.g.
-// `Pick<S3Client, "send">`) breaks the SAME way issue #103 documents: this
-// outer `type: "..."` wrap is itself a property_string-shaped value, and an
-// embedded `"` inside it hits the identical block_property GLR-precedence
-// race (property_string commits to the FIRST `"..."` and ERRORs on the
-// remainder) — just reached via this quoting wrapper instead of a raw
-// unquoted value. Unlike every other quoteStringLiteral call site in this
-// module, the `"` -> `'` substitution is NOT safe to apply here: the printed
-// text gets reparsed as a TypeExprNode by type-expr-from-text.ts
-// (longform-builder.ts), and that reparser's parseStringLiteral only
-// recognizes `"`, never `'` — swapping the inner quotes would silently
-// degrade a `literal`/literalKind:'string' member to an `opaque` leaf (the
-// checker DISTINGUISHES the two, check-dto-fields.ts:181), a semantic
-// change, not a byte-preservation nicety. Left AS UNQUOTED-INNER-BROKEN
-// (matching pre-fix #103 behavior) is deliberately not "fixed" with a
-// meaning-changing substitution the way emit-suppression.ts's reason field
-// and every description/purpose site above safely can (those never get
-// reparsed as a TypeExprNode). Tracked as an issue #103 addendum, NOT a
-// separate issue — same grammar-level mechanism, different call site.
+// The alias type is QUOTED BY DEFAULT (`type: "<printed>"`, matching the DTO
+// field slot at `dtoFieldToLongform` below and the corpus's documented
+// canonical spelling) and unquoted ONLY for the narrow shape class where
+// quoting is what breaks it. `longformTypeValue` (above dtoFieldToLongform)
+// is that shared rule — the DTO field's `type:` slot uses the SAME one,
+// because the grammar treats the two positions identically.
+//
+// Why quoting is the right default: the quoted value routes through P1
+// `property_string`, whose `unquote`d text goes to the SAME string-based
+// reparser (`type-expr-from-text.ts`) the DTO field slot already uses. That
+// reparser accepts every shape `printTypeExpr` can produce, including ones
+// the grammar's own P7 `freetext_value` cannot represent at all — a leading
+// `[` (a tuple, `[string, number]`) being the load-bearing example. PR #142's
+// `_freetext_open` / `_freetext_open_string` tokens cover a leading bare
+// identifier and a leading `{`; they do NOT cover a leading `[`. An unquoted
+// tuple is therefore not captured as a `type` scalar at all, and
+// `longform-builder.ts`'s fallback default silently absorbs the miss into a
+// plausible-looking escape-hatch-typed `named` leaf, with ZERO diagnostics.
+// Silent AST
+// corruption is strictly worse than a loud syntax error, so the default must
+// stay quoted.
+//
+// Why the exception exists: quoting DOUBLE-WRAPS every printed text that
+// carries its own `"`. `Pick<S3Client, "send">` emitted as
+// `type: "Pick<S3Client, "send">"` is unparsable — the outer wrap is itself
+// a property_string-shaped value, so P1 commits to the first `"..."` and
+// ERRORs on the remainder. For that class, and only that class, unquoted is
+// both parseable and byte-exact, because #142's tokens do cover it: the
+// value's first chunk is a bare identifier, so `_freetext_open` out-lengths
+// P3's `entity_name` and P7 takes the whole line.
+//
+// The two conditions are therefore necessary together. `containsDoubleQuote`
+// alone would send `Only = "active"` (a lone string literal) unquoted, where
+// P1 claims it and `unquote` strips the quotes — reparsing to
+// `named 'active'` instead of `literal/'string'`, again silently. The
+// checker DISTINGUISHES those two kinds (`check-dto-fields.ts:181` gates
+// `checker/enum-literal-outside-members` on `literalKind === 'string'`), so
+// that degradation is a semantic change, not a spelling nicety. Excluding a
+// leading `"` keeps that shape on the quoted path, where it stays a LOUD
+// failure exactly as it is on main. Excluding a leading `[` keeps the tuple
+// class on the quoted path, where it round-trips byte-perfect.
+//
+// Residual limit, issue #130: a type whose printed text OPENS with a string
+// literal (`"active" | "inactive"`, `"active"`) has no correct longform
+// spelling in either direction — unquoted is silently wrong, quoted is
+// loudly wrong. `freetext_value` deliberately requires a leading
+// `_sig_chunk` so P1 stays the sole owner of a bare-quoted value; without
+// that, `description: "text"` is a genuine LR conflict (grammar.js
+// `freetext_value`). This emitter picks the LOUD failure. A real fix belongs
+// in the grammar.
 const typeDefToLongform = (entity: TypeDefNode): string[] => {
   const body: string[] = [];
   if (entity.variant === 'enum') {
     body.push('variant: enum');
     body.push(`members: [${(entity.members ?? []).join(', ')}]`);
   } else {
-    body.push(`type: "${entity.aliasType === undefined ? '' : printTypeExpr(entity.aliasType)}"`);
+    // The `undefined` arm is unreachable for an alias: TypeDefNode's
+    // constructor union pins `{ variant: 'alias'; aliasType: TypeExprNode }`,
+    // and the field is only widened to `| undefined` to cover the enum
+    // variant. Kept for the narrowing.
+    body.push(`type: ${longformTypeValue(entity.aliasType === undefined ? '' : printTypeExpr(entity.aliasType))}`);
   }
   body.push(...descriptionAndPurposeLines(entity.comment, entity.purpose));
   return [`typedef ${entity.name} {`, ...indent(body), '}'];

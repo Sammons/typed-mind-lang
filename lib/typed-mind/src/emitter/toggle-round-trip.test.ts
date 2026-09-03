@@ -22,6 +22,7 @@ import { before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { TypedMindParser } from '../pipeline/typed-mind-parser.ts';
 import { detectFormat } from './detect-format.ts';
+import { UNREPRESENTABLE_ALIAS_CODE } from './emitter-diagnostics.ts';
 import { honestFieldsAcrossToggleOf, honestSuppressionOf } from './honest-fields.ts';
 import { SyntaxEmitter } from './syntax-emitter.ts';
 
@@ -231,7 +232,7 @@ interface ToggleFixture {
   readonly name: string;
   readonly source: string;
   // When set, this fixture is expected to reproduce a KNOWN, documented
-  // gap (bucket-b, cross-referenced to issue #103 or its addendum) rather
+  // gap (bucket-b, cross-referenced to the open issue that owns it) rather
   // than round-trip cleanly. The test asserts the failure still reproduces
   // exactly as described, so a change to this behavior requires a
   // conscious decision (updating this fixture's expectation), never a
@@ -239,23 +240,84 @@ interface ToggleFixture {
   readonly knownGap?: string;
 }
 
+// The 21 alias shape classes enumerated by this PR's review. `TypeDef`'s
+// alias slot is the single most spelling-sensitive position in the language:
+// `typeDefToLongform`'s `aliasTypeValue` picks quoted or unquoted per shape,
+// and picking wrong is either a loud parse failure or — worse — a SILENT AST
+// rewrite. This corpus pins the outcome for every class so a future change to
+// that rule cannot move one silently.
+//
+// The knownGap mechanism below asserts `syntaxDiagnostics.length > 0`, so it
+// can only express LOUD failures. Two classes (tuple, single string literal)
+// regressed into SILENT corruption during this PR's first round and produced
+// zero diagnostics — knownGap would not have caught either. That is why
+// `ALIAS_SHAPE_CLASSES` below carries its own AST-identity assertion suite:
+// silence is only acceptable when the round-trip is exact.
 const TYPE_EXPR_KIND_FIXTURES: readonly ToggleFixture[] = [
+  { name: 'typedef alias: bare identifier', source: 'Alias = Other\n' },
   { name: 'typedef alias: named', source: 'Named = string\n' },
   { name: 'typedef alias: array (suffix spelling)', source: 'Ids = string[]\n' },
   { name: 'typedef alias: array (readonly suffix spelling)', source: 'ReadonlyIds = readonly string[]\n' },
   { name: 'typedef alias: array (generic spelling, Array<T>)', source: 'GenericIds = Array<string>\n' },
   { name: 'typedef alias: intersection', source: 'Combo = Named & Other\n' },
   { name: 'typedef alias: generic with named args', source: 'Pair = Record<string, number>\n' },
+  { name: 'typedef alias: union of named', source: 'Either = Widget | Gadget\n' },
+  { name: 'typedef alias: union with null', source: 'Maybe = Widget | null\n' },
+  { name: 'typedef alias: object literal', source: 'Obj = { a: string; b: number }\n' },
   {
+    name: 'typedef alias: union of object literals',
+    source: 'Tag = { tagged: false } | { tagged: true; label: string }\n',
+  },
+  { name: 'typedef alias: parenthesized union array', source: 'Paren = (Widget | Gadget)[]\n' },
+  { name: 'typedef alias: function type', source: 'Fn = (input: string) => number\n' },
+  { name: 'typedef alias: nested generic', source: 'Nested = Record<string, Array<Widget>>\n' },
+  { name: 'typedef alias: numeric literal union', source: 'Level = 1 | 2 | 3\n' },
+  // Regression guard, this PR's review. Emitted UNQUOTED, `[string, number]`
+  // is not captured as a `type` scalar at all (PR #142's `_freetext_open`
+  // tokens cover a leading bare identifier and a leading `{`, never a leading
+  // `[`), and longform-builder.ts's fallback default absorbs the miss into a
+  // plausible escape-hatch-typed `named` leaf, with ZERO diagnostics.
+  // `aliasTypeValue` keeps
+  // this class quoted, where it round-trips byte-perfect.
+  { name: 'typedef alias: tuple', source: 'Tup = [string, number]\n' },
+  // The same tuple text in a NON-leading position is fine: the value's first
+  // chunk is a bare identifier, so P7 takes the whole line. Pins that only
+  // the leading position is affected.
+  { name: 'typedef alias: tuple nested in a union', source: 'TupUnion = Widget | [string, number]\n' },
+  // Both genuinely fixed by this PR: quoting these double-wrapped into an
+  // unparsable value, and unquoted is safe because the first chunk is a bare
+  // identifier.
+  { name: 'typedef alias: generic with a string-literal argument', source: 'PickSend = Pick<S3Client, "send">\n' },
+  { name: 'typedef alias: union mixing named and string literal', source: 'Mixed = Widget | "active" | Gadget\n' },
+  {
+    // Issue #130 — one of the two classes longform cannot spell at all. The
+    // printed type OPENS with a string literal, so BOTH representations are
+    // wrong: quoted double-wraps (`type: ""active" | "inactive""`) into an
+    // unparsable value, and unquoted is claimed by P1 `property_string`,
+    // whose `unquote` silently degrades the literal members. P7
+    // `freetext_value` deliberately requires a leading non-string chunk so P1
+    // keeps sole ownership of a bare-quoted value — without that,
+    // `description: "text"` is a genuine LR conflict (grammar.js
+    // `freetext_value`). `aliasTypeValue` picks the QUOTED route so the
+    // failure is loud, and `emitter/unrepresentable-alias` reports it at emit
+    // time too. A fix belongs in the grammar.
     name: 'typedef alias: union of string literals',
     source: 'Status = "active" | "inactive"\n',
     knownGap:
-      'issue #103 addendum (see emit-longform.ts typeDefToLongform comment): a printed type containing its own string-literal spelling breaks longform emission via the same block_property GLR-precedence race #103 documents.',
+      'issue #130: an alias type whose printed text OPENS with a string literal has no correct longform spelling — quoted double-wraps (loud), unquoted degrades the literal to a named leaf (silent). The emitter picks loud, and also reports emitter/unrepresentable-alias.',
   },
   {
-    name: 'typedef alias: generic with a string-literal argument (opaque leaf via type-expr-from-text fallback)',
-    source: 'PickSend = Pick<S3Client, "send">\n',
-    knownGap: 'issue #103 addendum: same mechanism as the union-of-string-literals case above — the printed type embeds a literal quote.',
+    // Issue #130's narrower sibling, and this PR's second regression guard. A
+    // LONE string literal. Unquoted, P1 claims it and `unquote` strips the
+    // quotes, reparsing `literal`/literalKind:'string' to `named 'active'`
+    // with zero diagnostics — a semantic change, because the checker
+    // distinguishes those kinds (`check-dto-fields.ts:181` gates
+    // `checker/enum-literal-outside-members` on `literalKind === 'string'`).
+    // Quoted keeps it loud, which is the lesser evil.
+    name: 'typedef alias: single string literal',
+    source: 'Only = "active"\n',
+    knownGap:
+      'issue #130 (narrower sibling): a lone string-literal alias has no correct longform spelling — quoted double-wraps (loud), unquoted silently degrades literal -> named. The emitter picks loud, and also reports emitter/unrepresentable-alias.',
   },
 ];
 
@@ -411,4 +473,157 @@ describe('toggle round-trip: targeted fixtures for surfaces the standard corpus 
       assert.deepEqual(reparsed2.suppressions.map(honestSuppressionOf), outcome.suppressions.map(honestSuppressionOf));
     });
   }
+});
+
+// The anti-silent-corruption gate for TypeDef's alias slot (this PR's review).
+//
+// The suite above cannot express this property. Its knownGap branch asserts
+// `syntaxDiagnostics.length > 0`, so a shape that reparses to a DIFFERENT AST
+// with ZERO diagnostics passes it either way. Both silent corruptions this
+// PR's first round introduced — `Tup = [string, number]` reparsing to
+// an escape-hatch-typed `named` leaf via longform-builder.ts's fallback
+// default, and
+// `Only = "active"` degrading `literal` -> `named` via P1's `unquote` — were
+// invisible to it.
+//
+// The rule enforced here is the one that actually matters: for every alias
+// shape class, toggling to longform and back either reproduces the source
+// AST EXACTLY, or fails LOUDLY. Silence plus a changed AST is never allowed.
+// `expectation` records which of the two a class is; a class moving between
+// them requires editing this table, which is the point.
+interface AliasShapeClass {
+  readonly name: string;
+  readonly source: string;
+  // 'round-trips'  -> longform reparse is diagnostic-free AND AST-identical.
+  // 'loud-failure' -> longform reparse raises a syntax/* diagnostic. Allowed
+  //                   only where NO representation is correct (issue #130);
+  //                   the emitter must additionally warn at emit time.
+  readonly expectation: 'round-trips' | 'loud-failure';
+}
+
+const ALIAS_SHAPE_CLASSES: readonly AliasShapeClass[] = [
+  { name: 'bare identifier', source: 'Alias = Other\n', expectation: 'round-trips' },
+  { name: 'named (string)', source: 'Named = string\n', expectation: 'round-trips' },
+  { name: 'array suffix', source: 'Ids = string[]\n', expectation: 'round-trips' },
+  { name: 'readonly array suffix', source: 'ReadonlyIds = readonly string[]\n', expectation: 'round-trips' },
+  { name: 'Array<T> generic spelling', source: 'GenericIds = Array<string>\n', expectation: 'round-trips' },
+  { name: 'Record<string, number>', source: 'Pair = Record<string, number>\n', expectation: 'round-trips' },
+  { name: 'intersection', source: 'Combo = Named & Other\n', expectation: 'round-trips' },
+  { name: 'union of named', source: 'Either = Widget | Gadget\n', expectation: 'round-trips' },
+  { name: 'union with null', source: 'Maybe = Widget | null\n', expectation: 'round-trips' },
+  { name: 'object literal', source: 'Obj = { a: string; b: number }\n', expectation: 'round-trips' },
+  {
+    name: 'union of object literals',
+    source: 'Tag = { tagged: false } | { tagged: true; label: string }\n',
+    expectation: 'round-trips',
+  },
+  { name: 'parenthesized union array', source: 'Paren = (Widget | Gadget)[]\n', expectation: 'round-trips' },
+  { name: 'function type', source: 'Fn = (input: string) => number\n', expectation: 'round-trips' },
+  { name: 'nested generic', source: 'Nested = Record<string, Array<Widget>>\n', expectation: 'round-trips' },
+  { name: 'numeric literal union', source: 'Level = 1 | 2 | 3\n', expectation: 'round-trips' },
+  { name: 'tuple', source: 'Tup = [string, number]\n', expectation: 'round-trips' },
+  { name: 'tuple nested in a union', source: 'TupUnion = Widget | [string, number]\n', expectation: 'round-trips' },
+  { name: 'generic with a string-literal argument', source: 'PickSend = Pick<S3Client, "send">\n', expectation: 'round-trips' },
+  { name: 'union mixing named and string literal', source: 'Mixed = Widget | "active" | Gadget\n', expectation: 'round-trips' },
+  // The only two classes where no representation is correct (issue #130).
+  { name: 'union of string literals', source: 'Status = "active" | "inactive"\n', expectation: 'loud-failure' },
+  { name: 'single string literal', source: 'Only = "active"\n', expectation: 'loud-failure' },
+];
+
+// Spans move when a shape is re-emitted into a different form, so identity is
+// compared on structure alone — the kind/name/value payload that carries the
+// MEANING. This is what separates an escape-hatch-typed `named` leaf from
+// `opaque '[string, number]'`, and `literal/'string'` from `named`.
+const stripSpans = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(stripSpans);
+  }
+  if (value !== null && typeof value === 'object') {
+    const stripped: Record<string, unknown> = {};
+    for (const [key, nested] of Object.entries(value)) {
+      if (key === 'span') {
+        continue;
+      }
+      stripped[key] = stripSpans(nested);
+    }
+    return stripped;
+  }
+  return value;
+};
+
+const aliasTypesOf = (outcome: { readonly entities: readonly unknown[] }): unknown =>
+  stripSpans(outcome.entities.map((entity) => (entity as { readonly aliasType?: unknown }).aliasType));
+
+describe('TypeDef alias shape classes: a longform toggle round-trips exactly or fails loudly, never silently', () => {
+  let parser: TypedMindParser;
+  const emitter = new SyntaxEmitter();
+
+  before(async () => {
+    parser = await TypedMindParser.create({ wasmPath });
+  });
+
+  for (const shapeClass of ALIAS_SHAPE_CLASSES) {
+    it(`${shapeClass.name} (${shapeClass.expectation})`, () => {
+      const outcome = parser.parse(shapeClass.source);
+      assert.deepEqual(
+        outcome.diagnostics.filter((diagnostic) => diagnostic.code.startsWith('syntax/')),
+        [],
+        'the shortform source itself must parse cleanly, or the fixture proves nothing',
+      );
+
+      const longform = emitter.toggleFormat(outcome, 'shortform');
+      const reparsed = parser.parse(longform);
+      const syntaxDiagnostics = reparsed.diagnostics.filter((diagnostic) => diagnostic.code.startsWith('syntax/'));
+
+      if (shapeClass.expectation === 'loud-failure') {
+        assert.equal(
+          syntaxDiagnostics.length > 0,
+          true,
+          `"${shapeClass.name}" must fail LOUDLY when longform cannot represent it — a silent reparse would hide an AST change. Emitted:\n${longform}`,
+        );
+        // Loud at parse time is necessary but not sufficient: a caller
+        // holding the emitted text should not have to reparse to learn the
+        // emission is lossy. The emitter must say so itself.
+        const emitDiagnostics = emitter.emitLongformWithDiagnostics(outcome).diagnostics;
+        assert.equal(
+          emitDiagnostics.some((diagnostic) => diagnostic.code === UNREPRESENTABLE_ALIAS_CODE),
+          true,
+          `"${shapeClass.name}" must also warn at EMIT time via ${UNREPRESENTABLE_ALIAS_CODE}, got: ${JSON.stringify(emitDiagnostics.map((diagnostic) => diagnostic.code))}`,
+        );
+        return;
+      }
+
+      assert.deepEqual(
+        syntaxDiagnostics,
+        [],
+        `"${shapeClass.name}" must reparse cleanly. Emitted:\n${longform}\ndiagnostics: ${JSON.stringify(syntaxDiagnostics)}`,
+      );
+      // The assertion the knownGap mechanism structurally cannot make: zero
+      // diagnostics is only acceptable when the AST actually survived.
+      assert.deepEqual(
+        aliasTypesOf(reparsed),
+        aliasTypesOf(outcome),
+        `"${shapeClass.name}" reparsed without diagnostics but to a DIFFERENT aliasType — silent corruption. Emitted:\n${longform}`,
+      );
+
+      // And the full circuit back to shortform, so the user-visible source
+      // text is proven to survive too.
+      const backToShortform = emitter.toggleFormat(reparsed, 'longform');
+      const reparsedTwice = parser.parse(backToShortform);
+      assert.deepEqual(
+        reparsedTwice.diagnostics.filter((diagnostic) => diagnostic.code.startsWith('syntax/')),
+        [],
+        `"${shapeClass.name}" failed on the toggle back to shortform:\n${backToShortform}`,
+      );
+      assert.deepEqual(
+        aliasTypesOf(reparsedTwice),
+        aliasTypesOf(outcome),
+        `"${shapeClass.name}" survived the longform hop but not the toggle back. Got:\n${backToShortform}`,
+      );
+    });
+  }
+
+  it('covers every shape class the review enumerated, so the table cannot silently shrink', () => {
+    assert.equal(ALIAS_SHAPE_CLASSES.length, 21);
+  });
 });
