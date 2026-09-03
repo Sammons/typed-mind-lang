@@ -77,7 +77,11 @@ class TextCursor {
   }
 
   skipWhitespace(): void {
-    while (this.index < this.text.length && (this.text[this.index] === ' ' || this.text[this.index] === '\t')) {
+    while (this.index < this.text.length) {
+      const char = this.text[this.index];
+      if (char === undefined || !isWhitespaceChar(char)) {
+        break;
+      }
       this.index += 1;
     }
   }
