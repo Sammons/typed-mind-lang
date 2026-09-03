@@ -598,10 +598,34 @@ export class TypeScriptAnalyzer {
 
   private recordModuleGraphEdge(sourceModule: string, specifier: string, outcome: ResolutionOutcome): void {
     const projectRoot = this.projectPath;
-    const target =
-      outcome.resolvedPath && outcome.classification === 'internal'
-        ? path.relative(projectRoot, outcome.resolvedPath)
-        : outcome.resolvedPath;
+    // Ladder rung (sammons/code-outline-cli) — an EXTERNAL edge used to keep
+    // `outcome.resolvedPath` verbatim, i.e. an absolute machine-specific
+    // path. That makes `module-graph.json` ungoldenable for any fixture with
+    // an external edge (the golden would embed the authoring machine's home
+    // directory) and leaks the developer's filesystem layout into extractor
+    // output. A resolution INSIDE the project root relativizes exactly like
+    // an internal edge — this is the pnpm `workspace:*` case, where the
+    // sibling package resolves through a node_modules symlink back into the
+    // same repo. A resolution genuinely outside the project root (a real npm
+    // dependency) keeps only its `node_modules`-relative tail, which is the
+    // portable, machine-independent identity of that package.
+    const target = ((): string | undefined => {
+      if (outcome.resolvedPath === undefined) {
+        return undefined;
+      }
+      if (outcome.classification === 'internal') {
+        return path.relative(projectRoot, outcome.resolvedPath);
+      }
+      const relativeToRoot = path.relative(projectRoot, outcome.resolvedPath);
+      if (!relativeToRoot.startsWith('..') && !path.isAbsolute(relativeToRoot)) {
+        return relativeToRoot;
+      }
+      const nodeModulesIndex = outcome.resolvedPath.lastIndexOf('node_modules');
+      if (nodeModulesIndex !== -1) {
+        return outcome.resolvedPath.slice(nodeModulesIndex);
+      }
+      return relativeToRoot;
+    })();
 
     this.moduleGraph.push({
       sourceModule: path.relative(projectRoot, sourceModule),

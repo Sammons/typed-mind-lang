@@ -1,0 +1,18 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [NodeInfo, visitTree]
+}
+
+IndexFile @ src/index.ts:
+  -> [NodeInfo, visitTree]
+
+visitTree :: visitTree(visitor: TreeVisitor<void>, predicate: NodePredicate) => void
+
+NodeInfo %
+  - name: string
+
+TreeVisitor = (node: NodeInfo, depth: number, parent?: NodeInfo) => T
+
+NodePredicate = (node: NodeInfo, depth: number) => boolean

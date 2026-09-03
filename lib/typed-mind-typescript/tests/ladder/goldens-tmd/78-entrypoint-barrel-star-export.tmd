@@ -1,0 +1,15 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [stringifyYaml]
+}
+
+IndexFile @ src/index.ts:
+  <- [FormatterFile]
+  <-> [stringifyYaml]
+
+FormatterFile @ src/formatter.ts:
+  -> [stringifyYaml]
+
+stringifyYaml :: stringifyYaml(value: unknown) => string
