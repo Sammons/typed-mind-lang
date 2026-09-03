@@ -321,43 +321,50 @@ const dependencyToLongform = (entity: DependencyNode): string[] => {
 // reparse. `variant:` defaults to alias when unspelled (applyProperties
 // mirrors this same default on parse), so a re-emitted alias round-trips
 // without ever printing a redundant `variant: alias` line. The alias type is
-// emitted QUOTED (`type: "..."`), matching a DTO field's longform
-// `type: "string[]"` spelling (§6): a bare, unquoted multi-part type
-// (`type: string | number`) does not survive P3's property_identifier
-// (grammar.js block_property choice order) trying first and matching only
-// the leading `string`, stranding `| number` as unparsable text — quoting
-// routes it through the SAME string-based re-parse path
-// (type-expr-from-text.ts) longform-builder.ts's dtoFieldOf already uses.
+// emitted UNQUOTED — the SAME text `typeDefToShortform` prints after the
+// `=` (emit-shortform.ts, `Name = <printTypeExpr(aliasType)>`), which is the
+// reference spelling for what an alias type looks like.
 //
-// toggle-fidelity audit (2026-08-31, issue #103 addendum, claude-home
-// knowledge/projects/typedmind/toggle-fidelity-audit-2026-08-31.md) — a
-// printed type containing its OWN string-literal spelling (a literal member,
-// e.g. `"active" | "inactive"`, or a generic's string-literal argument, e.g.
-// `Pick<S3Client, "send">`) breaks the SAME way issue #103 documents: this
-// outer `type: "..."` wrap is itself a property_string-shaped value, and an
-// embedded `"` inside it hits the identical block_property GLR-precedence
-// race (property_string commits to the FIRST `"..."` and ERRORs on the
-// remainder) — just reached via this quoting wrapper instead of a raw
-// unquoted value. Unlike every other quoteStringLiteral call site in this
-// module, the `"` -> `'` substitution is NOT safe to apply here: the printed
-// text gets reparsed as a TypeExprNode by type-expr-from-text.ts
-// (longform-builder.ts), and that reparser's parseStringLiteral only
-// recognizes `"`, never `'` — swapping the inner quotes would silently
-// degrade a `literal`/literalKind:'string' member to an `opaque` leaf (the
-// checker DISTINGUISHES the two, check-dto-fields.ts:181), a semantic
-// change, not a byte-preservation nicety. Left AS UNQUOTED-INNER-BROKEN
-// (matching pre-fix #103 behavior) is deliberately not "fixed" with a
-// meaning-changing substitution the way emit-suppression.ts's reason field
-// and every description/purpose site above safely can (those never get
-// reparsed as a TypeExprNode). Tracked as an issue #103 addendum, NOT a
-// separate issue — same grammar-level mechanism, different call site.
+// The wrap was previously `type: "<printed>"`, which double-wrapped every
+// alias whose printed text carries its OWN quotes: a string-literal union
+// (`"active" | "inactive"`) emitted as `type: ""active" | "inactive""`, and
+// a generic with a string-literal argument (`Pick<S3Client, "send">`)
+// emitted as `type: "Pick<S3Client, "send">"`. Both are unparsable — the
+// outer wrap is itself a property_string-shaped value, so P1 commits to the
+// FIRST `"..."` and ERRORs on the remainder.
+//
+// Unquoted is correct because PR #142 (issue #103) gave P7's
+// `freetext_value` a `$.string` alternative plus the `_freetext_open` /
+// `_freetext_open_string` longest-match opening tokens. Those tokens are
+// exactly what stops P3's `property_identifier` matching only a multi-part
+// value's leading chunk (the failure mode the old quoting existed to dodge):
+// `_freetext_open` reaches past the first chunk into the next, so it
+// out-lengths `entity_name` whenever the value continues. `type: string |
+// number` and `type: Pick<S3Client, "send">` therefore both parse clean as
+// P7 today, and a single-chunk value (`type: string`) stays P3's, which is
+// the same scalar the builder reads either way.
+//
+// Residual limit, issue #130: a value whose FIRST chunk is a string literal
+// (`type: "active" | "inactive"`) is still unrepresentable. `freetext_value`
+// deliberately requires a leading `_sig_chunk` so that P1 stays the sole
+// owner of a bare-quoted value — without that, `description: "text"` is
+// genuinely ambiguous between P1 and P7 (an LR conflict, not a precedence
+// nudge; see grammar.js `freetext_value`). Quoting does not rescue this case
+// either: it is what produced the double-wrap. That single shape stays a
+// documented gap in toggle-round-trip.test.ts.
 const typeDefToLongform = (entity: TypeDefNode): string[] => {
   const body: string[] = [];
   if (entity.variant === 'enum') {
     body.push('variant: enum');
     body.push(`members: [${(entity.members ?? []).join(', ')}]`);
   } else {
-    body.push(`type: "${entity.aliasType === undefined ? '' : printTypeExpr(entity.aliasType)}"`);
+    // The `undefined` arm is unreachable for an alias: TypeDefNode's
+    // constructor union pins `{ variant: 'alias'; aliasType: TypeExprNode }`,
+    // and the field is only widened to `| undefined` to cover the enum
+    // variant. Kept for the narrowing, and spelled the same way
+    // `typeDefToShortform` spells it so the two emitters stay a byte-for-byte
+    // pair on the alias value.
+    body.push(`type: ${entity.aliasType === undefined ? '' : printTypeExpr(entity.aliasType)}`);
   }
   body.push(...descriptionAndPurposeLines(entity.comment, entity.purpose));
   return [`typedef ${entity.name} {`, ...indent(body), '}'];

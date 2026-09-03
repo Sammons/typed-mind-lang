@@ -231,7 +231,7 @@ interface ToggleFixture {
   readonly name: string;
   readonly source: string;
   // When set, this fixture is expected to reproduce a KNOWN, documented
-  // gap (bucket-b, cross-referenced to issue #103 or its addendum) rather
+  // gap (bucket-b, cross-referenced to the open issue that owns it) rather
   // than round-trip cleanly. The test asserts the failure still reproduces
   // exactly as described, so a change to this behavior requires a
   // conscious decision (updating this fixture's expectation), never a
@@ -247,16 +247,24 @@ const TYPE_EXPR_KIND_FIXTURES: readonly ToggleFixture[] = [
   { name: 'typedef alias: intersection', source: 'Combo = Named & Other\n' },
   { name: 'typedef alias: generic with named args', source: 'Pair = Record<string, number>\n' },
   {
+    // Issue #130, the one alias shape longform still cannot spell. The
+    // printed type OPENS with a string literal, and P7 `freetext_value`
+    // deliberately requires a leading `_sig_chunk` so that P1
+    // `property_string` stays the sole owner of a bare-quoted value —
+    // without that requirement `description: "text"` is genuinely ambiguous
+    // between P1 and P7 (an LR conflict, not a precedence nudge; see
+    // grammar.js `freetext_value`). So `type: "active" | "inactive"` parses
+    // as P1, which commits to the first `"active"` and strands `| "inactive"`.
+    // Quoting the whole value does not rescue it either — that is exactly
+    // the double-wrap (`type: ""active" | "inactive""`) this suite's sibling
+    // fixture stopped producing. A fix belongs in the grammar, not the
+    // emitter.
     name: 'typedef alias: union of string literals',
     source: 'Status = "active" | "inactive"\n',
     knownGap:
-      'issue #103 addendum (see emit-longform.ts typeDefToLongform comment): a printed type containing its own string-literal spelling breaks longform emission via the same block_property GLR-precedence race #103 documents.',
+      'issue #130: an alias type whose printed text OPENS with a string literal has no longform spelling — P7 freetext_value requires a leading non-string chunk so P1 property_string keeps sole ownership of a bare-quoted value.',
   },
-  {
-    name: 'typedef alias: generic with a string-literal argument (opaque leaf via type-expr-from-text fallback)',
-    source: 'PickSend = Pick<S3Client, "send">\n',
-    knownGap: 'issue #103 addendum: same mechanism as the union-of-string-literals case above — the printed type embeds a literal quote.',
-  },
+  { name: 'typedef alias: generic with a string-literal argument', source: 'PickSend = Pick<S3Client, "send">\n' },
 ];
 
 // Issue #103's own two named shapes, as round-trip fixtures. Both are

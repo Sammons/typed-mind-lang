@@ -38,26 +38,33 @@ describe('issue #114: a union-of-object-literals type alias degrades honestly in
     assert.equal(tag?.kind, 'TypeDef', `expected Tag to convert as TypeDef, got kind: ${tag?.kind}`);
   });
 
-  it('the emitted .tmd carries the whole union as one well-formed quoted type string, not a broken field list', () => {
+  it('the emitted .tmd carries the whole union on one type line, not a broken field list', () => {
     const result = convert();
     assert.equal(result.success, true);
     const emitter = new SyntaxEmitter();
     const longform = emitter.emitLongform({ entities: result.entities as never, imports: [], suppressions: [], diagnostics: [] });
-    // The pre-fix bug emitted the union text as a BARE, unquoted DTO field
-    // line (`  - tagged: false } | { tagged: true`, no surrounding `"..."`)
-    // — the corrupted shape is a bare `}` sitting outside any quoted
-    // string. Post-fix, the entire union lives inside one `type: "..."`
-    // property line, so every `{`/`}` in the union text is INSIDE a
-    // matched pair of double quotes on its line.
+    // The pre-fix bug emitted the union text as a BARE DTO field line
+    // (`  - tagged: false } | { tagged: true`) — the corrupted shape is the
+    // union split ACROSS field lines. Post-fix, the entire union lives on
+    // one `type:` property line of a typedef block.
     const brokenFieldLine = longform.split('\n').find((line) => /^\s*-\s.*tagged: false\s*}\s*\|/.test(line));
     assert.equal(
       brokenFieldLine,
       undefined,
       `must not emit the union as a broken bare field line, got: ${JSON.stringify(brokenFieldLine)}`,
     );
+    // The alias value is emitted UNQUOTED, matching the shortform spelling
+    // (`Name = <type>`). It was previously wrapped in `"..."`; that wrapper
+    // double-wrapped any alias whose own printed text carries quotes
+    // (`type: ""active" | "inactive""`, unparsable), so the wrapper is gone.
+    // Both spellings parse to the IDENTICAL aliasType here — a union of two
+    // opaque members, zero syntax findings — so this assertion pins the
+    // current spelling only; the behaviour issue #114 is about is the
+    // whole-union-on-one-line property asserted above and the clean-parse
+    // property asserted in the next test.
     assert.ok(
-      longform.includes('type: "{ tagged: false } | { tagged: true; label: string }"'),
-      `expected the whole union inside one well-formed quoted type string, got:\n${longform}`,
+      longform.includes('type: { tagged: false } | { tagged: true; label: string }'),
+      `expected the whole union on one type line, got:\n${longform}`,
     );
   });
 

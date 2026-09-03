@@ -108,6 +108,24 @@ const collapseDescription = (raw: string): string => {
 // emission, not re-derived heuristically.
 const isBareEntityName = (type: string): boolean => /^[A-Za-z_]\w*$/.test(type);
 
+// issue #86 follow-up — the classification guards above are whitespace-exact
+// (`isBareEntityName`'s `/^[A-Za-z_]\w*$/` is anchored, and `isDTOLikeType`'s
+// branches test prefixes/suffixes), but a type authored across multiple lines
+// in the source arrives here with its raw newlines and indentation intact:
+// `Promise<\n  WidgetList\n>` strips to `\n  WidgetList\n`, which
+// `isBareEntityName` correctly rejects, silently dropping the `output` edge
+// for a type that resolves fine when authored on one line.
+//
+// Collapsing every whitespace run to a single space and trimming is the same
+// normalization `collapseDescription` applies to JSDoc text and issue #86
+// applied to signature text — it is meaning-preserving for a TYPE, because
+// TypeScript treats inter-token whitespace as insignificant everywhere a type
+// can appear. It is deliberately NOT a truncation: a multi-line union stays a
+// multi-line union's full text, just on one line, so a shape that is genuinely
+// not a bare entity name (`Widget | null`) still fails the guard afterwards,
+// exactly as it does today.
+const collapseTypeWhitespace = (type: string): string => type.replace(/\s+/g, ' ').trim();
+
 // issue #72 (rfc-tm-10-diamond.md §5's tracked follow-up) — an inline
 // object-literal type (`{ current?: string }`) has no enclosing
 // Class/Interface name to resolve against, so D-LEG-1's `isDTOLikeType`
@@ -2924,7 +2942,16 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private extractOutputDTO(func: ParsedFunction, functionEntityName: string): string | undefined {
-    const returnType = func.returnType.replace(/^Promise<(.+)>$/, '$1');
+    // issue #86 follow-up — collapse BEFORE the `Promise<...>` strip, not
+    // after. The strip's `.` does not match a newline, so a multi-line-
+    // authored `Promise<\n  WidgetList\n>` fails the anchored pattern
+    // outright and the wrapper survives into classification; collapsing
+    // first turns it into `Promise< WidgetList >`, which strips to
+    // ` WidgetList ` and then trims to the bare name the grammar's
+    // `output_name` slot accepts. Collapsing after the strip would fix this
+    // one shape but leave the wrapper itself unstrippable whenever the
+    // newline sits inside the `Promise<>` brackets.
+    const returnType = collapseTypeWhitespace(collapseTypeWhitespace(func.returnType).replace(/^Promise<(.+)>$/, '$1'));
     if (isInlineObjectLiteralType(returnType)) {
       // issue #72 — same synthesis path as `extractInputDTO`, applied to
       // the return-type position. `Output` is the codomain-disambiguation
