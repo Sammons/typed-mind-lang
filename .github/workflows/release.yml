@@ -197,7 +197,7 @@ jobs:
     name: Publish VS Code Extension
     needs: [validate, test, publish-npm]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     environment:
       name: vscode-marketplace
       url: https://marketplace.visualstudio.com/items?itemName=sammons.typed-mind
@@ -258,6 +258,40 @@ jobs:
           cd lib/typed-mind-vscode-extension
           mise exec -- pnpm --filter typed-mind exec vsce publish --pat ${{ secrets.VSCE_PAT }} --no-dependencies
           cd ../..
+
+      - name: Verify publication
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          EXTENSION_ID="sammons.typed-mind"
+
+          echo "Waiting for extension to be available on marketplace..."
+
+          # vsce's own publish output says the marketplace "might take a few
+          # minutes" to index a new version (observed ~6 minutes on
+          # vscode-publish.yml run 33751628608). Poll with a fixed 60s
+          # backoff, same shape as vscode-publish.yml's Verify publication
+          # step, rather than declaring the publish unverified immediately.
+          MAX_ATTEMPTS=12
+          ATTEMPT=1
+
+          while [ "$ATTEMPT" -le "$MAX_ATTEMPTS" ]; do
+            echo "Checking marketplace (attempt $ATTEMPT/$MAX_ATTEMPTS)..."
+
+            if mise exec -- pnpm --filter typed-mind exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
+              echo "✓ Extension $EXTENSION_ID@$VERSION is now available on marketplace"
+              exit 0
+            fi
+
+            if [ "$ATTEMPT" -eq "$MAX_ATTEMPTS" ]; then
+              break
+            fi
+
+            sleep 60
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+
+          echo "Error: $EXTENSION_ID@$VERSION did not appear on the marketplace after $MAX_ATTEMPTS attempts (60s apart)"
+          exit 1
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
