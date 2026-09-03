@@ -27,11 +27,6 @@ jobs:
       - name: Install toolchain
         run: mise install
 
-      - name: Install pnpm
-        run: |
-          mise exec -- corepack enable
-          mise exec -- corepack prepare pnpm@11 --activate
-
       - name: Install dependencies
         run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts
 
@@ -77,11 +72,6 @@ jobs:
 
       - name: Install toolchain
         run: mise install
-
-      - name: Install pnpm
-        run: |
-          mise exec -- corepack enable
-          mise exec -- corepack prepare pnpm@11 --activate
 
       - name: Install dependencies
         run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts

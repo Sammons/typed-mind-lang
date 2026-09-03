@@ -14,7 +14,7 @@
 // invoked to run this .mjs file) is what tree-sitter's `generate` step uses to load grammar.js.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, platform } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -93,7 +93,35 @@ const writeThrowawayGrammar = (grammarDir) => {
   writeFileSync(join(grammarDir, 'grammar.js'), grammarJs);
 };
 
+const checkPnpmPinMatchesPackageManager = () => {
+  // Node 26 dropped corepack (nodejs/node#57617, #59835), so mise.toml's
+  // `pnpm = "..."` pin is the only thing that installs pnpm in CI. Nothing
+  // enforces that it stays equal to package.json's `packageManager` field
+  // (which `pnpm install` itself still trusts) short of this check.
+  const miseToml = readFileSync(join(REPO_ROOT, 'mise.toml'), 'utf8');
+  const misePnpmMatch = miseToml.match(/^pnpm\s*=\s*"([^"]+)"/m);
+  if (!misePnpmMatch) {
+    throw new ToolchainCheckError('mise.toml has no top-level `pnpm = "..."` pin under [tools]');
+  }
+  const misePnpmVersion = misePnpmMatch[1];
+
+  const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'));
+  const packageManagerMatch = String(packageJson.packageManager ?? '').match(/^pnpm@(.+)$/);
+  if (!packageManagerMatch) {
+    throw new ToolchainCheckError('package.json has no `packageManager: "pnpm@..."` field');
+  }
+  const packageManagerVersion = packageManagerMatch[1];
+
+  if (misePnpmVersion !== packageManagerVersion) {
+    throw new ToolchainCheckError(
+      `mise.toml pnpm pin (${misePnpmVersion}) does not match package.json packageManager (pnpm@${packageManagerVersion})`,
+    );
+  }
+  console.log(`[check:toolchain] mise.toml pnpm pin matches package.json packageManager: ${misePnpmVersion}`);
+};
+
 const main = () => {
+  checkPnpmPinMatchesPackageManager();
   const treeSitterBin = resolveTreeSitterBin();
   const wasiSdkPath = resolveWasiSdkPath();
 

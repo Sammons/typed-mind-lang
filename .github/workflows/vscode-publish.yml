@@ -61,7 +61,7 @@ jobs:
           echo "Checking if $EXTENSION_ID@$VERSION exists on marketplace..."
           
           # Check if version already exists
-          if pnpm exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
+          if mise exec -- pnpm exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
             echo "Version $VERSION already exists on marketplace"
             echo "should_publish=false" >> $GITHUB_OUTPUT
           else
@@ -82,7 +82,7 @@ jobs:
           done
           
           # Validate package.json
-          pnpm exec vsce ls --no-dependencies
+          mise exec -- pnpm exec vsce ls --no-dependencies
           
           cd ../..
 
@@ -96,32 +96,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
+      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
+      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml) is
+      # installed by the composite action below, same shape as
+      # .gitea/workflows/deploy-static-site.yml. The extension currently
+      # depends on the published @sammons/typed-mind (not the workspace
+      # build), so this is a no-op today; it makes the pipeline structurally
+      # ready for TM-5 Q2/Q3's bundle-lsp wiring, which will build
+      # @sammons/typed-mind-lsp (and transitively @sammons/typed-mind) from
+      # the local workspace instead.
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
-
-      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
-      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml). Mirrors
-      # .gitea/workflows/deploy-static-site.yml's mise setup shape. The
-      # extension currently depends on the published @sammons/typed-mind
-      # (not the workspace build), so this step is a no-op today; it makes
-      # the pipeline structurally ready for TM-5 Q2/Q3's bundle-lsp wiring,
-      # which will build @sammons/typed-mind-lsp (and transitively
-      # @sammons/typed-mind) from the local workspace instead.
-      - name: Install mise
-        run: |
-          curl https://mise.run | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install toolchain
-        run: mise install
-
-      - name: Install pnpm
-        run: |
-          mise exec -- corepack enable
-          mise exec -- corepack prepare pnpm@11 --activate
-
-      - name: Install dependencies
-        run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build TypedMind packages
         run: |
@@ -227,9 +212,9 @@ jobs:
           echo "Publishing $VSIX_FILE..."
           
           if [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
-            pnpm exec vsce publish --pre-release --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
+            mise exec -- pnpm exec vsce publish --pre-release --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
           else
-            pnpm exec vsce publish --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
+            mise exec -- pnpm exec vsce publish --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
           fi
 
       - name: Dry run summary
@@ -254,7 +239,7 @@ jobs:
           RETRY_COUNT=0
           
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if pnpm exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
+            if mise exec -- pnpm exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
               echo "✓ Extension $EXTENSION_ID@$VERSION is now available on marketplace"
               break
             fi

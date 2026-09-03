@@ -1,47 +1,63 @@
 name: 'Setup Node and pnpm'
-description: 'Setup Node.js with pnpm and caching'
+description: 'Setup Node.js and pnpm via mise, matching .gitea/workflows/ci.yml'
 inputs:
-  node-version:
-    description: 'Node.js version to use'
-    required: false
-    default: '22'
-  pnpm-version:
-    description: 'pnpm version to use'
-    required: false
-    default: '9'
   cache-dependency-path:
     description: 'Path to pnpm-lock.yaml'
     required: false
     default: 'pnpm-lock.yaml'
+  install:
+    description: 'Whether to run pnpm install after setup'
+    required: false
+    default: 'true'
 runs:
   using: composite
   steps:
-    - name: Setup pnpm
-      uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
-      with:
-        version: ${{ inputs.pnpm-version }}
-        run_install: false
+    # Node AND pnpm versions are NOT duplicated here. Root mise.toml pins
+    # both (`node = "26"`, `pnpm = "11.15.1"`) and scripts/check-toolchain.mjs
+    # asserts the pnpm pin matches package.json's `packageManager` field, so
+    # there is exactly one place either version can be bumped. This mirrors
+    # .gitea/workflows/ci.yml's and .gitea/workflows/deploy-static-site.yml's
+    # setup shape exactly — all three CI surfaces install pnpm the same way.
+    #
+    # pnpm does NOT come from corepack: Node 26 no longer ships it
+    # (nodejs/node#57617 "stop distributing Corepack", #59835 dropped the
+    # corepack tarballs too), so `corepack enable`/`prepare` fails on a clean
+    # Node-26 runner with no other corepack on PATH. mise's own `pnpm` tool
+    # backend is what provisions pnpm here (verified locally: `mise install`
+    # against this pin, then `mise exec -- pnpm --version` prints 11.15.1).
+    - name: Install mise
+      shell: bash
+      run: |
+        curl https://mise.run | sh
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-    - name: Setup Node.js
-      uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
-      with:
-        node-version: ${{ inputs.node-version }}
-        cache: 'pnpm'
-        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+    - name: Install toolchain
+      shell: bash
+      run: mise install
+
+    # Convenience only — later `run:` steps in the calling workflows do NOT
+    # rely on this. Every step that invokes pnpm or node is prefixed with
+    # `mise exec --`, matching the only pattern actually proven to work in
+    # this repo (.gitea/workflows/ci.yml, .gitea/workflows/deploy-static-site.yml
+    # never trust bare PATH resolution either).
+    - name: Add mise shims to PATH (convenience only, not relied upon)
+      shell: bash
+      run: echo "$HOME/.local/share/mise/shims" >> "$GITHUB_PATH"
 
     - name: Get pnpm store directory
       id: pnpm-cache
       shell: bash
-      run: echo "store_path=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+      run: echo "store_path=$(mise exec -- pnpm store path --silent)" >> $GITHUB_OUTPUT
 
     - name: Setup pnpm cache
       uses: actions/cache@v4
       with:
         path: ${{ steps.pnpm-cache.outputs.store_path }}
-        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles(inputs.cache-dependency-path) }}
         restore-keys: |
           ${{ runner.os }}-pnpm-store-
 
     - name: Install dependencies
+      if: ${{ inputs.install == 'true' }}
       shell: bash
-      run: pnpm install
+      run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts

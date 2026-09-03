@@ -1,5 +1,12 @@
 [tools]
 node = "26" # bumped from 24 → 26 for native type stripping, stable node:sqlite, Temporal
+# Node 26 no longer ships corepack (nodejs/node#57617, #59835), so pnpm comes
+# from mise's own pnpm backend rather than `corepack prepare`. This is the
+# single source of truth for the pnpm version across all three CI surfaces
+# (.github/actions/setup-node-pnpm, .gitea/workflows/ci.yml,
+# .gitea/workflows/deploy-static-site.yml). Keep in sync with package.json's
+# `packageManager` field — scripts/check-toolchain.mjs asserts the two match.
+pnpm = "11.15.1"
 tree-sitter = "0.27.0"            # resolves via aqua:tree-sitter/tree-sitter
 
 [tools."http:wasi-sdk"]

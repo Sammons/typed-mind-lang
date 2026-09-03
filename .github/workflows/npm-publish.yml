@@ -45,33 +45,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
+      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml) is
+      # installed by the composite action's `mise install` step below, same
+      # as .gitea/workflows/deploy-static-site.yml's mise setup shape.
+      # Without it, @sammons/typed-mind's prebuild/prepack (build-wasm.mjs)
+      # fails for lack of `mise where tree-sitter` / `mise where
+      # http:wasi-sdk`.
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
-      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml). Mirrors
-      # .gitea/workflows/deploy-static-site.yml's mise setup shape. Without
-      # this, @sammons/typed-mind's prebuild/prepack (build-wasm.mjs) fails
-      # for lack of `mise where tree-sitter` / `mise where http:wasi-sdk`.
-      - name: Install mise
-        run: |
-          curl https://mise.run | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install toolchain
-        run: mise install
-
       - name: Lint
-        run: pnpm lint
+        run: mise exec -- pnpm lint
 
       - name: Test
         if: ${{ github.event.inputs.skip_tests != 'true' }}
-        run: pnpm test
+        run: mise exec -- pnpm test
 
       - name: Build publishable packages only
         run: |
           # Build only the packages that will be published to NPM
-          pnpm --filter "@sammons/typed-mind" \
+          mise exec -- pnpm --filter "@sammons/typed-mind" \
                --filter "@sammons/typed-mind-renderer" \
                --filter "@sammons/typed-mind-cli" \
                --filter "@sammons/typed-mind-lsp" \
@@ -80,7 +74,7 @@ jobs:
       - name: Check packages to publish
         id: check
         run: |
-          PACKAGES=$(.github/scripts/check-npm-packages.sh)
+          PACKAGES=$(mise exec -- bash .github/scripts/check-npm-packages.sh)
           if [ -z "$PACKAGES" ]; then
             echo "No packages need publishing"
             echo "packages=" >> $GITHUB_OUTPUT
@@ -104,23 +98,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - name: Setup Node and pnpm
-        uses: ./.github/actions/setup-node-pnpm
-
       # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — see the matching step in
       # the validate job above for the full rationale.
-      - name: Install mise
-        run: |
-          curl https://mise.run | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install toolchain
-        run: mise install
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Build publishable packages only
         run: |
           # Build only the packages that will be published to NPM
-          pnpm --filter "@sammons/typed-mind" \
+          mise exec -- pnpm --filter "@sammons/typed-mind" \
                --filter "@sammons/typed-mind-renderer" \
                --filter "@sammons/typed-mind-cli" \
                --filter "@sammons/typed-mind-lsp" \
@@ -129,14 +115,14 @@ jobs:
       - name: Configure npm authentication
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          pnpm whoami
+          mise exec -- pnpm whoami
 
       - name: Publish packages
         run: |
           if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
-            .github/scripts/publish-npm-packages.sh --dry-run
+            mise exec -- bash .github/scripts/publish-npm-packages.sh --dry-run
           else
-            .github/scripts/publish-npm-packages.sh
+            mise exec -- bash .github/scripts/publish-npm-packages.sh
           fi
 
       - name: Verify published packages
@@ -147,7 +133,7 @@ jobs:
               package_name=$(jq -r '.name' "$package_dir/package.json")
               version=$(jq -r '.version' "$package_dir/package.json")
               echo "Verifying $package_name@$version..."
-              pnpm view "$package_name@$version" version || exit 1
+              mise exec -- pnpm view "$package_name@$version" version || exit 1
             fi
           done
 
