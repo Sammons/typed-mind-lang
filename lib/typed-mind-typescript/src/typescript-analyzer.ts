@@ -997,7 +997,17 @@ export class TypeScriptAnalyzer {
         namespaceImport = importClause.namedBindings.name.text;
       } else if (ts.isNamedImports(importClause.namedBindings)) {
         for (const element of importClause.namedBindings.elements) {
-          namedImports.push(element.name.text);
+          // Fixture 75 (itp-maker `cli/itp-cli.ts:51`) — for an ALIASED
+          // specifier (`{ doWork as doWorkAliased }`) TypeScript puts the
+          // local alias in `element.name` and the ORIGINAL exported name
+          // in `element.propertyName`. Recording only `element.name` fed
+          // `resolveImportToEntity` a name the target module never
+          // exports, so the lookup missed, no import edge was
+          // contributed, and the imported file plus every entity it
+          // exports were reported orphaned despite a real, used import.
+          // The exported name is what the export registry is keyed by, so
+          // that is what the import edge must carry.
+          namedImports.push((element.propertyName ?? element.name).text);
         }
       }
     }
@@ -1133,7 +1143,7 @@ export class TypeScriptAnalyzer {
     if (node.heritageClauses) {
       for (const clause of node.heritageClauses) {
         if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-          extendsClasses.push(...clause.types.map((type) => this.getTypeString(type)));
+          extendsClasses.push(...clause.types.map((type) => this.getHeritageTypeString(type)));
         } else if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
           implementsInterfaces.push(...clause.types.map((type) => this.getTypeString(type)));
         }
@@ -1561,6 +1571,37 @@ export class TypeScriptAnalyzer {
   private getTypeString(typeNode: ts.TypeNode | undefined): string {
     if (!typeNode) return 'any';
     return typeNode.getText();
+  }
+
+  // Fixture 76 (itp-maker's Lit + MobX frontend — five components written
+  // as `class X extends withMobx(LitElement)`). A heritage clause's type
+  // is an `ExpressionWithTypeArguments`, and for a MIXIN APPLICATION its
+  // `.expression` is a CallExpression, so `getTypeString`'s bare
+  // `getText()` returned the literal text `withMobx(LitElement)`. The
+  // converter emits that into the `<:` inherit slot, where the grammar's
+  // `inherit_list` accepts only bare entity names — one
+  // `Unparsable text: \`(LitElement)\`` finding per mixin-based class.
+  //
+  // The base class is the mixin call's first argument, which is what the
+  // inheritance edge actually means: `withMobx(LitElement)` IS-A
+  // LitElement. Unwrapping to that argument states the true edge instead
+  // of emitting unparsable text. A mixin call with no identifier argument
+  // has no nameable base, so the mixin's own callee name is used —
+  // still a bare identifier, so the emitted line stays parsable.
+  private getHeritageTypeString(typeNode: ts.ExpressionWithTypeArguments): string {
+    const expression = typeNode.expression;
+
+    if (!ts.isCallExpression(expression)) {
+      return this.getTypeString(typeNode);
+    }
+
+    const identifierArgument = expression.arguments.find((argument) => ts.isIdentifier(argument));
+
+    if (identifierArgument !== undefined) {
+      return identifierArgument.getText();
+    }
+
+    return ts.isIdentifier(expression.expression) ? expression.expression.text : 'unknown';
   }
 
   private hasExportModifier(node: ts.Node): boolean {

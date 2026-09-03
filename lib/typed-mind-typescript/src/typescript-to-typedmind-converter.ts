@@ -120,6 +120,61 @@ const isBareEntityName = (type: string): boolean => /^[A-Za-z_]\w*$/.test(type);
 // `isDTOLikeType`'s own `"`-prefix / `{`-prefix branches already use.
 const isInlineObjectLiteralType = (type: string): boolean => type.trim().startsWith('{') && type.trim().endsWith('}');
 
+// Fixture 74 (itp-maker `functions/procore-worker.ts:149-165`) — issue
+// #72's `isInlineObjectLiteralType` requires the trimmed text to BOTH
+// start with `{` and end with `}`, so it says false for the single most
+// common real shape carrying an inline record: the literal wrapped in a
+// generic, `Array<{ ... }>` / `ReadonlyArray<{ ... }>` / `Promise<{ ...
+// }>`. Such a field skipped the `synthesizeInlineDTO` routing and fell
+// through to `sanitizeFieldType`, whose last statement is `.trim()` — so
+// the raw source text, newlines included, landed in the emitted field
+// line and desynced the grammar's single-line field production.
+//
+// This splits a generic wrapper into its constructor and its single type
+// argument when — and only when — that argument is itself a bare inline
+// object literal. The brace/angle depth walk is what keeps a nested
+// `Array<{ a: Map<string, number> }>` from splitting at the inner `>`.
+// A wrapper with 2+ type arguments (`Record<string, { a: 1 }>`) is out of
+// scope here and keeps its existing behavior: this returns undefined and
+// the caller stays on the original path.
+const splitGenericWrappedObjectLiteral = (type: string): { wrapper: string; inner: string } | undefined => {
+  const trimmed = type.trim();
+  const open = trimmed.indexOf('<');
+
+  if (open <= 0 || !trimmed.endsWith('>')) {
+    return undefined;
+  }
+
+  const wrapper = trimmed.slice(0, open).trim();
+
+  if (!/^[A-Za-z_]\w*$/.test(wrapper)) {
+    return undefined;
+  }
+
+  const inner = trimmed.slice(open + 1, -1).trim();
+
+  if (!isInlineObjectLiteralType(inner)) {
+    return undefined;
+  }
+
+  // Reject a multi-argument generic: scan the argument text at depth zero
+  // for a `,` separator. `Record<string, { a: 1 }>` must not be treated as
+  // a single-argument wrapper around `{ a: 1 }`.
+  let depth = 0;
+
+  for (const character of inner) {
+    if (character === '{' || character === '<' || character === '(' || character === '[') {
+      depth += 1;
+    } else if (character === '}' || character === '>' || character === ')' || character === ']') {
+      depth -= 1;
+    } else if (character === ',' && depth === 0) {
+      return undefined;
+    }
+  }
+
+  return { wrapper, inner };
+};
+
 // Two-pass architecture data structures
 interface ExportRegistry {
   [moduleSpecifier: string]: {
@@ -1972,6 +2027,28 @@ export class TypeScriptToTypedMindConverter {
         return new DtoFieldNode({
           name: prop.name,
           type: nestedDtoName,
+          typeExpr,
+          optionalityMarker: prop.isOptional ? 'question' : 'none',
+          span: SYNTHETIC_SPAN,
+        });
+      }
+
+      // Fixture 74 — the generic-wrapped form of the branch above. The
+      // inner literal synthesizes its own DTO through the SAME recursion,
+      // and the wrapper is rebuilt around the synthesized name so the
+      // emitted type is `Array<WorkerPayload_references>`: a legal
+      // generic over a real entity name, which keeps the collection
+      // nature of the field instead of flattening it away.
+      const genericWrapped = splitGenericWrappedObjectLiteral(prop.type);
+
+      if (genericWrapped) {
+        const nestedDtoName = this.synthesizeInlineDTO(genericWrapped.inner, this.sanitizeEntityName(`${entityName}_${prop.name}`));
+        const wrappedType = `${genericWrapped.wrapper}<${nestedDtoName}>`;
+        const typeExpr = parseTypeExprText(wrappedType).typeExpr;
+        this.walkGenericArgsForExternalStubs(typeExpr);
+        return new DtoFieldNode({
+          name: prop.name,
+          type: wrappedType,
           typeExpr,
           optionalityMarker: prop.isOptional ? 'question' : 'none',
           span: SYNTHETIC_SPAN,
