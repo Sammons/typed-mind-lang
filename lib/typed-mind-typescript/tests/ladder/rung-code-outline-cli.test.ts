@@ -14,9 +14,9 @@
 // Fixture 81 is a documented knownGap (see its README.md) — its test pins the
 // CURRENT behaviour so the gap is a committed fact rather than prose.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { describe, it } from 'node:test';
+import { before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
@@ -25,6 +25,41 @@ import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmin
 const testDir = dirname(fileURLToPath(import.meta.url));
 const reprosDir = join(testDir, 'repros-analyzer');
 const fixturePath = (name: string, ...segments: string[]): string => join(reprosDir, name, ...segments);
+
+// Fixture 81 is a two-package mini-workspace whose gap only reproduces when the
+// sibling resolves the way pnpm actually exposes a `workspace:*` dependency:
+// through a `node_modules` link to the package's declared `types` entry. That
+// is what makes `ts.resolveModuleName` report `isExternalLibraryImport: true`.
+//
+// The link is created HERE rather than committed, because a checked-in symlink
+// is not portable (git on Windows can materialize it as a plain text file
+// containing the target path). The link's target — `packages/core/dist/
+// index.d.ts` — IS committed, with a matching `.gitignore` negation.
+//
+// Without this setup the fixture is non-hermetic: it passes on a machine where
+// a previous run left the link behind and fails on a clean runner, where the
+// specifier does not resolve at all and the module-graph golden differs. That
+// is precisely the PR #156 run-334 failure this helper closes.
+//
+// `paths` is NOT an alternative here: a `paths`-resolved specifier reports
+// `isExternalLibraryImport: false` whether it points at the source or at the
+// built `.d.ts`, so it resolves as INTERNAL and does not exercise the gap.
+const ensureFixture81WorkspaceLink = (): void => {
+  const linkDir = fixturePath('81-crosspkg-type-only-dto-field', 'packages', 'cli', 'node_modules', '@fixture');
+  const linkPath = join(linkDir, 'core');
+
+  mkdirSync(linkDir, { recursive: true });
+
+  // Replace anything that is not already the correct link, so a stale entry
+  // from an older checkout cannot silently change what the test resolves.
+  if (existsSync(linkPath) || lstatSync(linkPath, { throwIfNoEntry: false }) !== undefined) {
+    rmSync(linkPath, { recursive: true, force: true });
+  }
+
+  // Relative target, matching how pnpm writes it: cli/node_modules/@fixture/core
+  // -> packages/core (three levels up from the @fixture directory).
+  symlinkSync(join('..', '..', '..', 'core'), linkPath, 'dir');
+};
 
 const analyzeFixture = (name: string, projectSegments: string[], entrySegments: string[]) => {
   const analyzer = new TypeScriptAnalyzer(fixturePath(name, ...projectSegments));
@@ -212,6 +247,23 @@ describe('81 — a `workspace:*` sibling is misclassified as an external package
   // invert and the README is deleted.
   const project = ['packages', 'cli', 'tsconfig.json'];
   const entry = ['packages', 'cli', 'src', 'index.ts'];
+
+  // Makes the fixture hermetic on a clean checkout — see the helper's own
+  // comment for why the link is created rather than committed.
+  before(() => {
+    ensureFixture81WorkspaceLink();
+  });
+
+  it('fixture is hermetic: the committed dist declaration and the setup-created workspace link both exist', () => {
+    assert.ok(
+      existsSync(fixturePath('81-crosspkg-type-only-dto-field', 'packages', 'core', 'dist', 'index.d.ts')),
+      'packages/core/dist/index.d.ts is committed fixture input (with a .gitignore negation); without it the specifier does not resolve at all on a clean runner',
+    );
+    assert.ok(
+      existsSync(fixturePath('81-crosspkg-type-only-dto-field', 'packages', 'cli', 'node_modules', '@fixture', 'core')),
+      'the workspace link is created by this suite’s before() hook',
+    );
+  });
 
   it('resolves the reference graph but still traverses only the importing package', () => {
     const result = convertFixture('81-crosspkg-type-only-dto-field', project, entry);

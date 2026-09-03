@@ -29,3 +29,17 @@ lib/typed-mind/grammar.wasm
 # (check-golden-deltas.mjs) reads, not committed source. goldens/legacy-baseline/
 # is the pinned, committed artifact; goldens/live/ never is.
 lib/typed-mind-renderer/goldens/live/
+
+# PR #156 — ladder fixture 81 is a two-package mini-workspace that reproduces a
+# pnpm `workspace:*` resolution gap. Its sibling's `dist/index.d.ts` is FIXTURE
+# INPUT, not build output: `ts.resolveModuleName` only reports
+# `isExternalLibraryImport: true` (the misclassification the fixture pins) when
+# the specifier resolves through a node_modules link to the package's declared
+# `types` entry. Nothing in this repo builds that file, so the blanket `dist/`
+# rule above would leave the fixture non-hermetic and the test would pass
+# locally while failing on a clean runner. The negation re-includes exactly
+# that one path. The matching node_modules link is created by the test's own
+# setup step (fixtures cannot rely on a committed symlink working on every
+# platform), so no `node_modules/` negation is needed.
+!lib/typed-mind-typescript/tests/ladder/repros-analyzer/81-crosspkg-type-only-dto-field/packages/core/dist/
+!lib/typed-mind-typescript/tests/ladder/repros-analyzer/81-crosspkg-type-only-dto-field/packages/core/dist/**
