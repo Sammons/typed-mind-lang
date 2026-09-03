@@ -2,7 +2,7 @@
   "name": "typed-mind",
   "displayName": "TypedMind DSL",
   "description": "Language support for TypedMind DSL - a declarative architecture description language with bidirectional validation",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "author": "sammons",
   "license": "MIT",
