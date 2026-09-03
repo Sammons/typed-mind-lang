@@ -61,7 +61,7 @@ jobs:
           echo "Checking if $EXTENSION_ID@$VERSION exists on marketplace..."
           
           # Check if version already exists
-          if mise exec -- pnpm exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
+          if mise exec -- pnpm --filter typed-mind exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
             echo "Version $VERSION already exists on marketplace"
             echo "should_publish=false" >> $GITHUB_OUTPUT
           else
@@ -82,7 +82,7 @@ jobs:
           done
           
           # Validate package.json
-          mise exec -- pnpm exec vsce ls --no-dependencies
+          mise exec -- pnpm --filter typed-mind exec vsce ls --no-dependencies
           
           cd ../..
 
@@ -156,7 +156,7 @@ jobs:
 
 
           # Package the extension
-          mise exec -- pnpm exec vsce package --no-dependencies
+          mise exec -- pnpm --filter typed-mind exec vsce package --no-dependencies
           
           # Verify VSIX was created
           VSIX_FILE=$(ls *.vsix | head -1)
@@ -212,9 +212,9 @@ jobs:
           echo "Publishing $VSIX_FILE..."
           
           if [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
-            mise exec -- pnpm exec vsce publish --pre-release --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
+            mise exec -- pnpm --filter typed-mind exec vsce publish --pre-release --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
           else
-            mise exec -- pnpm exec vsce publish --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
+            mise exec -- pnpm --filter typed-mind exec vsce publish --pat "${{ secrets.VSCE_PAT }}" --packagePath "$VSIX_FILE"
           fi
 
       - name: Dry run summary
@@ -239,7 +239,7 @@ jobs:
           RETRY_COUNT=0
           
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if mise exec -- pnpm exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
+            if mise exec -- pnpm --filter typed-mind exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
               echo "✓ Extension $EXTENSION_ID@$VERSION is now available on marketplace"
               break
             fi

@@ -249,14 +249,14 @@ jobs:
       - name: Package VS Code extension
         run: |
           cd lib/typed-mind-vscode-extension
-          mise exec -- pnpm exec vsce package --no-dependencies
+          mise exec -- pnpm --filter typed-mind exec vsce package --no-dependencies
           echo "VSIX_FILE=$(ls *.vsix)" >> $GITHUB_ENV
           cd ../..
 
       - name: Publish to VS Code Marketplace
         run: |
           cd lib/typed-mind-vscode-extension
-          mise exec -- pnpm exec vsce publish --pat ${{ secrets.VSCE_PAT }} --no-dependencies
+          mise exec -- pnpm --filter typed-mind exec vsce publish --pat ${{ secrets.VSCE_PAT }} --no-dependencies
           cd ../..
 
       - name: Upload VSIX artifact
