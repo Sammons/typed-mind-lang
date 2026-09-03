@@ -12,9 +12,18 @@
 // each written as `class X extends withMobx(LitElement)`, producing 6
 // `syntax/*` findings on the frontend entrypoint.
 //
-// Fixed by `getHeritageTypeString`, which unwraps a mixin call to its
-// identifier argument — the base class, which is what the inheritance
-// edge actually means: `withMobx(LitElement)` IS-A LitElement.
+// Fixed by `getExtendsTargetName`, which unwraps a mixin call to its
+// base argument — the base class, which is what the inheritance edge
+// actually means: `withMobx(LitElement)` IS-A LitElement.
+//
+// Helper reconciliation (PR #152 / PR #153): this rung originally shipped
+// `getHeritageTypeString` while the slat-harness rung shipped
+// `getExtendsTargetName` for the same defect found in a different corpus.
+// The two are now ONE helper, `getExtendsTargetName`, keeping every
+// property either version had: the non-CallExpression path still returns
+// `getTypeString(typeNode)` so generic bases keep their type arguments,
+// the argument search still skips a leading options object, and nested
+// mixin applications now recurse. Assertions below are unchanged.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';

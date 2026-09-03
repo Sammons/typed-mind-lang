@@ -1,0 +1,29 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [BaseWidget, Container, StringBox, configurableMixin, ConfiguredWidget, inner, outer, NestedWidget]
+}
+
+IndexFile @ src/index.ts:
+  -> [BaseWidget, Container, StringBox, configurableMixin, ConfiguredWidget, inner, outer, NestedWidget]
+
+BaseWidget <:
+  => [render]
+
+Container <:
+
+StringBox <: Container<string>
+  => [unwrap]
+
+ConfiguredWidget <: BaseWidget
+  => [label]
+
+NestedWidget <: BaseWidget
+  => [depth]
+
+configurableMixin :: configurableMixin(_options: { opt: number }, base: typeof BaseWidget) => typeof BaseWidget
+
+inner :: inner(base: typeof BaseWidget) => typeof BaseWidget
+
+outer :: outer(base: typeof BaseWidget) => typeof BaseWidget

@@ -176,6 +176,25 @@ const cases: readonly FixtureCase[] = [
   },
   { fixture: '68-generic-type-parameters', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '69-interface-method-dropped', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  // Reconciliation controls for the single mixin-heritage helper (PR #152
+  // + PR #153 merged into `getExtendsTargetName`). 66b records `false`:
+  // its `StringBox extends Container<string>` carries the generic-base
+  // finding of gap 68, which is the PRICE of property 1 being correct —
+  // preserving the type arguments is what the reconciliation restores.
+  // 66c records `false` for its own known gap (a zero-identifier mixin
+  // falls back to the factory name, which the checker rejects).
+  {
+    fixture: '66b-mixin-heritage-controls',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
+  {
+    fixture: '66c-mixin-no-base-argument',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
 ];
 
 describe('RFC-TM-9 Q1 — .tmd goldens against the current language (per-fixture, RFC §8 golden discipline)', () => {

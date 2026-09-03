@@ -1,0 +1,17 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [Widget, makeWidget, SelfMadeWidget]
+}
+
+IndexFile @ src/index.ts:
+  -> [Widget, makeWidget, SelfMadeWidget]
+
+Widget <:
+  => [render]
+
+SelfMadeWidget <: makeWidget
+  => [label]
+
+makeWidget :: makeWidget() => typeof Widget
