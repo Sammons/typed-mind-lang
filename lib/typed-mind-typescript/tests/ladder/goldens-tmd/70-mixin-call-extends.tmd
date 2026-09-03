@@ -1,0 +1,25 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [PlainWidget, LoggedWidget]
+}
+
+IndexFile @ src/index.ts:
+  <- [BaseWidget, WithLogging]
+  -> [PlainWidget, LoggedWidget]
+
+MixinFile @ src/mixin.ts:
+  <- [BaseWidget]
+  -> [WithLogging]
+
+BaseWidget #: src/base.ts
+  => [render]
+
+PlainWidget <: BaseWidget
+  => [describe]
+
+LoggedWidget <: BaseWidget
+  => [describe]
+
+WithLogging :: WithLogging(Base: typeof BaseWidget) => typeof BaseWidget

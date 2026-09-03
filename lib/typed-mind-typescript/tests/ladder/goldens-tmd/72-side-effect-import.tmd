@@ -1,0 +1,15 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [boot]
+}
+
+IndexFile @ src/index.ts:
+  <- [Widget]
+  -> [boot]
+
+Widget #: src/components/widget.ts
+  => [render]
+
+boot :: boot() => string

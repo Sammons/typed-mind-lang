@@ -195,6 +195,36 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: false,
   },
+  // NEW — the architecture-notebook ladder rung (a Lit web app plus a
+  // node:http server). Three gaps the real target surfaced, each with its
+  // own dedicated fail-then-pass suite; these entries commit the .tmd
+  // golden layer for them. All three check clean, so the recorded verdict
+  // is `true` — no pre-existing emitter defect survives on these shapes.
+  //
+  // 70: a mixin-application heritage clause (`class X extends Mixin(Base)`,
+  // Lit's `SignalWatcher(LitElement)`) emitted `<: Mixin(Base)` — an
+  // unparsable line, and a PARSE failure, so it also masked every later
+  // diagnostic on the target. 51 diagnostics across the two web
+  // entrypoints. Resolved by `getExtendsTargetName`, the single mixin-
+  // heritage helper reconciled from PR #152 and PR #153: the call unwraps
+  // to its base ARGUMENT, so `WithLogging(BaseWidget)` states the true
+  // IS-A edge `<: BaseWidget`. The golden records that unwrapped edge
+  // alongside the untouched `PlainWidget <: BaseWidget` control, which
+  // pins property 1 (non-CallExpression heritage is byte-identical to
+  // pre-#152 behavior).
+  { fixture: '70-mixin-call-extends', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  // 71: a `.ts`-suffixed re-export specifier (`export { x } from
+  // './types-list.ts'`, legal under allowImportingTsExtensions) tripped the
+  // converter's private hand-rolled resolver, producing a false
+  // "Re-export source module not found" warning. 17 instances on the
+  // target's server entrypoint.
+  { fixture: '71-ts-suffix-reexport', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  // 72: a side-effect import (`import './components/widget.ts'`, the
+  // custom-elements registration idiom) bound no name, so the resolved
+  // module edge never reached the importing File's `imports:` list and
+  // every component file read as orphaned. 18 false orphaned-file
+  // diagnostics on the target's web entrypoint.
+  { fixture: '72-side-effect-import', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
 ];
 
 describe('RFC-TM-9 Q1 — .tmd goldens against the current language (per-fixture, RFC §8 golden discipline)', () => {

@@ -448,6 +448,12 @@ export class TypeScriptToTypedMindConverter {
       // also runs as a post-pass rather than threaded into `convertImports`.
       this.foldDynamicImportsIntoSourceFiles(filteredModules);
 
+      // Fixture 72 — side-effect imports (`import './components/widget.ts'`).
+      // Same ordering rationale as the folds around it: a target File's
+      // entity name is only guaranteed final once `convertModules` has
+      // finished.
+      this.foldSideEffectImportsIntoSourceFiles(filteredModules);
+
       // RFC-TM-11 Amendment 1, §RX-6 (rfc-tm-11-diamond.md) — issue #109
       // (RC-G), the cross-package residual Quantum 1 left open: same
       // ordering rationale as the two folds immediately above — a
@@ -929,8 +935,21 @@ export class TypeScriptToTypedMindConverter {
 
     // Add a warning if the re-export source might not be included
     if (reExport.source !== undefined && !this.isExternalPackage(reExport.source)) {
-      const sourceModulePath = this.resolveModulePath(reExport.source, path.dirname(module.filePath));
-      if (!sourceModulePath || !fs.existsSync(sourceModulePath)) {
+      // Fixture 71 — consult the analyzer's own resolved module graph FIRST.
+      // `resolveModulePath` below is a hand-rolled `fs.existsSync` extension
+      // probe: given an already-suffixed specifier (`./types-list.ts`, legal
+      // under `allowImportingTsExtensions` and idiomatic in Node
+      // type-stripping projects) it appends extensions to the suffixed path,
+      // probes `types-list.ts.ts`/`types-list.ts/index.ts`, finds nothing,
+      // and warns that a file which plainly exists was not found. This is the
+      // census's A-g2 `.js`-suffix defect surviving in the converter's own
+      // copy of the resolver; the analyzer's `ts.resolveModuleName` (X-AN-1)
+      // already resolved this exact edge and recorded it here.
+      const graphResolved = this.moduleGraphResolution.has(
+        TypeScriptToTypedMindConverter.moduleGraphResolutionKey(this.getRelativePath(module.filePath), reExport.source),
+      );
+      const sourceModulePath = graphResolved ? undefined : this.resolveModulePath(reExport.source, path.dirname(module.filePath));
+      if (!graphResolved && (!sourceModulePath || !fs.existsSync(sourceModulePath))) {
         this.warnings.push({
           message: `Re-export source module not found: ${reExport.source} (re-exporting ${reExport.name})`,
           filePath: module.filePath,
@@ -2356,6 +2375,123 @@ export class TypeScriptToTypedMindConverter {
   // itself is the correct and only nameable reference here, and `File` is
   // `imports.to`-legal (valid-references.ts) so this is not a reference-
   // legality violation.
+  // Fixture 72 — a SIDE-EFFECT import (`import './components/widget.ts'`)
+  // binds no name: `ParsedImport` carries no `defaultImport`, no
+  // `namedImports`, no `namespaceImport`. `convertImports` iterates exactly
+  // those three binding kinds, so a bindingless import contributes NOTHING
+  // to the importing File's `imports:` list — the module edge that the
+  // analyzer resolved (X-AN-1, recorded in `moduleGraphResolution`) is
+  // dropped on the floor at conversion time.
+  //
+  // This is the custom-elements registration idiom: a Lit/vanilla web
+  // component module's entire purpose is its `customElements.define(...)`
+  // side effect, and the app entry imports it for that effect alone. The
+  // result is a false `Orphaned file` for EVERY component in the app (18 of
+  // them on the architecture-notebook web target) plus a false `Orphaned
+  // entity` for each component class — the file is genuinely imported, so
+  // the diagnostic is a false statement about the graph.
+  //
+  // Structurally identical to RC-E's `lazy(() => import('./Home.js'))` case
+  // (issue #107) — "a real edge with no bound name" — and fixed the same
+  // way: fold the TARGET's File/ClassFile entity name into the importer's
+  // `imports:` list, so `isFileConsumed` sees the file as consumed.
+  //
+  // Unlike RC-E, no default export is folded: a side-effect import makes no
+  // claim about any particular symbol (there is no `lazy()`-style contract
+  // that the module default-exports the thing being used). Folding only the
+  // File name states exactly what the source states — this file is loaded —
+  // and nothing more. A component class that is genuinely never referenced
+  // by name stays orphaned, which is the true reading.
+  private foldSideEffectImportsIntoSourceFiles(modules: readonly ParsedModule[]): void {
+    for (const module of modules) {
+      const sideEffectSpecifiers = (module.imports ?? [])
+        .filter(
+          (imp) => imp.defaultImport === undefined && imp.namespaceImport === undefined && imp.namedImports.length === 0 && !imp.isTypeOnly,
+        )
+        .map((imp) => imp.specifier);
+      if (sideEffectSpecifiers.length === 0) {
+        continue;
+      }
+
+      const sourceRelativePath = this.getRelativePath(module.filePath);
+      const sourceFileEntityName = this.fileEntityNameByRelativePath.get(this.stripKnownSourceExtension(sourceRelativePath));
+      if (sourceFileEntityName === undefined) {
+        continue;
+      }
+
+      for (const specifier of sideEffectSpecifiers) {
+        if (this.isExternalPackage(specifier)) {
+          // `import 'some-polyfill'` — external packages are Dependency
+          // entities and are never subject to the orphan rule this fold
+          // exists to correct.
+          continue;
+        }
+
+        const resolvedTarget = this.moduleGraphResolution.get(
+          TypeScriptToTypedMindConverter.moduleGraphResolutionKey(sourceRelativePath, specifier),
+        );
+        if (resolvedTarget === undefined) {
+          // Genuinely unresolved — the analyzer already surfaced its own
+          // `unresolvable-import` diagnostic. Nothing to fold.
+          continue;
+        }
+
+        const targetFileEntityName = this.fileEntityNameByRelativePath.get(this.stripKnownSourceExtension(resolvedTarget));
+        if (targetFileEntityName === undefined || targetFileEntityName === sourceFileEntityName) {
+          continue;
+        }
+
+        this.foldImportNamesIntoFileEntity(sourceFileEntityName, [targetFileEntityName]);
+      }
+    }
+  }
+
+  // Shared by `foldSideEffectImportsIntoSourceFiles` — rebuilds a File or
+  // ClassFile entity with additional `imports:` names, preserving every
+  // other field. A no-op when the entity is missing, is neither node kind,
+  // or already carries all the names.
+  private foldImportNamesIntoFileEntity(sourceFileEntityName: string, namesToFold: readonly string[]): void {
+    const sourceIndex = this.entities.findIndex((entity) => entity.name === sourceFileEntityName);
+    const sourceEntity = this.entities[sourceIndex];
+    if (sourceIndex === -1 || (!(sourceEntity instanceof FileNode) && !(sourceEntity instanceof ClassFileNode))) {
+      return;
+    }
+
+    const newNames = namesToFold.filter((name) => !sourceEntity.imports.includes(name));
+    if (newNames.length === 0) {
+      return;
+    }
+
+    this.entities[sourceIndex] =
+      sourceEntity instanceof FileNode
+        ? new FileNode({
+            name: sourceEntity.name,
+            span: sourceEntity.span,
+            raw: sourceEntity.raw,
+            comment: sourceEntity.comment,
+            sourceForm: sourceEntity.sourceForm,
+            path: sourceEntity.path,
+            imports: [...sourceEntity.imports, ...newNames],
+            exports: sourceEntity.exports,
+            reExports: sourceEntity.reExports,
+            purpose: sourceEntity.purpose,
+          })
+        : new ClassFileNode({
+            name: sourceEntity.name,
+            span: sourceEntity.span,
+            raw: sourceEntity.raw,
+            comment: sourceEntity.comment,
+            sourceForm: sourceEntity.sourceForm,
+            path: sourceEntity.path,
+            implements: sourceEntity.implements,
+            methods: sourceEntity.methods,
+            imports: [...sourceEntity.imports, ...newNames],
+            exports: sourceEntity.exports,
+            extends: sourceEntity.extends,
+            purpose: sourceEntity.purpose,
+          });
+  }
+
   private foldDynamicImportsIntoSourceFiles(modules: readonly ParsedModule[]): void {
     for (const module of modules) {
       // `?? []` — same defensive-optional convention `isPureTypesFile`
