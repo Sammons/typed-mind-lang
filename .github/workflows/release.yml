@@ -120,21 +120,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
+      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
+      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml) is
+      # installed by the composite action below, same shape as
+      # .gitea/workflows/deploy-static-site.yml. @sammons/typed-mind's
+      # pretest AND prebuild (both call build-wasm.mjs) fail without it, so
+      # this runs before both `pnpm test` and `pnpm build`.
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
-
-      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
-      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml). Mirrors
-      # .gitea/workflows/deploy-static-site.yml's mise setup shape.
-      # @sammons/typed-mind's pretest AND prebuild (both call build-wasm.mjs)
-      # fail without it, so this runs before both `pnpm test` and `pnpm build`.
-      - name: Install mise
-        run: |
-          curl https://mise.run | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install toolchain
-        run: mise install
 
       - name: Lint
         run: pnpm lint
@@ -167,20 +160,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - name: Setup Node and pnpm
-        uses: ./.github/actions/setup-node-pnpm
-
       # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — `pnpm publish` re-runs the
       # prepack lifecycle script (build-wasm.mjs && stage-published-wasm.mjs)
-      # regardless of the downloaded dist/ artifact, so the toolchain must be
-      # present here too, not only in the `test` job above.
-      - name: Install mise
-        run: |
-          curl https://mise.run | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install toolchain
-        run: mise install
+      # regardless of the downloaded dist/ artifact, so the toolchain (again
+      # installed by the composite action below) must be present here too,
+      # not only in the `test` job above.
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Download build artifacts
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
@@ -219,27 +205,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
+      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
+      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml) is
+      # installed by the composite action below, same shape as
+      # .gitea/workflows/ci.yml.
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
-
-      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
-      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml). Mirrors
-      # .gitea/workflows/ci.yml's mise setup shape.
-      - name: Install mise
-        run: |
-          curl https://mise.run | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install toolchain
-        run: mise install
-
-      - name: Install pnpm
-        run: |
-          mise exec -- corepack enable
-          mise exec -- corepack prepare pnpm@11 --activate
-
-      - name: Install dependencies
-        run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts
 
       # A committed lib/typed-mind-vscode-extension/lsp-bundled/ can drift from
       # what the pinned toolchain produces (PR #138) because nothing forced a

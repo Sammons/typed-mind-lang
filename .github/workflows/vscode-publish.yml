@@ -96,38 +96,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
+      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
+      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml) is
+      # installed by the composite action below, same shape as
+      # .gitea/workflows/deploy-static-site.yml. The extension currently
+      # depends on the published @sammons/typed-mind (not the workspace
+      # build), so this is a no-op today; it makes the pipeline structurally
+      # ready for TM-5 Q2/Q3's bundle-lsp wiring, which will build
+      # @sammons/typed-mind-lsp (and transitively @sammons/typed-mind) from
+      # the local workspace instead.
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
-
-      # RFC-TM-7 §3 (rfc-tm-7-diamond.md, S-CI-2) — the mise-pinned wasm
-      # toolchain (tree-sitter CLI + wasi-sdk, per root mise.toml). Mirrors
-      # .gitea/workflows/deploy-static-site.yml's mise setup shape. The
-      # extension currently depends on the published @sammons/typed-mind
-      # (not the workspace build), so this step is a no-op today; it makes
-      # the pipeline structurally ready for TM-5 Q2/Q3's bundle-lsp wiring,
-      # which will build @sammons/typed-mind-lsp (and transitively
-      # @sammons/typed-mind) from the local workspace instead.
-      - name: Install mise
-        run: |
-          curl https://mise.run | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install toolchain
-        run: mise install
-
-      - name: Install pnpm
-        run: |
-          mise exec -- corepack enable
-          mise exec -- corepack prepare pnpm@11 --activate
-
-      - name: Install dependencies
-        run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build TypedMind packages
         run: |
           # Build only the extension and its dependencies
           cd lib/typed-mind-vscode-extension
-          mise exec -- pnpm run build
+          pnpm run build
 
       # A committed lib/typed-mind-vscode-extension/lsp-bundled/ can drift from
       # what the pinned toolchain produces (PR #138) because nothing forced a

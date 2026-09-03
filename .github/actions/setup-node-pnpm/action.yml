@@ -1,47 +1,66 @@
 name: 'Setup Node and pnpm'
-description: 'Setup Node.js with pnpm and caching'
+description: 'Setup Node.js and pnpm via mise + corepack, matching .gitea/workflows/ci.yml'
 inputs:
-  node-version:
-    description: 'Node.js version to use'
-    required: false
-    default: '22'
-  pnpm-version:
-    description: 'pnpm version to use'
-    required: false
-    default: '9'
   cache-dependency-path:
     description: 'Path to pnpm-lock.yaml'
     required: false
     default: 'pnpm-lock.yaml'
+  install:
+    description: 'Whether to run pnpm install after setup'
+    required: false
+    default: 'true'
 runs:
   using: composite
   steps:
-    - name: Setup pnpm
-      uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
-      with:
-        version: ${{ inputs.pnpm-version }}
-        run_install: false
+    # Node version is NOT duplicated here. mise.toml is the single source of
+    # truth (root mise.toml pins node = "26"); this mirrors
+    # .gitea/workflows/ci.yml's setup shape exactly so GitHub and Gitea CI
+    # install the identical toolchain from the identical file.
+    - name: Install mise
+      shell: bash
+      run: |
+        curl https://mise.run | sh
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-    - name: Setup Node.js
-      uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
-      with:
-        node-version: ${{ inputs.node-version }}
-        cache: 'pnpm'
-        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+    - name: Install toolchain
+      shell: bash
+      run: mise install
+
+    # pnpm version is NOT pinned here either. corepack reads the
+    # `packageManager` field in package.json (pnpm@11.15.1), so this is the
+    # only place a pnpm version can drift from — and it can't, since it's
+    # read from the same file `pnpm install` itself already trusts. Passing
+    # a `version:` here (as the old pnpm/action-setup step did) is what
+    # produced "Multiple versions of pnpm specified" against packageManager.
+    #
+    # corepack enable/prepare must run through `mise exec --` so they see the
+    # mise-installed node — corepack itself is not a mise shim. Once
+    # `corepack prepare --activate` writes the pnpm@11.15.1 shim into mise's
+    # shim dir, bare `node`/`pnpm` calls in later workflow steps resolve
+    # correctly without needing `mise exec --` (verified locally: mise
+    # install + `mise exec -- corepack enable && mise exec -- corepack
+    # prepare --activate` leaves `pnpm --version` on plain PATH at 11.15.1).
+    - name: Install pnpm
+      shell: bash
+      run: |
+        mise exec -- corepack enable
+        mise exec -- corepack prepare --activate
+        echo "$HOME/.local/share/mise/shims" >> "$GITHUB_PATH"
 
     - name: Get pnpm store directory
       id: pnpm-cache
       shell: bash
-      run: echo "store_path=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+      run: echo "store_path=$(mise exec -- pnpm store path --silent)" >> $GITHUB_OUTPUT
 
     - name: Setup pnpm cache
       uses: actions/cache@v4
       with:
         path: ${{ steps.pnpm-cache.outputs.store_path }}
-        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles(inputs.cache-dependency-path) }}
         restore-keys: |
           ${{ runner.os }}-pnpm-store-
 
     - name: Install dependencies
+      if: ${{ inputs.install == 'true' }}
       shell: bash
-      run: pnpm install
+      run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts
