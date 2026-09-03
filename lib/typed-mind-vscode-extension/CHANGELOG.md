@@ -5,6 +5,22 @@ All notable changes to the "TypedMind DSL" extension will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-09-03
+
+### Changed
+- **Node 26 baseline** - The workspace moved to a Node 26 engine baseline with nodenext module resolution.
+- **LSP protocol 10** - `vscode-languageserver` bumped to 10, with `vscode-languageclient` matched.
+- **tree-sitter 0.27 grammar** - Paired bump of the tree-sitter toolchain and `web-tree-sitter` to 0.27.0.
+- **Workspace dependencies** - `@sammons/typed-mind`, `@sammons/typed-mind-lsp`, and
+  `@sammons/typed-mind-renderer` are all `workspace:*`; the preview command runs on
+  `TypedMind.create()` plus the renderer's `setGraph`/`setValidationResult` entry point.
+
+### Fixed
+- **Toggle-format** - Corrected toggle-format behavior (#103, #121).
+- **Quote-swap warning** - Added a warning for the quote-swap case (#130).
+- **Bundled grammar reproducibility** - `grammar.wasm` now builds reproducibly and is gated in CI,
+  so a stale bundled LSP fails the publish instead of shipping unvalidated bytes.
+
 ## [0.2.0] - 2025-09-14
 
 ### Added

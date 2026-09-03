@@ -62,7 +62,7 @@ code --install-extension Sammons.typed-mind
 **For Cursor IDE or other VS Code-compatible editors that may not have marketplace access:**
 
 1. **Download the latest VSIX file:**
-   - [Latest Release (v0.2.0)](https://github.com/Sammons/typed-mind-lang/releases/latest) - Download `typed-mind-0.2.0.vsix`
+   - [Latest Release](https://github.com/Sammons/typed-mind-lang/releases/latest) - Download the `typed-mind-<version>.vsix` asset
    - Or browse all releases: [GitHub Releases](https://github.com/Sammons/typed-mind-lang/releases)
 
 2. **Install in VS Code/Cursor:**
