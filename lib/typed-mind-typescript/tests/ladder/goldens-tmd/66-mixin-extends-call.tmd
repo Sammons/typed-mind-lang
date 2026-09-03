@@ -1,0 +1,21 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [BaseWidget, applyMixin, IsolatedLeaf, LightWidget]
+}
+
+IndexFile @ src/index.ts:
+  -> [BaseWidget, applyMixin, IsolatedLeaf, LightWidget]
+
+BaseWidget <:
+  => [render]
+
+IsolatedLeaf <: BaseWidget
+  "The zero-method shape — this is the one that leaked unparsable text."
+
+LightWidget <: BaseWidget
+  "The with-methods shape — took the ClassFile path and emitted safely."
+  => [createRoot]
+
+applyMixin :: applyMixin(base: typeof BaseWidget) => typeof BaseWidget

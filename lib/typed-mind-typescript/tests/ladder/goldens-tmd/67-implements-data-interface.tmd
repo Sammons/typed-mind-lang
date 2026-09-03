@@ -1,0 +1,18 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [Span, NoopSpan, endSpan]
+}
+
+IndexFile @ src/index.ts:
+  -> [Span, NoopSpan, endSpan]
+
+NoopSpan <: Span
+
+endSpan :: endSpan(span: Span) => void
+  <- Span
+
+Span %
+  - name: string
+  - ended: boolean

@@ -155,6 +155,27 @@ const cases: readonly FixtureCase[] = [
   // gates `valid`. This is expected, welcome drift (file header), not a
   // regression.
   { fixture: '25-generated-single-file', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  // NEW — RFC-TM-9 §8 X-LADDER-2 rung against sammons/slat-harness. Four
+  // fixtures distilled from that target's real diagnostics; see
+  // slat-harness-mixin-extends.test.ts (the FIXED one) and
+  // slat-harness-known-gaps.test.ts (the three left as documented failing
+  // expectations) for the per-gap adjudication and root causes.
+  //
+  // 66 is fixed in this change (mixin-application extends targets now
+  // resolve to the mixin's base argument), so its checker verdict is
+  // `true`. 67/68 record `false` — each carries the exact diagnostic its
+  // known-gap pin asserts. 69 records `true` precisely BECAUSE its gap is
+  // checker-invisible: the dropped interface method produces no finding at
+  // all, which is what makes it the severe one.
+  { fixture: '66-mixin-extends-call', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  {
+    fixture: '67-implements-data-interface',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
+  { fixture: '68-generic-type-parameters', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  { fixture: '69-interface-method-dropped', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
 ];
 
 describe('RFC-TM-9 Q1 — .tmd goldens against the current language (per-fixture, RFC §8 golden discipline)', () => {
