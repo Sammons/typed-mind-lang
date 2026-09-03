@@ -203,12 +203,19 @@ jobs:
         if: ${{ github.event.inputs.dry_run != 'true' || github.event.inputs.dry_run == '' || github.event.inputs.dry_run == null }}
         run: |
           VSIX_FILE=$(find ./artifacts -name "*.vsix" | head -1)
-          
+
           if [ -z "$VSIX_FILE" ]; then
             echo "Error: No VSIX file found"
             exit 1
           fi
-          
+
+          # pnpm --filter typed-mind exec runs vsce with cwd set to
+          # lib/typed-mind-vscode-extension, so a path relative to the
+          # repo root (where this step's find above resolves it) no
+          # longer points at the artifact. Resolve to an absolute path
+          # before handing it to --packagePath.
+          VSIX_FILE=$(realpath "$VSIX_FILE")
+
           echo "Publishing $VSIX_FILE..."
           
           if [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
