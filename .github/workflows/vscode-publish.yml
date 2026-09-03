@@ -238,28 +238,35 @@ jobs:
         run: |
           VERSION="${{ needs.validate.outputs.version }}"
           EXTENSION_ID="sammons.typed-mind"
-          
+
           echo "Waiting for extension to be available on marketplace..."
-          
-          # Wait for extension to be available
-          MAX_RETRIES=30
-          RETRY_COUNT=0
-          
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+
+          # vsce's own publish output says the marketplace "might take a few
+          # minutes" to index a new version (observed ~6 minutes on run
+          # 33751628608). Poll with a fixed 60s backoff instead of the
+          # previous 30x10s=5min budget, which was short by exactly the
+          # margin that run needed.
+          MAX_ATTEMPTS=12
+          ATTEMPT=1
+
+          while [ "$ATTEMPT" -le "$MAX_ATTEMPTS" ]; do
+            echo "Checking marketplace (attempt $ATTEMPT/$MAX_ATTEMPTS)..."
+
             if mise exec -- pnpm --filter typed-mind exec vsce show "$EXTENSION_ID" --json 2>/dev/null | jq -e ".versions[] | select(.version == \"$VERSION\")" > /dev/null 2>&1; then
               echo "✓ Extension $EXTENSION_ID@$VERSION is now available on marketplace"
+              exit 0
+            fi
+
+            if [ "$ATTEMPT" -eq "$MAX_ATTEMPTS" ]; then
               break
             fi
-            
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-            echo "Waiting... (attempt $RETRY_COUNT/$MAX_RETRIES)"
-            sleep 10
+
+            sleep 60
+            ATTEMPT=$((ATTEMPT + 1))
           done
-          
-          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-            echo "Warning: Timeout waiting for extension to be available"
-            exit 1
-          fi
+
+          echo "Error: $EXTENSION_ID@$VERSION did not appear on the marketplace after $MAX_ATTEMPTS attempts (60s apart)"
+          exit 1
 
   summary:
     name: Publishing Summary
