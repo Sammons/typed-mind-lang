@@ -1260,6 +1260,9 @@ export class TypeScriptAnalyzer {
     if (node.heritageClauses) {
       for (const clause of node.heritageClauses) {
         if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
+          // Stays `getTypeString`, not `getExtendsTargetName`: an interface's
+          // heritage clause is grammatically restricted to type references,
+          // so it is unreachable by a CallExpression and needs no unwrap.
           extendsInterfaces.push(...clause.types.map((type) => this.getTypeString(type)));
         }
       }
