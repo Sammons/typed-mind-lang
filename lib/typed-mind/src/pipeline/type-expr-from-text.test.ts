@@ -344,14 +344,12 @@ describe('parseTypeExprText: the shared string-based type-expression parser', ()
       assert.equal(result.remainder, '');
       assert.equal(result.typeExpr.kind, 'union');
       if (result.typeExpr.kind === 'union') {
-        // The union SHAPE survives across lines. Each member degrades to an
-        // opaque leaf rather than a `named` one, because `skipWhitespace`
-        // advances over spaces and tabs only — a member preceded by a newline
-        // never reaches `parseNamed`. That is pre-existing behaviour this
-        // change does not alter; what it DOES guarantee is that each leaf's
-        // text is collapsed to a single line and carries no stray whitespace.
+        // `skipWhitespace` treats '\n'/'\r' as whitespace (fix), so a member
+        // preceded by a newline still reaches `parseNamed` and each leaf
+        // stays `named` — the newline never has to fall through to the
+        // opaque scanner just to be consumed as inter-token separation.
         assert.deepEqual(
-          result.typeExpr.members.map((member) => (member.kind === 'opaque' ? member.text : member.kind)),
+          result.typeExpr.members.map((member) => (member.kind === 'named' ? member.name : member.kind)),
           ['Alpha', 'Beta'],
         );
       }
@@ -363,13 +361,40 @@ describe('parseTypeExprText: the shared string-based type-expression parser', ()
       assert.equal(result.typeExpr.kind, 'generic');
       if (result.typeExpr.kind === 'generic') {
         assert.equal(result.typeExpr.base.name, 'Record');
-        // Same pre-existing newline/`skipWhitespace` interaction as the union
-        // case above: the generic's ARGUMENT COUNT and ordering survive, and
-        // each argument's text is single-line and clean.
+        // Same newline-as-whitespace fix as the union case above: the
+        // generic's ARGUMENT COUNT and ordering survive, and each argument
+        // reaches `parseNamed` instead of degrading to opaque.
         assert.deepEqual(
-          result.typeExpr.args.map((arg) => (arg.kind === 'opaque' ? arg.text : arg.kind)),
+          result.typeExpr.args.map((arg) => (arg.kind === 'named' ? arg.name : arg.kind)),
           ['string', 'number'],
         );
+      }
+    });
+
+    it('collapses a multi-line intersection and keeps each member named', () => {
+      const result = parseTypeExprText('(\n  Alpha &\n  Beta\n)');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'intersection');
+      if (result.typeExpr.kind === 'intersection') {
+        assert.deepEqual(
+          result.typeExpr.members.map((member) => (member.kind === 'named' ? member.name : member.kind)),
+          ['Alpha', 'Beta'],
+        );
+      }
+    });
+
+    it('collapses a multi-line array-of-union and keeps each member named', () => {
+      const result = parseTypeExprText('(\n  Alpha |\n  Beta\n)[]');
+      assert.equal(result.remainder, '');
+      assert.equal(result.typeExpr.kind, 'array');
+      if (result.typeExpr.kind === 'array') {
+        assert.equal(result.typeExpr.element.kind, 'union');
+        if (result.typeExpr.element.kind === 'union') {
+          assert.deepEqual(
+            result.typeExpr.element.members.map((member) => (member.kind === 'named' ? member.name : member.kind)),
+            ['Alpha', 'Beta'],
+          );
+        }
       }
     });
 
