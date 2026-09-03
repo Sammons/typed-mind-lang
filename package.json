@@ -21,6 +21,7 @@
     "typecheck:scripts": "tsc --noEmit -p scripts/tsconfig.json",
     "clean": "pnpm run -r clean && rm -rf node_modules",
     "dev": "pnpm run -r --parallel dev",
+    "check:workspace-scope": "node scripts/check-workspace-scope.mjs",
     "check:toolchain": "node scripts/check-toolchain.mjs",
     "check:generated": "node scripts/check-generated.mjs",
     "check:diagnostic-jargon": "node lib/typed-mind/scripts/check-diagnostic-jargon.mjs",
@@ -36,8 +37,8 @@
     "check:release-manifests": "node scripts/check-release-manifests.ts",
     "check:version-lockstep": "node scripts/check-version-lockstep.mjs",
     "check:browser-graph": "pnpm --dir lib/typed-mind run build:browser && node scripts/check-browser-graph.mjs",
-    "validate": "pnpm run build && pnpm run build:bundled-all && pnpm run lint && pnpm run typecheck && pnpm run check:toolchain && pnpm run check:generated && pnpm run check:bundled-wasm && pnpm run check:diagnostic-jargon && pnpm run check:diagnostic-code-audit && pnpm run check:fixture-audit-gating && pnpm run check:engines && pnpm run check:fix-orphans-deleted && pnpm run check:version-lockstep && pnpm run check:pack && pnpm run check:release-manifests && pnpm run check:browser-graph && pnpm run test && pnpm run check:golden-deltas && pnpm run check:clean-tree",
-    "validate:fix": "pnpm run build && pnpm run build:bundled-all && pnpm run check:toolchain && pnpm run check:generated && pnpm run check:bundled-wasm && pnpm run check:diagnostic-jargon && pnpm run check:diagnostic-code-audit && pnpm run check:fixture-audit-gating && pnpm run check:engines && pnpm run check:fix-orphans-deleted && pnpm run check:version-lockstep && pnpm run check:pack && pnpm run check:release-manifests && pnpm run check:browser-graph && pnpm run lint:fix && pnpm run typecheck && pnpm run test && pnpm run check:golden-deltas",
+    "validate": "pnpm run check:workspace-scope && pnpm run build && pnpm run build:bundled-all && pnpm run lint && pnpm run typecheck && pnpm run check:toolchain && pnpm run check:generated && pnpm run check:bundled-wasm && pnpm run check:diagnostic-jargon && pnpm run check:diagnostic-code-audit && pnpm run check:fixture-audit-gating && pnpm run check:engines && pnpm run check:fix-orphans-deleted && pnpm run check:version-lockstep && pnpm run check:pack && pnpm run check:release-manifests && pnpm run check:browser-graph && pnpm run test && pnpm run check:golden-deltas && pnpm run check:clean-tree",
+    "validate:fix": "pnpm run check:workspace-scope && pnpm run build && pnpm run build:bundled-all && pnpm run check:toolchain && pnpm run check:generated && pnpm run check:bundled-wasm && pnpm run check:diagnostic-jargon && pnpm run check:diagnostic-code-audit && pnpm run check:fixture-audit-gating && pnpm run check:engines && pnpm run check:fix-orphans-deleted && pnpm run check:version-lockstep && pnpm run check:pack && pnpm run check:release-manifests && pnpm run check:browser-graph && pnpm run lint:fix && pnpm run typecheck && pnpm run test && pnpm run check:golden-deltas",
     "ci": "pnpm run validate",
     "precommit": "pnpm run validate:fix",
     "release": "pnpm run validate && pnpm run check:release-manifests && pnpm -r --filter './lib/*' publish --access public"
