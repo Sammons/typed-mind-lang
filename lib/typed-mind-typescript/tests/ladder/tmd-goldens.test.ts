@@ -155,6 +155,46 @@ const cases: readonly FixtureCase[] = [
   // gates `valid`. This is expected, welcome drift (file header), not a
   // regression.
   { fixture: '25-generated-single-file', entrySegments: ['src', 'main.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  // NEW — RFC-TM-9 §8 X-LADDER-2 rung against sammons/slat-harness. Four
+  // fixtures distilled from that target's real diagnostics; see
+  // slat-harness-mixin-extends.test.ts (the FIXED one) and
+  // slat-harness-known-gaps.test.ts (the three left as documented failing
+  // expectations) for the per-gap adjudication and root causes.
+  //
+  // 66 is fixed in this change (mixin-application extends targets now
+  // resolve to the mixin's base argument), so its checker verdict is
+  // `true`. 67/68 record `false` — each carries the exact diagnostic its
+  // known-gap pin asserts. 69 records `true` precisely BECAUSE its gap is
+  // checker-invisible: the dropped interface method produces no finding at
+  // all, which is what makes it the severe one.
+  { fixture: '66-mixin-extends-call', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  {
+    fixture: '67-implements-data-interface',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
+  { fixture: '68-generic-type-parameters', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  { fixture: '69-interface-method-dropped', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  // Reconciliation controls for the single mixin-heritage helper (PR #152
+  // + PR #153 merged into `getExtendsTargetName`). 66b records `false`:
+  // its `StringBox extends Container<string>` carries the generic-base
+  // finding of gap 68, which is the PRICE of property 1 being correct —
+  // preserving the type arguments is what the reconciliation restores.
+  // 66c records `false` for its own known gap (a zero-identifier mixin
+  // falls back to the factory name, which the checker rejects).
+  {
+    fixture: '66b-mixin-heritage-controls',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
+  {
+    fixture: '66c-mixin-no-base-argument',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
 ];
 
 describe('RFC-TM-9 Q1 — .tmd goldens against the current language (per-fixture, RFC §8 golden discipline)', () => {

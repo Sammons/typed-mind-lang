@@ -1143,7 +1143,7 @@ export class TypeScriptAnalyzer {
     if (node.heritageClauses) {
       for (const clause of node.heritageClauses) {
         if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-          extendsClasses.push(...clause.types.map((type) => this.getHeritageTypeString(type)));
+          extendsClasses.push(...clause.types.map((type) => this.getExtendsTargetName(type)));
         } else if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
           implementsInterfaces.push(...clause.types.map((type) => this.getTypeString(type)));
         }
@@ -1573,35 +1573,77 @@ export class TypeScriptAnalyzer {
     return typeNode.getText();
   }
 
-  // Fixture 76 (itp-maker's Lit + MobX frontend — five components written
-  // as `class X extends withMobx(LitElement)`). A heritage clause's type
-  // is an `ExpressionWithTypeArguments`, and for a MIXIN APPLICATION its
-  // `.expression` is a CallExpression, so `getTypeString`'s bare
-  // `getText()` returned the literal text `withMobx(LitElement)`. The
-  // converter emits that into the `<:` inherit slot, where the grammar's
-  // `inherit_list` accepts only bare entity names — one
-  // `Unparsable text: \`(LitElement)\`` finding per mixin-based class.
+  // The single mixin-heritage helper, reconciling PR #152 (slat-harness,
+  // fixture 66 — Lit + @lit-labs/signals, `class SlatLeaf extends
+  // SignalWatcher(LitElement) {}`) and PR #153 (itp-maker, fixture 76 —
+  // Lit + MobX, `class X extends withMobx(LitElement)`). Both rungs hit
+  // the same defect from different corpora and each shipped a helper that
+  // handled a case the other missed; this is the merged implementation.
   //
-  // The base class is the mixin call's first argument, which is what the
-  // inheritance edge actually means: `withMobx(LitElement)` IS-A
-  // LitElement. Unwrapping to that argument states the true edge instead
-  // of emitting unparsable text. A mixin call with no identifier argument
-  // has no nameable base, so the mixin's own callee name is used —
-  // still a bare identifier, so the emitted line stays parsable.
-  private getHeritageTypeString(typeNode: ts.ExpressionWithTypeArguments): string {
+  // A heritage clause's type is an `ExpressionWithTypeArguments`. For a
+  // MIXIN APPLICATION its `.expression` is a CallExpression, so
+  // `getTypeString`'s bare `getText()` returned the literal call text
+  // (`withMobx(LitElement)`). The converter emits that into the `<:`
+  // inherit slot, where the grammar's `inherit_list` accepts only bare
+  // entity names — one `Unparsable text: \`(LitElement)\`` finding per
+  // mixin-based class. That finding is a PARSE failure, so it also halts
+  // checking and masks every later diagnostic on the target.
+  //
+  // Unwrap-to-base is the design: the inheritance edge a mixin states is
+  // `withMobx(LitElement)` IS-A `LitElement`, so naming the base argument
+  // records the true edge instead of leaking syntax. Three properties,
+  // each pinned by a test (see slat-harness-mixin-extends.test.ts and
+  // slat-harness-mixin-heritage-controls.test.ts):
+  //
+  // 1. NON-CallExpression heritage is returned exactly as it was before
+  //    either rung, via `getTypeString(typeNode)` on the whole type node —
+  //    NOT `.expression.getText()`, which silently drops type arguments and
+  //    would turn `extends Container<string>` into `Container`. The
+  //    `ts.isCallExpression` guard is what keeps the ordinary path byte-
+  //    identical to main's long-standing behavior.
+  // 2. CallExpression heritage searches the ARGUMENTS for the base rather
+  //    than assuming position 0: `find` skips a leading options object, so
+  //    `Mix({ opt: 1 }, Base)` yields `Base`. An argument that is itself a
+  //    CallExpression recurses, so nested applications `A(B(Base))` yield
+  //    `Base`. Recursion runs before the identifier search at each level so
+  //    a nested base outranks a sibling identifier argument.
+  // 3. A zero-identifier mixin (`Mixin()`, or one whose only arguments are
+  //    non-identifier expressions) has no nameable base, so the mixin's own
+  //    callee name is used. That keeps the emitted line parsable but states
+  //    an edge to the FACTORY rather than a base class, which the checker
+  //    then reports as an illegal reference. Known gap, pinned by a test
+  //    with this root cause rather than silently tolerated.
+  private getExtendsTargetName(typeNode: ts.ExpressionWithTypeArguments): string {
     const expression = typeNode.expression;
 
     if (!ts.isCallExpression(expression)) {
       return this.getTypeString(typeNode);
     }
 
-    const identifierArgument = expression.arguments.find((argument) => ts.isIdentifier(argument));
+    const base = this.findMixinBaseExpression(expression);
+    return base !== undefined ? base.getText() : this.mixinFactoryFallbackName(expression);
+  }
 
-    if (identifierArgument !== undefined) {
-      return identifierArgument.getText();
+  // Finds the base among a mixin call's arguments. Recurses into a nested
+  // mixin application first (property 2's `A(B(Base))` case), then falls
+  // back to the first plain identifier argument (property 2's
+  // `Mix({ opt: 1 }, Base)` case). Returns undefined when no argument
+  // names anything (property 3).
+  private findMixinBaseExpression(call: ts.CallExpression): ts.Expression | undefined {
+    for (const argument of call.arguments) {
+      if (ts.isCallExpression(argument)) {
+        const nested = this.findMixinBaseExpression(argument);
+        if (nested !== undefined) {
+          return nested;
+        }
+      }
     }
 
-    return ts.isIdentifier(expression.expression) ? expression.expression.text : 'unknown';
+    return call.arguments.find((argument) => ts.isIdentifier(argument));
+  }
+
+  private mixinFactoryFallbackName(call: ts.CallExpression): string {
+    return ts.isIdentifier(call.expression) ? call.expression.text : 'unknown';
   }
 
   private hasExportModifier(node: ts.Node): boolean {

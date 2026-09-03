@@ -1,0 +1,19 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [HalEnvelope, Pair, unwrap]
+}
+
+IndexFile @ src/index.ts:
+  -> [HalEnvelope, Pair, unwrap]
+
+unwrap :: unwrap(envelope: HalEnvelope<string>, pair: Pair<number, string>) => void
+
+HalEnvelope %
+  - data: T
+  - self: string
+
+Pair %
+  - left: A
+  - right: B

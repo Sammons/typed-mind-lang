@@ -1,0 +1,15 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [Repository, persist]
+}
+
+IndexFile @ src/index.ts:
+  -> [Repository, persist]
+
+persist :: persist(repository: Repository) => void
+  <- Repository
+
+Repository %
+  - id: string
