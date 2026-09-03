@@ -2,11 +2,11 @@
 // (`import type { OutputFormat } from '@sammons/code-outline-parser'`) and
 // file-processor.ts:4 (`NodeInfo`). A pnpm `workspace:*` sibling resolves
 // through a node_modules SYMLINK to the package's built `dist/index.d.ts`,
-// so `resolveImportPath` (typescript-analyzer.ts:1695) classifies it as
+// so `resolveImportPath` (typescript-analyzer.ts:1805) classifies it as
 // external on BOTH clauses (`isExternalLibraryImport === true` and
 // `resolvedPath.includes('node_modules')`). The sibling package is never
 // traversed, so `OutputFormat`/`NodeInfo` never become entities and the
-// DTO fields typed by them emit `checker/dto-field-undefined-type`.
+// DTO fields typed by them emit `checker/dto-field-unknown-type`.
 import type { NodeInfo, OutputFormat } from '@fixture/core';
 
 export interface CliOptions {

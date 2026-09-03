@@ -18,7 +18,7 @@ This fixture is a two-package mini-workspace, mirroring the real repo:
 
 ## Root cause
 
-`typescript-analyzer.ts:1695` (`resolveImportPath`):
+`typescript-analyzer.ts:1805` (`resolveImportPath`):
 
 ```ts
 const isExternal = resolvedModule.isExternalLibraryImport === true || resolvedPath.includes('node_modules');

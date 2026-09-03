@@ -118,16 +118,86 @@ class TextCursor {
 // needs the pre-existing `trim()`. Scoping the rewrite to the multi-line case
 // keeps this fix confined to the shape it exists for and leaves every
 // already-correct single-line spelling byte-identical.
+//
+// LITERAL-AWARENESS (PR #156 review finding): the rewrite is a single
+// left-to-right scan, not a chain of text-blind regexes. A regex pass cannot
+// tell a structural bracket from one INSIDE a string literal, so
+// `'( x )' | Foo` (a legal literal-type member whose own text carries spaces
+// next to brackets) would silently become `'(x)' | Foo` — changing the type's
+// MEANING, since a string-literal type's value is its exact characters. This
+// scan copies any single-quoted, double-quoted, or backtick-quoted span
+// through byte-for-byte (honoring backslash escapes) and applies whitespace
+// rules only to the structural text between literals.
+const isWhitespaceChar = (char: string): boolean => {
+  return char === ' ' || char === '\t' || char === '\n' || char === '\r';
+};
+
 const normalizeOpaqueWhitespace = (text: string): string => {
   if (!/[\n\r]/.test(text)) {
     return text.trim();
   }
-  return text
-    .trim()
-    .replace(/\s+/g, ' ')
-    .replace(/([([])\s+/g, '$1')
-    .replace(/\s+([)\]])/g, '$1')
-    .replace(/\s+,/g, ',');
+
+  const trimmed = text.trim();
+  let result = '';
+  let index = 0;
+
+  while (index < trimmed.length) {
+    const char = trimmed[index];
+    if (char === undefined) {
+      break;
+    }
+
+    // A quoted span is copied verbatim — including its own whitespace and
+    // brackets — so literal text is byte-preserved.
+    if (char === "'" || char === '"' || char === '`') {
+      const quote = char;
+      let cursor = index + 1;
+      while (cursor < trimmed.length) {
+        const inner = trimmed[cursor];
+        if (inner === '\\') {
+          cursor += 2;
+          continue;
+        }
+        if (inner === quote) {
+          cursor += 1;
+          break;
+        }
+        cursor += 1;
+      }
+      result += trimmed.slice(index, Math.min(cursor, trimmed.length));
+      index = Math.min(cursor, trimmed.length);
+      continue;
+    }
+
+    if (isWhitespaceChar(char)) {
+      // Collapse the whole run, then decide whether it survives at all.
+      let cursor = index;
+      while (cursor < trimmed.length) {
+        const runChar = trimmed[cursor];
+        if (runChar === undefined || !isWhitespaceChar(runChar)) {
+          break;
+        }
+        cursor += 1;
+      }
+      const previousChar = result[result.length - 1];
+      const nextChar = trimmed[cursor];
+      // Drop the space just inside a paren/bracket pair and before a comma —
+      // the grammar's opaque-run tokens reject `( a: T )` and `(a: T , b: U)`.
+      // Braces are excluded on purpose (see the object-literal note above).
+      const dropsBefore = nextChar === ')' || nextChar === ']' || nextChar === ',';
+      const dropsAfter = previousChar === '(' || previousChar === '[';
+      if (nextChar !== undefined && !dropsBefore && !dropsAfter) {
+        result += ' ';
+      }
+      index = cursor;
+      continue;
+    }
+
+    result += char;
+    index += 1;
+  }
+
+  return result;
 };
 
 const spanFrom = (cursor: TextCursor, startIndex: number, endIndex: number): Span => {
