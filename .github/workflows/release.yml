@@ -250,26 +250,30 @@ jobs:
       #
       # @sammons/typed-mind's grammar.wasm is gitignored and produced only by
       # its own prebuild script (scripts/build-wasm.mjs), which fires only
-      # when `pnpm run build` runs scoped to that package. bundle-lsp's tsup
-      # onSuccess hook copies that wasm (and bundles @sammons/typed-mind's
-      # dist via esbuild) but never builds it — on a clean checkout, skipping
-      # this step makes bundle-lsp throw BundledWasmCopyError / an
-      # unresolved-module error before the rebuild even finishes.
+      # when `pnpm run build` runs scoped to that package. build:bundled-all
+      # (root package.json, from PR #145) builds @sammons/typed-mind-lsp's
+      # bundle and the extension's lsp-bundled/ copy, but does NOT build
+      # @sammons/typed-mind first — its own onSuccess hook only copies
+      # grammar.wasm, it does not build it. Skipping this step makes the next
+      # one throw BundledWasmCopyError / an unresolved-module error on a
+      # clean checkout.
       - name: Build core TypedMind package (produces grammar.wasm + dist)
         run: mise exec -- pnpm --filter @sammons/typed-mind run build
 
       - name: Rebuild bundled LSP for the extension
-        run: mise exec -- pnpm --filter typed-mind run bundle-lsp
+        run: mise exec -- pnpm run build:bundled-all
 
+      # check:bundled-wasm (byte-exact sha256 against the canonical rebuilt
+      # grammar.wasm and the installed web-tree-sitter.wasm) and
+      # check:clean-tree (git status --porcelain=v1 over every tracked file)
+      # together supersede a hand-rolled porcelain diff scoped to just these
+      # two directories — check:clean-tree's scope is a strict superset, and
+      # check:bundled-wasm verifies content correctness, not just "git saw a
+      # change." Both scripts landed on main via PR #145.
       - name: Verify bundled LSP output matches the committed tree
         run: |
-          STATUS=$(git status --porcelain -- lib/typed-mind-lsp/dist-bundled lib/typed-mind-vscode-extension/lsp-bundled)
-          if [ -n "$STATUS" ]; then
-            echo "Error: rebuilding the bundled LSP produced changes not present in the commit being published."
-            echo "$STATUS"
-            echo "This means the committed lsp-bundled/ was stale. Rebuild and commit before publishing."
-            exit 1
-          fi
+          mise exec -- pnpm run check:bundled-wasm
+          mise exec -- pnpm run check:clean-tree
 
       - name: Package VS Code extension
         run: |
