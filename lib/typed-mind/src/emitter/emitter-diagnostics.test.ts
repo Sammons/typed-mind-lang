@@ -22,7 +22,7 @@ import { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 import { quoteSwapDiagnosticsForSuppressions } from './emit-suppression.ts';
-import { QUOTE_SWAP_CODE, quoteSwapDiagnosticsFor } from './emitter-diagnostics.ts';
+import { QUOTE_SWAP_CODE, quoteSwapDiagnosticsFor, UNREPRESENTABLE_ALIAS_CODE } from './emitter-diagnostics.ts';
 
 const SPAN = { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } };
 const QUOTED = 'contains a "quote" here';
@@ -374,6 +374,14 @@ describe('quoteSwapDiagnosticsFor: TypeDef alias string-literal member (printTyp
       variant: 'alias',
       aliasType: literalNode(QUOTED),
     });
+    // TWO diagnostics in longform, from two independent defects that happen
+    // to coincide on this input. The quote-swap is about the literal's own
+    // embedded `"` being rewritten to `'`. The unrepresentable-alias warning
+    // is about POSITION: a printed type opening with a string literal has no
+    // longform `type:` spelling at all (issue #130), so this emission will
+    // not reparse regardless of what the swap did to the inner character.
+    // The shortform sibling test below gets only the swap, since shortform
+    // has no such positional limit.
     assert.deepEqual(quoteSwapDiagnosticsFor(typeDef, 'longform'), [
       {
         code: QUOTE_SWAP_CODE,
@@ -381,6 +389,17 @@ describe('quoteSwapDiagnosticsFor: TypeDef alias string-literal member (printTyp
         span: SPAN,
         message:
           "'aliasType' on 'Status' contained a double quote, which was rewritten to a single quote — the grammar has no escaped-quote form, so this emission cannot preserve the original character",
+      },
+      {
+        code: UNREPRESENTABLE_ALIAS_CODE,
+        severity: 'warning',
+        span: SPAN,
+        // The printed text is the POST-swap spelling (printTypeExpr routes a
+        // string literal through quoteStringLiteral), so the outer `"` are
+        // the literal's own delimiters and the inner `'` are the swapped
+        // characters the sibling quote-swap diagnostic reports.
+        message:
+          "'aliasType' on 'Status' prints as `\"contains a 'quote' here\"`, which opens with a string literal and has no longform spelling — the grammar's 'type:' slot cannot represent it, so this emission will not reparse; keep this entity in shortform (`Status = \"contains a 'quote' here\"`), which round-trips exactly",
       },
     ]);
   });

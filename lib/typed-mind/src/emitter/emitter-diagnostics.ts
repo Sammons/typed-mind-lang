@@ -40,9 +40,45 @@ import type { Span } from '../ast/span.ts';
 import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
+import { printTypeExpr } from './print-type-expr.ts';
 import { quoteSwapOccurred } from './quote-string-literal.ts';
 
 export const QUOTE_SWAP_CODE = 'emitter/quote-swap';
+
+// Issue #130, second face — the LONGFORM-ONLY counterpart of the quote-swap
+// silence above, added in this PR's review round. A TypeDef alias whose
+// printed type OPENS with a string literal (`"active"`, `"active" |
+// "inactive"`) has no correct longform spelling in EITHER representation:
+// quoted double-wraps into an unparsable value, and unquoted is claimed by
+// P1 `property_string`, whose `unquote` silently degrades a
+// `literal`/literalKind:'string' leaf to a `named` one. The checker
+// DISTINGUISHES those kinds (`check-dto-fields.ts:181` gates
+// `checker/enum-literal-outside-members` on `literalKind === 'string'`), so
+// the unquoted route is a semantic change, not a spelling nicety.
+//
+// `typeDefToLongform` (emit-longform.ts `aliasTypeValue`) deliberately picks
+// the QUOTED route for this class, so the failure is at least loud at parse
+// time. This diagnostic makes it loud at EMIT time too, so a caller holding
+// the emitted text does not have to reparse to discover the emission could
+// not represent its input. Shortform is unaffected — `Name = "active"`
+// round-trips byte-perfect — so this is form-gated to longform, the same way
+// `comment` and TypeDef `purpose` are.
+export const UNREPRESENTABLE_ALIAS_CODE = 'emitter/unrepresentable-alias';
+
+export const unrepresentableAliasDiagnostic = (entityName: string, printedType: string, span: Span): Diagnostic => {
+  return {
+    code: UNREPRESENTABLE_ALIAS_CODE,
+    severity: 'warning',
+    span,
+    message: `'aliasType' on '${entityName}' prints as \`${printedType}\`, which opens with a string literal and has no longform spelling — the grammar's 'type:' slot cannot represent it, so this emission will not reparse; keep this entity in shortform (\`${entityName} = ${printedType}\`), which round-trips exactly`,
+  };
+};
+
+// The emitter-side twin of `aliasTypeValue`'s exclusion in emit-longform.ts:
+// a printed type whose first chunk is a string literal. Kept here (not
+// imported from the emitter) because this module must not depend on
+// emit-longform.ts — that module already imports THIS one.
+const opensWithStringLiteral = (printed: string): boolean => printed.trimStart().startsWith('"');
 
 // Style guide (lib/typed-mind/docs/diagnostic-style-guide.md): WHAT + WHERE
 // in `message` (backtick-quoted names), WHAT-TO-DO folded into `message`
@@ -216,6 +252,16 @@ export const quoteSwapDiagnosticsFor = (entity: EntityNode, form: 'shortform' | 
       }
       if (typeDef.variant === 'alias') {
         pushIfTypeExprSwapped(diagnostics, entity.name, 'aliasType', typeDef.aliasType, entity.span);
+        // Longform-only: shortform prints `Name = "active"`, which
+        // round-trips byte-perfect. Only the longform `type:` slot cannot
+        // represent a leading string literal. See
+        // UNREPRESENTABLE_ALIAS_CODE's comment above.
+        if (form === 'longform' && typeDef.aliasType !== undefined) {
+          const printed = printTypeExpr(typeDef.aliasType);
+          if (opensWithStringLiteral(printed)) {
+            diagnostics.push(unrepresentableAliasDiagnostic(entity.name, printed, entity.span));
+          }
+        }
       }
       break;
     }
