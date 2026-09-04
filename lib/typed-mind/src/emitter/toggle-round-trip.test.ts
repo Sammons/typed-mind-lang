@@ -410,6 +410,35 @@ const PENDING_DEPENDENCIES_FIXTURES: readonly ToggleFixture[] = [
   },
 ];
 
+// Ladder gap 93 (PR #158): a string-literal discriminant inside a union of
+// object literals — the house-style `kind`-tagged failure union that
+// `failures_are_local_tagged_unions` mandates. `_opaque_piece`'s chunk token
+// excludes `"` and the choice had no `$.string` alternative, so a quoted
+// value inside a balanced group was structurally unrepresentable and the
+// whole type ERRORed. Fixed in grammar.js by giving the brace and bracket
+// opaque-group bodies the `$.string` alternative, mirroring the
+// `freetext_value` fix issue #103 needed one layer over.
+const LITERAL_DISCRIMINANT_FIXTURES: readonly ToggleFixture[] = [
+  {
+    name: 'ladder gap 93: union of object literals with string-literal discriminants',
+    source: 'DispatchResult = { kind: "none"; reason: string } | { kind: "reply"; text: string }\n',
+  },
+  {
+    // The union is not the trigger — a SINGLE object literal with a quoted
+    // value reproduced the gap identically. Pinned so a future change cannot
+    // "fix" only the multi-member form.
+    name: 'ladder gap 93 minimal trigger: a single object literal with a quoted value',
+    source: 'One = { kind: "none"; reason: string }\n',
+  },
+  {
+    // Both halves of the design at once: the quoted discriminants belong to
+    // the type, while the trailing quoted string stays the field's
+    // description. This is the shape complex-dto-example.tmd:167 carries.
+    name: 'ladder gap 93: quoted discriminant inside the type plus a separate description string',
+    source: 'UserDTO %\n  - preferences: { theme: "light" | "dark", language: string } "User preferences"\n',
+  },
+];
+
 const ALL_TARGETED_FIXTURES: readonly ToggleFixture[] = [
   ...TYPE_EXPR_KIND_FIXTURES,
   ...FUNCTION_SIGNATURE_FIXTURES,
@@ -419,6 +448,7 @@ const ALL_TARGETED_FIXTURES: readonly ToggleFixture[] = [
   ...RC_C_PROMOTION_FIXTURES,
   ...QUOTED_DESCRIPTION_FIXTURES,
   ...PENDING_DEPENDENCIES_FIXTURES,
+  ...LITERAL_DISCRIMINANT_FIXTURES,
 ];
 
 describe('toggle round-trip: targeted fixtures for surfaces the standard corpus does not exercise', () => {
