@@ -153,10 +153,20 @@ describe('87 — a multi-line DTO field type leaks its source newlines', () => {
   });
 
   it('collapses rather than truncates — the full type text survives', () => {
+    // RECONCILED with PR #158's fixture 91 (mail-agent), which found this same
+    // defect from another corpus and carried the normalization further: the
+    // collapsed text now also drops the dangling comma before `)` and the
+    // space just inside the brackets, neither of which is legal — nor emitted —
+    // in the single-line spelling. The expected text changed from
+    // `( make: string, ..., )` to `(make: string, ...)` accordingly. That is
+    // strictly closer to this fixture's own stated goal: the
+    // `singleLineTarget` control below is now byte-identical in shape to these
+    // collapsed multi-line fields, which is what "collapse to the single-line
+    // form" means. Every token of the source type is still present.
     const result = convertFixture('87-multiline-dto-field-type');
     assert.match(
       result.tmdContent,
-      /- checkSupersession: \( make: string, model: string, yearRange: \[number, number\], \) => Promise<\{ ruleId: string; severity: string \} \| null>/,
+      /- checkSupersession: \(make: string, model: string, yearRange: \[number, number\]\) => Promise<\{ ruleId: string; severity: string \} \| null>/,
       'every token of the source type must still be present, just on one line',
     );
   });
@@ -167,13 +177,29 @@ describe('87 — a multi-line DTO field type leaks its source newlines', () => {
     assert.equal(fieldLines.length, 1);
     assert.match(
       result.tmdContent,
-      /- createPr: \( content: PrContent, files: Array<\{ path: string; content: string \}>, \) => Promise<number>/,
+      /- createPr: \(content: PrContent, files: Array<\{ path: string; content: string \}>\) => Promise<number>/,
     );
   });
 
   it('control: the single-line sibling was already correct and is unchanged', () => {
     const result = convertFixture('87-multiline-dto-field-type');
     assert.match(result.tmdContent, /- singleLineTarget: \(make: string, model: string\) => Promise<number>/);
+  });
+
+  it('the collapsed multi-line form is spelled exactly like the single-line form', () => {
+    // The reconciliation check (PR #158 fixture 91 + this fixture). Both
+    // spellings of a function type must emit identical bracket-and-comma
+    // punctuation; if they ever diverge again, the collapse has stopped being
+    // a normalization and become a second dialect.
+    const result = convertFixture('87-multiline-dto-field-type');
+    const multiLinePunctuation = /- checkSupersession: \((?:[^)]*)\) =>/.exec(result.tmdContent)?.[0];
+    const singleLinePunctuation = /- singleLineTarget: \((?:[^)]*)\) =>/.exec(result.tmdContent)?.[0];
+    assert.ok(multiLinePunctuation !== undefined && singleLinePunctuation !== undefined);
+    // Neither opens with `( ` nor closes with `, )`.
+    for (const line of [multiLinePunctuation, singleLinePunctuation]) {
+      assert.equal(line.includes('( '), false, `no space just inside the opener: ${line}`);
+      assert.equal(line.includes(', )'), false, `no dangling comma before the closer: ${line}`);
+    }
   });
 
   it('no DTO field line contains a stray newline-induced fragment', () => {

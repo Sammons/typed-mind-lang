@@ -22,4 +22,4 @@ PlainWidget <: BaseWidget
 LoggedWidget <: BaseWidget
   => [describe]
 
-WithLogging :: WithLogging(Base: typeof BaseWidget) => typeof BaseWidget
+WithLogging :: WithLogging(Base: (typeof BaseWidget)) => (typeof BaseWidget)

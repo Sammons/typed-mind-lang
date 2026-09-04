@@ -1807,7 +1807,68 @@ export class TypeScriptAnalyzer {
 
   private getTypeString(typeNode: ts.TypeNode | undefined): string {
     if (!typeNode) return 'any';
+    return this.parenthesizeTypeQueries(typeNode);
+  }
+
+  // Fixtures 92 / 93 (mail-agent `src/model/client.ts:19` `ModelDeps`'s
+  // `fetchImpl: typeof fetch`, and `src/http/routes-activity.ts:40`
+  // `ActivityRouteDeps`'s `revert: ReturnType<typeof makeRevert>`) — a TS
+  // TYPE QUERY (`typeof X`) reached the emitted `.tmd` as bare source text.
+  //
+  // The TypedMind grammar DOES have a `typeof` production, but its trigger
+  // token requires a leading `(` (grammar.js `_typeof_opaque_open`, added for
+  // issue #83's `(typeof CHECK_CODES)[number]`). A BARE `typeof fetch` never
+  // matches it, so `entity_name` matched `typeof` as an ordinary identifier
+  // and the checker then choked on the next token — reported as
+  // `Unparsable text: 'fetch'`. Nested inside a generic argument the same
+  // defect recurs one level deeper: `ReturnType<typeof makeRevert>` parsed
+  // its argument as a named type literally called `typeof`, which also fed
+  // `walkGenericArgsForExternalStubs` a bogus external type named `typeof`.
+  //
+  // Both are one defect — a type query that is not parenthesized — so the fix
+  // is one AST walk that wraps EVERY `TypeQuery` node in parens, wherever it
+  // sits in the type tree. That lands the text squarely inside the grammar's
+  // existing, already-correct `(typeof X)` production rather than widening the
+  // grammar to parse arbitrary TypeScript type-query syntax.
+  //
+  // The walk rebuilds text only along the path to a type query; a type node
+  // containing none returns `getText()` unchanged, so this is inert for every
+  // shape that already worked.
+  private parenthesizeTypeQueries(typeNode: ts.TypeNode): string {
+    if (ts.isTypeQueryNode(typeNode)) {
+      return `(${typeNode.getText()})`;
+    }
+
+    if (ts.isTypeReferenceNode(typeNode) && typeNode.typeArguments !== undefined) {
+      const args = typeNode.typeArguments;
+
+      if (args.some((arg) => this.containsTypeQuery(arg))) {
+        const rendered = args.map((arg) => this.parenthesizeTypeQueries(arg)).join(', ');
+        return `${typeNode.typeName.getText()}<${rendered}>`;
+      }
+    }
+
+    if (ts.isArrayTypeNode(typeNode) && this.containsTypeQuery(typeNode.elementType)) {
+      return `${this.parenthesizeTypeQueries(typeNode.elementType)}[]`;
+    }
+
+    if (ts.isUnionTypeNode(typeNode) && typeNode.types.some((t) => this.containsTypeQuery(t))) {
+      return typeNode.types.map((t) => this.parenthesizeTypeQueries(t)).join(' | ');
+    }
+
+    if (ts.isIntersectionTypeNode(typeNode) && typeNode.types.some((t) => this.containsTypeQuery(t))) {
+      return typeNode.types.map((t) => this.parenthesizeTypeQueries(t)).join(' & ');
+    }
+
     return typeNode.getText();
+  }
+
+  private containsTypeQuery(typeNode: ts.Node): boolean {
+    if (ts.isTypeQueryNode(typeNode)) {
+      return true;
+    }
+
+    return typeNode.getChildren().some((child) => this.containsTypeQuery(child));
   }
 
   // The single mixin-heritage helper, reconciling PR #152 (slat-harness,
