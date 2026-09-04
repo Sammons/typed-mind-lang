@@ -12,10 +12,11 @@
 // The gap is pre-existing and independent of fixture 90: the single-line form
 // below reproduces it on `main` with no converter change at all, which is what
 // makes this a language gap rather than a regression. Fixture 51
-// (`51-union-of-object-literals`, issue #114) emits this exact shape but only
-// asserts on the emitted TEXT and never `--check`s it, so the grammar's
-// inability to parse the result went unrecorded until this rung ran a checker
-// pass over a corpus that uses the shape heavily.
+// (`51-union-of-object-literals`, issue #114) DOES `--check` its output
+// (union-of-object-literals.test.ts:69) and passes — because its discriminants
+// are BOOLEANS (`{ tagged: false }`). A boolean discriminant is a bare token
+// the grammar accepts; a quoted one is not. That is why the shape looked
+// covered until this rung ran a corpus whose discriminants are strings.
 //
 // Root cause: `lib/typed-mind/grammar/grammar.js` — the union-member production
 // reached by a `{`-opening member does not admit a quoted string literal in the

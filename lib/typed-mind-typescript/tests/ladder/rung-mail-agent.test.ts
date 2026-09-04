@@ -201,10 +201,11 @@ describe('93 — knownGap: a string-literal discriminant in a union of object li
   //
   // This is a LANGUAGE-layer gap, not a regression: the single-line form in
   // this fixture reproduces it on `main` with no converter change at all.
-  // Fixture 51 (`51-union-of-object-literals`, issue #114) emits this exact
-  // shape but only asserts on the emitted TEXT and never `--check`s it, so the
-  // grammar's inability to parse the result went unrecorded until this rung
-  // ran a checker pass over a corpus that leans on the shape.
+  // Fixture 51 (`51-union-of-object-literals`, issue #114) DOES `--check` its
+  // output (union-of-object-literals.test.ts:69) and passes — its
+  // discriminants are BOOLEANS (`{ tagged: false }`), a bare token the grammar
+  // accepts. A QUOTED discriminant is not. That is why the shape looked
+  // covered until this rung ran a corpus whose discriminants are strings.
   //
   // Root cause: lib/typed-mind/grammar/grammar.js — the union-member
   // production reached by a `{`-opening member does not admit a quoted string

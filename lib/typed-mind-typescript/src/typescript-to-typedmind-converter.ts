@@ -19,6 +19,7 @@ import {
   TypeDefNode,
   type TypeExprNode,
 } from '@sammons/typed-mind';
+import { mapStructuralSegments } from './type-text-segments.ts';
 import type {
   ConversionError,
   ConversionOptions,
@@ -155,29 +156,48 @@ const collapseTypeWhitespace = (type: string): string => type.replace(/\s+/g, ' 
 // what issue #83's corpus shape `(typeof CHECK_CODES)[number]` is authored
 // as) must not be double-wrapped — the negative lookbehind for `(` is what
 // keeps this function idempotent across both paths.
-const parenthesizeTypeQueryText = (type: string): string =>
-  type.replace(/(?<!\()\btypeof\s+([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)/g, '(typeof $1)');
+//
+// LITERAL-AWARENESS (PR #158 review, comment 22136): the rewrite runs only on
+// STRUCTURAL runs via `mapStructuralSegments`. A string-literal type's value
+// is its exact characters, so an unanchored regex would rewrite
+// `'typeof x'` into `'(typeof x)'` — a silently WRONG type that still parses
+// cleanly, so no checker diagnostic would catch it.
+export const parenthesizeTypeQueryText = (type: string): string =>
+  mapStructuralSegments(type, (segment) => segment.replace(/(?<!\()\btypeof\s+([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)/g, '(typeof $1)'));
 
 // Collapse a multi-line type text to the exact bytes the same type authored on
 // ONE line would have produced. Shared by the type-alias lane (fixture 90) and
 // the DTO-field lane (fixture 91), which hit the identical defect from two
 // directions, so the normalization must agree between them.
-const collapseToSingleLineType = (type: string): string =>
-  collapseTypeWhitespace(type)
-    // A dangling comma before a closer (`remove: string[], )`) is legal
-    // multi-line TypeScript but not legal once collapsed onto one line.
-    .replace(/,\s*([)\]}])/g, '$1')
-    // Drop the space an opener or a closer inherits from the collapsed line
-    // break, so the result is byte-identical to the same type authored on one
-    // line. Both sides are needed: the opener's space comes from the newline
-    // AFTER `(`, the closer's from the newline BEFORE `)`.
-    .replace(/([([])\s+/g, '$1')
-    .replace(/\s+([)\]])/g, '$1');
+//
+// LITERAL-AWARENESS (PR #158 review, comment 22136): same reasoning as
+// `parenthesizeTypeQueryText`, and the same remedy PR #156's review applied to
+// the core's `normalizeOpaqueWhitespace`. A literal member whose own text
+// carries brackets and spaces (`'E ( bad )' | Foo`) must survive byte-for-byte;
+// a text-blind regex chain would rewrite it to `'E (bad)'` and change the
+// type's meaning.
+export const collapseToSingleLineType = (type: string): string =>
+  mapStructuralSegments(type, (segment) =>
+    segment
+      .replace(/\s+/g, ' ')
+      // A dangling comma before a closer (`remove: string[], )`) is legal
+      // multi-line TypeScript but not legal once collapsed onto one line.
+      .replace(/,\s*([)\]}])/g, '$1')
+      // Drop the space an opener or a closer inherits from the collapsed line
+      // break, so the result is byte-identical to the same type authored on one
+      // line. Both sides are needed: the opener's space comes from the newline
+      // AFTER `(`, the closer's from the newline BEFORE `)`.
+      .replace(/([([])\s+/g, '$1')
+      .replace(/\s+([)\]])/g, '$1'),
+  ).trim();
 
 const normalizeUnionAliasText = (type: string): string => {
-  const withoutLineComments = type.replace(/\/\/[^\n]*/g, '\n');
-  const withoutBlockComments = withoutLineComments.replace(/\/\*[\s\S]*?\*\//g, ' ');
-  const collapsed = collapseToSingleLineType(withoutBlockComments);
+  // Comment stripping is literal-aware for the same reason the rewrites are:
+  // `'https://x'` and `` `a/*b*/c` `` are literal text, not commentary, and a
+  // blind strip would eat the rest of the union at the first `//` inside a
+  // string-literal member.
+  const withoutComments = mapStructuralSegments(type, (segment) => segment.replace(/\/\/[^\n]*/g, '\n').replace(/\/\*[\s\S]*?\*\//g, ' '));
+  const collapsed = collapseToSingleLineType(withoutComments);
 
   const withoutLeadingBar = collapsed.startsWith('|') ? collapsed.slice(1).trim() : collapsed;
 
