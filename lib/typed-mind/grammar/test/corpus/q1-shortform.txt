@@ -1382,3 +1382,217 @@ UserDTO %
                 (type_readonly_array
                   (readonly_kw)
                   element: (readonly_brace_rest))))))))))
+
+============================================================
+issue-93: string-literal discriminant inside a union of object literals (ladder fixture 93 — the house-style `kind`-tagged failure union)
+============================================================
+
+DispatchResult = { kind: "none"; reason: string } | { kind: "reply"; text: string }
+
+---
+
+(source_file
+  (typedef_declaration
+    (entity_name)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_opaque
+                (string)))))
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_opaque
+                (string)))))))))
+
+============================================================
+issue-93: the union is NOT the trigger — a SINGLE object literal with a quoted value reproduced identically before the fix
+============================================================
+
+One = { kind: "none"; reason: string }
+
+---
+
+(source_file
+  (typedef_declaration
+    (entity_name)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_opaque
+                (string)))))))))
+
+============================================================
+issue-93 boundary: a quoted value CONTAINING `|` and `}` stays one balanced string and does not desynchronize the brace group
+============================================================
+
+Weird = { a: "x|y}z"; b: string }
+
+---
+
+(source_file
+  (typedef_declaration
+    (entity_name)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_opaque
+                (string)))))))))
+
+============================================================
+issue-93 conservation: a top-level string-literal union still reduces to type_literal_string, NOT opaque (pins the #130/#113 knownGap unchanged)
+============================================================
+
+Status = "a" | "b"
+
+---
+
+(source_file
+  (typedef_declaration
+    (entity_name)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_literal_string
+                (string)))))
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_literal_string
+                (string)))))))))
+
+============================================================
+issue-93 conservation: a DTO field typed as a string-literal union is likewise untouched
+============================================================
+
+UserDTO %
+  - x: "a" | "b"
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_string
+                  (string)))))
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_literal_string
+                  (string))))))))))
+
+============================================================
+issue-93 conservation: a union of object literals with NO quoted value parses exactly as before
+============================================================
+
+Shape = { a: string; b: number } | { c: boolean }
+
+---
+
+(source_file
+  (typedef_declaration
+    (entity_name)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_opaque))))
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_opaque))))))))
+
+============================================================
+issue-93 conservation: the DESCRIPTION SLOT keeps its `"` boundary — a top-level opaque run must NOT swallow the description
+============================================================
+
+UserDTO %
+  - cb: (x: number) => void "desc" (optional)
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque)))))))
+    (string)
+    (optional_marker)))
+
+============================================================
+issue-93: a quoted discriminant INSIDE the type and a separate description string coexist and split correctly
+============================================================
+
+UserDTO %
+  - x: { kind: "ok"; v: string } "the result" (optional)
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque
+                  (string))))))))
+    (string)
+    (optional_marker)))
+
+============================================================
+issue-93 boundary: a top-level parenthesized string-literal union routes through the structured paren group and parses cleanly
+============================================================
+
+Paren = ("a" | "b")
+
+---
+
+(source_file
+  (typedef_declaration
+    (entity_name)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_expr
+                (type_union
+                  (type_intersection
+                    (type_postfix
+                      (type_atom
+                        (type_literal_string
+                          (string)))))
+                  (type_intersection
+                    (type_postfix
+                      (type_atom
+                        (type_literal_string
+                          (string))))))))))))))
