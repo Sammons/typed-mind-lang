@@ -287,7 +287,25 @@ const parseNumberLiteral = (cursor: TextCursor): TypeExprNode | undefined => {
 // PARSING an arrow-typed opaque leaf found inside a generic's own args as
 // itself a candidate for this branch (defensive: the `<`/`>` characters of
 // `<=`/`>=` must never bump angleDepth either, for the same reason).
-const scanOpaqueRun = (cursor: TextCursor, inGenericArgs = false): string => {
+// `trackOwnAngles` (default false) makes the scan count `<`/`>` pairs that the
+// RUN ITSELF opens, so a `|` sitting inside one of them is not mistaken for a
+// top-level union operator. It is set only by the `(params) => Return` rescan
+// in `parseAtom`: that run is known to be a whole function type, and its return
+// position may be a generic whose arguments contain a union
+// (`(a: X) => Promise<Y | Z>`). Without it, `scanOpaqueRun` breaks at that `|`
+// and strands the generic's own closing `>` in the parser's remainder, which
+// every caller discards — the emitted field line then carries an unbalanced
+// `>` the grammar rejects as "Unparsable text: `>`". Corpus:
+// sammons/s7-constructor `lib/harness/src/model-client.ts` (`S7ModelClient`)
+// and `lib/harness/src/forks.ts` (`S7ForkRunner`).
+//
+// This is deliberately NOT folded into `inGenericArgs`, whose contract is the
+// opposite one: `inGenericArgs` means an unmatched `>` at depth 0 belongs to an
+// ENCLOSING generic and must END the run unconsumed. `trackOwnAngles` means a
+// `<` the run opens itself must be balanced WITHIN the run. Both can be true at
+// once (a function type nested inside a generic's argument list), and the depth
+// counter below serves both: it only ever ends the run at depth 0.
+const scanOpaqueRun = (cursor: TextCursor, inGenericArgs = false, trackOwnAngles = false): string => {
   const startIndex = cursor.index;
   const stack: string[] = [];
   const closerFor: Record<string, string> = { '(': ')', '[': ']', '{': '}' };
@@ -325,6 +343,15 @@ const scanOpaqueRun = (cursor: TextCursor, inGenericArgs = false): string => {
     // check below, at any bracket depth (mirrors splitObjectLiteralProperties's
     // own `=>` carve-out, PR #84 finding).
     const isArrowOrComparisonAngle = (ch === '>' || ch === '<') && (prevCh === '=' || cursor.text[cursor.index + 1] === '=');
+    // When the run tracks its own angles, a `<` it opens raises the depth and
+    // the matching `>` lowers it, regardless of `inGenericArgs`. A `>` at depth
+    // 0 here is not ours, so it falls through to the `inGenericArgs` branch
+    // below, which decides whether it ends the run.
+    if (trackOwnAngles && stack.length === 0 && !isArrowOrComparisonAngle && (ch === '<' || (ch === '>' && angleDepth > 0))) {
+      angleDepth += ch === '<' ? 1 : -1;
+      cursor.index += 1;
+      continue;
+    }
     if (inGenericArgs && stack.length === 0 && !isArrowOrComparisonAngle) {
       if (ch === '<') {
         angleDepth += 1;
@@ -418,15 +445,26 @@ const parseAtom = (cursor: TextCursor, inGenericArgs = false): TypeExprNode => {
       cursor.skipWhitespace();
       if (cursor.startsWith('=>')) {
         cursor.index = startIndex;
-        const text = scanOpaqueRun(cursor, inGenericArgs);
+        // `trackOwnAngles` — the return position may be a generic carrying a
+        // union (`(a: X) => Promise<Y | Z>`); see scanOpaqueRun's own comment.
+        const text = scanOpaqueRun(cursor, inGenericArgs, true);
         return { kind: 'opaque', text: normalizeOpaqueWhitespace(text), span: spanFrom(cursor, startIndex, cursor.index) };
       }
       cursor.index = afterGroupIndex;
       return inner;
     }
     // Unbalanced — fall through to opaque scanning from the original start.
+    //
+    // This is the path a real function type takes. `parseUnion` above stops at
+    // the `:` of a PARAMETER LIST (`(a: X) => ...` parses `a` then halts on
+    // `:`), so `cursor.startsWith(')')` is false and the `=>` rescan branch
+    // above is never reached — only a parameterless `()` or a true type group
+    // gets there. `trackOwnAngles` therefore belongs here as well: the run may
+    // still span a return-position generic carrying a union
+    // (`(a: X) => Promise<Y | Z>`), whose `|` must not be read as a top-level
+    // union operator. See `scanOpaqueRun`'s own comment for the full rationale.
     cursor.index = startIndex;
-    const text = scanOpaqueRun(cursor, inGenericArgs);
+    const text = scanOpaqueRun(cursor, inGenericArgs, true);
     return { kind: 'opaque', text: normalizeOpaqueWhitespace(text), span: spanFrom(cursor, startIndex, cursor.index) };
   }
   const stringLiteral = parseStringLiteral(cursor);
