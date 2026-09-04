@@ -3,11 +3,11 @@
 // `kind`-discriminated union as fixture 90, but this fixture pins what remains
 // AFTER fixture 90's converter fix lands.
 //
-// This is a knownGap. Fixture 90 fixed the CONVERTER: the union now reaches the
-// TypeDef alias lane carrying all of its members. What that unmasked is a
-// LANGUAGE-layer limit — the grammar cannot parse a string-literal discriminant
-// inside a union of object literals, so `{ kind: "none"; ... }` reports
-// `Unparsable text: '"none"'`.
+// This WAS a knownGap; PR #163 closed it. Fixture 90 fixed the CONVERTER: the
+// union now reaches the TypeDef alias lane carrying all of its members. What
+// that unmasked was a LANGUAGE-layer limit — the grammar could not parse a
+// string-literal discriminant inside a union of object literals, so
+// `{ kind: "none"; ... }` reported `Unparsable text: '"none"'`. It now parses.
 //
 // The gap is pre-existing and independent of fixture 90: the single-line form
 // below reproduces it on `main` with no converter change at all, which is what
@@ -18,15 +18,17 @@
 // the grammar accepts; a quoted one is not. That is why the shape looked
 // covered until this rung ran a corpus whose discriminants are strings.
 //
-// Root cause: `lib/typed-mind/grammar/grammar.js` — the union-member production
-// reached by a `{`-opening member does not admit a quoted string literal in the
-// value position of a member field. Fixing it is a grammar change plus a
-// regenerated parser, which is a language-layer decision above this rung's bar
-// (the same reasoning that deferred issue #118).
+// Root cause, as diagnosed while fixing it (NARROWER than this comment's
+// original claim): there is no "union-member production", and the union is not
+// the trigger — a single `{ kind: "none"; reason: string }` reproduced it
+// identically. `_opaque_piece`'s fallback chunk token excludes `"` and the
+// choice had no `$.string` alternative, so a quoted value anywhere inside a
+// balanced group was structurally unrepresentable. PR #163 added `$.string` to
+// the brace and bracket opaque-group bodies only — the top-level run keeps the
+// `"` boundary, which is what opens a DTO field's description slot.
 //
-// This test pins the CURRENT behaviour so the gap is a committed fact rather
-// than prose. When the grammar learns this shape, this test fails loudly and is
-// the signal to promote the gap to fixed.
+// The test now asserts ZERO syntax diagnostics. A diagnostic here is a
+// regression of PR #163, not a gap to re-pin.
 export type DispatchResult = { kind: "none"; reason: string } | { kind: "reply"; text: string };
 
 export const dispatch = (result: DispatchResult): boolean => Boolean(result);

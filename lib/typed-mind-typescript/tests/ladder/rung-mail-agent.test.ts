@@ -194,41 +194,46 @@ describe('92 — a `typeof` type query reaches the emitted document unparenthesi
   });
 });
 
-describe('93 — knownGap: a string-literal discriminant in a union of object literals', () => {
-  // What fixture 90's converter fix UNMASKED. The union now reaches the alias
-  // lane carrying its members; the grammar then cannot parse the quoted
-  // discriminant in a member's value position.
+describe('93 — fixed: a string-literal discriminant in a union of object literals', () => {
+  // What fixture 90's converter fix UNMASKED, now CLOSED at the language layer
+  // by PR #163. The union reaches the alias lane carrying its members, and the
+  // grammar parses the quoted discriminants.
   //
-  // This is a LANGUAGE-layer gap, not a regression: the single-line form in
-  // this fixture reproduces it on `main` with no converter change at all.
   // Fixture 51 (`51-union-of-object-literals`, issue #114) DOES `--check` its
-  // output (union-of-object-literals.test.ts:69) and passes — its
+  // output (union-of-object-literals.test.ts:69) and passed all along — its
   // discriminants are BOOLEANS (`{ tagged: false }`), a bare token the grammar
-  // accepts. A QUOTED discriminant is not. That is why the shape looked
-  // covered until this rung ran a corpus whose discriminants are strings.
+  // always accepted. A QUOTED discriminant was not. That is why the shape
+  // looked covered until this rung ran a corpus whose discriminants are
+  // strings.
   //
-  // Root cause: lib/typed-mind/grammar/grammar.js — the union-member
-  // production reached by a `{`-opening member does not admit a quoted string
-  // literal in a member field's value position. Fixing it is a grammar change
-  // plus a regenerated parser, a language-layer decision above this rung's bar
-  // (the same reasoning that deferred issue #118).
+  // Root cause (narrower than this fixture's original write-up, corrected
+  // after the fix): there is no "union-member production" — the whole type is
+  // one `type_opaque` leaf, and the UNION IS NOT THE TRIGGER. A single
+  // `{ kind: "none"; reason: string }` reproduced it identically. The real
+  // cause was `_opaque_piece`'s fallback chunk token `/[^ \t\n"(){}\[\]]+/`,
+  // which excludes `"`, combined with the choice having no `$.string`
+  // alternative — so a quoted value ANYWHERE inside a balanced group was
+  // structurally unrepresentable. Fixed by giving the brace and bracket
+  // opaque-group bodies the `$.string` alternative (PR #163); the top-level
+  // run deliberately does NOT get it, because there a `"` opens the DTO
+  // field's description slot.
   it('converts and emits the union text correctly — the converter side is right', () => {
     const result = convertSimple('93-string-literal-discriminant-union');
     assert.equal(result.success, true);
     assert.match(result.tmdContent, /DispatchResult = \{ kind: "none"; reason: string \} \| \{ kind: "reply"; text: string \}/);
   });
 
-  it('PINS THE GAP: the checker cannot parse the quoted discriminant', async () => {
+  it('the checker parses the quoted discriminants — zero syntax diagnostics', async () => {
     const result = convertSimple('93-string-literal-discriminant-union');
     const checkResult = await checkTmd(result.tmdContent);
-    const errors = syntaxErrors(checkResult);
 
-    // When the grammar learns this shape, this assertion fails loudly — that
-    // is the signal to promote this gap from knownGap to fixed, not to weaken
-    // the assertion.
-    assert.ok(
-      errors.some((message) => message.includes('"none"')),
-      `knownGap 93 expects the grammar to reject a quoted discriminant. If this now parses, the gap is CLOSED — update this test rather than relaxing it. Got: ${JSON.stringify(errors)}`,
+    // Was the `PINS THE GAP` assertion, inverted when PR #163 taught the
+    // grammar this shape. Before that change this returned two diagnostics:
+    // `Unparsable text: `"none"`` and `Unparsable text: `"reply"``.
+    assert.deepEqual(
+      syntaxErrors(checkResult),
+      [],
+      `the grammar accepts a quoted discriminant inside a union of object literals. A syntax diagnostic here is a REGRESSION of PR #163, not a knownGap to re-pin. Got: ${JSON.stringify(syntaxErrors(checkResult))}`,
     );
   });
 });

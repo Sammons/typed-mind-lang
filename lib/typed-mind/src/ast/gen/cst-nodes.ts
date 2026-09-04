@@ -1294,6 +1294,9 @@ export class CstTypeOpaque extends CstNode {
   constructor(syntaxNode: SyntaxNode) {
     super(syntaxNode, CstTypeOpaque.nodeTypes);
   }
+  stringChildren(): CstString[] {
+    return this.childrenOfTypes(['string'], CstString);
+  }
 }
 
 export class CstTypePostfix extends CstNode {

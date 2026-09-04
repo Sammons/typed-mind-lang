@@ -129,24 +129,6 @@
         "message": "Orphaned entity 'PermissionDTO'"
       },
       {
-        "code": "syntax/error",
-        "severity": "error",
-        "line": 167,
-        "column": 18,
-        "endLine": 167,
-        "endColumn": 26,
-        "message": "Unparsable text: `{ theme:` — check this line against the grammar and fix or remove it"
-      },
-      {
-        "code": "syntax/error",
-        "severity": "error",
-        "line": 167,
-        "column": 43,
-        "endLine": 167,
-        "endColumn": 63,
-        "message": "Unparsable text: `, language: string }` — check this line against the grammar and fix or remove it"
-      },
-      {
         "code": "checker/orphaned-entity",
         "severity": "error",
         "line": 172,
