@@ -210,6 +210,21 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
+  // 69d records `false`, and the `false` is the POINT of the fixture: a
+  // generic heritage target emits its argument list verbatim into `<:`
+  // (`GenericChild <: Repo<Item>`), which shortform cannot parse. Both the
+  // interface lane and the real-class lane do this identically — the fixture
+  // pins them together — and the residual finding is gap 68's (type
+  // parameters are unmodeled), the same adjudication 66b already carries for
+  // `StringBox <: Container<string>`. Stripping the arguments to make this
+  // green is PR #152's original bug, which
+  // slat-harness-mixin-heritage-controls.test.ts exists to prevent.
+  {
+    fixture: '69d-generic-heritage-both-lanes',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
   // Reconciliation controls for the single mixin-heritage helper (PR #152
   // + PR #153 merged into `getExtendsTargetName`). 66b records `false`:
   // its `StringBox extends Container<string>` carries the generic-base

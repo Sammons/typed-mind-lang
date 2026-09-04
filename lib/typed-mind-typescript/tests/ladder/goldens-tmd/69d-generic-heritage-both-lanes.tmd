@@ -1,0 +1,25 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [Item, Repo, GenericChild, GenericBase, GenericDerived, drive]
+}
+
+IndexFile @ src/index.ts:
+  -> [Item, Repo, GenericChild, GenericBase, GenericDerived, drive]
+
+GenericBase <:
+  => [hold]
+
+GenericDerived <: GenericBase<string>
+  => [run]
+
+Repo <:
+  => [find]
+
+GenericChild <: Repo<Item>
+
+drive :: drive(a: GenericChild, b: GenericDerived) => void
+
+Item %
+  - id: string

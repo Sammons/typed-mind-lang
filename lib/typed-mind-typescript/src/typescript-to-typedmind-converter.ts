@@ -2416,6 +2416,18 @@ export class TypeScriptToTypedMindConverter {
       );
     }
 
+    // The inherit targets are recorded VERBATIM, type arguments included, so
+    // `extends Repo<Item>` emits `<: Repo<Item>`. That is intentional and
+    // matches `convertClass` (the real-class lane) exactly: dropping the
+    // arguments is PR #152's original bug, and
+    // slat-harness-mixin-heritage-controls.test.ts pins the verbatim form as
+    // property 1 of the #152/#153 reconciliation, warning that silencing the
+    // resulting diagnostic "would pressure a future author to reintroduce the
+    // bug". The unresolvable generic base is gap 68's territory (type
+    // parameters are unmodeled language-wide), NOT a defect of this lane —
+    // fixture 69d pins both lanes together so neither can be changed alone.
+    // `stripGenericArguments` is applied only to the heritage LOOKUP
+    // (`resolveInterfaceIsMethodBearing`), never to the emitted text.
     const inheritList = [...iface.extends];
     const classEntity = new ClassNode({
       name: entityName,

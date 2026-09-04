@@ -350,3 +350,93 @@ describe('slat-harness rung, 69c: an unresolvable parent falls back to own membe
     assert.deepEqual(spurious, [], 'resolvable parents must not warn');
   });
 });
+
+// PR #162 review, non-blocking finding — a GENERIC heritage target emits its
+// argument list verbatim into the `<:` slot, producing `Unparsable text`.
+//
+// Pinned rather than "fixed" because the obvious repair (strip the arguments
+// when emitting) is a change this repo has already rejected on purpose: it is
+// PR #152's original bug, and `slat-harness-mixin-heritage-controls.test.ts`
+// pins the verbatim recording as property 1 of the #152/#153 reconciliation,
+// warning in its own comment that asserting zero diagnostics there "would
+// pressure a future author to reintroduce the bug". Stripping on the interface
+// lane alone would additionally make the two lanes diverge, which is the
+// specific outcome the review asked to avoid.
+//
+// These assertions therefore pin the CURRENT behavior on BOTH lanes. If a
+// future change teaches TypedMind to model a parameterized base (gap 68), this
+// suite fails loudly and the expectation is re-baselined deliberately — the
+// same gap-pin lifecycle fixtures 67 and 69 just went through.
+describe('slat-harness rung, 69d: a generic heritage target behaves identically on both lanes', () => {
+  it('the interface lane resolves the generic parent for the LOOKUP, so the child is Class-lane', () => {
+    // `stripGenericArguments` is what makes `Repo<Item>` resolve to `Repo`,
+    // so the shape decision sees the inherited `find`. Without it the child
+    // would fall to the DTO lane and silently drop the contract.
+    const result = convert('69d-generic-heritage-both-lanes');
+    assert.equal(result.success, true);
+    const child = result.entities.find((e) => e.name === 'GenericChild') as { kind?: string; extends?: string } | undefined;
+    assert.equal(child?.kind, 'Class', 'a generic method-bearing parent must still make the child Class-like');
+    assert.equal(child?.extends, 'Repo<Item>', 'the emitted target keeps its type arguments verbatim (property 1)');
+  });
+
+  it('the real-class lane emits the SAME shape — the lanes agree, so this is not an interface-lane defect', () => {
+    const result = convert('69d-generic-heritage-both-lanes');
+    const derived = result.entities.find((e) => e.name === 'GenericDerived') as { kind?: string; extends?: string } | undefined;
+    assert.equal(derived?.kind, 'Class');
+    assert.equal(derived?.extends, 'GenericBase<string>');
+  });
+
+  it('KNOWN GAP (68) — in LONGFORM, each lane yields one unknown-base-class finding and nothing else', async () => {
+    // `diagnose` round-trips through longform, which preserves the slot, so
+    // the generic base surfaces as an unresolvable NAME. This is the exact
+    // finding slat-harness-mixin-heritage-controls.test.ts pins for
+    // `StringBox <: Container<string>` on the real-class lane — the same
+    // defect, the same adjudication (gap 68).
+    const result = convert('69d-generic-heritage-both-lanes');
+    const diagnostics = await diagnose(result.entities);
+    const messages = diagnostics.map((d) => d.message).sort();
+    // Asserting the exact pair (rather than "at least one") is what makes
+    // this fail if either lane is changed in isolation.
+    assert.deepEqual(messages, [
+      "Class 'GenericChild' extends 'Repo<Item>' which does not exist",
+      "Class 'GenericDerived' extends 'GenericBase<string>' which does not exist",
+    ]);
+  });
+
+  it('KNOWN GAP (68) — in SHORTFORM, the same pair surfaces as unparsable text', async () => {
+    // The emitted `.tmd` is shortform, where `<:` takes a bare entity_name,
+    // so the argument list is unparsable rather than merely unresolvable.
+    // Both spellings of the same defect are pinned because a future fix
+    // could plausibly address one and not the other. This is the same
+    // shortform/longform split fixture 67's header documents for its own
+    // extends/implements collapse.
+    const result = convert('69d-generic-heritage-both-lanes');
+    const originalCwd = process.cwd();
+    process.chdir('/');
+    try {
+      const typedMind = await TypedMind.create();
+      const messages = typedMind
+        .check(result.tmdContent)
+        .diagnostics.map((d) => d.message)
+        .sort();
+      assert.deepEqual(messages, [
+        'Unparsable text: `<Item>` — check this line against the grammar and fix or remove it',
+        'Unparsable text: `<string>` — check this line against the grammar and fix or remove it',
+      ]);
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
+  it('the generic child still warns about its own dropped property', () => {
+    // The blocker-1 warning is orthogonal to the generic question and must
+    // keep firing through it.
+    const result = convert('69d-generic-heritage-both-lanes');
+    const warning = result.warnings.find((w) => /Interface 'GenericChild'/.test(w.message));
+    assert.equal(
+      warning?.message,
+      "Interface 'GenericChild' inherits methods from an interface it extends, so it converts to a Class; " +
+        'a Class has no field surface, so 1 property is dropped: tag',
+    );
+  });
+});
