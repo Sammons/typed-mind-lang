@@ -198,6 +198,15 @@ interface ExportRegistry {
   [moduleSpecifier: string]: {
     defaultExport?: string;
     namedExports: Set<string>;
+    // The subset of `namedExports` that this module RE-exports from a sibling
+    // (`export { a } from './other.ts'`) rather than declaring itself. Kept as
+    // a parallel set because `namedExports` holds bare strings with no
+    // provenance, and `registerModuleExports` is the only point that sees a
+    // ParsedExport's `source` alongside the declaring module's own path.
+    // `convertExports` already branches on the same distinction via
+    // `isReExport`; this carries that fact forward to the one consumer that
+    // reads the registry instead of the ParsedExport list.
+    reExportedNames: Set<string>;
     namespaceExport?: string;
     filePath: string;
   };
@@ -881,6 +890,7 @@ export class TypeScriptToTypedMindConverter {
   private registerModuleExports(module: ParsedModule): void {
     const moduleExports = {
       namedExports: new Set<string>(),
+      reExportedNames: new Set<string>(),
       filePath: module.filePath,
     } as ExportRegistry[string];
 
@@ -890,6 +900,13 @@ export class TypeScriptToTypedMindConverter {
         moduleExports.defaultExport = exp.name;
       } else {
         moduleExports.namedExports.add(exp.name);
+        // Record re-export provenance here, the only point that sees the
+        // ParsedExport's `source`. The name still belongs in `namedExports`
+        // (it IS part of this module's import-resolution surface); this set
+        // only records that another file DECLARES it.
+        if (this.isReExport(exp) && exp.name !== '*') {
+          moduleExports.reExportedNames.add(exp.name);
+        }
       }
 
       // X-AN-3 residual — record the star's SOURCE specifier so
@@ -2946,6 +2963,24 @@ export class TypeScriptToTypedMindConverter {
         }
         continue;
       }
+      // A name this entrypoint RE-exports from a sibling is declared — and
+      // already listed in its own `-> [...]` exports — by that sibling. Adding
+      // it here too made two files each claim to export one entity, which the
+      // checker correctly reports as `checker/multi-exported`. `convertExports`
+      // has always drawn this distinction via `isReExport` (routing such names
+      // to `reExportNames`); this is the third call site building the same
+      // `exports` verb and it was the one missing the check.
+      //
+      // Distinct from the `'*'` branch above (fixture 78), which fixes an
+      // ungrammatical NAME rather than a duplicated claim: an `export *`
+      // barrel never reaches this ordinary named-re-export path. The star
+      // expansion above deliberately keeps its names — a star's source module
+      // is not itself in the emitted document as an exporter of them.
+      //
+      // Corpus: sammons/bens-almanac packages/vehicle-data/src/index.ts.
+      if (moduleExports.reExportedNames.has(namedExport)) {
+        continue;
+      }
       if (!this.isPredictedTypeDef(namedExport)) {
         publicExports.push(namedExport);
       }
@@ -3978,8 +4013,22 @@ export class TypeScriptToTypedMindConverter {
       return 'string';
     }
 
-    // Clean up the type string
-    return fieldType.trim();
+    // Clean up the type string. `collapseTypeWhitespace`, not a bare `.trim()`:
+    // a field type authored across multiple lines in the source arrives here
+    // with its interior newlines and indentation intact, and a `.trim()` only
+    // removes the leading/trailing run. Every DTO field line in the grammar is
+    // single-line (`- name: type`), so an interior `\n` emitted verbatim
+    // splits one field across several lines and the remainder no longer parses
+    // as a field at all — the leading fragments become `syntax/error`s and the
+    // trailing one an unparsable stray. Corpus: sammons/bens-almanac
+    // packages/{nhtsa,usda}-ingestion/src/handler.ts, whose `IngestionDeps`
+    // declares `checkSupersession` / `createPr` as multi-line function types.
+    //
+    // Meaning-preserving for the same reason it is at the return-type call
+    // site (see the helper's own comment): TypeScript treats inter-token
+    // whitespace as insignificant everywhere a type can appear, and this
+    // collapses rather than truncates — the full text survives on one line.
+    return collapseTypeWhitespace(fieldType);
   }
 
   private convertTypeToSchema(type: string): string {

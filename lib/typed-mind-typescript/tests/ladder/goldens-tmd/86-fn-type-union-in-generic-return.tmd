@@ -1,0 +1,20 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [DedupRecord, IngestionDeps, runIngestion]
+}
+
+IndexFile @ src/index.ts:
+  -> [DedupRecord, IngestionDeps, runIngestion]
+
+runIngestion :: runIngestion(deps: IngestionDeps) => void
+  <- IngestionDeps
+
+DedupRecord %
+  - fingerprint: string
+
+IngestionDeps %
+  - getWatermark: () => Promise<string>
+  - getDedupRecord: (pk: string, sk: string) => Promise<DedupRecord | null>
+  - writeDedupRecord: (record: DedupRecord) => Promise<void>
