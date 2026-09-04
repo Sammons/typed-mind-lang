@@ -99,11 +99,33 @@ describe('82 — a function type returning a generic whose argument is a union',
   it('knownGap — the GRAMMAR still rejects the same shape in a DTO field', async () => {
     // The extractor now emits this line correctly, but the checker's grammar
     // cannot read it back, so the fixture's end-to-end verdict is still an
-    // error. Closing this needs a change to `_opaque_piece` in
-    // lib/typed-mind/grammar/grammar.js plus a `tree-sitter generate` and a
-    // grammar.wasm regeneration — a language-layer change well outside one
-    // rung's bar, and one that must not silently weaken the union split that
-    // `- f: A | B` depends on.
+    // error.
+    //
+    // Scope correction (measured in PR #163, pristine main + isolated
+    // XDG_CACHE_HOME): the trigger is NOT just "a union inside a generic".
+    // The function type must also sit at the TOP LEVEL of the field's type —
+    // the identical shape wrapped in braces parses clean, because the
+    // enclosing `_opaque_brace_group` absorbs the `|` before `type_union`
+    // ever sees it:
+    //   - b: (x: string) => Promise<Rec | null>        # 1 ERROR node
+    //   - b: { f: (x: string) => Promise<Rec | null> } # clean
+    //
+    // Closing it is NOT a matter of adding an `_opaque_angle_group`. That was
+    // implemented and measured on clean main (PR #163): it generates with no
+    // conflicts, leaves the corpus at 138/138, does NOT break the legal
+    // `A < B` case, and does NOT fix this shape either — a no-op, because the
+    // fallback chunk token consumes `Promise<` as opaque text before any
+    // angle group could open.
+    //
+    // The real fix is lexer-level: the `|` must stop being visible to
+    // `type_union` while inside an unclosed `<`, which is external-scanner
+    // territory (the grammar header reserves that as a stop-and-report
+    // boundary, S-GRAMMAR-3). Staying a knownGap is the recommendation —
+    // zero corpus instances, and the work lands in the same `(`-position
+    // neighborhood where `_paramlist_opaque_run` and `_opaque_paren_group`
+    // already collide, so it risks regressing issue #50 for a shape nothing
+    // uses. Any fix must also not weaken the union split `- f: A | B`
+    // depends on.
     const result = convertFixture('82-function-type-generic-union-return', ['src', 'index.ts']);
     assert.equal(result.success, true);
 

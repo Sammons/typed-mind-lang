@@ -47,7 +47,7 @@ The emitted `.tmd` is now correct, but `--check` still reports one
 `syntax/error` on the field, because the tree-sitter grammar is a **separate
 parser** with the same blind spot.
 
-`grammar/grammar.js:1221` (`_opaque_piece`) offers three balanced-group
+`grammar/grammar.js`'s `_opaque_piece` offers three balanced-group
 productions — `_opaque_paren_group`, `_opaque_bracket_group`,
 `_opaque_brace_group` — and a fallback token
 `/[^ \t\n"(){}\[\]]+/`. There is no `_opaque_angle_group`, and the fallback
@@ -63,20 +63,70 @@ does not:
 - b: (x: string) => Promise<Rec | null>   # Unparsable text: `>`
 ```
 
-Adding an `_opaque_angle_group` is NOT a safe local change: `<`/`>` are not
-reliably paired in this position, which is exactly why the pipeline parser
-tracks them on a separate clamped counter instead of the bracket stack
-(see `type-expr-from-text.ts`'s own comment on issue #118). A bare `<` is legal
-opaque text today and parses:
+### Scope correction (measured in PR #163)
 
-```
-- a: (x: string) => A < B                 # parses clean today
+Whitespace is necessary but **not sufficient**. The function type must also sit
+at the **top level** of the field's type. Measured against pristine `main`
+(e461e24) with an isolated `XDG_CACHE_HOME`, counting `(ERROR` nodes:
+
+| input | result |
+|---|---|
+| `- b: (x: string) => Promise<Rec \| null>` | **1 ERROR node** |
+| `- b: { f: (x: string) => Promise<Rec \| null> }` | **clean** |
+| `- b: Promise<Rec \| null>` | clean (`type_generic` owns it) |
+| `- b: (x: string) => Rec \| null` | clean (no generic) |
+| `- b: (x: string) => Promise<Rec>` | clean (no union) |
+
+The second row is the finding: **the identical function type wrapped in braces
+parses fine.** Inside a brace group the enclosing `_opaque_brace_group` already
+absorbs the `|`, so `type_union` never sees it. The gap needs the full
+conjunction — a `_paramlist_opaque_run` at top level, containing a generic,
+containing a space-separated `|`.
+
+### The angle-group hypothesis is a no-op, not a regression
+
+This README previously argued an `_opaque_angle_group` would break the legal
+unpaired-`<` case. That was implemented on a clean copy of `main` and measured
+(PR #163):
+
+```js
+_opaque_angle_open: () => token(seq(/[A-Za-z_]\w*/, '<')),
+_opaque_angle_group: ($) => seq($._opaque_angle_open, prec.right(repeat($._opaque_piece)), '>'),
 ```
 
-An angle-group production would make that input unbalanced and break it. Fixing
-the grammar half needs a design answer for how `<`/`>` pair inside an opaque
-run — an operator-level decision above a single rung's bar, and one that must
-not regress the unpaired-`<` case above.
+- `tree-sitter generate` — succeeds, **no conflicts**.
+- Grammar corpus — **138/138, unchanged**.
+- `- a: (x: string) => A < B` — still parses clean. **It does NOT break the
+  case this README feared.**
+- `- b: (x: string) => Promise<Rec | null>` — **still 1 ERROR node. Unchanged.**
+
+It neither helps nor harms, because by the time the run reaches `Promise<` the
+fallback chunk token has already consumed it as opaque text; the angle group
+never gets the chance to open. **An angle group in `_opaque_piece` is not the
+lever.**
+
+(For contrast, a bare `X = A < B` at top level yields `MISSING ">"` on `main` —
+so "a bare `<` is legal opaque text" holds in the opaque-run position, not
+universally.)
+
+### What a real fix requires
+
+The `|` must stop being visible to `type_union` while inside an unclosed `<`.
+That is **lexer-level** state, not a parser production, because the split
+happens at `type_union` before any opaque sub-rule is consulted. The honest fix
+is an external C scanner tracking `<`/`>` depth with the same guards the
+pipeline parser needs (`<=`/`>=`/`=>` must not bump depth — see
+`type-expr-from-text.ts`, learned from PR #119's review). The grammar header
+reserves the external scanner as a **stop-and-report** boundary (S-GRAMMAR-3),
+which is exactly what this is.
+
+Staying a knownGap is the recommendation: zero corpus instances
+(grep-verified across all 268 `.tmd`), the brace-wrapped form already works,
+the pipeline half is fixed, and any angle-depth work lands in the same
+`(`-position neighborhood where `_paramlist_opaque_run` and
+`_opaque_paren_group` already collide (PR #163 hit that conflict directly), so
+it carries real regression risk against issue #50's fix for a shape nothing
+uses. If prioritized, scope it as an external-scanner RFC, not a local tweak.
 
 ## What the tests pin
 
