@@ -5,32 +5,38 @@
 // and `Telemetry` are implemented by NoopSpan/NoopTelemetry/RecordingSpan/
 // RecordingTelemetry, producing 3 checker errors on the hub-http target.
 //
-// KNOWN GAP — deliberately left failing, no analyzer fix attached.
+// FIXED — this fixture now checks CLEAN. Regressions in
+// tests/ladder/slat-harness-known-gaps.test.ts.
 //
-// Adjudication: the ANALYZER AND CONVERTER ARE CORRECT here. Verified by
-// reading the converted entity directly: NoopSpan carries
-// `extends: undefined, implements: ['Span']` — the right slot — and `Span`
-// is correctly classified DTO because it is data-shaped (properties only).
+// The extractor was always correct here, and the original adjudication said
+// so: NoopSpan carries `extends: undefined, implements: ['Span']` — the right
+// slot — and `Span` is correctly classified DTO because it is data-shaped
+// (properties only). The defect was in the LANGUAGE layer,
+// `lib/typed-mind/src/checker/valid-references.ts`, where `implements` was
+// declared `to: ['Class', 'ClassFile']` with the comment "In TypedMind,
+// interfaces are represented as Classes".
 //
-// The defect is in the LANGUAGE layer, `lib/typed-mind/src/checker/
-// valid-references.ts:49-52`: `implements` is declared `to: ['Class',
-// 'ClassFile']` with the comment "In TypedMind, interfaces are represented
-// as Classes". That assumption does not hold once the converter classifies
-// a property-only interface as a DTO — a legal, correct classification —
-// so the pair is unsatisfiable: implementing a data interface is
-// unrepresentable no matter which slot the converter picks.
+// That comment was a half truth. A TypeScript interface has no single
+// TypedMind kind: the extractor classifies it BY SHAPE, because the language
+// models a method surface only on Class (`ClassNode.methods`) and a field
+// surface only on DTO (`DtoNode.fields`). A method-bearing interface is a
+// Class (fixture 69); a property-only interface like `Span` is a DTO. Both
+// are correct, and both are legitimate `implements` targets in the source
+// language — so restricting the slot to Class/ClassFile hard-coded one half
+// of a two-way classification and made this legal source shape
+// unrepresentable no matter which kind the converter picked.
 //
-// Confirmed via longform round-trip (which preserves the slot exactly,
-// unlike shortform's single `<:` inherit list): the diagnostic is
-// `Cannot use 'implements' to reference DTO 'Span'`. Shortform reports the
-// same defect as `Cannot use 'extends' to reference DTO 'Span'` only
-// because emit-shortform.ts:187-192 collapses extends+implements into one
-// `<:` list, so the re-parse attributes the first item to `extends`.
-//
-// Fixing it means widening VALID_REFERENCES.implements to accept DTO
-// targets (a language-grammar/checker decision with blast radius beyond
-// the extractor), so it is out of the ~60-line/one-owning-layer bar and is
-// recorded here as a documented failing expectation for the operator.
+// The fix widens `VALID_REFERENCES.extends` and `.implements` to accept a
+// DTO target. BOTH slots widen, not just `implements`, because shortform
+// emission collapses them into one `<:` inherit list
+// (emit-shortform.ts `inheritanceSuffix`), so a round-trip re-parse
+// attributes the first target to `extends` — which is why this fixture's
+// diagnostic read `Cannot use 'extends' to reference DTO 'Span'` in
+// shortform and `Cannot use 'implements' ...` in longform. Still enforced:
+// the `from` side (only a Class/ClassFile may declare inheritance), target
+// existence, and cycle rejection. Forcing `Span` into the Class kind instead
+// was rejected — ClassNode has no field surface, so it would have stripped
+// `name`/`ended` and traded a checker error for silent data loss.
 export interface Span {
   name: string;
   ended: boolean;

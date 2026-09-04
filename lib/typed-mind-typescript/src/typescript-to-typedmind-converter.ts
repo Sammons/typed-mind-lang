@@ -453,6 +453,131 @@ export class TypeScriptToTypedMindConverter {
     return this.typesRegistryPredictedKind.get(name) === 'TypeDef';
   }
 
+  // Gap 69/67 — the interface-lane twin of `typesRegistryPredictedKind`.
+  // Once `convertInterface` routes a method-bearing interface to
+  // `convertInterfaceToClass`, an interface name no longer implies DTO kind,
+  // so every call site that PREDICTS an interface's emitted kind must predict
+  // the same split the Phase-2 dispatcher performs. Computed ONCE by
+  // `predictInterfaceKinds` (after Phase 1 has indexed every module's
+  // interfaces) and then read by BOTH the dispatcher and `isDTOLikeType`, so
+  // prediction and emission are not merely consistent — they are literally
+  // the same value. This is stronger than the anti-divergence argument
+  // `typesRegistryPredictedKind` makes for `isObjectLikeType`, and it has to
+  // be: the shape decision now depends on the heritage chain, which is not a
+  // pure function of a single `ParsedInterface`.
+  private readonly interfacesPredictedClassKind = new Set<string>();
+
+  // Program-wide interface index, keyed by bare name, filled by
+  // `collectModuleEntities`. Backs the heritage walk in
+  // `resolveInterfaceIsMethodBearing`: a parent named in an `extends` clause
+  // is looked up here to decide whether it contributes methods.
+  //
+  // Bare-name keying inherits the same last-write-wins flatness
+  // `entityRegistry.interfaces`/`.classes` already have (two same-named
+  // interfaces in different modules collide). That is pre-existing structural
+  // flatness, not a new category of bug — noted here so the limitation is on
+  // record at the place that depends on it.
+  private readonly interfacesByName = new Map<string, ParsedInterface>();
+
+  // Interfaces whose heritage chain could not be fully resolved — a parent
+  // named in an `extends` clause that is not in `interfacesByName` (an
+  // external/`node_modules` interface, a type alias used as a parent, or a
+  // module the traversal never reached). Recorded so the Phase-2 lanes can
+  // WARN that the classification was made on own members alone, rather than
+  // silently guessing. See `convertInterface`.
+  private readonly interfacesWithUnresolvedHeritage = new Set<string>();
+
+  // The single consumer-facing predicate. `isDTOLikeType` uses it to keep a
+  // method-bearing interface OUT of a Function's `input`/`output` slot:
+  // `check-function-graph.ts:44` requires `target.kind === 'DTO'` exactly, so
+  // a Class-kind name there is `checker/input-not-dto` +
+  // `checker/reference-to-illegal` — the SAME two findings the pre-existing
+  // `entityRegistry.classes` exclusion (`isDTOLikeType`, D-LEG-1's
+  // disclosed-loss trade) already exists to prevent for a real `class`
+  // declaration. A method-bearing interface is now the same kind of thing, so
+  // it takes the same exclusion. The type text stays visible verbatim in the
+  // emitted `signature`; only the machine-checked input/output edge is
+  // dropped, which is exactly the trade D-LEG-1 documented and accepted.
+  private isPredictedClassInterface(name: string): boolean {
+    return this.interfacesPredictedClassKind.has(name);
+  }
+
+  // Gap 69 blocker 2 — the shape decision over the RESOLVED HERITAGE CHAIN,
+  // not own members alone. `interface Child extends HasMethod {}` inherits a
+  // method contract and declares nothing; classifying it on own members put
+  // it on the DTO lane, emitting a fieldless `Child %` with no `<: HasMethod`
+  // edge and no warning — `doIt` unreachable through the child. That is gap
+  // 69's exact symptom one level up, so the predicate has to see the chain.
+  //
+  // Runs as a whole-program pass AFTER `collectModuleEntities` has indexed
+  // every module's interfaces (a per-module computation cannot see a parent
+  // declared in a module visited later), and BEFORE any Phase-2 conversion
+  // reads `isPredictedClassInterface`. Both lanes and `isDTOLikeType` then
+  // read one precomputed answer.
+  private predictInterfaceKinds(): void {
+    for (const name of this.interfacesByName.keys()) {
+      if (this.resolveInterfaceIsMethodBearing(name, new Set())) {
+        this.interfacesPredictedClassKind.add(name);
+      }
+    }
+  }
+
+  // True when this interface, or any interface it transitively extends,
+  // declares at least one method signature.
+  //
+  // UNRESOLVABLE PARENTS: a parent not in `interfacesByName` is an external
+  // interface (`node_modules`), a type alias used as a parent, or a module the
+  // traversal never reached. Its members are unknowable, so the walk cannot
+  // prove OR disprove a method. It records the child in
+  // `interfacesWithUnresolvedHeritage` and keeps walking the parents it CAN
+  // resolve. The effect is the own-member rule as the floor, with the caller
+  // warning that heritage could not be fully inspected — a resolvable
+  // method-bearing parent elsewhere in the chain still wins, and an
+  // unresolvable parent never silently flips a property-only interface onto
+  // the Class lane (which would strip its fields on a guess).
+  //
+  // `seen` makes the walk cycle-safe. TypeScript rejects circular interface
+  // inheritance, but the converter must not hang on malformed input.
+  private resolveInterfaceIsMethodBearing(name: string, seen: Set<string>): boolean {
+    if (seen.has(name)) {
+      return false;
+    }
+    seen.add(name);
+
+    const iface = this.interfacesByName.get(name);
+    if (iface === undefined) {
+      return false;
+    }
+
+    if (iface.methods.length > 0) {
+      return true;
+    }
+
+    let inheritsMethod = false;
+    for (const parent of iface.extends) {
+      // A parent is written as a type reference and may carry generic
+      // arguments (`extends Repository<User>`); the index is keyed by the
+      // bare declaration name, so strip the argument list before lookup.
+      const parentName = this.stripGenericArguments(parent);
+      if (!this.interfacesByName.has(parentName)) {
+        this.interfacesWithUnresolvedHeritage.add(name);
+        continue;
+      }
+      if (this.resolveInterfaceIsMethodBearing(parentName, seen)) {
+        inheritsMethod = true;
+      }
+    }
+    return inheritsMethod;
+  }
+
+  // `Repository<User>` -> `Repository`. Also trims whitespace so a
+  // multi-line-authored heritage clause resolves.
+  private stripGenericArguments(typeReference: string): string {
+    const angleIndex = typeReference.indexOf('<');
+    const bare = angleIndex === -1 ? typeReference : typeReference.slice(0, angleIndex);
+    return bare.trim();
+  }
+
   // X-CONV-3 — the target project's root, supplied by the analysis this
   // convert() call is processing. `getRelativePath`/`filterModules`
   // relativize against this, never `process.cwd()`, so extraction produces
@@ -755,6 +880,9 @@ export class TypeScriptToTypedMindConverter {
     this.builtinExtendsStubNames.clear();
     this.namespaceImplementsStubNames.clear();
     this.typesRegistryPredictedKind.clear();
+    this.interfacesPredictedClassKind.clear();
+    this.interfacesByName.clear();
+    this.interfacesWithUnresolvedHeritage.clear();
     this.moduleGraphResolution.clear();
     this.starReExportSources.clear();
     this.claimedStubExportNames.clear();
@@ -850,6 +978,12 @@ export class TypeScriptToTypedMindConverter {
     for (const module of modules) {
       this.collectModuleEntities(module);
     }
+
+    // 1.4 (gap 69/67): resolve every interface's shape over its heritage
+    // chain, now that 1.3 has indexed the interfaces of EVERY module. Must
+    // run after that loop (a parent may be declared in a module visited
+    // later) and before any Phase-2 conversion reads the prediction.
+    this.predictInterfaceKinds();
 
     // issue #72 (tm10-inc2), adversarial-review blocker fix (2nd round,
     // PR #84 comment 19118) — the per-module reservation in `processModule`
@@ -1156,6 +1290,12 @@ export class TypeScriptToTypedMindConverter {
         exported: module.exports.some((exp) => exp.name === iface.name),
       };
       this.entityRegistry.interfaces.set(iface.name, entityInfo);
+      // Gap 69/67 — see `interfacesPredictedClassKind`'s field comment. The
+      // shape decision needs the whole program's interfaces before it can
+      // resolve a heritage chain, so Phase 1 only INDEXES here; the
+      // prediction itself is computed by `predictInterfaceKinds` once this
+      // per-module loop has visited every module.
+      this.interfacesByName.set(iface.name, iface);
     }
 
     // Collect all type aliases
@@ -1428,7 +1568,7 @@ export class TypeScriptToTypedMindConverter {
     // Then convert interfaces to DTOs
     for (const iface of module.interfaces) {
       if (this.isInterfaceExported(iface, module)) {
-        this.convertInterfaceToDTO(iface);
+        this.convertInterface(iface);
       }
     }
 
@@ -1718,7 +1858,7 @@ export class TypeScriptToTypedMindConverter {
     // Convert interfaces as DTOs
     for (const iface of module.interfaces) {
       if (this.isInterfaceExported(iface, module)) {
-        this.convertInterfaceToDTO(iface);
+        this.convertInterface(iface);
       }
     }
 
@@ -1815,7 +1955,7 @@ export class TypeScriptToTypedMindConverter {
 
     for (const iface of module.interfaces) {
       if (this.isInterfaceExported(iface, module)) {
-        this.convertInterfaceToDTO(iface);
+        this.convertInterface(iface);
       }
     }
 
@@ -2158,6 +2298,236 @@ export class TypeScriptToTypedMindConverter {
       }
     }
     return Array.from(resolved);
+  }
+
+  // Gap 69 / gap 67 (ladder rung sammons/slat-harness, fixtures
+  // 67-implements-data-interface and 69-interface-method-dropped) — the
+  // single shape predicate that decides which lane an exported interface
+  // takes. TypedMind's grammar has NO Interface entity kind (grammar.md:25-37
+  // lists twelve; interface is not one), and the checker already declares the
+  // mapping in-source: valid-references.ts:51, "In TypedMind, interfaces are
+  // represented as Classes". `ClassNode.methods` (class-node.ts:15) is the
+  // only method surface in the language — check-method-calls.ts:36 states the
+  // matching rule from the other side, "Only Classes and ClassFiles can have
+  // methods". So a method-bearing interface has exactly one honest home, and
+  // it is not the DTO lane.
+  //
+  // WHAT COUNTS AS A METHOD: `iface.methods`, and only that. This is the
+  // analyzer's own `ts.isMethodSignature` partition (typescript-analyzer.ts:
+  // 1294-1302) — the ONLY two member kinds `parseInterface` reads are
+  // `isPropertySignature` -> `properties` and `isMethodSignature` ->
+  // `methods`. Three consequences worth stating because each is a decision,
+  // not an accident:
+  //
+  //   - CALL SIGNATURES (`(x: string): void`) and INDEX SIGNATURES
+  //     (`[k: string]: number`) do NOT count. They are not merely excluded
+  //     here — `parseInterface` never collects them into EITHER list, so they
+  //     are already absent from the converter's input on both lanes and this
+  //     predicate cannot see them. Making them count would require analyzer
+  //     work first (a separate concern: they have no name, and both
+  //     `DtoFieldNode` and `ClassNode.methods` are name-keyed), and the DTO
+  //     lane drops them identically today, so no behavior regresses by
+  //     leaving them out.
+  //   - FUNCTION-TYPED PROPERTIES (`save: (row: string) => void`) do NOT
+  //     count. The memo's Q1 recommended folding them in; reading the analyzer
+  //     shows why that is the wrong call HERE: TypeScript parses them as
+  //     `PropertySignature`, so they arrive as `ParsedProperty` carrying a
+  //     real type string that the DTO lane renders faithfully as a field.
+  //     Counting them would move a member that currently converts CORRECTLY
+  //     into `ClassNode.methods`, which is a bare `readonly string[]` with no
+  //     type surface — trading a good field for a lossy method name. Gap 69 is
+  //     about members that are DROPPED, and a function-typed property is not
+  //     dropped. Keeping the split on the analyzer's own syntactic partition
+  //     also means the rule is checkable by reading one predicate, per the
+  //     memo's "second, arbitrary classification rule" caution — the line just
+  //     falls where TypeScript's own grammar already put it.
+  //
+  // HERITAGE IS PART OF THE SHAPE. The decision reads the whole resolved
+  // inheritance chain, not own members: `interface Child extends HasMethod {}`
+  // inherits a method contract while declaring nothing, and classifying it on
+  // own members alone emitted a fieldless `Child %` with no `<: HasMethod`
+  // edge and no diagnostic — gap 69's own symptom, one level up. The walk
+  // lives in `resolveInterfaceIsMethodBearing`, is computed once per program
+  // by `predictInterfaceKinds`, and its result is READ here rather than
+  // recomputed, so the dispatcher and `isDTOLikeType` cannot disagree.
+  //
+  // Deliberately `.length > 0` over lists the analyzer populates, never a
+  // re-parse of source text: no new failure mode.
+  private isMethodBearingInterface(iface: ParsedInterface): boolean {
+    return this.interfacesPredictedClassKind.has(iface.name);
+  }
+
+  // Gap 69/67 dispatcher. Every call site that used to call
+  // `convertInterfaceToDTO` unconditionally now calls this, so the two lanes
+  // stay in lockstep across all three module-conversion paths
+  // (`processModule`'s own loop, `convertToClassFile`, and
+  // `convertToSeparateEntities`) — three sites, one rule.
+  //
+  // NOTHING THIS DISPATCHER DROPS IS DROPPED SILENTLY. That is the standard
+  // fixture 69's own header sets ("silent data loss, not a surfaced failure.
+  // Every other gap on this rung announces itself"), and it applies to the fix
+  // as much as to the bug. Both lanes emit a warning through the existing
+  // `addWarning` channel for every member the language cannot carry:
+  //
+  //   - Class lane, mixed interface -> properties dropped (ClassNode has no
+  //     field surface). Warned in `convertInterfaceToClass`.
+  //   - Either lane, unresolvable parent -> the chain could not be inspected,
+  //     so the classification rests on own members alone. Warned here.
+  //
+  // The remaining known-lossy case is a property-only interface extending
+  // another interface: the DTO lane reads `iface.extends` nowhere, so
+  // inherited FIELDS do not flatten in. That predates this change and is not
+  // widened by it (flattening on one lane only would make the lanes
+  // inconsistent in a new way), but it is no longer silent either — an
+  // unresolvable parent warns, and a resolvable method-bearing parent now
+  // moves the child to the Class lane instead of vanishing.
+  private convertInterface(iface: ParsedInterface): void {
+    if (this.interfacesWithUnresolvedHeritage.has(iface.name)) {
+      const unresolved = iface.extends
+        .map((parent) => this.stripGenericArguments(parent))
+        .filter((parent) => !this.interfacesByName.has(parent));
+      this.addWarning(
+        `Interface '${iface.name}' extends ${unresolved.map((parent) => `'${parent}'`).join(', ')}, which could not be resolved in this program, ` +
+          `so its members could not be inspected; '${iface.name}' was classified from its own members alone.`,
+        undefined,
+        'If the parent declares methods, the extracted entity may be a DTO where a Class was intended. Include the module that declares the parent in the traversal, or restate the inherited methods on this interface.',
+      );
+    }
+
+    if (this.isMethodBearingInterface(iface)) {
+      this.convertInterfaceToClass(iface);
+      return;
+    }
+    this.convertInterfaceToDTO(iface);
+  }
+
+  // The Class lane for a method-bearing interface. Mirrors `convertClass`
+  // (the `class` declaration path) exactly in entity shape — same ClassNode,
+  // same `<:` raw form, same single-inheritance `extends` slot, same
+  // `implements` list — so a method-bearing interface and a class that
+  // implements it become the same KIND of thing, which is precisely what
+  // makes `implements` resolvable (VALID_REFERENCES.implements is
+  // `to: ['Class','ClassFile']`).
+  //
+  // DELIBERATELY a plain ClassNode, never a ClassFileNode: the Class/ClassFile
+  // decision in `processModule` is a statement about a MODULE (does this file
+  // fuse with its primary class?), and it is made per-module before any
+  // interface is reached. An interface is a member of a module, never the
+  // module itself — `convertClass`, the sibling path for non-primary class
+  // declarations, emits a plain ClassNode for the identical reason. Emitting a
+  // ClassFile here would require inventing a path for an entity that owns no
+  // file, and would collide with the real ClassFile the module may already
+  // have produced.
+  //
+  // INHERITANCE, IN BOTH DIRECTIONS. `iface.extends` is threaded through the
+  // SAME `extends`(first)/`implements`(rest) split `convertClass` uses, so
+  // multiple interface parents survive as `implements` targets rather than
+  // being silently truncated to the first. Both directions of the parent/child
+  // relationship matter here, and an earlier revision of this comment argued
+  // only the first:
+  //
+  //   - CHILD IS METHOD-BEARING, PARENT IS PROPERTY-ONLY. The parent converts
+  //     to a DTO, so the child names a DTO in an inherit slot. That used to be
+  //     illegal; the companion change to `VALID_REFERENCES.extends`/
+  //     `.implements` (gap 67) makes a DTO a legal inherit target, so the edge
+  //     now resolves. Inherited FIELDS still do not flatten into the child —
+  //     the DTO lane reads `iface.extends` nowhere either, so flattening on
+  //     one lane only would make the lanes inconsistent in a new way.
+  //   - PARENT IS METHOD-BEARING, CHILD DECLARES NOTHING (or only properties).
+  //     This is the direction that was BROKEN, not merely lossy:
+  //     `isMethodBearingInterface` read own members only, so
+  //     `interface Child extends HasMethod {}` took the DTO lane and emitted a
+  //     fieldless `Child %` with no `<: HasMethod` edge and no diagnostic —
+  //     the inherited method contract was unreachable through the child, which
+  //     is gap 69's exact symptom one level up. The shape decision now runs
+  //     over the resolved heritage chain
+  //     (`resolveInterfaceIsMethodBearing`), so such a child takes the Class
+  //     lane and keeps its `<: Parent` edge. An unresolvable parent falls back
+  //     to the own-member rule AND warns (`convertInterface`), so the fallback
+  //     is never silent.
+  //
+  // PROPERTY LOSS IS THE KNOWN, ACCEPTED COST — and, since the review of
+  // PR #162, a WARNED one. A ClassNode has no field surface at all —
+  // class-node.ts declares exactly `implements`, `methods`, `extends`,
+  // `purpose`, and grammar.md's Class production (`<name> <: [<inherit_list>]`
+  // with a `=> [...]` methods continuation) offers no place to put a property.
+  // So a MIXED interface (properties AND methods) loses its properties on this
+  // lane, exactly as it lost its methods on the DTO lane before this change.
+  // There is no third option inside the current grammar: the only lossless fix
+  // would add a field surface to Class or a method surface to DTO, which is
+  // the memo's rejected Option 2/3 (a language change). What this change buys
+  // is that the loss falls on the members the language CANNOT model instead of
+  // the ones it CAN — a method has no representation as a DTO field, while a
+  // property at least had one — and that it ANNOUNCES ITSELF. Emitting the
+  // Class silently would have reproduced the very failure mode fixture 69's
+  // header names as the most severe on its rung, merely pointed the other way.
+  // Measured on the corpora (typed-mind-lang, slat-harness, code-outline-cli):
+  // ~643 interfaces, ~43 method-bearing, ~17 mixed — so ~2.6% of interfaces
+  // trade property fidelity for method fidelity, and ~97% are untouched. The
+  // counts drift by one or two between runs because all three corpora are live
+  // working trees; the ratio is what the decision rests on.
+  private convertInterfaceToClass(iface: ParsedInterface): void {
+    const entityName = createEntityName(iface.name);
+
+    if (this.entityNames.has(entityName)) {
+      this.addError(`Duplicate entity name: ${entityName}`);
+      return;
+    }
+
+    this.addEntityName(entityName, 'convertInterfaceToClass');
+
+    // The disclosed property loss, surfaced. See this method's own
+    // PROPERTY LOSS note above for why the loss is unavoidable inside the
+    // current grammar, and why announcing it is not optional.
+    if (iface.properties.length > 0) {
+      const propertyNames = iface.properties.map((prop) => prop.name);
+      // "declares" vs "inherits" is not cosmetic: a reader looking at
+      // `interface Child extends HasMethod { id: string }` sees no method in
+      // the declaration, so a message claiming it declares one sends them
+      // hunting for a member that is not there.
+      const methodSource = iface.methods.length > 0 ? 'declares methods' : 'inherits methods from an interface it extends';
+      this.addWarning(
+        `Interface '${iface.name}' ${methodSource}, so it converts to a Class; a Class has no field surface, so ` +
+          `${propertyNames.length} ${propertyNames.length === 1 ? 'property is' : 'properties are'} dropped: ${propertyNames.join(', ')}`,
+        undefined,
+        'Split the data members into a separate property-only interface (which converts to a DTO) if the fields must survive extraction.',
+      );
+    }
+
+    // The inherit targets are recorded VERBATIM, type arguments included, so
+    // `extends Repo<Item>` emits `<: Repo<Item>`. That is intentional and
+    // matches `convertClass` (the real-class lane) exactly: dropping the
+    // arguments is PR #152's original bug, and
+    // slat-harness-mixin-heritage-controls.test.ts pins the verbatim form as
+    // property 1 of the #152/#153 reconciliation, warning that silencing the
+    // resulting diagnostic "would pressure a future author to reintroduce the
+    // bug". The unresolvable generic base is gap 68's territory (type
+    // parameters are unmodeled language-wide), NOT a defect of this lane —
+    // fixture 69d pins both lanes together so neither can be changed alone.
+    // `stripGenericArguments` is applied only to the heritage LOOKUP
+    // (`resolveInterfaceIsMethodBearing`), never to the emitted text.
+    const inheritList = [...iface.extends];
+    const classEntity = new ClassNode({
+      name: entityName,
+      span: SYNTHETIC_SPAN,
+      raw: `${entityName} <: ${inheritList.join(', ')}`,
+      sourceForm: 'shortform',
+      // TypedMind supports single inheritance in the `extends` slot; every
+      // further parent lands in `implements`, the same split `convertClass`
+      // performs on a class's own heritage.
+      extends: inheritList[0] || undefined,
+      implements: this.convertImplementsList(inheritList.slice(1), []),
+      // Private/protected modifiers do not exist on a `MethodSignature`, so
+      // there is no `includePrivateMembers` filter to apply here — every
+      // method an interface declares is part of its public contract by
+      // construction. This is why the method list is taken directly rather
+      // than through `convertMethods` (which filters `isPrivate` on a
+      // ParsedClass).
+      methods: iface.methods.map((method) => method.name),
+      purpose: iface.description ? collapseDescription(iface.description) : undefined,
+    });
+
+    this.entities.push(classEntity);
   }
 
   private convertInterfaceToDTO(iface: ParsedInterface): void {
@@ -3723,7 +4093,19 @@ export class TypeScriptToTypedMindConverter {
       return false;
     }
 
-    // Interface-kind reference: the ORIGINAL true positive, still DTO-like.
+    // Gap 69/67 — a METHOD-BEARING interface now converts to a ClassNode
+    // (`convertInterfaceToClass`), so it takes the identical exclusion the
+    // `entityRegistry.classes` branch above applies to a real `class`
+    // declaration. Checked BEFORE the interfaces branch below, mirroring the
+    // Class-kind and TypeDef exclusions' own placement. See
+    // `isPredictedClassInterface`'s comment for why the edge is dropped
+    // rather than emitted.
+    if (this.isPredictedClassInterface(cleaned)) {
+      return false;
+    }
+
+    // Interface-kind reference: the ORIGINAL true positive — still DTO-like,
+    // now narrowed to the PROPERTY-ONLY interfaces that still emit a DtoNode.
     if (this.entityRegistry.interfaces.has(cleaned)) {
       return true;
     }

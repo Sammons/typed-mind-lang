@@ -162,20 +162,69 @@ const cases: readonly FixtureCase[] = [
   // expectations) for the per-gap adjudication and root causes.
   //
   // 66 is fixed in this change (mixin-application extends targets now
-  // resolve to the mixin's base argument), so its checker verdict is
-  // `true`. 67/68 record `false` — each carries the exact diagnostic its
-  // known-gap pin asserts. 69 records `true` precisely BECAUSE its gap is
-  // checker-invisible: the dropped interface method produces no finding at
-  // all, which is what makes it the severe one.
+  // resolve to the mixin's base argument), so its checker verdict is `true`.
+  //
+  // 67 and 69 are now BOTH fixed (see slat-harness-known-gaps.test.ts, whose
+  // gap pins were re-baselined into fail-before/pass-after regressions):
+  // a method-bearing interface extracts as a Class carrying its methods, and
+  // `VALID_REFERENCES.extends`/`.implements` accept a DTO target so a class
+  // implementing a data-shaped interface resolves. 67 FLIPS false -> true.
+  //
+  // 69 stays `true`, but the reason inverted, and the distinction matters:
+  // it used to check clean because its interface method vanished with zero
+  // diagnostic (silent data loss — the severe gap). It now checks clean
+  // because the method is modeled on the only kind that can hold it. The
+  // golden itself is the evidence of the change (`Repository %` with a
+  // dropped `save` became `Repository <:` / `=> [save]`); this table's
+  // verdict column cannot express it, which is why the regression suite
+  // asserts the entity kind directly.
+  //
+  // 68 keeps `false` — a separate, unowned root cause (the analyzer never
+  // reads `node.typeParameters`), untouched by this change.
   { fixture: '66-mixin-extends-call', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   {
     fixture: '67-implements-data-interface',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   { fixture: '68-generic-type-parameters', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '69-interface-method-dropped', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  // NEW (PR #162 review) — the two edge fixtures for the interface shape
+  // rule. 69b pins the heritage walk: a child extending a method-bearing
+  // parent takes the Class lane and keeps its `<: Parent` edge, while a
+  // property-only chain stays on the DTO lane. 69c pins the unresolvable
+  // parent fallback. Both check clean; the property-loss and
+  // unresolved-heritage WARNINGS they emit are converter-level, not checker
+  // findings, so they do not move these verdicts — the assertions on the
+  // warning text live in slat-harness-known-gaps.test.ts.
+  {
+    fixture: '69b-interface-heritage-shape',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
+  {
+    fixture: '69c-interface-unresolved-heritage',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
+  // 69d records `false`, and the `false` is the POINT of the fixture: a
+  // generic heritage target emits its argument list verbatim into `<:`
+  // (`GenericChild <: Repo<Item>`), which shortform cannot parse. Both the
+  // interface lane and the real-class lane do this identically — the fixture
+  // pins them together — and the residual finding is gap 68's (type
+  // parameters are unmodeled), the same adjudication 66b already carries for
+  // `StringBox <: Container<string>`. Stripping the arguments to make this
+  // green is PR #152's original bug, which
+  // slat-harness-mixin-heritage-controls.test.ts exists to prevent.
+  {
+    fixture: '69d-generic-heritage-both-lanes',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
   // Reconciliation controls for the single mixin-heritage helper (PR #152
   // + PR #153 merged into `getExtendsTargetName`). 66b records `false`:
   // its `StringBox extends Container<string>` carries the generic-base
