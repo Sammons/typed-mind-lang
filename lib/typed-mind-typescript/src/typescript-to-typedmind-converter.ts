@@ -2316,14 +2316,19 @@ export class TypeScriptToTypedMindConverter {
     // Use the real path - multiple constants can share the same file path
     const realPath = this.getRelativePath(module.filePath);
 
+    const constantSchema = constant.type && constant.type !== 'any' ? this.convertTypeToSchema(constant.type) : undefined;
+
     const constantsEntity = new ConstantsNode({
       name: entityName,
       span: SYNTHETIC_SPAN,
       raw: `${entityName} ! ${realPath}`,
       sourceForm: 'shortform',
       path: realPath,
-      // Add schema information if we can infer it from the type
-      schema: constant.type && constant.type !== 'any' ? this.convertTypeToSchema(constant.type) : undefined,
+      // Add schema information if we can infer it from the type.
+      // `convertTypeToSchema` returns '' for a type with no grammatical
+      // entity_name rendering; normalize that to `undefined` so the emitter
+      // omits the `:` slot entirely rather than emitting a dangling one.
+      schema: constantSchema === '' ? undefined : constantSchema,
     });
 
     this.entities.push(constantsEntity);
@@ -4032,7 +4037,13 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private convertTypeToSchema(type: string): string {
-    // Convert TypeScript types to schema names
+    // Convert TypeScript types to schema names.
+    //
+    // The Constants type slot is grammatically an `entity_name`
+    // (`grammar/grammar.js:761` — `optional(seq(':', $.entity_name))`,
+    // matching `grammar.md:35`), so whatever this returns must match
+    // `/[A-Za-z_]\w*/`. Anything else emits a line the checker rejects as
+    // "Unparsable text".
     if (type.includes('[]')) {
       return 'Array';
     }
@@ -4044,6 +4055,25 @@ export class TypeScriptToTypedMindConverter {
     }
     if (type.includes('{') && type.includes('}')) {
       return 'Object';
+    }
+
+    // Ladder rung `artifice-with-intelligence` (fixture 94), corpus
+    // `server/lib/parse-embed.ts:7`: `ReadonlySet<string>`. The two
+    // allowlist entries above generalize — ANY generic must degrade to its
+    // base name, or its `<...>` argument list reaches the entity_name slot
+    // verbatim. Reducing to the base is the same lossy-but-grammatical
+    // answer `Record<string, string>` -> `Record` already gives.
+    const genericBase = /^([A-Za-z_]\w*)\s*</.exec(type);
+    if (genericBase?.[1] !== undefined) {
+      return genericBase[1];
+    }
+
+    // A type that is still not a bare identifier (a union, an intersection,
+    // a function type, a tuple, a qualified `ns.Type`) has no entity_name
+    // rendering at all. Drop the annotation rather than emit an
+    // ungrammatical line — the Constants entity itself is still recorded.
+    if (!/^[A-Za-z_]\w*$/.test(type)) {
+      return '';
     }
 
     return type;
