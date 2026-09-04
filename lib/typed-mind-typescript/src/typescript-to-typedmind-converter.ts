@@ -19,7 +19,7 @@ import {
   TypeDefNode,
   type TypeExprNode,
 } from '@sammons/typed-mind';
-import { mapStructuralSegments } from './type-text-segments.ts';
+import { mapStructuralSegments, stripComments } from './type-text-segments.ts';
 import type {
   ConversionError,
   ConversionOptions,
@@ -196,7 +196,15 @@ const normalizeUnionAliasText = (type: string): string => {
   // `'https://x'` and `` `a/*b*/c` `` are literal text, not commentary, and a
   // blind strip would eat the rest of the union at the first `//` inside a
   // string-literal member.
-  const withoutComments = mapStructuralSegments(type, (segment) => segment.replace(/\/\/[^\n]*/g, '\n').replace(/\/\*[\s\S]*?\*\//g, ' '));
+  //
+  // Fixture 101 (PR #165 review, comment 22273): this used to be a regex run
+  // over the structural segments, which could not see a comment whose own text
+  // contained a quote character. A backtick inside a JSDoc block opened a
+  // template-literal span that swallowed the comment's `*/`, so the strip
+  // never matched and the comment survived into a one-line TypeDef — breaking
+  // it across physical lines. Comments are now their own span kind in the
+  // scanner, and `stripComments` removes exactly those spans.
+  const withoutComments = stripComments(type);
   const collapsed = collapseToSingleLineType(withoutComments);
 
   const withoutLeadingBar = collapsed.startsWith('|') ? collapsed.slice(1).trim() : collapsed;
@@ -4032,11 +4040,26 @@ export class TypeScriptToTypedMindConverter {
     return members;
   }
 
+  // Fixture 100 (`sammons/slat` rung) — a bare `Record<K, V>` / `Map<K, V>`
+  // alias (`type ExactRoutes = Record<string, RouteHandler>`) has NO `{` to
+  // split, so routing it to the DTO path produced a field-LESS `%` entity:
+  // the index and value types vanished, and a value type reachable only
+  // through the alias (`RouteHandler`) became `checker/orphaned-entity`.
+  //
+  // A mapped/indexed collection is only DTO-like when it actually carries an
+  // inline object literal to split into fields (`Record<string, { a: T }>`
+  // still contains a `{`, and the existing field-synthesis path handles it).
+  // Without a brace there are no fields to emit, and the TypeDef path
+  // preserves the whole `Record<string, RouteHandler>` text — which keeps
+  // the value type visible as a real reference instead of discarding it.
+  //
+  // Checked AFTER the union guard so a union of object literals keeps its
+  // existing issue #114 routing.
   private isObjectLikeType(type: string): boolean {
     if (this.isUnionOfObjectLiterals(type)) {
       return false;
     }
-    return type.includes('{') || type.includes('Record<') || type.includes('Map<');
+    return type.includes('{');
   }
 
   // RFC-TM-10 §1 (rfc-tm-10-diamond.md, D-LEG-1, issue #59) — REPLACES the
@@ -4395,8 +4418,29 @@ export class TypeScriptToTypedMindConverter {
   // object-literal's body into its name/type/optionality — the same
   // `^(\w+)(\?)?\s*:\s*(.+)$` shape `parseObjectProperties` uses, applied to
   // one brace-depth-correct property string instead of a naively-split line.
+  //
+  // Fixture 98 (`sammons/slat` rung) — the `readonly` PROPERTY MODIFIER is
+  // stripped before the name is read. Without the strip, `readonly a: T`
+  // fails the `^(\w+)` anchor (the space after `readonly` is not `\w`), the
+  // function returns `undefined`, and `parseInlineObjectLiteralToFields`
+  // `continue`s past the field — so a `type X = { readonly a: T }` alias
+  // emitted a field-LESS `X %` and every type reachable only through a
+  // dropped field became `checker/orphaned-entity`. Measured on the slat
+  // corpus: 139 of 140 emitted DTOs had zero fields.
+  //
+  // The strip is deliberately NOT `\breadonly\b` anywhere in the string: a
+  // property legitimately NAMED `readonly` (`{ readonly: boolean }`) must
+  // keep parsing as the field `readonly`. Requiring whitespace AND a
+  // following property-name character after the modifier distinguishes the
+  // modifier (`readonly a: T`) from the property name (`readonly: T`) —
+  // in the latter the next character is `:`, not a name start.
+  //
+  // The interface path is unaffected: it reads modifiers off the AST rather
+  // than off type TEXT, which is why `interface X { readonly a: T }` always
+  // emitted its fields correctly and only the type-alias path lost them.
   private parseObjectLiteralProperty(propertyText: string): { name: string; type: string; optional: boolean } | undefined {
-    const match = propertyText.match(/^(\w+)(\?)?\s*:\s*(.+)$/s);
+    const withoutModifier = propertyText.replace(/^readonly\s+(?=[A-Za-z_$])/, '');
+    const match = withoutModifier.match(/^(\w+)(\?)?\s*:\s*(.+)$/s);
     if (!match?.[1] || !match[3]) {
       return undefined;
     }
