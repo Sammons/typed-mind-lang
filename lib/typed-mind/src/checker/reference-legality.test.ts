@@ -194,6 +194,54 @@ describe('walk quirks (validator.ts:1252-1253, 1305-1321, 1400-1409)', () => {
   });
 });
 
+// Gap 67 (ladder rung sammons/slat-harness, fixture
+// 67-implements-data-interface) — `VALID_REFERENCES.extends`/`.implements`
+// gained 'DTO' on the `to` side. A TypeScript interface has no single
+// TypedMind kind: the extractor classifies it by shape (method-bearing ->
+// Class, property-only -> DTO), and a class may legally implement either, so
+// pinning the slot to Class/ClassFile made a common source shape
+// unrepresentable. These fixtures pin the widening AND its edges.
+describe('extends/implements accept a DTO target (gap 67)', () => {
+  it('implements-to-DTO is legal', async () => {
+    const result = await check(
+      ['App -> Main v1.0.0', 'Main @ src/main.ts:', '  -> [Span, NoopSpan]', 'Span %', '  - name: string', 'NoopSpan <: Span', ''].join(
+        '\n',
+      ),
+    );
+    assert.deepEqual(messagesByCode(result, 'checker/reference-to-illegal'), []);
+  });
+
+  it('a DTO target still has to EXIST — widening the kind did not drop the existence check', async () => {
+    const result = await check(['App -> Main v1.0.0', 'Main @ src/main.ts:', '  -> [NoopSpan]', 'NoopSpan <: Ghost', ''].join('\n'));
+    assert.deepEqual(messagesByCode(result, 'checker/unknown-base-class'), ["Class 'NoopSpan' extends 'Ghost' which does not exist"]);
+  });
+
+  it('the widening is exactly one kind — a Function target stays illegal', async () => {
+    const result = await check(
+      ['App -> Main v1.0.0', 'Main @ src/main.ts:', '  -> [helper, Impl]', 'helper :: helper() => void', 'Impl <: helper', ''].join('\n'),
+    );
+    assert.deepEqual(messagesByCode(result, 'checker/reference-to-illegal'), ["Cannot use 'extends' to reference Function 'helper'"]);
+  });
+
+  it('the from side is untouched — a DTO cannot itself declare inheritance', () => {
+    // Asserted through `checkSingleReference` directly: the grammar gives a
+    // DTO no inherit syntax, so the from-side gate is only reachable here.
+    const dtoReferencer = new FileNode({
+      name: 'NotAClass',
+      span: span(10),
+      raw: 'NotAClass @ src/x.ts:',
+      sourceForm: 'shortform',
+      path: 'src/x.ts',
+      imports: [],
+      exports: [],
+    });
+    const context = new CheckContext({ entities: [dtoReferencer], imports: [], diagnostics: [] }, computeLinks([dtoReferencer]));
+    checkSingleReference(context, dtoReferencer, 'implements' as ReferenceKind, 'NotAClass');
+    const messages = context.findings.filter((f) => f.code === 'checker/reference-from-illegal').map((f) => f.message);
+    assert.equal(messages.length, 1, `expected a from-side rejection; got ${JSON.stringify(messages)}`);
+  });
+});
+
 describe('from-side + unknown-ref-type arms (defensive gates, exercised directly)', () => {
   it('emits the from-side error verbatim for a kind outside the from list', () => {
     const fn = new FunctionNode({

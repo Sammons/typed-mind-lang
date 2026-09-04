@@ -162,17 +162,31 @@ const cases: readonly FixtureCase[] = [
   // expectations) for the per-gap adjudication and root causes.
   //
   // 66 is fixed in this change (mixin-application extends targets now
-  // resolve to the mixin's base argument), so its checker verdict is
-  // `true`. 67/68 record `false` — each carries the exact diagnostic its
-  // known-gap pin asserts. 69 records `true` precisely BECAUSE its gap is
-  // checker-invisible: the dropped interface method produces no finding at
-  // all, which is what makes it the severe one.
+  // resolve to the mixin's base argument), so its checker verdict is `true`.
+  //
+  // 67 and 69 are now BOTH fixed (see slat-harness-known-gaps.test.ts, whose
+  // gap pins were re-baselined into fail-before/pass-after regressions):
+  // a method-bearing interface extracts as a Class carrying its methods, and
+  // `VALID_REFERENCES.extends`/`.implements` accept a DTO target so a class
+  // implementing a data-shaped interface resolves. 67 FLIPS false -> true.
+  //
+  // 69 stays `true`, but the reason inverted, and the distinction matters:
+  // it used to check clean because its interface method vanished with zero
+  // diagnostic (silent data loss — the severe gap). It now checks clean
+  // because the method is modeled on the only kind that can hold it. The
+  // golden itself is the evidence of the change (`Repository %` with a
+  // dropped `save` became `Repository <:` / `=> [save]`); this table's
+  // verdict column cannot express it, which is why the regression suite
+  // asserts the entity kind directly.
+  //
+  // 68 keeps `false` — a separate, unowned root cause (the analyzer never
+  // reads `node.typeParameters`), untouched by this change.
   { fixture: '66-mixin-extends-call', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   {
     fixture: '67-implements-data-interface',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   { fixture: '68-generic-type-parameters', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '69-interface-method-dropped', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },

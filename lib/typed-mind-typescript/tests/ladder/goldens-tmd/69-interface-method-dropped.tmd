@@ -8,8 +8,7 @@ program Index__App {
 IndexFile @ src/index.ts:
   -> [Repository, persist]
 
-persist :: persist(repository: Repository) => void
-  <- Repository
+Repository <:
+  => [save]
 
-Repository %
-  - id: string
+persist :: persist(repository: Repository) => void
