@@ -152,7 +152,21 @@ describe('RFC-TM-9 Q2 check — X-CONV-4: collision-safe naming + I-13 degrade-n
     );
   });
 
-  it('I-13: a real duplicate-entity-name collision still writes partial output and exits nonzero via the CLI', () => {
+  // decision-same-named-entities PR 1 — RE-PINNED. This test previously
+  // asserted the I-13 DEGRADE path for this fixture: a nonzero CLI exit plus
+  // PARTIAL output. Fixture 18 is two files each declaring `class Widget`,
+  // which is exactly the cross-module collision PR 1 resolves, so there is no
+  // longer anything here to degrade FROM — the collision is renamed
+  // (`Other__Widget`) and the CLI exits 0 with COMPLETE output. Strictly
+  // better than the behaviour this test pinned: the same entities, none lost,
+  // and the collision reported as a warning that names both paths.
+  //
+  // The I-13 degrade-never-discard POLICY is unchanged and still covered:
+  // `convert()`'s partial-output emission path (see its `addError`
+  // /`Partial-output emission also failed` arm) is untouched by this change.
+  // What changed is that a duplicate entity name is no longer one of the
+  // errors that triggers it.
+  it('I-13: a duplicate entity name no longer degrades — the CLI exits 0 with complete output', () => {
     const projectDir = fixturePath('18-i13-degrade-never-discard');
     const outputPath = join(mkdtempSync(join(tmpdir(), 'tm9-q2-i13-')), 'out.tmd');
     try {
@@ -168,11 +182,16 @@ describe('RFC-TM-9 Q2 check — X-CONV-4: collision-safe naming + I-13 degrade-n
       } catch (error) {
         exitCode = (error as { status?: number }).status ?? 1;
       }
-      assert.notEqual(exitCode, 0, 'a real duplicate-entity-name collision must exit nonzero');
-      assert.equal(existsSync(outputPath), true, 'I-13: partial output must still be written, never discarded');
+      assert.equal(exitCode, 0, 'a duplicate entity name is now resolved by a rename, not an abort');
+      assert.equal(existsSync(outputPath), true, 'output must be written');
       const content = readFileSync(outputPath, 'utf-8');
-      assert.ok(content.length > 0, 'the partial output file must be non-empty');
-      assert.ok(content.includes('Widget'), 'the successfully-converted entities before the collision are preserved');
+      assert.ok(content.length > 0, 'the output file must be non-empty');
+
+      // BOTH colliding classes are present: the first declarer keeps the bare
+      // name, the second is qualified by its sanitized module basename. Before
+      // PR 1 only one survived, and the run failed.
+      assert.ok(content.includes('Widget <:'), 'main.ts keeps the bare Widget');
+      assert.ok(content.includes('Other__Widget'), 'other.ts is renamed, not dropped');
     } finally {
       rmSync(dirname(outputPath), { recursive: true, force: true });
     }
