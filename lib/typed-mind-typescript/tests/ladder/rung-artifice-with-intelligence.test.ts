@@ -3,11 +3,17 @@
 // Target shape: a single-package Node 26 agent-friendly email service
 // (HATEOAS + MJML), 3 tsconfigs, generics-heavy, 163 TypeScript files.
 //
-// Fixture 94 is a FIX (fail-before / pass-after). Fixtures 95 and 96 are
-// KNOWN GAPS, pinned with positive assertions per the harness convention
-// (slat-harness-known-gaps.test.ts:1-9): each asserts the defect is STILL
+// Fixture 94 is a FIX (fail-before / pass-after). Fixture 95 is a KNOWN GAP,
+// pinned with positive assertions per the harness convention
+// (slat-harness-known-gaps.test.ts:1-9): it asserts the defect is STILL
 // present, so the day it is fixed this suite fails loudly and the
 // expectation gets re-baselined deliberately rather than drifting.
+//
+// Fixture 96 was such a gap and has been PARTIALLY fixed by
+// decision-same-named-entities PR 1 — its declaration half is closed (the
+// abort is gone; the second declaration is renamed) and its reference half
+// remains pinned. That re-baselining is exactly the deliberate flip this
+// convention exists to force. See the describe block's own comment.
 //
 // No existing assertion is weakened by this file.
 import assert from 'node:assert/strict';
@@ -93,19 +99,110 @@ describe('artifice rung, KNOWN GAP 95: a generic function type parameter leaks i
   });
 });
 
-describe('artifice rung, KNOWN GAP 96: two files declaring the same type alias abort the whole conversion', () => {
-  it('KNOWN GAP — the collision still fails the conversion via convertTypeAliasToDTO (:2173)', () => {
+// decision-same-named-entities PR 1 — RE-PINNED. Gap 96 was the type-alias
+// twin of fixture 77: both files declare `export type PublishState`, and
+// `convertTypeAliasToDTO` aborted the whole conversion with
+// `Duplicate entity name: PublishState` (`success: false`, partial output).
+// The memo this PR implements named exactly this fixture as one of the two
+// knownGaps it unblocks.
+//
+// The abort is GONE. The DECLARATION half is fixed: `reserveTypeEntityNames`
+// renames the second declarer to `Lifecycle__PublishState`, both TypeDefs
+// survive carrying their own right-hand sides, and the run completes.
+//
+// The REFERENCE half is still the gap, so this fixture stays a pin for it —
+// same status as fixture 77, and for the same reason. `advance(state:
+// PublishState)` and `nextState(...)` hold raw type TEXT that PR 1 cannot
+// resolve to a declaring module (`getTypeString` is a bare
+// `typeNode.getText()`; `types.ts` has no resolved-type-origin field), so
+// those references stay bare and each one emits an interim-window warning.
+// The assertions below characterize that interim state; when PR 2 lands they
+// fail by design and get re-baselined deliberately.
+describe('artifice rung, gap 96: same type alias in two files — declaration renamed (PR 1), references still bare (PR 2)', () => {
+  it('FIXED (PR 1): the conversion completes — no duplicate-name abort', () => {
     const result = convert('96-same-name-type-alias-two-files');
-    assert.equal(result.success, false, 'the duplicate-name abort must still be present and annotated');
+    assert.equal(result.success, true, 'the duplicate-name abort is replaced by a rename');
     assert.deepEqual(
       result.errors.map((e) => e.message),
-      ['Duplicate entity name: PublishState'],
+      [],
+      'no error may survive the rename',
     );
   });
 
-  it('degrade-not-discard still holds: partial entities are emitted alongside the error', () => {
+  it('FIXED (PR 1): both type aliases survive, the second module-qualified, each with its own RHS', () => {
     const result = convert('96-same-name-type-alias-two-files');
-    assert.ok(result.entities.length > 0, 'X-CONV-4 requires partial output, not a total discard');
-    assert.notEqual(result.tmdContent, '', 'partial .tmd content must still be emitted');
+
+    const publishStateEntities = result.entities
+      .map((entity) => entity.name)
+      .filter((name) => name === 'PublishState' || name.endsWith('__PublishState'))
+      .sort();
+    assert.deepEqual(
+      publishStateEntities,
+      ['Lifecycle__PublishState', 'PublishState'],
+      'index.ts keeps the bare name; lifecycle.ts is qualified by its sanitized module basename',
+    );
+
+    // Each keeps its OWN aliased type — the renamed entity is a real, distinct
+    // entity, not the survivor wearing the other module's shape.
+    assert.ok(
+      result.tmdContent.includes("PublishState = 'draft' | 'published'"),
+      `index.ts's own union must survive verbatim: ${result.tmdContent}`,
+    );
+    assert.ok(
+      result.tmdContent.includes('Lifecycle__PublishState = (typeof publishStates)[number]'),
+      `lifecycle.ts's own indexed-access alias must survive verbatim: ${result.tmdContent}`,
+    );
+  });
+
+  it('FIXED (PR 1): the collision warning names both declaring paths and the resulting name', () => {
+    const result = convert('96-same-name-type-alias-two-files');
+    assert.deepEqual(
+      result.warnings.map((warning) => warning.message).filter((message) => message.startsWith('Duplicate entity name ')),
+      [
+        "Duplicate entity name 'PublishState' declared in both 'src/index.ts' and 'src/lifecycle.ts'; the declaration whose file path sorts first kept the bare name, so 'src/lifecycle.ts' was renamed to 'Lifecycle__PublishState'. TypedMind entity names are global to a document.",
+      ],
+    );
+  });
+
+  it('STILL THE GAP (PR 2): raw type-text references stay bare, and each one warns', () => {
+    const result = convert('96-same-name-type-alias-two-files');
+
+    // Three reference positions hold raw text PR 1 cannot resolve:
+    // `advance`'s input, and `nextState`'s input and output.
+    const interimWarnings = result.warnings
+      .map((warning) => warning.message)
+      .filter((message) => message.startsWith("Reference to 'PublishState'"));
+    assert.equal(
+      interimWarnings.length,
+      3,
+      `each unresolved reference must warn so the interim window is visible: ${JSON.stringify(interimWarnings)}`,
+    );
+
+    // The signature text itself is untouched — still naming the bare alias.
+    assert.ok(result.tmdContent.includes('advance(state: PublishState)'), 'the reference stays BARE — reference-following is PR 2');
+  });
+
+  it('STILL THE GAP (PR 2): no duplicate-name or multi-exported finding; the residual is the aliased import', async () => {
+    const result = convert('96-same-name-type-alias-two-files');
+    const codes = (await diagnose(result.tmdContent)).map((diagnostic) => diagnostic.code);
+
+    // The rename's whole purpose: the global namespace is genuinely
+    // collision-free now, so neither check fires.
+    assert.deepEqual(
+      codes.filter((code) => code === 'checker/duplicate-name' || code === 'checker/multi-exported'),
+      [],
+      `no duplicate-name and no multi-exported finding may survive the rename: ${JSON.stringify(codes)}`,
+    );
+
+    // Residuals pinned exactly so any OTHER finding appearing here fails.
+    // Two orphans (the renamed TypeDef and its bare sibling are referenced
+    // only from raw signature text the orphan check does not walk) plus the
+    // aliased-import `StoredPublishState` shape this fixture was built for —
+    // all three are PR 2's territory.
+    assert.deepEqual(
+      codes.sort(),
+      ['checker/orphaned-entity', 'checker/orphaned-entity', 'checker/output-dto-not-found'],
+      `unexpected residual diagnostics: ${JSON.stringify(codes)}`,
+    );
   });
 });

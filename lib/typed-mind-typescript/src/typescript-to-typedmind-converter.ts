@@ -349,6 +349,60 @@ export class TypeScriptToTypedMindConverter {
   // way the entity names themselves did). Scoped to the current `convert()`
   // call, cleared in `reset()` like every other per-run map here.
   private readonly functionNameRemap = new Map<string, string>();
+  // decision-same-named-entities PR 1 — the TYPE-side sibling of
+  // `functionNameRemap`, covering every non-function declaration form that
+  // lands in the flat global entity namespace: class, interface, type alias,
+  // enum, and constant. Keyed by `${module.filePath}::${declName}` for the
+  // identical reason `functionNameRemap` is (a bare-name key would collide
+  // across modules exactly the way the entity names themselves do — that IS
+  // the bug being fixed). The value is the FINAL emitted entity name: the
+  // bare name for the first module to declare it, and a module-qualified
+  // `<disambiguator>__<declName>` for every later one, per
+  // `reserveTypeEntityNames`.
+  //
+  // Before this map, six sibling declaration sites (`convertToClassFile`,
+  // `convertClass`, `convertInterfaceToDTO`, `convertTypeAliasToDTO`,
+  // `convertEnumToTypeDef`, plus `convertFunction`'s own defensive arm) each
+  // `addError`ed `Duplicate entity name` on a cross-module bare-name
+  // collision, which fails the WHOLE conversion — one collision killed a
+  // 349-entity extraction. `createConstantEntity` did something strictly
+  // worse: it silently `return`ed, so the surviving Constants entity carried
+  // the WRONG module's shape while both Files still listed it, converting a
+  // loud failure into silent semantic corruption. Entity names are global to
+  // a `.tmd` document by the grammar's own design (`grammar.md:30-41` keys
+  // every entity form by one flat `<entity_name>`; `check-context.ts`'s
+  // `byName` is a flat `Map<string, EntityNode>` with no module dimension),
+  // so module-qualification must produce a unique NAME, not a namespace.
+  private readonly typeNameRemap = new Map<string, string>();
+  // decision-same-named-entities PR 1 — the first module (by
+  // `reserveTypeEntityNames`'s deterministic module order) to declare each
+  // bare type-side name, so the collision warning can name BOTH colliding
+  // paths (`declared in both '<pathA>' and '<pathB>'`). Keyed by the bare
+  // declaration name, valued by the declaring module's relative path.
+  private readonly typeNameFirstDeclarer = new Map<string, string>();
+  // decision-same-named-entities PR 1 — every bare name that LOST a
+  // collision somewhere in this run (i.e. at least one module's declaration
+  // of it was renamed). This is the interim-window signal: PR 1 renames the
+  // DECLARATION but cannot yet rewrite the nine reference sites that hold
+  // raw type TEXT (`getTypeString` is a bare `typeNode.getText()` and
+  // `types.ts` carries no resolved-type-origin field, so a reference like
+  // `Map<Config, Result[]>` cannot be resolved to a declaring module without
+  // PR 2's TypeChecker plumbing). Every such reference is warned about here
+  // so the window between PR 1 and PR 2 is VISIBLE rather than inferred from
+  // a downstream `checker/dto-field-unknown-type`.
+  private readonly collidedTypeNames = new Set<string>();
+  // decision-same-named-entities PR 1 — the project-relative,
+  // extension-stripped module path -> the module's ABSOLUTE `filePath`.
+  // `resolveImportToEntity` already computes a `resolvedTarget` from the
+  // analyzer's `ts.resolveModuleName` graph, but that value is
+  // project-relative and extension-stripped (`moduleGraphResolution`'s own
+  // field comment), while `typeNameRemap` is keyed by absolute `filePath`
+  // like every other per-module map here. This index is the normalization
+  // between the two, built from the module list itself rather than by
+  // re-appending a guessed extension to the relative path — the guess is
+  // exactly the extension-mismatch trap `fileEntityNameByRelativePath` was
+  // added to avoid (RC-E, issue #107).
+  private readonly modulePathByRelativePath = new Map<string, string>();
   // SST-referenced-module orphan flags (issue #52's own PR #74 closing
   // comment; lead-authorized amendment extending X-AN-11's mechanism) —
   // maps a module's absolute `filePath` to its FINAL File/ClassFile entity
@@ -619,6 +673,17 @@ export class TypeScriptToTypedMindConverter {
   // one exporter; the first claimant wins and later files import it without
   // re-exporting.
   private readonly claimedStubExportNames = new Set<string>();
+  // decision-same-named-entities PR 1 — the bare-name index over
+  // `entityRegistry`. See `registryHasBareName` for why this is an index
+  // rather than a scan.
+  private readonly registryBareNames: Record<keyof EntityRegistry, Set<string>> = {
+    functions: new Set(),
+    classes: new Set(),
+    interfaces: new Set(),
+    types: new Set(),
+    constants: new Set(),
+    files: new Set(),
+  };
   private readonly entityRegistry: EntityRegistry = {
     functions: new Map(),
     classes: new Map(),
@@ -832,11 +897,16 @@ export class TypeScriptToTypedMindConverter {
   // design (they are modelable via real edges, never suppressed — doc §6/§9).
   private computeSuppressions(entities: readonly EntityNode[]): SuppressionNode[] {
     const suppressions: SuppressionNode[] = [];
+    const classRegistryByEntityName = this.buildClassRegistryEntryByEntityName();
     for (const entity of entities) {
       if (entity.kind !== 'Class') {
         continue;
       }
-      const registryEntry = this.entityRegistry.classes.get(entity.name);
+      // decision-same-named-entities PR 1 — `entity.name` is the FINAL
+      // emitted name, module-qualified for a collision loser, while the
+      // registry records the raw declaration name. Resolved via the map
+      // built once above.
+      const registryEntry = classRegistryByEntityName.get(entity.name);
       if (registryEntry === undefined || registryEntry.exported) {
         continue;
       }
@@ -879,6 +949,10 @@ export class TypeScriptToTypedMindConverter {
     this.entityNames.clear();
     this.reservedNamedTypeNames.clear();
     this.functionNameRemap.clear();
+    this.typeNameRemap.clear();
+    this.typeNameFirstDeclarer.clear();
+    this.collidedTypeNames.clear();
+    this.modulePathByRelativePath.clear();
     this.fileEntityNameByModulePath.clear();
     this.fileEntityNameByRelativePath.clear();
     this.reservedFileEntityNameByModulePath.clear();
@@ -905,10 +979,68 @@ export class TypeScriptToTypedMindConverter {
     this.entityRegistry.types.clear();
     this.entityRegistry.constants.clear();
     this.entityRegistry.files.clear();
+    for (const bareNames of Object.values(this.registryBareNames)) {
+      bareNames.clear();
+    }
   }
 
   private addEntityName(entityName: string, _context: string): void {
     this.entityNames.add(entityName);
+  }
+
+  // decision-same-named-entities PR 1 — the composite key shape for
+  // `entityRegistry.classes/interfaces/types/constants`. Identical in shape
+  // to `functionNameRemap`/`typeNameRemap`'s own `${filePath}::${name}` key,
+  // for the identical reason: a bare-name key collapses two modules'
+  // declarations into one last-write-wins entry, which is the very
+  // collision the rename resolves. `entityRegistry.functions` keeps its
+  // bare-name key — no consumer of it needs per-module resolution, and
+  // changing it is outside this change's scope.
+  private static registryKey(sourceFile: string, name: string): string {
+    return `${sourceFile}::${name}`;
+  }
+
+  // decision-same-named-entities PR 1 — "does ANY module declare this bare
+  // name in this registry bucket?", the exact question every pre-existing
+  // consumer of the bare-name-keyed registry was asking. Preserves those
+  // consumers' semantics verbatim across the composite-key re-key.
+  //
+  // Backed by `registryBareNames`, a per-bucket bare-name index maintained
+  // alongside the composite-keyed registry, NOT by a scan over the registry's
+  // values. A scan is O(registry) per call and these predicates run once per
+  // type reference: on a module that imports `typescript`, the analyzer's
+  // traversal makes the registry large enough that the product is quadratic
+  // and the suite stops finishing (measured: `q12-not-exported-namespace-
+  // implements` went from ~2s to >60s on the scan implementation). The index
+  // is cleared in `reset()` next to the registry buckets it mirrors.
+  private registryHasBareName(bucket: keyof EntityRegistry, bareName: string): boolean {
+    return this.registryBareNames[bucket].has(bareName);
+  }
+
+  // decision-same-named-entities PR 1 — `computeSuppressions`'s inverse
+  // lookup, built ONCE per call rather than scanned per entity. The registry
+  // is keyed by `${sourceFile}::${declName}`, which is exactly
+  // `typeNameRemap`'s own key shape, so the emitted name for any entry is
+  // `typeNameRemap.get(thatKey)`. A class that never collided maps to its
+  // bare declaration name, so this reduces to the pre-change bare lookup for
+  // every entity that did not collide.
+  //
+  // Built as a map, not scanned: `computeSuppressions` already iterates every
+  // entity, and a per-entity scan over the class registry is quadratic on any
+  // module that pulls a large ambient surface into the registry (a module
+  // importing `typescript` is the measured case).
+  private buildClassRegistryEntryByEntityName(): Map<string, EntityInfo> {
+    const byEntityName = new Map<string, EntityInfo>();
+    for (const [key, entityInfo] of this.entityRegistry.classes) {
+      const emittedName = this.typeNameRemap.get(key) ?? createEntityName(entityInfo.name);
+      // First writer wins, matching the pre-change `Map.get` semantics on a
+      // bare-name-keyed registry where a later duplicate overwrote nothing
+      // this consumer could distinguish.
+      if (!byEntityName.has(emittedName)) {
+        byEntityName.set(emittedName, entityInfo);
+      }
+    }
+    return byEntityName;
   }
 
   private filterModules(modules: readonly ParsedModule[]): ParsedModule[] {
@@ -1020,6 +1152,18 @@ export class TypeScriptToTypedMindConverter {
     for (const module of modules) {
       this.reserveNamedTypeEntityNames(module);
     }
+
+    // decision-same-named-entities PR 1 — reserve every module's TYPE-side
+    // entity names (class, interface, type alias, enum, constant) up front,
+    // across the WHOLE `modules` list, so a cross-module bare-name collision
+    // is resolved by a deterministic module-qualified rename instead of
+    // aborting the conversion at seven `addError` sites (or, for constants,
+    // silently dropping the loser). Runs next to the reservation passes
+    // above and before `reserveFileEntityNames` for the same reason they do:
+    // every downstream consumer needs the FINAL name, and "is this module
+    // the first to declare this name?" is only answerable with every module
+    // in view. See `reserveTypeEntityNames`'s own doc comment.
+    this.reserveTypeEntityNames(modules);
 
     // RC-B (issue #100) — reserve every module's File-entity name up front,
     // across the WHOLE `modules` list, before any module converts. See
@@ -1276,6 +1420,7 @@ export class TypeScriptToTypedMindConverter {
         exported: this.isFunctionExported(func, module),
       };
       this.entityRegistry.functions.set(func.name, entityInfo);
+      this.registryBareNames.functions.add(func.name);
     }
 
     // Collect all classes
@@ -1286,7 +1431,8 @@ export class TypeScriptToTypedMindConverter {
         sourceFile,
         exported: module.exports.some((exp) => exp.name === cls.name),
       };
-      this.entityRegistry.classes.set(cls.name, entityInfo);
+      this.entityRegistry.classes.set(TypeScriptToTypedMindConverter.registryKey(sourceFile, cls.name), entityInfo);
+      this.registryBareNames.classes.add(cls.name);
     }
 
     // Collect all interfaces
@@ -1297,7 +1443,8 @@ export class TypeScriptToTypedMindConverter {
         sourceFile,
         exported: module.exports.some((exp) => exp.name === iface.name),
       };
-      this.entityRegistry.interfaces.set(iface.name, entityInfo);
+      this.entityRegistry.interfaces.set(TypeScriptToTypedMindConverter.registryKey(sourceFile, iface.name), entityInfo);
+      this.registryBareNames.interfaces.add(iface.name);
       // Gap 69/67 — see `interfacesPredictedClassKind`'s field comment. The
       // shape decision needs the whole program's interfaces before it can
       // resolve a heritage chain, so Phase 1 only INDEXES here; the
@@ -1314,7 +1461,8 @@ export class TypeScriptToTypedMindConverter {
         sourceFile,
         exported: module.exports.some((exp) => exp.name === type.name),
       };
-      this.entityRegistry.types.set(type.name, entityInfo);
+      this.entityRegistry.types.set(TypeScriptToTypedMindConverter.registryKey(sourceFile, type.name), entityInfo);
+      this.registryBareNames.types.add(type.name);
       // See `typesRegistryPredictedKind`'s field comment.
       this.typesRegistryPredictedKind.set(type.name, this.isObjectLikeType(type.type) ? 'DTO' : 'TypeDef');
     }
@@ -1335,7 +1483,8 @@ export class TypeScriptToTypedMindConverter {
         sourceFile,
         exported: module.exports.some((exp) => exp.name === enumDef.name),
       };
-      this.entityRegistry.types.set(enumDef.name, entityInfo);
+      this.entityRegistry.types.set(TypeScriptToTypedMindConverter.registryKey(sourceFile, enumDef.name), entityInfo);
+      this.registryBareNames.types.add(enumDef.name);
       this.typesRegistryPredictedKind.set(enumDef.name, 'TypeDef');
     }
 
@@ -1347,7 +1496,8 @@ export class TypeScriptToTypedMindConverter {
         sourceFile,
         exported: this.isConstantExported(constant, module),
       };
-      this.entityRegistry.constants.set(constant.name, entityInfo);
+      this.entityRegistry.constants.set(TypeScriptToTypedMindConverter.registryKey(sourceFile, constant.name), entityInfo);
+      this.registryBareNames.constants.add(constant.name);
     }
   }
 
@@ -1561,7 +1711,7 @@ export class TypeScriptToTypedMindConverter {
     // Convert all type aliases FIRST (they become TypeDef/DTO entities with their exact names)
     for (const typeAlias of module.types) {
       if (this.isTypeAliasExported(typeAlias, module)) {
-        this.convertTypeAliasToDTO(typeAlias);
+        this.convertTypeAliasToDTO(typeAlias, module);
       }
     }
 
@@ -1569,14 +1719,14 @@ export class TypeScriptToTypedMindConverter {
     // 'enum'), the same lane as type aliases, not the Constants lane.
     for (const enumDef of module.enums ?? []) {
       if (this.isEnumExported(enumDef, module)) {
-        this.convertEnumToTypeDef(enumDef);
+        this.convertEnumToTypeDef(enumDef, module);
       }
     }
 
     // Then convert interfaces to DTOs
     for (const iface of module.interfaces) {
       if (this.isInterfaceExported(iface, module)) {
-        this.convertInterface(iface);
+        this.convertInterface(iface, module);
       }
     }
 
@@ -1648,7 +1798,7 @@ export class TypeScriptToTypedMindConverter {
     }
 
     const entityName = createEntityName(extendsTarget);
-    if (this.entityRegistry.classes.has(extendsTarget) || this.entityRegistry.interfaces.has(extendsTarget)) {
+    if (this.registryHasBareName('classes', extendsTarget) || this.registryHasBareName('interfaces', extendsTarget)) {
       // A real class/interface in the analyzed source happens to share a
       // name with a known ambient builtin (e.g. a project defines its own
       // `Error` class) — the real declared entity wins, no stub needed.
@@ -1722,6 +1872,19 @@ export class TypeScriptToTypedMindConverter {
   // grammar-representable list: a namespace-qualified target (contains `.`)
   // is replaced by its sanitized stub's entity name; a bare identifier
   // target passes through unchanged.
+  // decision-same-named-entities PR 1, interim window — a class's
+  // `extends`/`implements` targets are raw source identifiers and are NOT
+  // rewritten to follow a collision rename (PR 2's job). Warn once per
+  // heritage target that names a renamed entity.
+  private warnOnCollidedHeritageReferences(cls: ParsedClass, entityName: string, filePath: string): void {
+    for (const target of cls.extends) {
+      this.warnOnCollidedTypeReference(target, `extends target of class '${entityName}'`, filePath);
+    }
+    for (const target of cls.implements) {
+      this.warnOnCollidedTypeReference(target, `implements target of class '${entityName}'`, filePath);
+    }
+  }
+
   private convertImplementsList(secondaryExtends: readonly string[], implementsTargets: readonly string[]): string[] {
     return [...secondaryExtends, ...implementsTargets].map((target) =>
       target.includes('.') ? this.ensureNamespaceImplementsStub(target) : target,
@@ -1776,12 +1939,12 @@ export class TypeScriptToTypedMindConverter {
       return;
     }
 
-    const entityName = createEntityName(primaryClass.name);
-
-    if (this.entityNames.has(entityName)) {
-      this.addError(`Duplicate entity name: ${entityName}`);
-      return;
-    }
+    // decision-same-named-entities PR 1 — resolve the primary class's final
+    // name through `typeNameRemap` (whole-run pre-pass,
+    // `reserveTypeEntityNames`) instead of `createEntityName` + a hard
+    // `Duplicate entity name` abort, so a cross-module collision renames
+    // rather than failing the whole conversion.
+    const entityName = this.resolveTypeEntityName(module, primaryClass.name);
 
     this.entityNames.add(entityName);
     // SST-referenced-module orphan flags (lead-authorized amendment) —
@@ -1833,6 +1996,8 @@ export class TypeScriptToTypedMindConverter {
     // auto-self-exports, so it can never be RC-G-shaped); any re-exported
     // names `convertExports` reports for this module are not applicable
     // here and are intentionally not read.
+    this.warnOnCollidedHeritageReferences(primaryClass, entityName, module.filePath);
+
     const classFileEntity = new ClassFileNode({
       name: entityName,
       span: SYNTHETIC_SPAN,
@@ -1852,7 +2017,7 @@ export class TypeScriptToTypedMindConverter {
     // Convert other classes as separate entities
     for (const cls of module.classes) {
       if (cls !== primaryClass) {
-        this.convertClass(cls, this.getRelativePath(module.filePath));
+        this.convertClass(cls, this.getRelativePath(module.filePath), module);
       }
     }
 
@@ -1866,21 +2031,21 @@ export class TypeScriptToTypedMindConverter {
     // Convert interfaces as DTOs
     for (const iface of module.interfaces) {
       if (this.isInterfaceExported(iface, module)) {
-        this.convertInterface(iface);
+        this.convertInterface(iface, module);
       }
     }
 
     // Convert all type aliases (both object-like and union types)
     for (const typeAlias of module.types) {
       if (this.isTypeAliasExported(typeAlias, module)) {
-        this.convertTypeAliasToDTO(typeAlias);
+        this.convertTypeAliasToDTO(typeAlias, module);
       }
     }
 
     // X-AN-7/X-CONV-2 — enums emit as TM-8's TypeDef entity kind.
     for (const enumDef of module.enums ?? []) {
       if (this.isEnumExported(enumDef, module)) {
-        this.convertEnumToTypeDef(enumDef);
+        this.convertEnumToTypeDef(enumDef, module);
       }
     }
 
@@ -1951,7 +2116,7 @@ export class TypeScriptToTypedMindConverter {
 
     // Convert other entities
     for (const cls of module.classes) {
-      this.convertClass(cls, this.getRelativePath(module.filePath));
+      this.convertClass(cls, this.getRelativePath(module.filePath), module);
     }
 
     // Only convert functions that are exported
@@ -1963,21 +2128,21 @@ export class TypeScriptToTypedMindConverter {
 
     for (const iface of module.interfaces) {
       if (this.isInterfaceExported(iface, module)) {
-        this.convertInterface(iface);
+        this.convertInterface(iface, module);
       }
     }
 
     // Convert all type aliases (both object-like and union types)
     for (const typeAlias of module.types) {
       if (this.isTypeAliasExported(typeAlias, module)) {
-        this.convertTypeAliasToDTO(typeAlias);
+        this.convertTypeAliasToDTO(typeAlias, module);
       }
     }
 
     // X-AN-7/X-CONV-2 — enums emit as TM-8's TypeDef entity kind.
     for (const enumDef of module.enums ?? []) {
       if (this.isEnumExported(enumDef, module)) {
-        this.convertEnumToTypeDef(enumDef);
+        this.convertEnumToTypeDef(enumDef, module);
       }
     }
 
@@ -1985,13 +2150,13 @@ export class TypeScriptToTypedMindConverter {
     this.convertConstants(module);
   }
 
-  private convertClass(cls: ParsedClass, sourceFile?: string): void {
-    const entityName = createEntityName(cls.name);
-
-    if (this.entityNames.has(entityName)) {
-      this.addError(`Duplicate entity name: ${entityName}`);
-      return;
-    }
+  // decision-same-named-entities PR 1 — `module` is threaded in (every call
+  // site already had it in scope) so the class's final entity name resolves
+  // through `typeNameRemap`. Optional because the converter's own unit tests
+  // construct classes without a surrounding module; a missing module falls
+  // back to the bare name, the pre-change behaviour.
+  private convertClass(cls: ParsedClass, sourceFile?: string, module?: ParsedModule): void {
+    const entityName = this.resolveTypeEntityName(module, cls.name);
 
     this.entityNames.add(entityName);
 
@@ -1999,6 +2164,8 @@ export class TypeScriptToTypedMindConverter {
     // `container`/`path` fields for Class (dead per the honest-fields table —
     // the File->Class lookahead heuristic's product is a ClassFileNode).
     void sourceFile;
+
+    this.warnOnCollidedHeritageReferences(cls, entityName, module?.filePath ?? '');
 
     const classEntity = new ClassNode({
       name: entityName,
@@ -2094,6 +2261,270 @@ export class TypeScriptToTypedMindConverter {
       if (this.isEnumExported(enumDef, module)) {
         this.reservedNamedTypeNames.add(createEntityName(enumDef.name));
       }
+    }
+  }
+
+  // decision-same-named-entities PR 1 — the TYPE-side counterpart of
+  // `reserveFunctionEntityNames`, run as a WHOLE-RUN pre-pass (over the
+  // entire `modules` list, next to the existing `reserveNamedTypeEntityNames`
+  // and `reserveFileEntityNames` loops in `convertModules`) rather than
+  // per-module. Whole-run is required, not stylistic: the remap's whole job
+  // is to answer "is this module the FIRST to declare this name?", and that
+  // question is only answerable once every module's declarations are in
+  // view. A per-module pass would answer it by conversion order, which is
+  // exactly the traversal-order-dependent last-write-wins nondeterminism
+  // RC-B was filed to close for File entities.
+  //
+  // Collision-ONLY: a name declared in exactly one module is untouched. Only
+  // a name declared in two or more modules is disambiguated, and even then
+  // exactly one declaration keeps the bare name.
+  //
+  // WHICH declaration keeps it is decided by a canonical, order-independent
+  // rule: within each colliding group, the declaration whose PROJECT-RELATIVE
+  // FILE PATH sorts first in byte order wins. This is not the same as
+  // "whichever module was traversed first" - `modules` arrives in
+  // BFS-from-entrypoint order, so a first-wins rule makes the emitted names a
+  // function of import-line order and of which entrypoint was used, meaning
+  // two runs over identical source can disagree. Sorting a grouped set is
+  // immune to both. The rule is stated in the collision warning itself so a
+  // reader can predict the outcome without reading this code.
+  //
+  // Name UNIQUENESS is guaranteed by a single `assignedNames` set recording
+  // every name this pass hands out, bare and qualified alike, with all bare
+  // winners reserved BEFORE any qualification runs. Two properties follow: a
+  // qualified name can never be claimed ahead of the bare declarer of that
+  // same base name, and a qualified candidate can never land on a bare name
+  // some other group already owns. The tier ladder itself, and the
+  // collision-proof argument for the `__` separator, live in
+  // `qualifyCollidedTypeName`.
+  //
+  // Scope: class, interface, type alias, enum, and constant — every
+  // declaration form that lands in the flat global entity namespace and that
+  // previously either aborted the run (`addError`) or silently dropped the
+  // loser (`createConstantEntity`). Functions are NOT handled here; they
+  // keep their own pre-existing `reserveFunctionEntityNames` path unchanged.
+  private reserveTypeEntityNames(modules: readonly ParsedModule[]): void {
+    // PHASE 1 — collect every type-side declaration, with no naming decisions
+    // yet. `modulePathByRelativePath` is populated here too since it is a pure
+    // index over the same module list.
+    //
+    // Grouping by BARE NAME first, then sorting, is what makes this pass
+    // order-independent. `modules` arrives in BFS-from-entrypoint traversal
+    // order, so iterating it directly would let an import-line reordering (or
+    // a different entrypoint reaching the same modules by a different path)
+    // change which declaration keeps the bare name — `A__Config` under one
+    // ordering and `C__Config` under another, for the same source tree. Set
+    // operations over a sorted key are immune to that.
+    const declarationsByBareName = new Map<string, { module: ParsedModule; declName: string; relativePath: string }[]>();
+    const seenRemapKeys = new Set<string>();
+
+    for (const module of modules) {
+      this.modulePathByRelativePath.set(this.stripKnownSourceExtension(this.getRelativePath(module.filePath)), module.filePath);
+
+      const declNames = [
+        ...module.classes.map((cls) => cls.name),
+        ...module.interfaces.map((iface) => iface.name),
+        ...module.types.map((typeAlias) => typeAlias.name),
+        ...(module.enums ?? []).map((enumDef) => enumDef.name),
+        ...module.constants.map((constant) => constant.name),
+      ];
+
+      for (const declName of declNames) {
+        // A module may declare the same bare name under two different
+        // collection buckets (a `declare`-merged interface + type alias, an
+        // enum also surfaced as a constant). The first claim wins; re-claiming
+        // must not manufacture a phantom self-collision.
+        const remapKey = `${module.filePath}::${declName}`;
+        if (seenRemapKeys.has(remapKey)) {
+          continue;
+        }
+        seenRemapKeys.add(remapKey);
+
+        const bareName = createEntityName(declName);
+        const group = declarationsByBareName.get(bareName);
+        const entry = { module, declName, relativePath: this.getRelativePath(module.filePath) };
+        if (group) {
+          group.push(entry);
+        } else {
+          declarationsByBareName.set(bareName, [entry]);
+        }
+      }
+    }
+
+    // PHASE 2 — assign names in a canonical order.
+    //
+    // `assignedNames` is the SINGLE authoritative record of every name this
+    // pass hands out, bare and qualified alike. The previous implementation
+    // recorded only qualified names and wrote bare names unguarded, so a
+    // module literally declaring `Config__Config` could be handed a name a
+    // prior collision rename had already produced — two entities, one name,
+    // emitted silently and surfacing only as two `checker/duplicate-name`
+    // findings downstream.
+    const assignedNames = new Set<string>();
+
+    // Bare names are reserved for their winners BEFORE any qualification runs.
+    // Without this, a group processed earlier could burn `Types__Config` as a
+    // disambiguator and leave the module that genuinely declares
+    // `Types__Config` unable to hold its own name. Reserving first means a
+    // qualified name can never be claimed ahead of the bare declarer of that
+    // same base name — the ordering guarantee the tier ladder relies on.
+    const sortedBareNames = [...declarationsByBareName.keys()].sort();
+    const winnerByBareName = new Map<string, { module: ParsedModule; declName: string; relativePath: string }>();
+
+    for (const bareName of sortedBareNames) {
+      const group = declarationsByBareName.get(bareName) ?? [];
+      // THE CANONICAL RULE: the declaration whose project-relative file path
+      // sorts first in byte order keeps the bare name. Documented in the
+      // collision warning so a reader can predict the outcome without reading
+      // this code. Ties inside one file fall back to the declaration name,
+      // which is unique per file per `seenRemapKeys`.
+      const sortedGroup = [...group].sort((left, right) => {
+        if (left.relativePath !== right.relativePath) {
+          return left.relativePath < right.relativePath ? -1 : 1;
+        }
+        return left.declName < right.declName ? -1 : left.declName > right.declName ? 1 : 0;
+      });
+
+      const [winner] = sortedGroup;
+      if (winner === undefined) {
+        continue;
+      }
+      winnerByBareName.set(bareName, winner);
+      declarationsByBareName.set(bareName, sortedGroup);
+      assignedNames.add(bareName);
+      this.typeNameFirstDeclarer.set(bareName, winner.relativePath);
+      this.typeNameRemap.set(`${winner.module.filePath}::${winner.declName}`, bareName);
+    }
+
+    for (const bareName of sortedBareNames) {
+      const group = declarationsByBareName.get(bareName) ?? [];
+      const winner = winnerByBareName.get(bareName);
+      if (winner === undefined) {
+        continue;
+      }
+
+      for (const entry of group) {
+        if (entry === winner) {
+          continue;
+        }
+
+        const qualifiedName = this.qualifyCollidedTypeName(entry.module, entry.declName, bareName, assignedNames);
+        this.typeNameRemap.set(`${entry.module.filePath}::${entry.declName}`, qualifiedName);
+        assignedNames.add(qualifiedName);
+        this.collidedTypeNames.add(bareName);
+
+        // The warning names BOTH colliding paths and the resulting name, and
+        // states the rule that decided the winner, so a reader can act on it
+        // without re-running the extraction or reading this file.
+        this.addWarning(
+          `Duplicate entity name '${bareName}' declared in both '${winner.relativePath}' and '${entry.relativePath}'; the declaration whose file path sorts first kept the bare name, so '${entry.relativePath}' was renamed to '${qualifiedName}'. TypedMind entity names are global to a document.`,
+          entry.module.filePath,
+        );
+      }
+    }
+  }
+
+  // decision-same-named-entities PR 1 — the disambiguator tier ladder for a
+  // declaration that lost its bare name. Tiers mirror `reserveFileEntityNames`
+  // exactly: sanitized module basename, then parent directory name, then the
+  // full sanitized relative directory path, then a `__2`/`__3` counter. Each
+  // tier exists because the one above it is lossy — `sanitizeEntityName`
+  // collapses `/`, `-`, `_` and case into one alnum-only PascalCase string, so
+  // two genuinely different modules can sanitize to the same disambiguator at
+  // any tier.
+  //
+  // The `__` separator is collision-proof for the reason `deriveProgramName`
+  // and `reserveFunctionEntityNames` already document: `sanitizeEntityName`
+  // collapses every run of underscores to exactly one and never re-inserts a
+  // separator, so a literal `__` is provably outside its codomain and cannot
+  // collide with any name derived from real source. Every candidate is checked
+  // against `isValidEntityName` (`/^[a-zA-Z_][a-zA-Z0-9_]*$/`, the grammar's
+  // own `entity_name` token shape) and against `assignedNames`, which by this
+  // point already holds every bare name this pass will hand out.
+  private qualifyCollidedTypeName(module: ParsedModule, declName: string, bareName: string, assignedNames: ReadonlySet<string>): string {
+    const moduleBaseName = this.sanitizeEntityName(path.basename(module.filePath, path.extname(module.filePath)));
+    const parentDirName = this.sanitizeEntityName(path.basename(path.dirname(module.filePath)));
+    const relativeDirName = this.sanitizeEntityName(this.getRelativePath(path.dirname(module.filePath)));
+
+    for (const tier of [moduleBaseName, parentDirName, relativeDirName]) {
+      if (tier === '') {
+        continue;
+      }
+      const candidate = createEntityName(`${tier}__${declName}`);
+      if (!assignedNames.has(candidate) && this.isValidEntityName(candidate)) {
+        return candidate;
+      }
+    }
+
+    // Last-resort counter tier. The seed is made a VALID entity name up front
+    // rather than being re-tested inside the loop: `isValidEntityName` is
+    // invariant under the `__${attempt}` suffix (appending digits can neither
+    // fix an empty seed nor fix a leading digit), so testing it in the loop
+    // guard would spin forever on exactly those seeds instead of terminating.
+    //
+    // Termination: with `isValidEntityName` hoisted out, the only remaining
+    // condition is a finite-set membership test and `attempt` is unbounded, so
+    // a free candidate is always reached.
+    const seedBase = moduleBaseName === '' ? bareName : createEntityName(`${moduleBaseName}__${declName}`);
+    const seed = this.isValidEntityName(seedBase) ? seedBase : this.sanitizeEntityName(seedBase);
+    let attempt = 2;
+    let candidate = `${seed}__${attempt}`;
+    while (assignedNames.has(candidate)) {
+      attempt += 1;
+      candidate = `${seed}__${attempt}`;
+    }
+    return candidate;
+  }
+
+  // decision-same-named-entities PR 1 — resolve a declaration's final entity
+  // name through `typeNameRemap`. `reserveTypeEntityNames` runs as a
+  // whole-run pre-pass over every module, so every class/interface/type-
+  // alias/enum/constant declaration reaching a converter has an entry. A
+  // miss means a caller that constructed the converter's module list outside
+  // `convertModules` (a unit-test mock); falling back to the bare name keeps
+  // that path working exactly as it did before this change.
+  private resolveTypeEntityName(module: ParsedModule | undefined, declName: string): string {
+    if (module === undefined) {
+      return createEntityName(declName);
+    }
+    return this.typeNameRemap.get(`${module.filePath}::${declName}`) ?? createEntityName(declName);
+  }
+
+  // decision-same-named-entities PR 1, INTERIM WINDOW instrumentation.
+  // PR 1 renames the DECLARATION but cannot rewrite the reference sites that
+  // hold raw type TEXT: `getTypeString` (typescript-analyzer.ts) is a bare
+  // `typeNode.getText()` and `types.ts` carries no resolved-type-origin
+  // field, so a reference like `Map<Config, Result[]>` cannot be resolved to
+  // a declaring module without PR 2's TypeChecker plumbing. Until then a
+  // renamed entity is reachable by its NEW name but referenced by its OLD
+  // one, surfacing downstream as `checker/dto-field-unknown-type` /
+  // `checker/input-dto-not-found`. That is loud, and strictly better than
+  // the abort it replaces — but it is only INFERABLE from the downstream
+  // finding. This warning makes it VISIBLE at the exact reference that will
+  // dangle.
+  //
+  // Matching is deliberately over-broad on identifier boundaries and
+  // under-broad on origin: it fires when a renamed bare name appears as a
+  // whole identifier anywhere in the reference's type text, without claiming
+  // the reference actually resolves to the renamed declaration (it may
+  // legitimately point at the first, un-renamed one). Establishing which is
+  // precisely PR 2's job. A false positive here costs one warning; a false
+  // negative costs an invisible dangling reference.
+  private warnOnCollidedTypeReference(typeText: string | undefined, referenceContext: string, filePath: string): void {
+    if (typeText === undefined || typeText === '' || this.collidedTypeNames.size === 0) {
+      return;
+    }
+    const seen = new Set<string>();
+    for (const identifier of typeText.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []) {
+      if (!this.collidedTypeNames.has(identifier) || seen.has(identifier)) {
+        continue;
+      }
+      seen.add(identifier);
+      this.addWarning(
+        `Reference to '${identifier}' in ${referenceContext} is not module-qualified; '${identifier}' is declared in more than one module and later declarations were renamed, so this reference may resolve to the wrong entity or to none.`,
+        filePath,
+        'Type references are not yet rewritten to follow a collision rename; resolve the ambiguity by renaming one declaration in the source.',
+      );
     }
   }
 
@@ -2210,6 +2641,16 @@ export class TypeScriptToTypedMindConverter {
     // converter's own collision-resolved function name, X-CONV-4) seeds
     // issue #72's inline-DTO synthesis naming — see
     // `synthesizeInlineDTO`'s doc comment.
+    // decision-same-named-entities PR 1, interim window — `input`/`output`
+    // are matched from raw parameter/return type TEXT and are not rewritten
+    // to follow a collision rename (PR 2's job). Warn at the reference so the
+    // dangling edge is visible here, not only downstream as
+    // `checker/input-dto-not-found`.
+    for (const parameter of func.parameters) {
+      this.warnOnCollidedTypeReference(parameter.type, `input of function '${entityName}'`, moduleFilePath);
+    }
+    this.warnOnCollidedTypeReference(func.returnType, `output of function '${entityName}'`, moduleFilePath);
+
     const inputDTO = this.extractInputDTO(func, entityName);
     const outputDTO = this.extractOutputDTO(func, entityName);
 
@@ -2288,7 +2729,11 @@ export class TypeScriptToTypedMindConverter {
       // EXPORTED sibling class is a legitimate same-file call-edge target.
       const siblingClass = module.classes.find((cls) => cls.name === calledName);
       if (siblingClass !== undefined && module.exports.some((exp) => exp.name === siblingClass.name)) {
-        const siblingClassEntityName = createEntityName(siblingClass.name);
+        // decision-same-named-entities PR 1 — same-file by construction
+        // (`siblingClass` came from THIS module's own class list), so the
+        // declaring module is known exactly and the rename resolves with no
+        // origin-resolution problem.
+        const siblingClassEntityName = this.resolveTypeEntityName(module, siblingClass.name);
         // valid-references.ts's VALID_REFERENCES table legalizes `calls.to`
         // as `['Function', 'Class']` ONLY — a ClassFile (a File fused with
         // its module's primary class, per `convertToClassFile`) is NOT a
@@ -2389,7 +2834,9 @@ export class TypeScriptToTypedMindConverter {
   // inconsistent in a new way), but it is no longer silent either — an
   // unresolvable parent warns, and a resolvable method-bearing parent now
   // moves the child to the Class lane instead of vanishing.
-  private convertInterface(iface: ParsedInterface): void {
+  // decision-same-named-entities PR 1 — `module` threaded through the
+  // dispatcher into BOTH lanes so either destination can resolve the rename.
+  private convertInterface(iface: ParsedInterface, module?: ParsedModule): void {
     if (this.interfacesWithUnresolvedHeritage.has(iface.name)) {
       const unresolved = iface.extends
         .map((parent) => this.stripGenericArguments(parent))
@@ -2403,10 +2850,10 @@ export class TypeScriptToTypedMindConverter {
     }
 
     if (this.isMethodBearingInterface(iface)) {
-      this.convertInterfaceToClass(iface);
+      this.convertInterfaceToClass(iface, module);
       return;
     }
-    this.convertInterfaceToDTO(iface);
+    this.convertInterfaceToDTO(iface, module);
   }
 
   // The Class lane for a method-bearing interface. Mirrors `convertClass`
@@ -2474,13 +2921,11 @@ export class TypeScriptToTypedMindConverter {
   // trade property fidelity for method fidelity, and ~97% are untouched. The
   // counts drift by one or two between runs because all three corpora are live
   // working trees; the ratio is what the decision rests on.
-  private convertInterfaceToClass(iface: ParsedInterface): void {
-    const entityName = createEntityName(iface.name);
-
-    if (this.entityNames.has(entityName)) {
-      this.addError(`Duplicate entity name: ${entityName}`);
-      return;
-    }
+  // decision-same-named-entities PR 1 — the interface Class lane (gap 69/67,
+  // PR #162) is the SEVENTH declaration site and gets the same treatment as
+  // its six siblings: resolve through `typeNameRemap` rather than aborting.
+  private convertInterfaceToClass(iface: ParsedInterface, module?: ParsedModule): void {
+    const entityName = this.resolveTypeEntityName(module, iface.name);
 
     this.addEntityName(entityName, 'convertInterfaceToClass');
 
@@ -2515,6 +2960,13 @@ export class TypeScriptToTypedMindConverter {
     // `stripGenericArguments` is applied only to the heritage LOOKUP
     // (`resolveInterfaceIsMethodBearing`), never to the emitted text.
     const inheritList = [...iface.extends];
+    // decision-same-named-entities PR 1, interim window — an interface's
+    // heritage targets are raw source identifiers, not rewritten to follow a
+    // collision rename (PR 2's job).
+    for (const target of inheritList) {
+      this.warnOnCollidedTypeReference(target, `extends target of interface-derived class '${entityName}'`, module?.filePath ?? '');
+    }
+
     const classEntity = new ClassNode({
       name: entityName,
       span: SYNTHETIC_SPAN,
@@ -2538,13 +2990,9 @@ export class TypeScriptToTypedMindConverter {
     this.entities.push(classEntity);
   }
 
-  private convertInterfaceToDTO(iface: ParsedInterface): void {
-    const entityName = createEntityName(iface.name);
-
-    if (this.entityNames.has(entityName)) {
-      this.addError(`Duplicate entity name: ${entityName}`);
-      return;
-    }
+  // decision-same-named-entities PR 1 — see `convertInterfaceToClass`.
+  private convertInterfaceToDTO(iface: ParsedInterface, module?: ParsedModule): void {
+    const entityName = this.resolveTypeEntityName(module, iface.name);
 
     this.addEntityName(entityName, 'convertInterfaceToDTO');
 
@@ -2608,6 +3056,10 @@ export class TypeScriptToTypedMindConverter {
       }
 
       const type = this.sanitizeFieldType(prop.type);
+      // decision-same-named-entities PR 1, interim window — this field's type
+      // is raw source text and is NOT rewritten to follow a collision rename
+      // (PR 2's job). Warn if it names a renamed entity.
+      this.warnOnCollidedTypeReference(type, `DTO field '${entityName}.${prop.name}'`, module?.filePath ?? '');
       // RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2): the converter builds a
       // synthetic DtoFieldNode from an already-sanitized type string, not a
       // parsed CST subtree — parseTypeExprText (the same hand-rolled parser
@@ -2639,13 +3091,9 @@ export class TypeScriptToTypedMindConverter {
     this.entities.push(dtoEntity);
   }
 
-  private convertTypeAliasToDTO(typeAliasInput: { name: string; type: string; description?: string }): void {
-    const entityName = createEntityName(typeAliasInput.name);
-
-    if (this.entityNames.has(entityName)) {
-      this.addError(`Duplicate entity name: ${entityName}`);
-      return;
-    }
+  // decision-same-named-entities PR 1 — see `convertInterfaceToClass`.
+  private convertTypeAliasToDTO(typeAliasInput: { name: string; type: string; description?: string }, module?: ParsedModule): void {
+    const entityName = this.resolveTypeEntityName(module, typeAliasInput.name);
 
     // Fixture 90 (mail-agent `src/harness/envelope.ts:266` `DispatchResult`,
     // `src/store/revert.ts:47` `RevertOutcome`) — TypeScript allows an
@@ -2724,6 +3172,10 @@ export class TypeScriptToTypedMindConverter {
     // `Cannot use 'schema' to reference <kind>`.
     this.addEntityName(entityName, 'convertTypeAliasToDTO-alias');
 
+    // decision-same-named-entities PR 1, interim window — the alias's
+    // right-hand side is raw source text, not rewritten to follow a rename.
+    this.warnOnCollidedTypeReference(typeAlias.type, `TypeDef '${entityName}' alias target`, module?.filePath ?? '');
+
     const aliasType = parseTypeExprText(typeAlias.type).typeExpr;
     // D-LEG-2 (rfc-tm-10-diamond.md §2, issue #65) — walk the alias's
     // TypeExprNode for any generic-argument external type needing a
@@ -2749,13 +3201,9 @@ export class TypeScriptToTypedMindConverter {
   // fell through to the generic Constants lane with its member list dropped
   // entirely (the analyzer captured `isEnum`/`enumValues` but the converter
   // never read them — confirmed zero references before this Quantum).
-  private convertEnumToTypeDef(enumDef: { name: string; members: readonly string[]; description?: string }): void {
-    const entityName = createEntityName(enumDef.name);
-
-    if (this.entityNames.has(entityName)) {
-      this.addError(`Duplicate entity name: ${entityName}`);
-      return;
-    }
+  // decision-same-named-entities PR 1 — see `convertInterfaceToClass`.
+  private convertEnumToTypeDef(enumDef: { name: string; members: readonly string[]; description?: string }, module?: ParsedModule): void {
+    const entityName = this.resolveTypeEntityName(module, enumDef.name);
 
     this.addEntityName(entityName, 'convertEnumToTypeDef');
 
@@ -2786,10 +3234,20 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private createConstantEntity(constant: { name: string; type: string; value?: string }, module: ParsedModule): void {
-    const entityName = createEntityName(constant.name);
+    // decision-same-named-entities PR 1 — this site used to SILENTLY `return`
+    // on a name collision, strictly worse than the six sibling `addError`
+    // paths: the surviving Constants entity carried the wrong module's `path`
+    // and `schema` while BOTH Files still listed the name in `exports:`,
+    // producing `checker/multi-exported` plus a silently wrong shape. A
+    // module-qualified rename gives each module its own real entity.
+    const entityName = this.resolveTypeEntityName(module, constant.name);
 
+    // A single module can reach this method twice for one constant (the
+    // module appearing in both the regular and pure-types lanes). Re-creating
+    // would duplicate the entity; the pre-existing skip is preserved for that
+    // case only, now that a genuine cross-module collision has its own
+    // distinct name and can never land here.
     if (this.entityNames.has(entityName)) {
-      // Skip if already created - avoid duplicates
       return;
     }
 
@@ -2797,6 +3255,10 @@ export class TypeScriptToTypedMindConverter {
 
     // Use the real path - multiple constants can share the same file path
     const realPath = this.getRelativePath(module.filePath);
+
+    // decision-same-named-entities PR 1, interim window — the `schema` slot
+    // carries the constant's type text, not rewritten to follow a rename.
+    this.warnOnCollidedTypeReference(constant.type, `Constants '${entityName}' schema`, module.filePath);
 
     const constantSchema = constant.type && constant.type !== 'any' ? this.convertTypeToSchema(constant.type) : undefined;
 
@@ -3397,6 +3859,20 @@ export class TypeScriptToTypedMindConverter {
 
   private extractPublicExportsFromEntrypoint(entryFilePath: string): string[] {
     const relativePath = this.getRelativePath(entryFilePath);
+    // decision-same-named-entities PR 1 — Program.exports is the FOURTH site
+    // building an `exports` list out of raw source names (alongside
+    // `convertExports`, `isDTOLikeType`, and `resolveImportToEntity`), and it
+    // needs the same remap: when the ENTRYPOINT module is the one that lost a
+    // bare-name collision, its own declaration is emitted under the qualified
+    // name while this list still said the bare one — naming an entity the
+    // document does not contain, and colliding with the real bare-name holder
+    // as `checker/multi-exported`. Resolved through the same
+    // `${filePath}::${name}` key the reservation pass wrote; every export that
+    // is not a collision-renamed declaration resolves to `undefined`, which is
+    // exactly when the raw name is already correct.
+    const remapExportName = (name: string): string => {
+      return this.functionNameRemap.get(`${entryFilePath}::${name}`) ?? this.typeNameRemap.get(`${entryFilePath}::${name}`) ?? name;
+    };
 
     // Look up exports from this entry file in our export registry
     const moduleExports =
@@ -3420,7 +3896,7 @@ export class TypeScriptToTypedMindConverter {
     // finding `convertExports` was fixed for, via a different producer of
     // the same verb. Same exclusion, same shared helper.
     if (moduleExports.defaultExport && !this.isPredictedTypeDef(moduleExports.defaultExport)) {
-      publicExports.push(moduleExports.defaultExport);
+      publicExports.push(remapExportName(moduleExports.defaultExport));
     }
 
     // Add all named exports
@@ -3445,6 +3921,8 @@ export class TypeScriptToTypedMindConverter {
       if (namedExport === '*') {
         for (const starName of this.resolveStarReExportNames(moduleExports.filePath)) {
           if (!this.isPredictedTypeDef(starName)) {
+            // A star-expanded name is declared by the SOURCE module, not the
+            // barrel, so it is not remapped against `entryFilePath`.
             publicExports.push(starName);
           }
         }
@@ -3469,13 +3947,13 @@ export class TypeScriptToTypedMindConverter {
         continue;
       }
       if (!this.isPredictedTypeDef(namedExport)) {
-        publicExports.push(namedExport);
+        publicExports.push(remapExportName(namedExport));
       }
     }
 
     // Add namespace export if it exists
     if (moduleExports.namespaceExport) {
-      publicExports.push(moduleExports.namespaceExport);
+      publicExports.push(remapExportName(moduleExports.namespaceExport));
     }
 
     return publicExports;
@@ -3752,8 +4230,22 @@ export class TypeScriptToTypedMindConverter {
       return undefined;
     }
 
-    // Now check if we have the entity in our registry
-    const entityName = createEntityName(importName);
+    // decision-same-named-entities PR 1 — the third mechanical reference
+    // site. `resolvedTarget` (computed above from the analyzer's own
+    // `ts.resolveModuleName` graph) names the DECLARING module exactly, so an
+    // import of a collision-renamed declaration resolves to that
+    // declaration's ACTUAL emitted entity name with no type-origin
+    // inference: normalize the project-relative target to the module's
+    // absolute `filePath` via `modulePathByRelativePath`, then look up
+    // `typeNameRemap` under the same `${filePath}::${name}` key the
+    // reservation pass wrote. Falls through to the bare name when the target
+    // module is unknown (empty `moduleGraph`, unit-test mock) or the name
+    // never collided — both the pre-change behaviour.
+    const declaringModulePath =
+      resolvedTarget !== undefined ? this.modulePathByRelativePath.get(this.stripKnownSourceExtension(resolvedTarget)) : undefined;
+    const entityName =
+      (declaringModulePath !== undefined ? this.typeNameRemap.get(`${declaringModulePath}::${importName}`) : undefined) ??
+      createEntityName(importName);
 
     // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — a `types`-registry name
     // predicted to become a TypeDef is EXCLUDED from import/export
@@ -3769,10 +4261,10 @@ export class TypeScriptToTypedMindConverter {
 
     // Check all entity types for this name
     const foundInFunctions = this.entityRegistry.functions.has(importName);
-    const foundInClasses = this.entityRegistry.classes.has(importName);
-    const foundInInterfaces = this.entityRegistry.interfaces.has(importName);
-    const foundInTypes = this.entityRegistry.types.has(importName);
-    const foundInConstants = this.entityRegistry.constants.has(importName);
+    const foundInClasses = this.registryHasBareName('classes', importName);
+    const foundInInterfaces = this.registryHasBareName('interfaces', importName);
+    const foundInTypes = this.registryHasBareName('types', importName);
+    const foundInConstants = this.registryHasBareName('constants', importName);
 
     if (foundInFunctions || foundInClasses || foundInInterfaces || foundInTypes || foundInConstants) {
       return entityName;
@@ -3857,7 +4349,16 @@ export class TypeScriptToTypedMindConverter {
           // isn't a renamed function (constants, classes, interfaces,
           // ...), which is exactly when the raw `exp.name` is already
           // correct.
-          const remapped = this.functionNameRemap.get(`${module.filePath}::${exp.name}`);
+          //
+          // decision-same-named-entities PR 1 — the same argument applies to a
+          // class/interface/type-alias/enum/constant renamed by
+          // `reserveTypeEntityNames` on a cross-module collision: this File's
+          // `exports:` list must name the entity that actually exists.
+          // `typeNameRemap` is the second lane and returns `undefined` for
+          // every export that is not a collision-renamed declaration, which is
+          // exactly when the raw `exp.name` is already correct.
+          const remapped =
+            this.functionNameRemap.get(`${module.filePath}::${exp.name}`) ?? this.typeNameRemap.get(`${module.filePath}::${exp.name}`);
           exportNames.push(remapped ?? exp.name);
         }
         seenNames.add(exp.name);
@@ -4101,7 +4602,7 @@ export class TypeScriptToTypedMindConverter {
 
     // Class/ClassFile-kind reference: leave input/output undefined, per
     // this item's disclosed-loss rationale above.
-    if (this.entityRegistry.classes.has(cleaned)) {
+    if (this.registryHasBareName('classes', cleaned)) {
       return false;
     }
 
@@ -4129,7 +4630,7 @@ export class TypeScriptToTypedMindConverter {
 
     // Interface-kind reference: the ORIGINAL true positive — still DTO-like,
     // now narrowed to the PROPERTY-ONLY interfaces that still emit a DtoNode.
-    if (this.entityRegistry.interfaces.has(cleaned)) {
+    if (this.registryHasBareName('interfaces', cleaned)) {
       return true;
     }
 

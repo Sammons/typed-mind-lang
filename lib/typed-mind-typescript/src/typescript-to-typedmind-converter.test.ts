@@ -402,7 +402,17 @@ describe('TypeScriptToTypedMindConverter', () => {
     assert.ok(result.tmdContent.indexOf('UserService #:') < result.tmdContent.indexOf('UserDTO %'));
   });
 
-  it('should handle duplicate entity names', () => {
+  // decision-same-named-entities PR 1 — RE-PINNED. This test previously
+  // asserted the ABORT: `success === false` plus a `Duplicate entity name`
+  // error. That abort is gone. A cross-module bare-name collision is now
+  // resolved by a deterministic module-qualified rename
+  // (`reserveTypeEntityNames`), so the conversion COMPLETES with both
+  // classes present under distinct names and emits a warning naming both
+  // declaring paths. The assertions below pin that interim outcome; they are
+  // the new committed fact, not a relaxation of the old one — the collision
+  // is still reported, as a warning that names it precisely rather than as a
+  // failure that discards every other entity in the run.
+  it('a cross-module duplicate entity name is renamed, not aborted', () => {
     const analysis = createMockAnalysis();
 
     // Create a duplicate by adding another class with the same name
@@ -421,9 +431,25 @@ describe('TypeScriptToTypedMindConverter', () => {
     const converter = new TypeScriptToTypedMindConverter();
     const result = converter.convert(analysis);
 
-    assert.equal(result.success, false);
-    assert.ok(result.errors.length > 0);
-    assert.ok(result.errors[0].message.includes('Duplicate entity name'));
+    assert.equal(result.success, true, 'a name collision must no longer fail the whole conversion');
+    assert.deepEqual(
+      result.errors.filter((error) => error.message.includes('Duplicate entity name')),
+      [],
+      'the hard `Duplicate entity name` abort is replaced by a rename plus a warning',
+    );
+
+    const collisionWarnings = result.warnings.filter((warning) => warning.message.includes("Duplicate entity name 'UserService'"));
+    assert.equal(collisionWarnings.length, 1, `expected exactly one collision warning, got: ${JSON.stringify(result.warnings)}`);
+    assert.ok(
+      collisionWarnings[0]?.message.endsWith('TypedMind entity names are global to a document.'),
+      `the warning must carry the documented closing sentence: ${collisionWarnings[0]?.message}`,
+    );
+
+    // Both declarations survive: the first keeps the bare name, the second
+    // is module-qualified by its own sanitized basename.
+    const userServiceEntities = result.entities.filter((entity) => entity.name.endsWith('UserService'));
+    assert.equal(userServiceEntities.length, 2, 'both colliding declarations must produce an entity');
+    assert.equal(new Set(userServiceEntities.map((entity) => entity.name)).size, 2, 'the two surviving entities must carry DISTINCT names');
   });
 
   it('should handle entity naming edge cases', () => {
