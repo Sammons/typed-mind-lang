@@ -1,0 +1,24 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [HasMethod, ChildOfMethodIface, ChildWithOwnProps, PropertyOnlyParent, ChildOfPropertyOnly, inspect]
+}
+
+IndexFile @ src/index.ts:
+  -> [HasMethod, ChildOfMethodIface, ChildWithOwnProps, PropertyOnlyParent, ChildOfPropertyOnly, inspect]
+
+HasMethod <:
+  => [doIt]
+
+ChildOfMethodIface <: HasMethod
+
+ChildWithOwnProps <: HasMethod
+
+inspect :: inspect(a: ChildOfMethodIface, b: ChildWithOwnProps, c: ChildOfPropertyOnly) => void
+
+PropertyOnlyParent %
+  - size: number
+
+ChildOfPropertyOnly %
+  - color: string

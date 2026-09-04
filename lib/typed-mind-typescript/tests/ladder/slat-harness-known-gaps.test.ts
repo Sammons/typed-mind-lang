@@ -13,11 +13,12 @@
 // widening:
 //
 //   - `convertInterface` (typescript-to-typedmind-converter.ts) routes an
-//     interface carrying >=1 `ts.MethodSignature` to `convertInterfaceToClass`
-//     (a ClassNode with `methods: [...]`); a property-only interface still
-//     converts to a DTO. This closes 69: the method survives instead of being
-//     silently dropped, because `ClassNode.methods` is the language's only
-//     method surface (check-method-calls.ts:36).
+//     interface whose RESOLVED HERITAGE CHAIN carries >=1 `ts.MethodSignature`
+//     to `convertInterfaceToClass` (a ClassNode with `methods: [...]`); a
+//     property-only interface still converts to a DTO. This closes 69: the
+//     method survives instead of being silently dropped, because
+//     `ClassNode.methods` is the language's only method surface
+//     (check-method-calls.ts:36).
 //   - `VALID_REFERENCES.extends`/`.implements` (valid-references.ts) now
 //     accept a DTO target. This closes 67: a class implementing a
 //     data-shaped interface is a legal source shape, and the interface is
@@ -28,6 +29,18 @@
 // 68 (generic type parameters) is UNTOUCHED and its pins below still assert
 // the gap is present — it is a separate, unowned root cause (the analyzer
 // never reads `node.typeParameters`).
+//
+// The PR #162 review added two more suites, both enforcing the same standard
+// fixture 69's header sets — nothing this converter drops may drop silently:
+//
+//   - 69b (`69b-interface-heritage-shape`): the shape decision walks the
+//     heritage chain. A child extending a method-bearing parent takes the
+//     Class lane and keeps its `<: Parent` edge, rather than emitting a
+//     fieldless DTO with the inherited contract unreachable. Mixed
+//     interfaces warn about every dropped property.
+//   - 69c (`69c-interface-unresolved-heritage`): a parent the program cannot
+//     resolve falls back to the own-member rule AND warns, so the fallback is
+//     conservative but never silent.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -186,6 +199,29 @@ describe('slat-harness rung, FIXED GAP 69: a method-bearing interface extracts a
     );
   });
 
+  it('the dropped property is ANNOUNCED, not silent (PR #162 review blocker 1)', () => {
+    // `Repository` is mixed: `id: string` plus `save(row): void`. The Class
+    // lane has no field surface, so `id` is dropped — and fixture 69's own
+    // header names silent loss as the most severe finding on this rung, so
+    // the fix must not reintroduce it pointed the other way.
+    const result = convert('69-interface-method-dropped');
+    const propertyLoss = result.warnings.filter((warning) => /Interface 'Repository'/.test(warning.message));
+    assert.equal(propertyLoss.length, 1, `expected exactly one property-loss warning; got ${JSON.stringify(result.warnings)}`);
+    assert.equal(
+      propertyLoss[0]?.message,
+      "Interface 'Repository' declares methods, so it converts to a Class; a Class has no field surface, so 1 property is dropped: id",
+    );
+    assert.match(propertyLoss[0]?.suggestion ?? '', /property-only interface/);
+  });
+
+  it('a PURE-METHOD interface loses nothing, so it warns about nothing', () => {
+    // The negative half of blocker 1: the warning must be tied to actual
+    // dropped properties, not fired on every Class-lane conversion.
+    const result = convert('69b-interface-heritage-shape');
+    const spurious = result.warnings.filter((warning) => /'(HasMethod|ChildOfMethodIface)'/.test(warning.message));
+    assert.deepEqual(spurious, [], 'an interface with no properties must produce no property-loss warning');
+  });
+
   it('a Class-kind interface is kept out of a Function input slot (input/output accept DTO only)', () => {
     // check-function-graph.ts requires `target.kind === 'DTO'` exactly, so
     // routing the now-Class `Repository` into `persist`'s `input` would emit
@@ -197,5 +233,120 @@ describe('slat-harness rung, FIXED GAP 69: a method-bearing interface extracts a
     const persist = result.entities.find((e) => e.name === 'persist') as { input?: string; signature?: string } | undefined;
     assert.equal(persist?.input, undefined, 'a Class-kind target must not reach the input slot');
     assert.match(persist?.signature ?? '', /Repository/, 'the type stays visible in the signature text');
+  });
+});
+
+// PR #162 review blocker 2 — the shape decision reads the RESOLVED HERITAGE
+// CHAIN, not own members. Before this, `interface Child extends HasMethod {}`
+// took the DTO lane and emitted a fieldless `Child %` with no `<: HasMethod`
+// edge and no diagnostic: the inherited method contract was unreachable
+// through the child, which is gap 69's own symptom one level up.
+describe('slat-harness rung, 69b: the interface shape decision walks the heritage chain', () => {
+  it('a child declaring NOTHING but extending a method-bearing parent takes the Class lane', () => {
+    const result = convert('69b-interface-heritage-shape');
+    assert.equal(result.success, true);
+    const child = result.entities.find((e) => e.name === 'ChildOfMethodIface') as
+      | { kind?: string; extends?: string; methods?: readonly string[] }
+      | undefined;
+    assert.notEqual(child, undefined, 'ChildOfMethodIface must be extracted');
+    assert.equal(child?.kind, 'Class', 'an inherited method contract makes the child Class-like');
+    // The edge itself is the other half of the blocker: the DTO lane reads
+    // `iface.extends` nowhere, so on that lane the parent link vanished too.
+    assert.equal(child?.extends, 'HasMethod', 'the inheritance edge must survive');
+  });
+
+  it('the parent is still its own Class carrying its method (control)', () => {
+    const result = convert('69b-interface-heritage-shape');
+    const parent = result.entities.find((e) => e.name === 'HasMethod') as { kind?: string; methods?: readonly string[] } | undefined;
+    assert.equal(parent?.kind, 'Class');
+    assert.deepEqual(parent?.methods, ['doIt']);
+  });
+
+  it('a child with OWN properties extending a method-bearing parent is Class-lane AND warns about the loss', () => {
+    const result = convert('69b-interface-heritage-shape');
+    const child = result.entities.find((e) => e.name === 'ChildWithOwnProps') as { kind?: string; extends?: string } | undefined;
+    assert.equal(child?.kind, 'Class');
+    assert.equal(child?.extends, 'HasMethod');
+    const warning = result.warnings.find((w) => /Interface 'ChildWithOwnProps'/.test(w.message));
+    assert.notEqual(warning, undefined, `expected a property-loss warning; got ${JSON.stringify(result.warnings)}`);
+    // "inherits" not "declares": this interface's own declaration contains no
+    // method, so a message claiming otherwise sends the reader hunting for a
+    // member that is not there.
+    assert.equal(
+      warning?.message,
+      "Interface 'ChildWithOwnProps' inherits methods from an interface it extends, so it converts to a Class; " +
+        'a Class has no field surface, so 1 property is dropped: label',
+    );
+  });
+
+  it('a property-only chain is untouched — both parent and child stay DTOs with their fields', () => {
+    // The negative half. Without this, a regression that swept every
+    // interface carrying a heritage clause onto the Class lane would still
+    // pass every assertion above.
+    const result = convert('69b-interface-heritage-shape');
+    const parent = result.entities.find((e) => e.name === 'PropertyOnlyParent') as
+      | { kind?: string; fields?: readonly { name: string }[] }
+      | undefined;
+    const child = result.entities.find((e) => e.name === 'ChildOfPropertyOnly') as
+      | { kind?: string; fields?: readonly { name: string }[] }
+      | undefined;
+    assert.equal(parent?.kind, 'DTO');
+    assert.deepEqual(
+      (parent?.fields ?? []).map((f) => f.name),
+      ['size'],
+    );
+    assert.equal(child?.kind, 'DTO');
+    assert.deepEqual(
+      (child?.fields ?? []).map((f) => f.name),
+      ['color'],
+    );
+  });
+
+  it('the whole heritage fixture checks clean', async () => {
+    const result = convert('69b-interface-heritage-shape');
+    const diagnostics = await diagnose(result.entities);
+    assert.deepEqual(
+      diagnostics.map((d) => d.message),
+      [],
+    );
+  });
+});
+
+describe('slat-harness rung, 69c: an unresolvable parent falls back to own members AND warns', () => {
+  it('the interface still converts, on the own-member rule', () => {
+    // Conservative by design: an unresolvable parent must never flip a
+    // property-only interface onto the Class lane, because that would strip
+    // its fields on a guess. `ExtendsUnknown` has a property and no own
+    // method, so it stays a DTO and keeps `id`.
+    const result = convert('69c-interface-unresolved-heritage');
+    assert.equal(result.success, true);
+    const entity = result.entities.find((e) => e.name === 'ExtendsUnknown') as
+      | { kind?: string; fields?: readonly { name: string }[] }
+      | undefined;
+    assert.equal(entity?.kind, 'DTO');
+    assert.deepEqual(
+      (entity?.fields ?? []).map((f) => f.name),
+      ['id'],
+    );
+  });
+
+  it('and the un-inspectable heritage is announced rather than assumed', () => {
+    const result = convert('69c-interface-unresolved-heritage');
+    const warning = result.warnings.find((w) => /could not be resolved in this program/.test(w.message));
+    assert.notEqual(warning, undefined, `expected an unresolved-heritage warning; got ${JSON.stringify(result.warnings)}`);
+    assert.equal(
+      warning?.message,
+      "Interface 'ExtendsUnknown' extends 'ExternalShape', which could not be resolved in this program, " +
+        "so its members could not be inspected; 'ExtendsUnknown' was classified from its own members alone.",
+    );
+    assert.match(warning?.suggestion ?? '', /may be a DTO where a Class was intended/);
+  });
+
+  it('a fully-resolvable program emits no unresolved-heritage warning', () => {
+    // Guards against the warning firing on every interface that merely has a
+    // heritage clause — 69b's parents are all declared in-program.
+    const result = convert('69b-interface-heritage-shape');
+    const spurious = result.warnings.filter((w) => /could not be resolved in this program/.test(w.message));
+    assert.deepEqual(spurious, [], 'resolvable parents must not warn');
   });
 });

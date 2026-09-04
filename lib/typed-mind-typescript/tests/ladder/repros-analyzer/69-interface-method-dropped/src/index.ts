@@ -54,6 +54,17 @@
 // method-bearing and 16 of those are mixed, so ~2.5% of interfaces make the
 // trade and 97.5% are unaffected.
 //
+// That loss is WARNED, not silent (PR #162 review blocker 1): the converter
+// emits "Interface 'Repository' declares methods, so it converts to a Class;
+// a Class has no field surface, so 1 property is dropped: id" through the
+// existing `addWarning` channel. Emitting the Class quietly would have
+// reproduced the exact failure mode this header names as the most severe on
+// the rung, merely pointed the other way.
+//
+// The heritage edges of the shape rule are pinned by two sibling fixtures:
+// 69b (a child inheriting methods from a parent takes the Class lane) and
+// 69c (an unresolvable parent falls back to own members and warns).
+//
 // A second, smaller consequence: `persist(repository: Repository)` no longer
 // emits a `<- Repository` input edge, because `input`/`output` accept only
 // DTO (check-function-graph.ts) — the same disclosed-loss exclusion

@@ -190,6 +190,26 @@ const cases: readonly FixtureCase[] = [
   },
   { fixture: '68-generic-type-parameters', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
   { fixture: '69-interface-method-dropped', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
+  // NEW (PR #162 review) — the two edge fixtures for the interface shape
+  // rule. 69b pins the heritage walk: a child extending a method-bearing
+  // parent takes the Class lane and keeps its `<: Parent` edge, while a
+  // property-only chain stays on the DTO lane. 69c pins the unresolvable
+  // parent fallback. Both check clean; the property-loss and
+  // unresolved-heritage WARNINGS they emit are converter-level, not checker
+  // findings, so they do not move these verdicts — the assertions on the
+  // warning text live in slat-harness-known-gaps.test.ts.
+  {
+    fixture: '69b-interface-heritage-shape',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
+  {
+    fixture: '69c-interface-unresolved-heritage',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
   // Reconciliation controls for the single mixin-heritage helper (PR #152
   // + PR #153 merged into `getExtendsTargetName`). 66b records `false`:
   // its `StringBox extends Container<string>` carries the generic-base
