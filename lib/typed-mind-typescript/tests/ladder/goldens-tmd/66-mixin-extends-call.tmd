@@ -18,4 +18,4 @@ LightWidget <: BaseWidget
   "The with-methods shape — took the ClassFile path and emitted safely."
   => [createRoot]
 
-applyMixin :: applyMixin(base: typeof BaseWidget) => typeof BaseWidget
+applyMixin :: applyMixin(base: (typeof BaseWidget)) => (typeof BaseWidget)

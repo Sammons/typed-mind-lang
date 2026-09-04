@@ -22,8 +22,8 @@ ConfiguredWidget <: BaseWidget
 NestedWidget <: BaseWidget
   => [depth]
 
-configurableMixin :: configurableMixin(_options: { opt: number }, base: typeof BaseWidget) => typeof BaseWidget
+configurableMixin :: configurableMixin(_options: { opt: number }, base: (typeof BaseWidget)) => (typeof BaseWidget)
 
-inner :: inner(base: typeof BaseWidget) => typeof BaseWidget
+inner :: inner(base: (typeof BaseWidget)) => (typeof BaseWidget)
 
-outer :: outer(base: typeof BaseWidget) => typeof BaseWidget
+outer :: outer(base: (typeof BaseWidget)) => (typeof BaseWidget)

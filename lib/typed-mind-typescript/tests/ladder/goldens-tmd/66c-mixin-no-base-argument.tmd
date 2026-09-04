@@ -14,4 +14,4 @@ Widget <:
 SelfMadeWidget <: makeWidget
   => [label]
 
-makeWidget :: makeWidget() => typeof Widget
+makeWidget :: makeWidget() => (typeof Widget)

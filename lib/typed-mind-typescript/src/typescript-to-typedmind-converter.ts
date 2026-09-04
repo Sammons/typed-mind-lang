@@ -126,6 +126,64 @@ const isBareEntityName = (type: string): boolean => /^[A-Za-z_]\w*$/.test(type);
 // exactly as it does today.
 const collapseTypeWhitespace = (type: string): string => type.replace(/\s+/g, ' ').trim();
 
+// Fixture 90 — a union type alias authored multi-line. TypeScript allows an
+// OPTIONAL LEADING `|` before the first member, and members are conventionally
+// separated across lines with `//` comments interleaved between them. All three
+// of those are pure authoring style with no semantic content, but each one
+// desyncs a downstream consumer that assumes the single-line form:
+// a leading `|` produces an empty first union member, an interior newline
+// breaks the one-line `X = <type>` alias production, and a `//` comment run
+// leaks source commentary into the emitted type text.
+//
+// This normalizes the three away, leaving the exact text the single-line
+// authoring of the same type would have produced. Comment stripping runs
+// BEFORE whitespace collapse so a `//` line comment cannot swallow the
+// remainder of the union once the newline that terminated it is gone.
+// Fixtures 92 / 93 — the text-level twin of the analyzer's
+// `parenthesizeTypeQueries`. A DTO field declared inside a TYPE ALIAS BODY
+// (`type ModelDeps = { fetchImpl: typeof fetch }`) never reaches that AST
+// walk: the alias's whole body is carried as one text blob and split into
+// fields by `parseInlineObjectLiteralToFields`, so the field's type is a
+// STRING by the time anything can normalize it.
+//
+// `sanitizeFieldType` is the single choke point both DTO field paths pass
+// through, so the parenthesization lands here. Same rationale as the AST
+// walk: the TypedMind grammar already accepts `(typeof X)` and only fails
+// on the bare form, so wrapping is all that is needed.
+//
+// An ALREADY-parenthesized `(typeof X)` (what the AST walk produces, and
+// what issue #83's corpus shape `(typeof CHECK_CODES)[number]` is authored
+// as) must not be double-wrapped — the negative lookbehind for `(` is what
+// keeps this function idempotent across both paths.
+const parenthesizeTypeQueryText = (type: string): string =>
+  type.replace(/(?<!\()\btypeof\s+([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)/g, '(typeof $1)');
+
+// Collapse a multi-line type text to the exact bytes the same type authored on
+// ONE line would have produced. Shared by the type-alias lane (fixture 90) and
+// the DTO-field lane (fixture 91), which hit the identical defect from two
+// directions, so the normalization must agree between them.
+const collapseToSingleLineType = (type: string): string =>
+  collapseTypeWhitespace(type)
+    // A dangling comma before a closer (`remove: string[], )`) is legal
+    // multi-line TypeScript but not legal once collapsed onto one line.
+    .replace(/,\s*([)\]}])/g, '$1')
+    // Drop the space an opener or a closer inherits from the collapsed line
+    // break, so the result is byte-identical to the same type authored on one
+    // line. Both sides are needed: the opener's space comes from the newline
+    // AFTER `(`, the closer's from the newline BEFORE `)`.
+    .replace(/([([])\s+/g, '$1')
+    .replace(/\s+([)\]])/g, '$1');
+
+const normalizeUnionAliasText = (type: string): string => {
+  const withoutLineComments = type.replace(/\/\/[^\n]*/g, '\n');
+  const withoutBlockComments = withoutLineComments.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const collapsed = collapseToSingleLineType(withoutBlockComments);
+
+  const withoutLeadingBar = collapsed.startsWith('|') ? collapsed.slice(1).trim() : collapsed;
+
+  return parenthesizeTypeQueryText(withoutLeadingBar);
+};
+
 // issue #72 (rfc-tm-10-diamond.md §5's tracked follow-up) — an inline
 // object-literal type (`{ current?: string }`) has no enclosing
 // Class/Interface name to resolve against, so D-LEG-1's `isDTOLikeType`
@@ -2183,13 +2241,39 @@ export class TypeScriptToTypedMindConverter {
     this.entities.push(dtoEntity);
   }
 
-  private convertTypeAliasToDTO(typeAlias: { name: string; type: string; description?: string }): void {
-    const entityName = createEntityName(typeAlias.name);
+  private convertTypeAliasToDTO(typeAliasInput: { name: string; type: string; description?: string }): void {
+    const entityName = createEntityName(typeAliasInput.name);
 
     if (this.entityNames.has(entityName)) {
       this.addError(`Duplicate entity name: ${entityName}`);
       return;
     }
+
+    // Fixture 90 (mail-agent `src/harness/envelope.ts:266` `DispatchResult`,
+    // `src/store/revert.ts:47` `RevertOutcome`) — TypeScript allows an
+    // OPTIONAL LEADING `|` on a union, which is how a multi-line union is
+    // conventionally authored, and is the house style for a
+    // `kind`-discriminated result/failure union:
+    //
+    //   type DispatchResult =
+    //     | { kind: 'none'; reason: string }
+    //     | { kind: 'reply'; text: string };
+    //
+    // Two defects compounded on this shape. First, the leading `|` is a
+    // separator with nothing before it, so `splitTopLevelUnionMembers`
+    // yielded an EMPTY first member; `isUnionOfObjectLiterals` then failed
+    // its `.every(isInlineObjectLiteralType)` test on that empty string and
+    // returned false, so `isObjectLikeType`'s naive `includes('{')` fallback
+    // routed the union down the DTO branch below — where the brace-slice
+    // found no `name: type` pairs and emitted a FIELDLESS `DispatchResult %`
+    // with every member silently dropped. Second, even once classified onto
+    // the TypeDef alias lane, the raw multi-line text (leading `|`, interior
+    // newlines, and any interleaved `//` comment between members) flowed
+    // verbatim into `raw` and `parseTypeExprText`, emitting `X = |`.
+    //
+    // Normalizing here — once, before either lane reads it — fixes both:
+    // the alias text becomes the single-line form that already worked.
+    const typeAlias = { ...typeAliasInput, type: normalizeUnionAliasText(typeAliasInput.type) };
 
     // Convert object-like type aliases to DTOs (unchanged by X-CONV-2 —
     // this shape stays a DTO regardless of the TM-8 TypeDef surface).
@@ -3545,6 +3629,11 @@ export class TypeScriptToTypedMindConverter {
       }
     }
     members.push(type.slice(memberStart).trim());
+
+    if (members.length > 1 && members[0] === '') {
+      members.shift();
+    }
+
     return members;
   }
 
@@ -4013,22 +4102,42 @@ export class TypeScriptToTypedMindConverter {
       return 'string';
     }
 
-    // Clean up the type string. `collapseTypeWhitespace`, not a bare `.trim()`:
-    // a field type authored across multiple lines in the source arrives here
-    // with its interior newlines and indentation intact, and a `.trim()` only
-    // removes the leading/trailing run. Every DTO field line in the grammar is
-    // single-line (`- name: type`), so an interior `\n` emitted verbatim
-    // splits one field across several lines and the remainder no longer parses
-    // as a field at all — the leading fragments become `syntax/error`s and the
-    // trailing one an unparsable stray. Corpus: sammons/bens-almanac
-    // packages/{nhtsa,usda}-ingestion/src/handler.ts, whose `IngestionDeps`
-    // declares `checkSupersession` / `createPr` as multi-line function types.
+    // Clean up the type string. Reconciles fixture 87 (PR #161,
+    // sammons/bens-almanac) and fixture 91 (PR #158, sammons/mail-agent),
+    // which found the SAME defect from two corpora: this fallthrough ended in
+    // a bare `fieldType.trim()`, which strips only the LEADING and TRAILING
+    // whitespace run. A field type authored across multiple source lines
+    // therefore arrived with its interior newlines and indentation intact.
+    // Every DTO field line in the grammar is single-line (`- name: type`), so
+    // an interior `\n` emitted verbatim splits one field across several lines:
+    // the leading fragments become `syntax/error`s and the trailing one an
+    // unparsable stray.
     //
-    // Meaning-preserving for the same reason it is at the return-type call
-    // site (see the helper's own comment): TypeScript treats inter-token
-    // whitespace as insignificant everywhere a type can appear, and this
-    // collapses rather than truncates — the full text survives on one line.
-    return collapseTypeWhitespace(fieldType);
+    // Corpora: bens-almanac packages/{nhtsa,usda}-ingestion/src/handler.ts
+    // (`IngestionDeps.checkSupersession` / `.createPr`) and mail-agent
+    // `src/harness/singleton.ts:338` (`HarnessDeps.executeMutation`) /
+    // `src/store/revert.ts:143` (`Reverters.modifyLabels`).
+    //
+    // `collapseToSingleLineType` supersedes the bare `collapseTypeWhitespace`
+    // both PRs started from. Collapsing alone is necessary but NOT sufficient:
+    // the multi-line spelling also carries a dangling comma before its closing
+    // `)` and a space just inside its brackets, both legal across lines and
+    // neither legal — nor emitted — in the single-line form. Fixture 87's own
+    // `singleLineTarget` control is the proof: after the collapse alone, the
+    // multi-line and single-line spellings of the same type still differed.
+    // The full normalization makes them byte-identical, which is what both
+    // fixtures' controls assert.
+    //
+    // Meaning-preserving throughout: TypeScript treats inter-token whitespace
+    // as insignificant everywhere a type can appear, a dangling comma before a
+    // closer carries no type information, and this collapses rather than
+    // truncates — the full text survives on one line. The rewrites are
+    // literal-aware (PR #158 review comment 22136), so a string-literal type's
+    // exact characters are never touched.
+    //
+    // `parenthesizeTypeQueryText` then wraps any bare `typeof X` so it lands
+    // in the grammar's existing `(typeof X)` production (fixture 92).
+    return parenthesizeTypeQueryText(collapseToSingleLineType(fieldType));
   }
 
   private convertTypeToSchema(type: string): string {
