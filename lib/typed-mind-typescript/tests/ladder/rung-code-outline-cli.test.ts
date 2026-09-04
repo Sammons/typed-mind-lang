@@ -10,11 +10,12 @@
 //   root tsconfig + packages/cli/src/cli.ts          6 diagnostics
 //   tsconfig.scripts.json + scripts/generate-docs.ts 0 (clean control)
 //
-// Fixtures 78/79/80 are fix-bound: each fails on main and passes here.
-// Fixture 81 is a documented knownGap (see its README.md) — its test pins the
-// CURRENT behaviour so the gap is a committed fact rather than prose.
+// Fixtures 78/79/80/81/81b are all fix-bound: each fails before its fix and
+// passes here. Fixture 81 was a documented knownGap until referenced-project
+// modules started classifying internal; 81b covers the unbuilt-sibling half of
+// the same defect. See each fixture's README.md.
 import assert from 'node:assert/strict';
-import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -59,6 +60,32 @@ const ensureFixture81WorkspaceLink = (): void => {
   // Relative target, matching how pnpm writes it: cli/node_modules/@fixture/core
   // -> packages/core (three levels up from the @fixture directory).
   symlinkSync(join('..', '..', '..', 'core'), linkPath, 'dir');
+};
+
+// Gap 81's external CONTROL. `@fixture/vendor` is a real installed-package
+// shape: a directory under the consumer's `node_modules` with its own
+// package.json and a `.d.ts` at its declared `types` entry. It resolves with
+// `isExternalLibraryImport: true` exactly like the workspace sibling does.
+//
+// The one difference is the one that matters: NO tsconfig `references` entry
+// names it, so its realpath lies under no referenced project's `outDir` and the
+// reverse-map declines to redirect it. It must stay external and untraversed.
+//
+// Written by this hook rather than committed for the same reason the symlink
+// is: the repo's `.gitignore` blanket-ignores `node_modules/`, and adding a
+// negation for a stub package would make the fixture's external control depend
+// on ignore-file bookkeeping rather than on the analyzer's own rule.
+const ensureFixture81ExternalStubPackage = (): void => {
+  const packageDir = fixturePath('81-crosspkg-type-only-dto-field', 'packages', 'cli', 'node_modules', '@fixture', 'vendor');
+
+  rmSync(packageDir, { recursive: true, force: true });
+  mkdirSync(packageDir, { recursive: true });
+
+  writeFileSync(
+    join(packageDir, 'package.json'),
+    `${JSON.stringify({ name: '@fixture/vendor', version: '2.0.0', type: 'module', types: 'index.d.ts', main: 'index.js' }, null, 2)}\n`,
+  );
+  writeFileSync(join(packageDir, 'index.d.ts'), 'export type VendorTag = string;\n');
 };
 
 const analyzeFixture = (name: string, projectSegments: string[], entrySegments: string[]) => {
@@ -241,23 +268,27 @@ describe('80 — two files extending the same builtin both claim to export the s
   });
 });
 
-describe('81 — a `workspace:*` sibling is misclassified as an external package (knownGap)', () => {
-  // See repros-analyzer/81-crosspkg-type-only-dto-field/README.md for the full
-  // root cause. These assertions pin CURRENT behaviour; when the fix lands they
-  // invert and the README is deleted.
+describe('81 — a `workspace:*` sibling declared in tsconfig `references` is internal', () => {
+  // Gap 81, FIXED. These assertions were the knownGap pin and are now inverted:
+  // the sibling package is classified internal, traversed, and its types become
+  // real entities. See repros-analyzer/81-crosspkg-type-only-dto-field/README.md
+  // for the resolution mechanism.
   const project = ['packages', 'cli', 'tsconfig.json'];
   const entry = ['packages', 'cli', 'src', 'index.ts'];
 
   // Makes the fixture hermetic on a clean checkout — see the helper's own
-  // comment for why the link is created rather than committed.
+  // comment for why the link is created rather than committed. The stub
+  // package is the external control: it proves the fix is scoped to referenced
+  // projects and does not drag genuine npm dependencies in.
   before(() => {
     ensureFixture81WorkspaceLink();
+    ensureFixture81ExternalStubPackage();
   });
 
   it('fixture is hermetic: the committed dist declaration and the setup-created workspace link both exist', () => {
     assert.ok(
       existsSync(fixturePath('81-crosspkg-type-only-dto-field', 'packages', 'core', 'dist', 'index.d.ts')),
-      'packages/core/dist/index.d.ts is committed fixture input (with a .gitignore negation); without it the specifier does not resolve at all on a clean runner',
+      'packages/core/dist/index.d.ts is committed fixture input (with a .gitignore negation); it is what makes the resolution report isExternalLibraryImport, which is the condition the fix reverses',
     );
     assert.ok(
       existsSync(fixturePath('81-crosspkg-type-only-dto-field', 'packages', 'cli', 'node_modules', '@fixture', 'core')),
@@ -265,32 +296,44 @@ describe('81 — a `workspace:*` sibling is misclassified as an external package
     );
   });
 
-  it('resolves the reference graph but still traverses only the importing package', () => {
-    const result = convertFixture('81-crosspkg-type-only-dto-field', project, entry);
-    assert.equal(result.success, true);
-    const fileEntities = result.entities.filter((entity) => entity.kind === 'File');
-    assert.equal(fileEntities.length, 1, 'knownGap: the sibling package is classified external and never traversed');
+  it('traverses the referenced sibling package, not just the importing package', () => {
+    const analysis = analyzeFixture('81-crosspkg-type-only-dto-field', project, entry);
+    // Two analyzed modules, not one: the importer plus the sibling's SOURCE.
+    // Asserted on the analyzer's own module list rather than on emitted `File`
+    // entities, because the sibling contributes only types and so produces no
+    // second File entity even when it is fully traversed.
+    const traversed = analysis.modules.map((module) => module.filePath);
+    assert.equal(traversed.length, 2, 'the sibling package is classified internal and traversed alongside the importer');
+    assert.ok(
+      traversed.some((filePath) => filePath.endsWith(join('packages', 'core', 'src', 'index.ts'))),
+      'the traversed sibling is its rootDir SOURCE, not the dist declaration the specifier literally resolved to',
+    );
   });
 
-  it('knownGap: DTO fields typed by a sibling package report an undefined type', async () => {
+  it('DTO fields typed by a sibling package resolve to real entities', async () => {
     const result = convertFixture('81-crosspkg-type-only-dto-field', project, entry);
     const checkResult = await checkTmd(result.tmdContent);
     const unknownTypeMessages = checkResult.diagnostics
       .filter((diagnostic) => diagnostic.code === 'checker/dto-field-unknown-type')
       .map((diagnostic) => diagnostic.message);
-    assert.deepEqual(unknownTypeMessages, [
-      "DTO 'CliOptions' field 'format' references undefined type 'OutputFormat'",
-      "DTO 'ProcessedFile' field 'outline' references undefined type 'NodeInfo'",
-    ]);
+    assert.deepEqual(unknownTypeMessages, [], 'OutputFormat and NodeInfo are extracted from the traversed sibling');
   });
 
-  it('module-graph golden: the workspace edge records a PORTABLE resolved target', () => {
-    // An external edge used to keep the absolute resolved path, which made
-    // this golden machine-specific (it embedded the authoring machine's home
-    // directory) and leaked the developer's filesystem layout into extractor
-    // output. `recordModuleGraphEdge` now relativizes an in-project external
-    // resolution — the pnpm `workspace:*` case, where the sibling resolves
-    // through a node_modules symlink back into the same repo.
+  it('the sibling package’s own types are emitted as entities', () => {
+    const result = convertFixture('81-crosspkg-type-only-dto-field', project, entry);
+    // The traversal is only worth anything if the types it reaches actually
+    // land — asserting on the absence of a diagnostic alone would also pass if
+    // the checker rule stopped firing for an unrelated reason.
+    assert.match(result.tmdContent, /OutputFormat =/);
+    assert.match(result.tmdContent, /NodeInfo %/);
+  });
+
+  it('module-graph golden: the workspace edge is internal and points at the sibling’s SOURCE', () => {
+    // The resolved target is `../../core/src/index.ts`, not the
+    // `../../core/dist/index.d.ts` the specifier literally resolves to: the
+    // analyzer reverse-maps a declaration under a referenced project's outDir
+    // back to the source under its rootDir, which is the file the union
+    // program already holds.
     assertModuleGraphGolden(
       '81-crosspkg-type-only-dto-field',
       ['packages', 'cli', 'tsconfig.json'],
@@ -298,12 +341,81 @@ describe('81 — a `workspace:*` sibling is misclassified as an external package
     );
   });
 
+  it('control: a genuine node_modules package stays EXTERNAL and is not traversed', () => {
+    // The scope guard on the fix. `@fixture/vendor` is a real installed-package
+    // shape — same node_modules location and same `isExternalLibraryImport`
+    // verdict as the workspace sibling — but no tsconfig `references` entry
+    // names it, so its realpath is under no referenced project's outDir and the
+    // reverse-map declines. Without this control, "classify referenced projects
+    // internal" and "classify everything internal" pass identically.
+    const analysis = analyzeFixture(
+      '81-crosspkg-type-only-dto-field',
+      ['packages', 'cli', 'tsconfig.json'],
+      ['packages', 'cli', 'src', 'vendor-consumer.ts'],
+    );
+    const vendorEdge = analysis.moduleGraph.find((edge) => edge.specifier === '@fixture/vendor');
+    assert.equal(vendorEdge?.classification, 'external', 'a package with no references entry must stay external');
+    const traversed = analysis.modules.map((module) => module.filePath);
+    assert.ok(!traversed.some((filePath) => filePath.includes('@fixture/vendor')), 'an external package must not be traversed');
+  });
+
   it('degrades rather than crashing or emitting nothing (I-13)', () => {
     const result = convertFixture('81-crosspkg-type-only-dto-field', project, entry);
-    // The gap must cost only the cross-package types — everything the
-    // extractor CAN prove still lands.
     assert.match(result.tmdContent, /describeOptions/);
     assert.match(result.tmdContent, /CliOptions %/);
     assert.match(result.tmdContent, /ProcessedFile %/);
+  });
+});
+
+describe('81b — a referenced sibling that has never been built is still internal', () => {
+  // The second trigger fixture 81's README named: with no `dist/`, the
+  // specifier does not resolve at all, so the fix's built-case reverse-map has
+  // nothing to reverse. The unbuilt fallback maps the package's DECLARED
+  // `types` path through the same outDir -> rootDir rule instead.
+  //
+  // No before() hook and no node_modules link: this fixture is hermetic by
+  // construction because it depends on nothing being present.
+  const project = ['packages', 'cli', 'tsconfig.json'];
+  const entry = ['packages', 'cli', 'src', 'index.ts'];
+
+  it('fixture is hermetic: the sibling has NO dist directory, which is the state under test', () => {
+    assert.ok(
+      !existsSync(fixturePath('81b-crosspkg-unbuilt-sibling', 'packages', 'core', 'dist')),
+      'the unbuilt state is the fixture input; a dist here would silently convert this into a duplicate of fixture 81',
+    );
+  });
+
+  it('traverses the unbuilt sibling and emits its types', () => {
+    const analysis = analyzeFixture('81b-crosspkg-unbuilt-sibling', project, entry);
+    const traversed = analysis.modules.map((module) => module.filePath);
+    assert.equal(traversed.length, 2, 'the unbuilt sibling is reached through its declared types path mapped back to source');
+    assert.ok(
+      traversed.some((filePath) => filePath.endsWith(join('packages', 'core', 'src', 'index.ts'))),
+      'the unbuilt sibling resolves straight to source; there is no declaration file for it to resolve to',
+    );
+
+    const result = new TypeScriptToTypedMindConverter().convert(analysis);
+    assert.equal(result.success, true);
+    assert.match(result.tmdContent, /ReportFormat =/);
+    assert.match(result.tmdContent, /ReportRow %/);
+  });
+
+  it('emits no unresolvable-import diagnostic for the sibling specifier', () => {
+    const analysis = analyzeFixture('81b-crosspkg-unbuilt-sibling', project, entry);
+    const unresolved = analysis.diagnostics.filter((diagnostic) => diagnostic.category === 'unresolvable-import');
+    assert.deepEqual(unresolved, [], 'the unbuilt fallback resolves the edge, so the diagnostic must not fire');
+  });
+
+  it('DTO fields typed by the unbuilt sibling resolve to real entities', async () => {
+    const result = convertFixture('81b-crosspkg-unbuilt-sibling', project, entry);
+    const checkResult = await checkTmd(result.tmdContent);
+    const unknownTypeMessages = checkResult.diagnostics
+      .filter((diagnostic) => diagnostic.code === 'checker/dto-field-unknown-type')
+      .map((diagnostic) => diagnostic.message);
+    assert.deepEqual(unknownTypeMessages, [], 'extraction quality must not depend on whether the sibling was built');
+  });
+
+  it('module-graph golden: the unbuilt edge is internal and points at the sibling’s SOURCE', () => {
+    assertModuleGraphGolden('81b-crosspkg-unbuilt-sibling', project, entry);
   });
 });

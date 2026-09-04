@@ -1,9 +1,9 @@
-# 81 — cross-package `workspace:*` import misclassified as external (knownGap)
+# 81 — cross-package `workspace:*` import classified as internal (FIXED)
 
 Corpus: `sammons/code-outline-cli`, `packages/cli/src/cli-argument-parser.ts:4`
 (`import type { OutputFormat } from '@sammons/code-outline-parser'`) and
-`packages/cli/src/file-processor.ts:4` (`NodeInfo`). Both produce
-`checker/dto-field-unknown-type` on the real target.
+`packages/cli/src/file-processor.ts:4` (`NodeInfo`). Both produced
+`checker/dto-field-unknown-type` on the real target before this fix.
 
 ## Shape
 
@@ -15,56 +15,60 @@ This fixture is a two-package mini-workspace, mirroring the real repo:
 - `packages/cli/node_modules/@fixture/core` is the pnpm workspace symlink
   (`../../../core`), which is how a `workspace:*` dependency is materialized.
 - `packages/cli/tsconfig.json` declares `references: [{ "path": "../core" }]`.
+- `packages/cli/src/vendor-consumer.ts` is the external CONTROL entrypoint. It
+  imports `@fixture/vendor`, a stub package the test's `before()` hook writes
+  into `packages/cli/node_modules/` — same installed-package shape, but named by
+  no `references` entry, so it must stay external.
 
-## Root cause
+## The defect (historical)
 
-`typescript-analyzer.ts:1805` (`resolveImportPath`):
+`resolveImportPath` classified with one line:
 
 ```ts
 const isExternal = resolvedModule.isExternalLibraryImport === true || resolvedPath.includes('node_modules');
 ```
 
 A pnpm workspace sibling resolves through the `node_modules` symlink to the
-package's `types` entry (`dist/index.d.ts`), so BOTH clauses fire:
-`isExternalLibraryImport` is `true` and the path contains `node_modules`. The
-sibling package is classified external, never traversed, and its types never
-become entities — so every DTO field typed by one emits
+package's `types` entry (`dist/index.d.ts`), so BOTH clauses fired. The sibling
+package was classified external, never traversed, and its types never became
+entities — so every DTO field typed by one emitted
 `checker/dto-field-unknown-type`.
 
-Verified with `ts.resolveModuleName` directly:
+Note the reference-graph walk (`unionFileNamesAcrossReferences`) ALREADY pulled
+`packages/core/src/**` into the program's file set. The break was purely the
+internal/external classification of the resolved specifier, never the program's
+file set — traversal was not the limit, classification was.
 
-```
-resolved = .../packages/core/dist/index.d.ts
-extLib   = true
-packageId = { name: '@fixture/core', subModuleName: 'dist/index.d.ts', version: '1.0.0' }
-```
+## The fix
 
-Note the reference-graph walk (`unionFileNamesAcrossReferences`,
-`typescript-analyzer.ts:132-174`) DOES pull `packages/core/src/**` into the
-program's file set. The break is purely the internal/external classification of
-the resolved specifier, not the program's file set.
+A declared `references` entry is the author stating that the target is part of
+this compilation, which is why the union program pulls its sources in. So the
+classifier now reverses the emit before honoring an external verdict:
 
-A second, independent trigger sits underneath: in an unbuilt clone
-(`pnpm install --ignore-scripts`, no `dist/`) the specifier does not resolve at
-all (`classification: 'unresolved'`), because `types` points at a file that does
-not exist yet. Extraction must not depend on the target having been built.
+1. `unionFileNamesAcrossReferences` records each referenced project's
+   `declarationDir || outDir` and `rootDir` (realpath'd) while walking the
+   reference graph it already walks.
+2. `resolveImportPath` realpaths an external-classified resolution and asks
+   whether it lies under any referenced project's declaration output.
+3. If it does, the path maps back to the corresponding source under that
+   project's `rootDir` (`.d.ts` -> `.ts`, falling back to `.tsx`), the source's
+   existence is verified on disk, and the edge classifies internal.
 
-## Why this is a knownGap, not a fix here
+TypeScript's own source-of-project-reference redirect is not a usable lever
+here: passing `projectReferences` plus a `getParsedCommandLine` host does not
+redirect this program's resolutions to source, so the mapping is done directly.
 
-The correct fix reverse-maps the resolved declaration file back to its source:
-read the resolved package's own tsconfig via the importing project's
-`projectReferences`, take its `outDir`/`declarationDir` and `rootDir`, and map
-`<outDir>/index.d.ts` back to `<rootDir>/index.ts` — then reclassify as
-internal. That spans two layers (the reference-graph walk and
-`resolveImportPath`) and needs its own handling for `exports`-map subpaths,
-`declarationDir` differing from `outDir`, and the unbuilt-`dist` case above. It
-is well past the "small and local, under ~60 lines, one owning layer" bar this
-rung applies, so it is recorded here with its root cause instead of half-fixed.
+Genuine third-party packages are unaffected — their realpath is under
+`node_modules/<name>`, never under a referenced project's `outDir`, so the
+reverse-map declines and the external classification stands. The
+`vendor-consumer.ts` control asserts exactly that.
 
-Owner: typedmind-lead. Breaks if wrong: every pnpm/npm workspace target
-extracts each package in isolation, and cross-package types silently degrade to
-`checker/dto-field-unknown-type` instead of resolving.
+A project whose tsconfig omits `outDir`/`rootDir` also declines to map: the
+emit layout is ambiguous, and declining is safe because the pre-fix behaviour is
+the fallback.
 
-`81-crosspkg-type-only-dto-field.test.ts` pins the CURRENT behaviour so the
-gap's shape is a committed, reviewable fact; when the fix lands, that test's
-assertions invert and this file is deleted.
+## Sibling fixture
+
+`81b-crosspkg-unbuilt-sibling` covers the second trigger this fixture's original
+root-cause note named: a referenced project that has never been built, where the
+specifier does not resolve at all. See that fixture's README.

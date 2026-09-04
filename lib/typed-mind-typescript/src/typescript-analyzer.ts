@@ -33,6 +33,29 @@ interface ResolutionOutcome {
   readonly classification: 'internal' | 'external' | 'unresolved';
 }
 
+// Gap 81 — one entry per project reachable through the tsconfig `references`
+// graph, recorded while `unionFileNamesAcrossReferences` already walks it.
+//
+// A declared `references` entry is the author stating that the target is part
+// of THIS compilation, which is why X-AN-1 unions its sources into the program
+// in the first place. But a pnpm `workspace:*` sibling resolves through a
+// node_modules link to the package's built `dist/index.d.ts`, so
+// `ts.resolveModuleName` reports `isExternalLibraryImport: true` and the old
+// classifier called a first-party package external. These three fields are
+// what let `resolveImportPath` reverse the emit: a declaration file under
+// `declarationOutputDir` maps back to the matching source under `rootDir`.
+//
+// `packageDir` is the referenced project's own directory, used for the
+// unbuilt-sibling fallback (reading its package.json `types`/`main`).
+// `declarationOutputDir` and `rootDir` are `undefined` when the tsconfig does
+// not declare them — see `mapDeclarationToSource`, which declines to guess
+// rather than mapping against an assumed default.
+interface ReferencedProject {
+  readonly packageDir: string;
+  readonly declarationOutputDir: string | undefined;
+  readonly rootDir: string | undefined;
+}
+
 // A parse-config-file host that reads from the real filesystem and reports
 // diagnostics into an accumulator rather than to stderr, since a broken
 // referenced tsconfig should surface as an AnalyzerDiagnostic, not a
@@ -92,6 +115,13 @@ export class TypeScriptAnalyzer {
   // that already proved (via `resolveSstHandlerString`'s own standalone
   // parse) that its target exists on disk outside `this.program`.
   private readonly recognizerResolvedPaths = new Set<string>();
+
+  // Gap 81 — every project reachable through the tsconfig `references` graph,
+  // collected by `unionFileNamesAcrossReferences` on the walk it already
+  // performs. Keyed by realpath'd package directory so a symlinked
+  // (`workspace:*`) and a direct resolution of the same package collapse to
+  // one entry. Read only by `resolveImportPath`'s reverse-map.
+  private readonly referencedProjects = new Map<string, ReferencedProject>();
 
   constructor(projectPath: string, configPath?: string, recognizers: readonly RecognizerName[] = []) {
     this.projectPath = projectPath;
@@ -171,6 +201,8 @@ export class TypeScriptAnalyzer {
         union.add(fileName);
       }
 
+      this.recordReferencedProject(referencedConfigPath, parsed.options);
+
       const nested = this.unionFileNamesAcrossReferences(referencedConfigPath, parsed.fileNames, parsed.projectReferences, visitedConfigs);
       for (const fileName of nested) {
         union.add(fileName);
@@ -187,6 +219,184 @@ export class TypeScriptAnalyzer {
       return fs.existsSync(candidate) ? candidate : undefined;
     }
     return fs.existsSync(resolved) ? resolved : undefined;
+  }
+
+  // Gap 81 — resolves a path to its realpath when it exists, and returns the
+  // input unchanged when it does not. Every comparison in the reverse-map runs
+  // on realpaths so a pnpm `workspace:*` symlink and the package's true
+  // location compare equal. A referenced project that has not been built has
+  // no `dist` directory on disk, so `outDir` cannot be realpath'd — hence the
+  // pass-through rather than a throw.
+  private realpathOrSelf(target: string): string {
+    try {
+      return fs.realpathSync(target);
+    } catch {
+      return target;
+    }
+  }
+
+  // Gap 81 — records one referenced project's source/output layout.
+  //
+  // `declarationDir` wins over `outDir` when both are set, because that is
+  // where `composite`/`declaration` projects actually emit the `.d.ts` a
+  // consumer resolves to. When neither is set the emit layout is ambiguous
+  // (TypeScript emits declarations next to their sources), so the field stays
+  // `undefined` and `mapDeclarationToSource` declines to map rather than
+  // guessing a directory that does not exist.
+  private recordReferencedProject(referencedConfigPath: string, options: ts.CompilerOptions): void {
+    const packageDir = this.realpathOrSelf(path.dirname(path.resolve(referencedConfigPath)));
+    const declarationOutput = options.declarationDir || options.outDir;
+
+    this.referencedProjects.set(packageDir, {
+      packageDir,
+      declarationOutputDir: declarationOutput === undefined ? undefined : this.realpathOrSelf(path.resolve(declarationOutput)),
+      rootDir: options.rootDir === undefined ? undefined : this.realpathOrSelf(path.resolve(options.rootDir)),
+    });
+  }
+
+  // Gap 81 — the reverse-map. Given a resolved declaration file, returns the
+  // source file that produced it when the declaration lies under some
+  // referenced project's declaration output directory, and `undefined`
+  // otherwise.
+  //
+  // This is what makes the classification stop depending on whether the
+  // sibling happened to be built: a `workspace:*` import lands on
+  // `<outDir>/index.d.ts`, and the corresponding `<rootDir>/index.ts` is
+  // already in the union program (X-AN-1 put it there), so redirecting the
+  // resolution to it makes the edge traversable.
+  //
+  // Fails safe by construction. A genuine third-party package's realpath is
+  // under `node_modules/<name>` inside the consuming project, never under a
+  // referenced project's `outDir`, so `containsPath` never matches and the
+  // caller keeps its external classification. A project missing `rootDir` or
+  // `outDir` also returns `undefined` — declining to map is always safe,
+  // because the pre-existing behaviour is what the caller falls back to.
+  private mapDeclarationToSource(resolvedRealPath: string): string | undefined {
+    for (const project of this.referencedProjects.values()) {
+      const { declarationOutputDir, rootDir } = project;
+      if (declarationOutputDir === undefined || rootDir === undefined) {
+        continue;
+      }
+      if (!this.containsPath(declarationOutputDir, resolvedRealPath)) {
+        continue;
+      }
+
+      const relativeToOutput = path.relative(declarationOutputDir, resolvedRealPath);
+      const source = this.declarationRelativePathToSource(rootDir, relativeToOutput);
+      if (source !== undefined) {
+        return source;
+      }
+    }
+
+    return undefined;
+  }
+
+  // Gap 81 — `dist/foo/bar.d.ts` -> `src/foo/bar.ts`, falling back to `.tsx`
+  // (the extension a JSX-carrying project emits declarations from). Returns
+  // `undefined` unless the candidate exists on disk, so a stale declaration
+  // left over from a deleted source file never redirects a resolution at a
+  // file that is not there.
+  private declarationRelativePathToSource(rootDir: string, relativeToOutput: string): string | undefined {
+    const declarationSuffix = '.d.ts';
+    if (!relativeToOutput.endsWith(declarationSuffix)) {
+      return undefined;
+    }
+
+    const withoutSuffix = relativeToOutput.slice(0, -declarationSuffix.length);
+    for (const extension of ['.ts', '.tsx']) {
+      const candidate = path.join(rootDir, `${withoutSuffix}${extension}`);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return undefined;
+  }
+
+  // Gap 81 — true when `candidate` is `parent` itself or sits beneath it.
+  // Uses `path.relative` rather than a `startsWith` prefix test so a sibling
+  // directory whose name merely shares a prefix (`dist-browser` next to
+  // `dist`) cannot match.
+  private containsPath(parent: string, candidate: string): boolean {
+    const relative = path.relative(parent, candidate);
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  }
+
+  // Gap 81, unbuilt-sibling fallback — a referenced project that has never
+  // been built has no `dist`, so its package.json `types`/`main` entry points
+  // at a file that does not exist and `ts.resolveModuleName` fails outright
+  // (classification `'unresolved'`, no edge to traverse). Extraction must not
+  // depend on the target having been built.
+  //
+  // So: find the referenced project whose package.json `name` matches the bare
+  // specifier, read its DECLARED `types`/`main` path, and run that declared
+  // path through the same outDir->rootDir mapping the built case uses. The
+  // declared path is what the build WOULD produce, so mapping it yields the
+  // same source file a built sibling would have redirected to.
+  //
+  // Returns `undefined` when the specifier names no referenced project, when
+  // the package.json is unreadable, or when the mapped source is absent — the
+  // caller then emits the existing unresolvable-import diagnostic rather than
+  // silently dropping the edge.
+  private resolveUnbuiltReferencedProject(importSpecifier: string): string | undefined {
+    for (const project of this.referencedProjects.values()) {
+      const manifestPath = path.join(project.packageDir, 'package.json');
+      if (!fs.existsSync(manifestPath)) {
+        continue;
+      }
+
+      const manifest = this.readPackageManifest(manifestPath);
+      if (manifest === undefined || manifest.name !== importSpecifier) {
+        continue;
+      }
+
+      const declaredEntry = manifest.types || manifest.main;
+      if (declaredEntry === undefined) {
+        continue;
+      }
+
+      const { declarationOutputDir, rootDir } = project;
+      if (declarationOutputDir === undefined || rootDir === undefined) {
+        continue;
+      }
+
+      // The declared entry is resolved against the package dir, then treated
+      // exactly like a built declaration: `dist/index.js` and `dist/index.d.ts`
+      // both normalize to the `dist/index.d.ts` shape the mapper expects.
+      const declaredAbsolute = path.resolve(project.packageDir, declaredEntry);
+      if (!this.containsPath(declarationOutputDir, declaredAbsolute)) {
+        continue;
+      }
+
+      const relativeToOutput = path.relative(declarationOutputDir, declaredAbsolute);
+      const declarationRelative = relativeToOutput.replace(/\.(d\.ts|js|mjs|cjs)$/, '.d.ts');
+      const source = this.declarationRelativePathToSource(rootDir, declarationRelative);
+      if (source !== undefined) {
+        return source;
+      }
+    }
+
+    return undefined;
+  }
+
+  private readPackageManifest(manifestPath: string): { name?: string; types?: string; main?: string } | undefined {
+    try {
+      const parsed: unknown = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      if (typeof parsed !== 'object' || parsed === null) {
+        return undefined;
+      }
+      const record = parsed as Record<string, unknown>;
+      // Narrowing, not casting: each field is only carried forward when it is
+      // actually a string, so a malformed manifest cannot inject a non-string
+      // into the path joins above.
+      return {
+        name: typeof record['name'] === 'string' ? record['name'] : undefined,
+        types: typeof record['types'] === 'string' ? record['types'] : undefined,
+        main: typeof record['main'] === 'string' ? record['main'] : undefined,
+      };
+    } catch {
+      return undefined;
+    }
   }
 
   analyze(): TypeScriptProjectAnalysis {
@@ -1798,11 +2008,38 @@ export class TypeScriptAnalyzer {
 
     const resolvedModule = result.resolvedModule;
     if (!resolvedModule) {
+      // Gap 81 — the referenced sibling exists but has not been built, so its
+      // package.json `types` names a file that is not on disk yet and module
+      // resolution fails. Map the DECLARED output path back to source before
+      // conceding: extraction quality must not depend on build state. Still
+      // `'unresolved'` when the specifier names no referenced project, which
+      // keeps the caller's existing unresolvable-import diagnostic intact.
+      const unbuiltSource = this.resolveUnbuiltReferencedProject(importSpecifier);
+      if (unbuiltSource !== undefined) {
+        return { resolvedPath: unbuiltSource, classification: 'internal' };
+      }
       return { resolvedPath: undefined, classification: 'unresolved' };
     }
 
     const resolvedPath = resolvedModule.resolvedFileName;
     const isExternal = resolvedModule.isExternalLibraryImport === true || resolvedPath.includes('node_modules');
+
+    if (isExternal) {
+      // Gap 81 — a tsconfig `references` entry declares the target to be part
+      // of this compilation, and X-AN-1 already unions its sources into the
+      // program on that basis. Classifying those same files external
+      // contradicts the traversal the analyzer performs. So before honoring
+      // the external verdict, check whether the resolution lands in a
+      // referenced project's declaration output and, if it does, redirect it
+      // to the source that produced it.
+      //
+      // A genuine third-party package never realpaths under a referenced
+      // project's outDir, so this leaves real npm dependencies external.
+      const sourcePath = this.mapDeclarationToSource(this.realpathOrSelf(resolvedPath));
+      if (sourcePath !== undefined) {
+        return { resolvedPath: sourcePath, classification: 'internal' };
+      }
+    }
 
     return {
       resolvedPath,
