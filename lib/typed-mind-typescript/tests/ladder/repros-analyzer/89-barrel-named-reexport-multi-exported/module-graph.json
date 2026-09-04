@@ -1,0 +1,14 @@
+[
+  {
+    "sourceModule": "src/index.ts",
+    "specifier": "./normalize.ts",
+    "resolvedTarget": "src/normalize.ts",
+    "classification": "internal"
+  },
+  {
+    "sourceModule": "src/index.ts",
+    "specifier": "./normalize.ts",
+    "resolvedTarget": "src/normalize.ts",
+    "classification": "internal"
+  }
+]

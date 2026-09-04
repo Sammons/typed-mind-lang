@@ -1,0 +1,21 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [barrelOwnHelper]
+}
+
+IndexFile @ src/index.ts:
+  <- [normalizeVehicleString, canonicalVehicleSlug]
+  -> [barrelOwnHelper]
+  <-> [normalizeVehicleString, canonicalVehicleSlug]
+
+NormalizeFile @ src/normalize.ts:
+  -> [normalizeVehicleString, canonicalVehicleSlug]
+
+barrelOwnHelper :: barrelOwnHelper() => string
+
+normalizeVehicleString :: normalizeVehicleString(raw: string) => string
+
+canonicalVehicleSlug :: canonicalVehicleSlug(raw: string) => string
+  ~> [normalizeVehicleString]

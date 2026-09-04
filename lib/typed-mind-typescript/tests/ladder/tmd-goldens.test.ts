@@ -262,6 +262,48 @@ const cases: readonly FixtureCase[] = [
   // this harness's fixture-root-as-project-dir shape cannot express. Their
   // goldens live in rung-code-outline-cli.test.ts and in each fixture's own
   // module-graph.json and README.md.
+  //
+  // 86 records `false`: the PIPELINE half is fixed (the emitted field text
+  // round-trips, asserted directly in rung-bens-almanac.test.ts), but the
+  // tree-sitter grammar is a separate parser with the same blind spot and
+  // still reports one `syntax/error` on the spaced `|` inside `<...>`. That
+  // residual is the committed grammar knownGap — see
+  // repros-analyzer/86-fn-type-union-in-generic-return/README.md.
+  {
+    fixture: '86-fn-type-union-in-generic-return',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
+  // 87 records `false`: the multi-line field now collapses to one line (the
+  // fix, asserted in the rung test), and the residual findings are the SAME
+  // grammar knownGap as 86 — both surviving fields return a generic over a
+  // union, which the grammar rejects for the reason 86's README records.
+  {
+    fixture: '87-multiline-dto-field-type',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
+  // 88 records `false`: it is a knownGap fixture. `export default <identifier>`
+  // never reaches the export registry, so the route file's exports go unimported
+  // and the checker reports the orphan. Root cause and the reason it is not
+  // fixed here (two layers plus a missing constant-name reservation pass) are in
+  // repros-analyzer/88-export-assignment-default/README.md.
+  {
+    fixture: '88-export-assignment-default',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: false,
+  },
+  // 89 records `true`: the barrel no longer double-claims its re-exported
+  // names, so the fixture checks clean end to end.
+  {
+    fixture: '89-barrel-named-reexport-multi-exported',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
 ];
 
 describe('RFC-TM-9 Q1 — .tmd goldens against the current language (per-fixture, RFC §8 golden discipline)', () => {

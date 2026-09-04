@@ -1,0 +1,26 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [createApi]
+}
+
+IndexFile @ src/index.ts:
+  <- [namedHelper]
+  -> [createApi]
+
+HealthFile @ src/routes/health.ts:
+  -> [HealthStatus, buildHealthStatus]
+
+HelperFile @ src/routes/helper.ts:
+  -> [namedHelper]
+
+createApi :: createApi() => string
+
+buildHealthStatus :: buildHealthStatus() => HealthStatus
+  -> HealthStatus
+
+namedHelper :: namedHelper() => string
+
+HealthStatus %
+  - status: string

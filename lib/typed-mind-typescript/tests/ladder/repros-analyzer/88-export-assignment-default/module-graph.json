@@ -1,0 +1,14 @@
+[
+  {
+    "sourceModule": "src/index.ts",
+    "specifier": "./routes/health.ts",
+    "resolvedTarget": "src/routes/health.ts",
+    "classification": "internal"
+  },
+  {
+    "sourceModule": "src/index.ts",
+    "specifier": "./routes/helper.ts",
+    "resolvedTarget": "src/routes/helper.ts",
+    "classification": "internal"
+  }
+]

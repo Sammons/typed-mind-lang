@@ -1,0 +1,20 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [PrContent, SupersessionDeps, runSupersession]
+}
+
+IndexFile @ src/index.ts:
+  -> [PrContent, SupersessionDeps, runSupersession]
+
+runSupersession :: runSupersession(deps: SupersessionDeps) => void
+  <- SupersessionDeps
+
+PrContent %
+  - title: string
+
+SupersessionDeps %
+  - checkSupersession: ( make: string, model: string, yearRange: [number, number], ) => Promise<{ ruleId: string; severity: string } | null>
+  - singleLineTarget: (make: string, model: string) => Promise<number>
+  - createPr: ( content: PrContent, files: Array<{ path: string; content: string }>, ) => Promise<number>
