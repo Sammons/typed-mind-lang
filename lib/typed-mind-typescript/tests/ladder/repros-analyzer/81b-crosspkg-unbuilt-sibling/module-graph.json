@@ -1,7 +1,7 @@
 [
   {
     "sourceModule": "../src/index.ts",
-    "specifier": "@fixture/core",
+    "specifier": "@fixture-unbuilt/core",
     "resolvedTarget": "../../core/src/index.ts",
     "classification": "internal"
   }

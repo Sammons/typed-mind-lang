@@ -257,11 +257,11 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: false,
   },
-  // 81 is deliberately absent: it is a two-package mini-workspace whose
-  // entrypoint sits under `packages/cli/` with its own tsconfig, which this
-  // harness's fixture-root-as-project-dir shape cannot express. Its goldens
-  // and knownGap disposition live in rung-code-outline-cli.test.ts and
-  // repros-analyzer/81-crosspkg-type-only-dto-field/README.md.
+  // 81 and 81b are deliberately absent: each is a two-package mini-workspace
+  // whose entrypoint sits under `packages/cli/` with its own tsconfig, which
+  // this harness's fixture-root-as-project-dir shape cannot express. Their
+  // goldens live in rung-code-outline-cli.test.ts and in each fixture's own
+  // module-graph.json and README.md.
 ];
 
 describe('RFC-TM-9 Q1 — .tmd goldens against the current language (per-fixture, RFC §8 golden discipline)', () => {

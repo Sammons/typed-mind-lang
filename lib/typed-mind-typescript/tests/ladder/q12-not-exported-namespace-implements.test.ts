@@ -54,10 +54,23 @@ describe('RFC-TM-10 follow-up check — issue #80: namespace-implements class-no
 
     const { result: checkResult } = await checkViaLongform(result.entities);
     const classNotExported = checkResult.diagnostics.filter((d) => d.code === 'checker/class-not-exported');
+
+    // Gap 81 widened this self-extraction's reach. `tsconfig.json` here
+    // declares `references: [{ "path": "../typed-mind" }]`, so the sibling
+    // package is now classified internal and traversed into its SOURCE instead
+    // of stopping at its `dist/*.d.ts`. That surfaces `LinkCollector`
+    // (lib/typed-mind/src/pipeline/link-index.ts:82) — a genuinely
+    // module-internal class, constructed and consumed only inside its own
+    // file, exported by nothing.
+    //
+    // The finding is a TRUE statement of exactly the kind this suite's first
+    // case pins, newly reachable rather than newly wrong. The assertion names
+    // it explicitly (rather than relaxing to a substring or a count) so that
+    // any OTHER class-not-exported appearing here still fails.
     assert.deepEqual(
       classNotExported.map((d) => d.message),
-      [],
-      'CollectingParseConfigHost must no longer flag class-not-exported now that it is exported',
+      ["Class 'LinkCollector' is not exported by any file"],
+      'CollectingParseConfigHost must not flag (it is exported); LinkCollector legitimately does, and is only visible because referenced projects are now traversed',
     );
   });
 });
