@@ -238,8 +238,8 @@ UserDTO %
     const result = await engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
     assert.equal(result.success, false);
-    assert.ok(result.extraEntities.includes('UserService'));
-    assert.ok(result.extraEntities.includes('createUser'));
+    // Every mock entity except IndexApp and UserDTO is extra, in mock order.
+    assert.deepEqual(result.extraEntities, ['UserService', 'BaseService', 'IUserService', 'createUser', 'findUser', 'CreateUserDTO']);
     // Main exists only in the expected document.
     assert.deepEqual(result.missingEntities, ['Main']);
   });

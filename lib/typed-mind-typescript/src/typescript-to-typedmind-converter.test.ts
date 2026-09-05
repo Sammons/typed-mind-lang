@@ -330,8 +330,8 @@ describe('TypeScriptToTypedMindConverter', () => {
     assert.equal(projectConfigField.type, 'ts.CompilerOptions');
     // The qualified name is structured and remains complete; checking its
     // declared namespace owner is a separate validation step.
-    assert.ok(projectConfigField.typeExpr.kind === 'named');
-    assert.equal(projectConfigField.typeExpr.name, 'ts.CompilerOptions');
+    assert.equal(projectConfigField.typeExpr.kind, 'named');
+    assert.equal(projectConfigField.typeExpr.kind === 'named' ? projectConfigField.typeExpr.name : undefined, 'ts.CompilerOptions');
   });
 
   it('should generate programs by default', () => {
