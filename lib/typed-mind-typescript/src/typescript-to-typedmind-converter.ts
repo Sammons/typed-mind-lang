@@ -2899,22 +2899,11 @@ export class TypeScriptToTypedMindConverter {
       );
     }
 
-    // The inherit targets are recorded VERBATIM, type arguments included, so
-    // `extends Repo<Item>` emits `<: Repo<Item>`. That is intentional and
-    // matches `convertClass` (the real-class lane) exactly: dropping the
-    // arguments is PR #152's original bug, and
-    // slat-harness-mixin-heritage-controls.test.ts pins the verbatim form as
-    // property 1 of the #152/#153 reconciliation, warning that silencing the
-    // resulting diagnostic "would pressure a future author to reintroduce the
-    // bug". The unresolvable generic base is gap 68's territory (type
-    // parameters are unmodeled language-wide), NOT a defect of this lane —
-    // fixture 69d pins both lanes together so neither can be changed alone.
-    // `stripGenericArguments` is applied only to the heritage LOOKUP
-    // (`resolveInterfaceIsMethodBearing`), never to the emitted text.
+    // G retains full instantiated heritage and declaration parameters in both
+    // class lanes. A2 rewrites exact reference origins before the canonical
+    // base/argument parse below; raw analyzer text remains observational.
+    // Legacy strings here serve only collision reporting and raw source text.
     const inheritList = [...iface.extends];
-    // decision-same-named-entities PR 1, interim window — an interface's
-    // heritage targets are raw source identifiers, not rewritten to follow a
-    // collision rename (PR 2's job).
     for (const [index, target] of inheritList.entries()) {
       this.warnOnCollidedTypeReference(
         target,
