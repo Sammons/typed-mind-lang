@@ -49,9 +49,16 @@ it('TM13 EXIT: gap fixture ledger has zero unowned or unresolved target rows', a
       assert.deepEqual(mind.check(emitted.text).diagnostics, [], `${id}: ${forceForm}`);
     }
   }
-  // #130's original DTO literal union and literal-led alias wrappers are
+  // #130's quoted-description trigger plus literal union/alias wrappers are
   // syntax/codec obligations; these standalone declarations have no Program.
-  for (const source of ['Data %\n  - status: "active" | "inactive"\n', 'Status = "active" | "inactive"\n', 'Only = "active"\n']) {
+  for (const source of [
+    'Data %\n  - status: "active" | "inactive"\n',
+    'Status = "active" | "inactive"\n',
+    'Only = "active"\n',
+    String.raw`Data %
+  - value: string "Description with \"quoted\" words and \\ slash"
+`,
+  ]) {
     const original = mind.parse(source);
     assert.deepEqual(original.diagnostics, []);
     const entity = original.entities[0];
@@ -61,6 +68,14 @@ it('TM13 EXIT: gap fixture ledger has zero unowned or unresolved target rows', a
       assert.deepEqual(emitted.diagnostics, []);
       const reparsed = mind.parse(emitted.text);
       assert.deepEqual(reparsed.diagnostics, []);
+      if (entity instanceof DtoNode) {
+        const next = reparsed.entities[0];
+        assert.ok(next instanceof DtoNode);
+        assert.deepEqual(
+          next.fields.map((field) => field.description),
+          entity.fields.map((field) => field.description),
+        );
+      }
       assert.equal(emitter.emitShortform(reparsed), emitter.emitShortform(original));
     }
   }
