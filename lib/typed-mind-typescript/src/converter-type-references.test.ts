@@ -94,7 +94,14 @@ it('TM13 A2: aliases and literals with equal spelling do not cross-rewrite', (co
   assert.match(converted.tmdContent, new RegExp(`external: ${dependency.name}\\.Public`));
   assert.match(converted.tmdContent, /local: Public/);
   assert.match(converted.tmdContent, /literal: "Local"/);
-  assert.ok(converted.warnings.some((warning) => /unsupported syntax/.test(warning.message)));
+  // RFC-TM-14 S7: inline object-literal members are structural for the
+  // rewrite — the member KEY `Local` is not a reference and keeps its
+  // spelling; the member TYPE is the external binding.
+  assert.match(converted.tmdContent, new RegExp(`- Local: ${dependency.name}\\.Public`));
+  assert.equal(
+    converted.warnings.some((warning) => /unsupported syntax/.test(warning.message)),
+    false,
+  );
 });
 
 it('TM13 A2: ambiguous source identities cannot borrow emitted names', (context) => {
