@@ -6,7 +6,7 @@ program IndexApp {
 }
 
 IndexFile @ src/index.ts:
-  <- [normalizeVehicleString, canonicalVehicleSlug]
+  <- [NormalizeFile.normalizeVehicleString, NormalizeFile.canonicalVehicleSlug]
   -> [barrelOwnHelper]
   <-> [normalizeVehicleString, canonicalVehicleSlug]
 

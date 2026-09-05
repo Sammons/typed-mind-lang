@@ -66,10 +66,12 @@ A calls entry is `fn`, `File.fn`, `Class.method`, or `Class.constructor` (constr
 
 Each continuation attaches only to the entity kinds that carry its property; the checker rejects the others (`semantics/illegal-continuation`). `~> [...]` attaches to Function, Class, ClassFile and Constants; `$< [...]` attaches to Function, Class and ClassFile. On a Class or ClassFile, a calls or consumes entry means a member body of that class calls or reads the target (the slot is per class, not per member).
 
+An import entry is `Owner.name` when more than one File exports or re-exports `name`; otherwise it is bare. Hand-authors may always qualify. `Owner` is the File the name was imported from, so the checker credits a re-exporting File only through an entry that names it (`DateUtilsFile.formatDate` below).
+
 ```tmd
 TodoApp -> main v1.0.0
 main @ src/index.ts:
-  <- [App, Logo, DATABASE_URL, startApp, formatDate, Scheduler]
+  <- [App, Logo, DATABASE_URL, startApp, DateUtilsFile.formatDate, Scheduler]
   -> [startApp, UserDTO, Widget, Scheduler]
 
 App &! "Root component"

@@ -32,16 +32,23 @@ DetectFormatFile @ src/detect-format.ts:
   -> [FormatDetectionResult, detectFormat]
 
 FormatApiFile @ src/format-api.ts:
-  <- [detectFormat, FormatDetectionResult]
+  <- [DetectFormatFile.detectFormat, DetectFormatFile.FormatDetectionResult]
   -> [formatLabel]
   <-> [FormatDetectionResult, detectFormat]
 
 classfile SyntaxEmitter {
   path: src/syntax-emitter.ts
-  imports: [detectFormat, FormatDetectionResult]
+  imports: [DetectFormatFile.detectFormat, DetectFormatFile.FormatDetectionResult]
   exports: [EmitOptions, SyntaxEmitter]
 }
 ```
+
+The import entries are owner-qualified since RFC-TM-15 §S3 (leaf I1): both
+names are exported by `DetectFormatFile` and re-exported by
+`FormatApiFile`, so an importer names the File it imported from. `MainFile`'s
+imports of the same names through `syntax-emitter.ts` stay bare: the
+ClassFile forwarder drops the re-exported names from its `exports:` (RX-1),
+so it cannot own them.
 
 Two forwarders are present on purpose:
 

@@ -183,13 +183,35 @@ describe('orphan check (validator.ts:245-367)', () => {
     assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), []);
   });
 
-  // Deferred half of RX-B, pinned: an UNRELATED importer of the bare name
-  // still credits the barrel, because the document carries no per-File
-  // import provenance to tell "imported through Barrel" from "imported
-  // from Origin directly". Closing this needs that provenance (fixture
-  // 111's README); it is not a checker-local change.
-  it('pins RX-B: an unrelated importer of the re-exported name still credits the barrel', async () => {
+  // RFC-TM-15 §S3 (rfc-tm-15-diamond.md, leaf I1) — RX-B's other half.
+  // The converter owner-qualifies an import entry whenever more than one
+  // File exports or re-exports the name, so the document now tells
+  // "imported through Barrel" (`Barrel.helper`) from "imported from Origin
+  // directly" (`Origin.helper`). The re-export branch credits the barrel
+  // only through an entry whose owner IS the barrel.
+  it('TM15 V3: an importer qualified with the declaring File does not credit the barrel', async () => {
+    const { result } = await check(selfCreditBarrel('  <- [Origin.helper]'));
+    assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), ["Orphaned file 'Barrel' - none of its exports are imported"]);
+    assert.deepEqual(messagesByCode(result, 'checker/qualified-name-unresolved'), []);
+  });
+
+  it('TM15 V3: an importer qualified with the barrel credits it without the RX-6 fold', async () => {
+    const { result } = await check(selfCreditBarrel('  <- [Barrel.helper]'));
+    assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), []);
+  });
+
+  // The hand-authored control (non-goal N-15-hand-authored): a bare entry
+  // carries no provenance and keeps today's credit.
+  it('TM15 V3: a bare hand-authored import still credits the barrel', async () => {
     const { result } = await check(selfCreditBarrel('  <- [helper]'));
+    assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), []);
+  });
+
+  // The `exports` branch passes no owner: `Origin`'s consumption is proven
+  // by `Barrel.helper` (the name resolves to `helper` through the barrel),
+  // so a through-barrel importer credits both Files.
+  it('TM15 V3: a through-barrel qualified importer credits the declaring File too', async () => {
+    const { result } = await check(selfCreditBarrel('  <- [Barrel.helper, Barrel]'));
     assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), []);
   });
 

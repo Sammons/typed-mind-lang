@@ -9,7 +9,7 @@ DetectFormatFile @ src/detect-format.ts:
   -> [FormatDetectionResult, detectFormat]
 
 FormatApiFile @ src/format-api.ts:
-  <- [detectFormat, FormatDetectionResult]
+  <- [DetectFormatFile.detectFormat, DetectFormatFile.FormatDetectionResult]
   -> [formatLabel]
   <-> [FormatDetectionResult, detectFormat]
 
@@ -20,7 +20,7 @@ MainFile @ src/main.ts:
 classfile SyntaxEmitter {
   type: ClassFile
   path: src/syntax-emitter.ts
-  imports: [detectFormat, FormatDetectionResult]
+  imports: [DetectFormatFile.detectFormat, DetectFormatFile.FormatDetectionResult]
   method: "emit(source: string, options?: EmitOptions) => string"
   exports: [EmitOptions, SyntaxEmitter]
 }

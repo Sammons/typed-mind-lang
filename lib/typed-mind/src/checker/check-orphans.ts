@@ -118,17 +118,42 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
   return referenced;
 };
 
+// RFC-TM-15 §S3 (rfc-tm-15-diamond.md, leaf I1) — the owner a
+// provenance-qualified import entry names (`NormalizeFile.normalizeVehicleString`
+// is "imported from NormalizeFile"): the longest declared prefix, the same
+// owner walk the resolver performs. A bare entry carries no provenance, and
+// neither does an entry that IS a declared entity's name (`HomeFile.default`
+// names an entity, not the File it was imported from).
+const importEntryOwner = (context: CheckContext, imported: string): string | undefined => {
+  if (!imported.includes('.') || context.byName.has(imported)) {
+    return undefined;
+  }
+  let separator = imported.lastIndexOf('.');
+  while (separator > 0 && !context.byName.has(imported.slice(0, separator))) {
+    separator = imported.lastIndexOf('.', separator - 1);
+  }
+  return separator > 0 ? imported.slice(0, separator) : undefined;
+};
+
 // `excluding` — the entity whose own `imports` list must NOT count as
 // evidence. Only `isFileConsumed`'s re-export branch passes it (see the
 // RX-B note there); every other caller scans the whole document.
-const isEntityImported = (context: CheckContext, entityName: string, excluding?: EntityNode): boolean => {
+// `owner` — when given, a qualified importer entry (`Owner.name`) is
+// evidence only when its owner is this one; a bare entry keeps its credit
+// (hand-authored documents may always spell the bare name, RFC-TM-15
+// non-goal N-15-hand-authored). Only the re-export branch passes it.
+const isEntityImported = (context: CheckContext, entityName: string, excluding?: EntityNode, owner?: string): boolean => {
   for (const entity of context.byName.values()) {
     if (entity === excluding) {
       continue;
     }
     for (const imported of importsOf(entity) ?? []) {
       if (resolvedNameTarget(context.names.resolve(imported, { importingFile: entity.name }))?.name === entityName) {
-        return true;
+        const entryOwner = owner === undefined ? undefined : importEntryOwner(context, imported);
+        if (entryOwner === undefined || entryOwner === owner) {
+          return true;
+        }
+        continue;
       }
       if (imported.includes('*')) {
         const base = imported.split('*')[0] ?? '';
@@ -189,10 +214,17 @@ const isFileConsumed = (context: CheckContext, file: FileNode): boolean => {
   // let a barrel that NOTHING imports prove its own consumption from its
   // own import edge, hiding a dead file. The barrel's own imports are
   // evidence that it consumes `a.ts`, never that anything consumes the
-  // barrel, so this branch excludes the File under evaluation. The
-  // remaining bare-name credit from an UNRELATED importer is RX-B's other
-  // half and stays deferred: closing it needs per-File import provenance
-  // the language does not carry (fixture 111's README).
+  // barrel, so this branch excludes the File under evaluation.
+  //
+  // RFC-TM-15 §S3 (rfc-tm-15-diamond.md, leaf I1) — RX-B's other half, the
+  // bare-name credit from an UNRELATED importer: the converter now emits an
+  // import entry owner-qualified (`NormalizeFile.normalizeVehicleString`)
+  // whenever more than one File exports or re-exports the name, so this
+  // branch passes `owner = file.name` and a qualified entry credits the
+  // barrel only when the importer imported THROUGH it
+  // (`BarrelFile.normalizeVehicleString`). A bare entry still credits
+  // (hand-authored trust, fixture 111's README); the `exports` branch above
+  // and the third branch below pass no owner.
   //
   // RFC-TM-15 §S2 (rfc-tm-15-diamond.md, leaf X1) — a qualified entry
   // (`VehicleVendorSdk.normalizeVehicleString`, fixture 110 shape B)
@@ -207,7 +239,7 @@ const isFileConsumed = (context: CheckContext, file: FileNode): boolean => {
     if (resolution.kind === 'external') {
       continue;
     }
-    if (isEntityImported(context, resolvedNameTarget(resolution)?.name ?? reExportName, file)) {
+    if (isEntityImported(context, resolvedNameTarget(resolution)?.name ?? reExportName, file, file.name)) {
       return true;
     }
   }

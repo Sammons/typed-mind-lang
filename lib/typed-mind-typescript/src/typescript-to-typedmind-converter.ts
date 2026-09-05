@@ -925,6 +925,13 @@ export class TypeScriptToTypedMindConverter {
       // guaranteed final once `convertModules` has finished.
       this.foldReExportedNamesIntoImporterFiles(filteredModules);
 
+      // RFC-TM-15 §S3 (rfc-tm-15-diamond.md, leaf I1) — owner-qualify the
+      // import entries whose bare name more than one File exports or
+      // re-exports. Same ordering rationale: the gate reads every File's
+      // final `exports`/`reExports`, and the owner is the target module's
+      // final entity name.
+      this.qualifyAmbiguousImportEntries(filteredModules);
+
       // X-AN-3 residual (ladder rung: sammons/code-outline-cli) — the
       // barrel->source direction of the same "a re-export is a real edge"
       // principle: `export * from '<source>'` emits no ImportDeclaration, so
@@ -4591,6 +4598,154 @@ export class TypeScriptToTypedMindConverter {
     return [...new Set(importNames)];
   }
 
+  // The registry entry an internal `specifier` (as written in
+  // `importerFilePath`) resolves to: the analyzer's own resolution first,
+  // the guessed-specifier keys as the fallback. issue #87: the registry's
+  // keys are always extension-less; the raw specifier may carry an explicit
+  // extension (nodenext/verbatimModuleSyntax style), so strip a known source
+  // extension before looking up. Shared by `resolveImportToEntity` and
+  // `qualifyAmbiguousImportEntries` (RFC-TM-15 §S3), which reads the
+  // entry's `filePath` to name the owning File.
+  private lookupImportTargetModuleExports(importerFilePath: string, specifier: string): ExportRegistry[string] | undefined {
+    const importerSourceModule = this.getRelativePath(importerFilePath);
+    const resolvedTarget = this.moduleGraphResolution.get(
+      TypeScriptToTypedMindConverter.moduleGraphResolutionKey(importerSourceModule, specifier),
+    );
+    return (
+      (resolvedTarget !== undefined ? this.exportRegistry[this.stripKnownSourceExtension(resolvedTarget)] : undefined) ??
+      this.exportRegistry[specifier] ??
+      this.exportRegistry[this.stripKnownSourceExtension(specifier)]
+    );
+  }
+
+  // RFC-TM-15 §S3 (rfc-tm-15-diamond.md, leaf I1) — ladder fixture 111
+  // (RFC-TM-11 Deferral RX-B, unrelated-importer half): an import entry is
+  // `Owner.name` when more than one File exports or re-exports `name`;
+  // otherwise it stays bare (non-goal N-15-qualify-all). `Owner` is the
+  // entity of the module the specifier resolved to. The checker's
+  // `isFileConsumed` re-export branch (check-orphans.ts) credits a barrel
+  // through a qualified entry only when the owner IS that barrel, which is
+  // what lets `MainFile: <- [NormalizeFile.normalizeVehicleString]` stop
+  // crediting the barrel `main.ts` never imports.
+  //
+  // Post-pass, same ordering rationale as `foldReExportedNamesIntoImporterFiles`
+  // immediately above: the gate reads every File's FINAL `exports` and
+  // `reExports`, and the owner name is only final once `convertModules` has
+  // finished. It walks each module's own `ParsedImport`s (and the
+  // re-exports `convertImports` records as imports) and rewrites the bare
+  // entry `convertImports` produced for the same binding; an entry is only
+  // qualified when the owner lists the name (`exports`, or a `reExports`
+  // member part), i.e. when the resolver will bind `Owner.name` — a
+  // ClassFile that forwards a name it dropped from `exports` (RX-1) is not a
+  // legal owner, so that entry stays bare.
+  private qualifyAmbiguousImportEntries(modules: readonly ParsedModule[]): void {
+    const exporterCounts = new Map<string, number>();
+    const bump = (name: string): void => {
+      exporterCounts.set(name, (exporterCounts.get(name) ?? 0) + 1);
+    };
+    for (const entity of this.entities) {
+      if (entity instanceof FileNode) {
+        for (const exported of entity.exports) bump(exported);
+        for (const entry of entity.reExports) bump(entry.slice(entry.lastIndexOf('.') + 1));
+      } else if (entity instanceof ClassFileNode) {
+        for (const exported of entity.exports) bump(exported);
+      }
+    }
+    const isAmbiguous = (entityName: string): boolean => !entityName.includes('.') && (exporterCounts.get(entityName) ?? 0) > 1;
+    if (![...exporterCounts.values()].some((count) => count > 1)) {
+      return;
+    }
+
+    for (const module of modules) {
+      const importerEntityName = this.fileEntityNameByModulePath.get(module.filePath);
+      const importerIndex = importerEntityName === undefined ? -1 : this.entities.findIndex((entity) => entity.name === importerEntityName);
+      const importerEntity = this.entities[importerIndex];
+      if (importerIndex === -1 || (!(importerEntity instanceof FileNode) && !(importerEntity instanceof ClassFileNode))) {
+        continue;
+      }
+
+      // entity name -> qualified entries, in source order, deduplicated.
+      const qualifiedByEntityName = new Map<string, string[]>();
+      const record = (specifier: string, requestedName: string, defaultImport: boolean): void => {
+        if (this.isExternalPackage(specifier)) {
+          return;
+        }
+        const entityName = this.resolveImportToEntity(module.filePath, requestedName, specifier, defaultImport);
+        if (entityName === undefined || !isAmbiguous(entityName) || !importerEntity.imports.includes(entityName)) {
+          return;
+        }
+        const targetModulePath = this.lookupImportTargetModuleExports(module.filePath, specifier)?.filePath;
+        const ownerName = targetModulePath === undefined ? undefined : this.fileEntityNameByModulePath.get(targetModulePath);
+        const owner = ownerName === undefined ? undefined : this.entities.find((entity) => entity.name === ownerName);
+        if (owner === undefined || ownerName === undefined || ownerName === importerEntityName || !this.ownerListsName(owner, entityName)) {
+          return;
+        }
+        const qualified = `${ownerName}.${entityName}`;
+        const entries = qualifiedByEntityName.get(entityName) ?? [];
+        if (!entries.includes(qualified)) {
+          entries.push(qualified);
+        }
+        qualifiedByEntityName.set(entityName, entries);
+      };
+      for (const imp of module.imports) {
+        if (imp.defaultImport !== undefined) {
+          record(imp.specifier, imp.defaultImport, true);
+        }
+        for (const namedImport of imp.namedImports) {
+          record(imp.specifier, namedImport, false);
+        }
+      }
+      for (const reExport of module.exports) {
+        if (reExport.source !== undefined && reExport.name !== '*') {
+          record(reExport.source, reExport.name, false);
+        }
+      }
+      if (qualifiedByEntityName.size === 0) {
+        continue;
+      }
+
+      const imports = importerEntity.imports.flatMap((entry) => qualifiedByEntityName.get(entry) ?? [entry]);
+      this.entities[importerIndex] =
+        importerEntity instanceof FileNode
+          ? new FileNode({
+              name: importerEntity.name,
+              span: importerEntity.span,
+              raw: importerEntity.raw,
+              comment: importerEntity.comment,
+              sourceForm: importerEntity.sourceForm,
+              path: importerEntity.path,
+              imports,
+              exports: importerEntity.exports,
+              reExports: importerEntity.reExports,
+              purpose: importerEntity.purpose,
+            })
+          : new ClassFileNode({
+              name: importerEntity.name,
+              span: importerEntity.span,
+              raw: importerEntity.raw,
+              comment: importerEntity.comment,
+              sourceForm: importerEntity.sourceForm,
+              path: importerEntity.path,
+              heritage: importerEntity.heritage,
+              typeParameters: importerEntity.typeParameters,
+              ...(importerEntity.members === undefined ? { methods: importerEntity.methods } : { members: importerEntity.members }),
+              imports,
+              exports: importerEntity.exports,
+              purpose: importerEntity.purpose,
+            });
+    }
+  }
+
+  // Whether `Owner.name` would bind through `owner` in the core resolver
+  // (`qualified-name-resolver.ts`): a File or ClassFile that exports the
+  // name, or a File whose `reExports` carry it (bare or `Dep.name`).
+  private ownerListsName(owner: EntityNode, name: string): boolean {
+    if (owner instanceof FileNode) {
+      return owner.exports.includes(name) || owner.reExports.some((entry) => entry.slice(entry.lastIndexOf('.') + 1) === name);
+    }
+    return owner instanceof ClassFileNode && owner.exports.includes(name);
+  }
+
   private resolveImportToEntity(
     importerFilePath: string,
     requestedName: string,
@@ -4616,19 +4771,7 @@ export class TypeScriptToTypedMindConverter {
     // list a few lines down only ever covers a fixed enumeration of shapes
     // and is kept only as a fallback for callers (unit-test mocks) that
     // construct a `TypeScriptProjectAnalysis` with an empty `moduleGraph`.
-    const importerSourceModule = this.getRelativePath(importerFilePath);
-    const resolvedTarget = this.moduleGraphResolution.get(
-      TypeScriptToTypedMindConverter.moduleGraphResolutionKey(importerSourceModule, specifier),
-    );
-
-    // Handle internal imports using the export registry. issue #87: the
-    // registry's keys are always extension-less; the raw specifier may
-    // carry an explicit extension (nodenext/verbatimModuleSyntax style), so
-    // strip a known source extension before looking up.
-    const moduleExports =
-      (resolvedTarget !== undefined ? this.exportRegistry[this.stripKnownSourceExtension(resolvedTarget)] : undefined) ??
-      this.exportRegistry[specifier] ??
-      this.exportRegistry[this.stripKnownSourceExtension(specifier)];
+    const moduleExports = this.lookupImportTargetModuleExports(importerFilePath, specifier);
     if (!moduleExports) {
       return undefined;
     }

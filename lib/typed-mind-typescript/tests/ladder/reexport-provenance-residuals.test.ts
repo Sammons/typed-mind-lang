@@ -13,7 +13,10 @@
 //         is owner-qualified and its Dependency carries the export.
 //   111 — RFC-TM-11 Deferral RX-B (same section): the self-credit shape is
 //         FIXED in check-orphans.ts (core test in ast-validator.test.ts);
-//         the unrelated-importer shape is pinned — needs the same mechanism.
+//         the unrelated-importer shape is FIXED by RFC-TM-15 §S3 (leaf I1):
+//         an import entry is owner-qualified when more than one File exports
+//         or re-exports the name, and the checker credits a barrel only
+//         through an entry whose owner is that barrel.
 //
 // Control: the `->`-for-`<->` rewrite of fixture 110's document (what the
 // pre-R converter emitted for the bare idiom) still produces exactly one
@@ -63,7 +66,10 @@ describe('Q7 item 1 — issue #62 residual: import-then-bare-export (fixture 109
     // (RFC-TM-11 §RX-1); the fact that matters is the names are absent from
     // its `exports:` — that absence is what the historical finding was about.
     assert.deepEqual(forwardingClassFile?.exports.toSorted(), ['EmitOptions', 'SyntaxEmitter']);
-    assert.deepEqual(forwardingClassFile?.imports.toSorted(), ['FormatDetectionResult', 'detectFormat']);
+    // RFC-TM-15 §S3 (leaf I1): both names are exported by DetectFormatFile
+    // and re-exported by FormatApiFile, so the ClassFile importer's entries
+    // are owner-qualified.
+    assert.deepEqual(forwardingClassFile?.imports.toSorted(), ['DetectFormatFile.FormatDetectionResult', 'DetectFormatFile.detectFormat']);
 
     const checked = await checkDocument(result.tmdContent);
     assert.deepEqual(codes(checked.diagnostics, 'checker/multi-exported'), [], result.tmdContent);
@@ -108,6 +114,16 @@ describe('Q7 item 2 — RFC-TM-11 Deferral RX-A: reExports vs an independent exp
     assert.deepEqual(vendorSurface?.imports, []);
     assert.deepEqual(dependency?.exports, ['normalizeVehicleString']);
     assert.ok(main?.imports.includes(vendorSurface?.name ?? ''), `RX-6 fold must survive qualification: ${main?.imports.join(', ')}`);
+    // RFC-TM-15 §S3 (leaf I1): `normalizeVehicleString` is exported by
+    // NormalizeFile and re-exported by BarrelFile and VendorSurfaceFile, so
+    // each of main.ts's two imports is owner-qualified; the vendor-surface
+    // entry resolves `external` through the qualified re-export.
+    assert.deepEqual(main?.imports, [
+      'BarrelFile.normalizeVehicleString',
+      'VendorSurfaceFile.normalizeVehicleString',
+      'BarrelFile',
+      'VendorSurfaceFile',
+    ]);
     assert.ok(
       result.tmdContent.includes('VendorSurfaceFile @ src/vendor-surface.ts:\n  <-> [VehicleVendorSdk.normalizeVehicleString]\n'),
       result.tmdContent,
@@ -119,24 +135,59 @@ describe('Q7 item 2 — RFC-TM-11 Deferral RX-A: reExports vs an independent exp
 });
 
 describe('Q7 item 3 — RFC-TM-11 Deferral RX-B: isFileConsumed re-export branch (fixture 111)', () => {
-  // PINNED, not fixed: main.ts imports the name DIRECTLY from normalize.ts
-  // and nothing imports barrel.ts, yet the bare-name scan credits the barrel.
-  // Only whole-project analysis puts an unimported barrel in the document at
-  // all; the CLI's entrypoint traversal never reaches one. The RX-6 fold
-  // (`foldReExportedNamesIntoImporterFiles`) writes the barrel's own File
-  // name into a through-barrel importer, so an extracted document ALWAYS
-  // carries the distinguishing fact — but the checker cannot rely on it for
-  // hand-authored documents, which is why this stays deferred.
-  it('unrelated-importer shape is pinned: the unimported barrel is not reported orphaned', async () => {
+  // FIXED (RFC-TM-15 §S3, leaf I1): main.ts imports the name DIRECTLY from
+  // normalize.ts and nothing imports barrel.ts. `normalizeVehicleString` is
+  // exported by NormalizeFile AND re-exported by BarrelFile, so the
+  // converter emits main.ts's entry owner-qualified
+  // (`NormalizeFile.normalizeVehicleString`); the checker's re-export branch
+  // credits the barrel only through an entry whose owner IS the barrel, so
+  // the dead barrel is reported. Only whole-project analysis puts an
+  // unimported barrel in the document at all; the CLI's entrypoint traversal
+  // never reaches one.
+  it('TM15 V3: an unrelated importer no longer credits an unimported barrel', async () => {
     const result = convertFixture('111-unconsumed-barrel-credited-by-direct-import', 'whole-project');
     assert.equal(result.success, true);
     const barrel = fileByPath(result.entities, 'barrel.ts');
     const main = fileByPath(result.entities, 'main.ts');
     assert.deepEqual(barrel?.reExports, ['normalizeVehicleString']);
-    assert.deepEqual(main?.imports, ['normalizeVehicleString']);
+    assert.deepEqual(barrel?.imports, ['NormalizeFile.normalizeVehicleString']);
+    assert.deepEqual(main?.imports, ['NormalizeFile.normalizeVehicleString']);
     assert.equal(main?.imports.includes(barrel?.name ?? ''), false, 'no importer names the barrel');
+    assert.ok(result.tmdContent.includes('MainFile @ src/main.ts:\n  <- [NormalizeFile.normalizeVehicleString]\n'), result.tmdContent);
     const checked = await checkDocument(result.tmdContent);
-    assert.deepEqual(codes(checked.diagnostics, 'checker/orphaned-file'), [], result.tmdContent);
+    assert.deepEqual(
+      codes(checked.diagnostics, 'checker/orphaned-file').map((diagnostic) => diagnostic.message),
+      ["Orphaned file 'BarrelFile' - none of its exports are imported"],
+      result.tmdContent,
+    );
+    assert.deepEqual(codes(checked.diagnostics, 'checker/qualified-name-unresolved'), [], result.tmdContent);
+    assert.deepEqual(codes(checked.diagnostics, 'checker/import-not-found'), [], result.tmdContent);
+  });
+
+  // Controls: the through-barrel spelling the converter emits for an
+  // importer that goes THROUGH the barrel (fixture 110's `MainFile`, the
+  // RX-6 fold retained) and the hand-authored bare spelling both still
+  // credit the barrel.
+  const mainImportsRewritten = (tmdContent: string, entries: string): string => {
+    const rewritten = tmdContent.replace('  <- [NormalizeFile.normalizeVehicleString]\n  -> [run]\n', `  <- [${entries}]\n  -> [run]\n`);
+    assert.notEqual(rewritten, tmdContent, "the rewrite must hit main.ts's import list");
+    return rewritten;
+  };
+
+  it('TM15 V3 control: a through-barrel qualified importer still credits the barrel', async () => {
+    const result = convertFixture('111-unconsumed-barrel-credited-by-direct-import', 'whole-project');
+    const throughBarrel = mainImportsRewritten(result.tmdContent, 'BarrelFile.normalizeVehicleString, BarrelFile');
+    const checked = await checkDocument(throughBarrel);
+    assert.deepEqual(codes(checked.diagnostics, 'checker/orphaned-file'), [], throughBarrel);
+    assert.equal(checked.valid, true, throughBarrel);
+  });
+
+  it('TM15 V3 control: a hand-authored bare import still credits the barrel', async () => {
+    const result = convertFixture('111-unconsumed-barrel-credited-by-direct-import', 'whole-project');
+    const bare = mainImportsRewritten(result.tmdContent, 'normalizeVehicleString');
+    const checked = await checkDocument(bare);
+    assert.deepEqual(codes(checked.diagnostics, 'checker/orphaned-file'), [], bare);
+    assert.equal(checked.valid, true, bare);
   });
 
   // FIXED (check-orphans.ts): the same document with main.ts's direct import
@@ -145,7 +196,7 @@ describe('Q7 item 3 — RFC-TM-11 Deferral RX-B: isFileConsumed re-export branch
   // control live in lib/typed-mind/src/checker/ast-validator.test.ts.
   it('self-credit shape is fixed: a barrel nothing imports is reported orphaned', async () => {
     const result = convertFixture('111-unconsumed-barrel-credited-by-direct-import', 'whole-project');
-    const withoutDirectImport = result.tmdContent.replace('  <- [normalizeVehicleString]\n  -> [run]\n', '  -> [run]\n');
+    const withoutDirectImport = result.tmdContent.replace('  <- [NormalizeFile.normalizeVehicleString]\n  -> [run]\n', '  -> [run]\n');
     assert.notEqual(withoutDirectImport, result.tmdContent, "the rewrite must remove main.ts's direct import");
     const checked = await checkDocument(withoutDirectImport);
     assert.deepEqual(
@@ -161,8 +212,8 @@ describe('Q7 control — a genuine duplicate export still produces checker/multi
     const result = convertFixture('110-reexport-name-vs-independent-export');
     const barrel = fileByPath(result.entities, 'barrel.ts');
     const duplicated = result.tmdContent.replace(
-      `${barrel?.name} @ src/barrel.ts:\n  <- [normalizeVehicleString]\n  <-> [normalizeVehicleString]\n`,
-      `${barrel?.name} @ src/barrel.ts:\n  <- [normalizeVehicleString]\n  -> [normalizeVehicleString]\n`,
+      `${barrel?.name} @ src/barrel.ts:\n  <- [NormalizeFile.normalizeVehicleString]\n  <-> [normalizeVehicleString]\n`,
+      `${barrel?.name} @ src/barrel.ts:\n  <- [NormalizeFile.normalizeVehicleString]\n  -> [normalizeVehicleString]\n`,
     );
     assert.notEqual(duplicated, result.tmdContent, 'the rewrite must hit the barrel block');
     const checked = await checkDocument(duplicated);

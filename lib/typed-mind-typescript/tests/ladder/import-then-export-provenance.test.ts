@@ -57,8 +57,11 @@ for (const [name, barrel] of [
     assert.deepEqual(original?.exports?.toSorted(), ['FormatDetectionResult', 'detectFormat']);
     assert.deepEqual(forwarding?.exports, ['localHelper']);
     assert.deepEqual(forwarding?.reExports?.toSorted(), ['FormatDetectionResult', 'detectFormat']);
-    assert.ok(consumer?.imports.includes('detectFormat'));
-    assert.ok(consumer?.imports.includes('FormatDetectionResult'));
+    // RFC-TM-15 §S3 (leaf I1): both names are exported by the original and
+    // re-exported by the barrel, so the consumer's entries are qualified with
+    // the File it imported from — the barrel.
+    assert.ok(consumer?.imports.includes(`${forwarding?.name}.detectFormat`), consumer?.imports.join(', '));
+    assert.ok(consumer?.imports.includes(`${forwarding?.name}.FormatDetectionResult`), consumer?.imports.join(', '));
     const checked = (await TypedMind.create()).check(converted.tmdContent);
     assert.deepEqual(checked.diagnostics, [], converted.tmdContent);
     assert.equal(checked.valid, true);

@@ -9,11 +9,11 @@ VehicleVendorSdk ^ "vehicle vendor sdk library"
   -> [normalizeVehicleString]
 
 BarrelFile @ src/barrel.ts:
-  <- [normalizeVehicleString]
+  <- [NormalizeFile.normalizeVehicleString]
   <-> [normalizeVehicleString]
 
 MainFile @ src/main.ts:
-  <- [normalizeVehicleString, BarrelFile, VendorSurfaceFile]
+  <- [BarrelFile.normalizeVehicleString, VendorSurfaceFile.normalizeVehicleString, BarrelFile, VendorSurfaceFile]
   -> [run]
 
 NormalizeFile @ src/normalize.ts:
