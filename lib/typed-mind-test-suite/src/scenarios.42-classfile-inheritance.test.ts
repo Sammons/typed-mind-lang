@@ -18,17 +18,17 @@ describe('scenario-42-classfile-inheritance', () => {
 
     // Should be invalid due to import and export issues (based on actual error output)
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 8);
+    assert.equal(result.diagnostics.length, 4);
 
     const diagnosticMessages = result.diagnostics.map((diagnostic) => diagnostic.message);
 
     // Q permits both verified ClassFile method calls.
     assert.equal(diagnosticMessages.filter((msg) => msg.includes("Cannot use 'calls' to reference ClassFile")).length, 0);
 
-    // Should detect orphaned interface entities
-    assert.ok(diagnosticMessages.includes("Orphaned entity 'IUserController'"));
-    assert.ok(diagnosticMessages.includes("Orphaned entity 'IAdminController'"));
-    assert.ok(diagnosticMessages.includes("Orphaned entity 'IAuditController'"));
+    // G counts all implements references; export legality remains independent.
+    assert.equal(diagnosticMessages.includes("Orphaned entity 'IUserController'"), false);
+    assert.equal(diagnosticMessages.includes("Orphaned entity 'IAdminController'"), false);
+    assert.equal(diagnosticMessages.includes("Orphaned entity 'IAuditController'"), false);
 
     // Should detect classes not exported by files
     assert.ok(diagnosticMessages.includes("Class 'IUserController' is not exported by any file"));
@@ -37,7 +37,7 @@ describe('scenario-42-classfile-inheritance', () => {
 
     // Verify specific error positions
     const orphanedIUserError = result.diagnostics.find((diagnostic) => diagnostic.message.includes("Orphaned entity 'IUserController'"));
-    assert.equal(orphanedIUserError?.span.start.line, 28);
+    assert.equal(orphanedIUserError, undefined);
 
     const callsError = result.diagnostics.find((diagnostic) =>
       diagnostic.message.includes("Cannot use 'calls' to reference ClassFile 'UserController'"),

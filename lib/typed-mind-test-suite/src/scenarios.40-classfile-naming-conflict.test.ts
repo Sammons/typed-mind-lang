@@ -18,7 +18,7 @@ describe('scenario-40-classfile-naming-conflict', () => {
 
     // Should be invalid due to naming conflicts and other validation diagnostics
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 10);
+    assert.equal(result.diagnostics.length, 9);
 
     const diagnosticMessages = result.diagnostics.map((diagnostic) => diagnostic.message);
 
@@ -31,7 +31,7 @@ describe('scenario-40-classfile-naming-conflict', () => {
     // Should detect orphaned entities
     assert.ok(diagnosticMessages.includes("Orphaned entity 'startApp'"));
     assert.ok(diagnosticMessages.includes("Orphaned entity 'someFunction'"));
-    assert.ok(diagnosticMessages.includes("Orphaned entity 'BaseController'"));
+    assert.equal(diagnosticMessages.includes("Orphaned entity 'BaseController'"), false);
 
     // Should detect orphaned file
     assert.ok(diagnosticMessages.includes("Orphaned file 'UserService' - none of its exports are imported"));

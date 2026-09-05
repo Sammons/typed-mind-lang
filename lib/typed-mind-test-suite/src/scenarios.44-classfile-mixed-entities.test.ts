@@ -18,14 +18,13 @@ describe('scenario-44-classfile-mixed-entities', () => {
 
     // The scenario should be invalid due to multiple validation errors
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 5); // Q removes three valid ClassFile method-call findings.
+    assert.equal(result.diagnostics.length, 4); // Q removes three valid ClassFile method-call findings.
 
-    // Should find error for BaseController being orphaned
+    // G counts BaseController as used by heritage.
     const baseControllerOrphanedError = result.diagnostics.find(
       (diagnostic) => diagnostic.message.includes('BaseController') && diagnostic.message.includes('Orphaned entity'),
     );
-    assert.notEqual(baseControllerOrphanedError, undefined);
-    assert.equal(baseControllerOrphanedError?.severity, 'error');
+    assert.equal(baseControllerOrphanedError, undefined);
 
     // Should find error for BaseController not being exported from a File
     const baseControllerNotExportedError = result.diagnostics.find(
