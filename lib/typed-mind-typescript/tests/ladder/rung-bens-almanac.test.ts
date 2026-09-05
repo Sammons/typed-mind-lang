@@ -122,29 +122,11 @@ describe('86 — a union inside a generic in a function-type return position', (
     assertModuleGraphGolden('86-fn-type-union-in-generic-return');
   });
 
-  it('knownGap: the tree-sitter grammar still rejects the spaced `|` inside `<...>`', async () => {
-    // The emitted text is correct (asserted above); the GRAMMAR is a separate
-    // parser with the same blind spot — `_opaque_piece`'s fallback token
-    // excludes whitespace, so the spaces around `|` split the run and the `|`
-    // escapes to `type_union`, stranding the trailing `>`.
-    //
-    // Scope correction (measured in PR #163): the function type must also sit
-    // at the TOP LEVEL of the field's type. The identical shape wrapped in
-    // braces parses clean, because the enclosing `_opaque_brace_group`
-    // absorbs the `|` before `type_union` sees it. And adding an
-    // `_opaque_angle_group` is a NO-OP, not the risky change the README once
-    // described: implemented on clean main it generates without conflicts,
-    // leaves the corpus at 138/138, does not break the legal `A < B`, and
-    // does not fix this shape either — the chunk token consumes `Promise<`
-    // first. The real fix is lexer-level (external scanner, S-GRAMMAR-3).
-    // Pinned as a committed fact, not prose. See README.md.
+  it('TM13 C: the grammar accepts the complete spaced generic union return', async () => {
     const result = convertFixture('86-fn-type-union-in-generic-return');
-    const checkResult = await checkTmd(result.tmdContent);
-    assert.deepEqual(
-      diagnosticCodes(checkResult),
-      ['syntax/error'],
-      'exactly one residual finding, and it is the grammar knownGap — not a converter or pipeline defect',
-    );
+    assert.deepEqual(diagnosticCodes(await checkTmd(result.tmdContent)), []);
+    const malformed = result.tmdContent.replace('Promise<DedupRecord | null>', 'Promise<DedupRecord | null');
+    assert.ok(diagnosticCodes(await checkTmd(malformed)).includes('syntax/error'));
   });
 });
 

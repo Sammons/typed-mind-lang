@@ -5081,13 +5081,21 @@
           "name": "_opaque_brace_group"
         },
         {
+          "type": "SYMBOL",
+          "name": "_opaque_angle_group"
+        },
+        {
+          "type": "STRING",
+          "value": "<="
+        },
+        {
           "type": "TOKEN",
           "content": {
             "type": "PREC",
             "value": -1,
             "content": {
               "type": "PATTERN",
-              "value": "[^ \\t\\n\"(){}\\[\\]]+"
+              "value": "[^ \\t\\n\"(){}\\[\\]<]+"
             }
           }
         }
@@ -5537,7 +5545,12 @@
   ],
   "conflicts": [],
   "precedences": [],
-  "externals": [],
+  "externals": [
+    {
+      "type": "SYMBOL",
+      "name": "_opaque_angle_group"
+    }
+  ],
   "inline": [],
   "supertypes": [],
   "reserved": {}
