@@ -51,3 +51,7 @@ const PRIMITIVES = [
 export const isPrimitiveType = (typeName: string): boolean => {
   return PRIMITIVES.includes(typeName);
 };
+
+// A measured platform global, separate from legacy primitive-first handling.
+// Callers must resolve real declarations before using this data-type fallback.
+export const isImplicitPlatformDataType = (typeName: string): boolean => typeName === 'AbortSignal';

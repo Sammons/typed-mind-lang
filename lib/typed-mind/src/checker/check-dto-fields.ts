@@ -29,7 +29,7 @@ import { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { walkTypeReferences } from '../pipeline/type-reference-walk.ts';
 import type { CheckContext } from './check-context.ts';
-import { isPrimitiveType } from './type-builtins.ts';
+import { isImplicitPlatformDataType, isPrimitiveType } from './type-builtins.ts';
 
 // The two kinds a field-type reference may resolve to (doc §5's second
 // enforcement point). Extracted so the enum closed-set walk (below) and the
@@ -53,6 +53,7 @@ const checkNamedPart = (context: CheckContext, entity: DtoNode, fieldName: strin
   if (name.includes('.') && (resolution.kind === 'unresolved' || resolution.kind === 'external')) return;
   const referenced = resolvedNameTarget(resolution);
   if (referenced === undefined) {
+    if (isImplicitPlatformDataType(name)) return;
     // RFC-TM-13 B2: external type exports resolve only absent local names.
     // A local declaration still owns its name and must pass the kind check.
     for (const dependency of context.byName.values()) {

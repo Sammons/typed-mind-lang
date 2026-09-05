@@ -9,7 +9,7 @@ import { parseSignatureText } from '../pipeline/parse-signature-text.ts';
 import { walkEntityTypeReferences } from '../pipeline/type-reference-walk.ts';
 import type { CheckContext } from './check-context.ts';
 import { checkSingleReference } from './check-reference-legality.ts';
-import { isPrimitiveType } from './type-builtins.ts';
+import { isImplicitPlatformDataType, isPrimitiveType } from './type-builtins.ts';
 
 const semanticParameters = (parameters: readonly TypeParameterNode[]): string =>
   JSON.stringify(parameters, (key, value: unknown) => (key === 'span' || key === 'raw' || key === 'textOffsets' ? undefined : value));
@@ -82,7 +82,7 @@ export const checkGenericDeclarations = (context: CheckContext): void => {
           ((position === 'signature' || position === 'alias') && declared === undefined)
         )
           return;
-        if (isPrimitiveType(node.name) && target === undefined) return;
+        if ((isPrimitiveType(node.name) || isImplicitPlatformDataType(node.name)) && target === undefined) return;
         if (result.kind === 'external') return;
         if (target === undefined) {
           if (

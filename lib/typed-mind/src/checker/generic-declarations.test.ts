@@ -235,3 +235,53 @@ class Api {
     ],
   );
 });
+
+it('TM13 EXIT: AbortSignal resolves only as an absent platform data type', async () => {
+  const implicit = await inspect(`WorkerDeps %
+  - signal: AbortSignal
+  - sleep?: (ms: number, signal?: AbortSignal) => Promise<void>
+class Worker {
+  typeParameter: "T extends AbortSignal = AbortSignal"
+  constructor: "(signal: AbortSignal)"
+  method: "sleep(signal: AbortSignal) => Promise<void>"
+}
+`);
+  assert.deepEqual(genericErrors(implicit), []);
+  const declared = await inspect('AbortSignal %\nWorkerDeps %\n  - signal: AbortSignal\n');
+  assert.deepEqual(genericErrors(declared), []);
+  assert.deepEqual(orphans(declared), ["Orphaned entity 'WorkerDeps'"]);
+  assert.equal(declared.links.referencedBy('AbortSignal').length, 1);
+  const wrongKind = await inspect(`AbortSignal :: () => void
+WorkerDeps %
+  - signal: AbortSignal
+class Worker {
+  method: "sleep(signal: AbortSignal) => void"
+}
+`);
+  assert.deepEqual(
+    genericErrors(wrongKind)
+      .map((finding) => finding.code)
+      .sort(),
+    ['checker/dto-field-non-data-type', 'checker/generic-non-data-type'],
+  );
+  const missing = await inspect(`WorkerDeps %
+  - signal: AbortSigal
+class Worker {
+  method: "sleep(signal: Missing) => void"
+}
+`);
+  assert.deepEqual(
+    genericErrors(missing)
+      .map((finding) => finding.code)
+      .sort(),
+    ['checker/dto-field-unknown-type', 'checker/generic-unknown-type'],
+  );
+  const local = await inspect(`AbortSignal %
+class Worker<AbortSignal> {
+  method: "sleep(signal: AbortSignal) => AbortSignal"
+}
+`);
+  assert.deepEqual(genericErrors(local), []);
+  assert.deepEqual(orphans(local), ["Orphaned entity 'AbortSignal'", "Orphaned entity 'Worker'"]);
+  assert.deepEqual(local.links.referencedBy('AbortSignal'), []);
+});
