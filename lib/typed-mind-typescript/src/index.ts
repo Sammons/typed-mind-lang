@@ -9,6 +9,7 @@ export type {
   DeclarationIdentity,
   Deviation,
   ModuleGraphEdge,
+  ParsedBodyReference,
   ParsedCallReference,
   ParsedClass,
   ParsedConstant,

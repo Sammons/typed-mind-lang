@@ -1587,6 +1587,11 @@ export class TypeScriptToTypedMindConverter {
   // (the function's own identity) is skipped, as before. Entries keep first-
   // occurrence order, the order the previous same-file fold emitted.
   // Class/ClassFile member bodies are folded by Quantum U3b, not here.
+  // Known narrowing versus the name-matched fold this replaces: an
+  // overloaded function (several same-name declarations in one file) has no
+  // unique assigned name, so it neither carries nor receives an edge; the
+  // document is already invalid there (`checker/duplicate-name` per overload
+  // entity), so no valid document changes verdict.
   private foldBodyReferences(modules: readonly ParsedModule[]): void {
     const { byName, targets, isUnique, key } = this.buildBodyReferenceTargets(modules);
     for (const module of modules) {

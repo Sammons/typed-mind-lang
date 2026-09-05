@@ -97,6 +97,7 @@ it('TM14 U1: function-body Constants reads emit consumes', async (context) => {
   const { converted, analysis } = convert(context, '115-body-constants-read');
   assert.deepEqual(functionNamed(converted, 'apply').consumes, ['LIMIT', 'TABLE']);
   assert.deepEqual(functionNamed(converted, 'apply').calls, []);
+  assert.deepEqual(functionNamed(converted, 'pack').consumes, ['LIMIT'], 'a shorthand property is a read (A-10)');
   assert.equal(functionNamed(converted, 'shadow').consumes, undefined);
   assert.equal(functionNamed(converted, 'local').consumes, undefined);
   assert.ok(converted.tmdContent.includes('$< [LIMIT, TABLE]'), converted.tmdContent);
@@ -108,6 +109,7 @@ it('TM14 U1: function-body Constants reads emit consumes', async (context) => {
       ?.bodyReferences.filter((reference) => reference.kind === 'read')
       .map((reference) => reference.writtenName);
   assert.deepEqual(readsOf('apply'), ['LIMIT', 'TABLE']);
+  assert.deepEqual(readsOf('pack'), ['LIMIT']);
   assert.deepEqual(readsOf('shadow'), []);
   assert.deepEqual(readsOf('local'), []);
   const checked = await check(converted.tmdContent);

@@ -11,6 +11,11 @@ export function apply(n: number): number {
   return Math.min(n, LIMIT) + (TABLE.get('x') ?? 0);
 }
 
+// A shorthand property is a read of the value (A-10).
+export function pack(): { LIMIT: number } {
+  return { LIMIT };
+}
+
 export function shadow(LIMIT: number): number {
   return LIMIT;
 }

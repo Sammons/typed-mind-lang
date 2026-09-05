@@ -1337,12 +1337,14 @@ export class TypeScriptAnalyzer {
     if (body === undefined) return [];
     const references: ParsedBodyReference[] = [];
     const record = (kind: ParsedBodyReference['kind'], identifier: ts.Identifier): void => {
-      references.push({
-        kind,
-        writtenName: identifier.text,
-        source: sourceRange(identifier),
-        origin: this.resolveReferenceOriginAtLocation(identifier),
-      });
+      // A shorthand property (`{ LIMIT }`) names the object-literal property
+      // at the identifier; the value symbol is the read target (A-10).
+      const origin = ts.isShorthandPropertyAssignment(identifier.parent)
+        ? resolveReferenceOrigin(this.checker.getShorthandAssignmentValueSymbol(identifier.parent), this.program, this.checker, {
+            mapDeclaration: (declaration) => this.mapReferenceDeclarationToSource(declaration),
+          })
+        : this.resolveReferenceOriginAtLocation(identifier);
+      references.push({ kind, writtenName: identifier.text, source: sourceRange(identifier), origin });
     };
     const visit = (node: ts.Node): void => {
       if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isClassExpression(node)) return;
