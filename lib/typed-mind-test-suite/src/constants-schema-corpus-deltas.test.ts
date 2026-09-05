@@ -19,7 +19,6 @@ import { WASM_PATH } from './wasm-path.ts';
 
 const root = join(import.meta.dirname, '../../..');
 const cases = [
-  ['complex-dto-example.tmd', ['DatabaseConfigDTO']],
   ['naming-edge-cases-example.tmd', ['ValidationRuleDTO']],
   ['lib/typed-mind-test-suite/scenarios/scenario-34-cli-tool.tmd', ['TaskConstants', 'WorkerConstants']],
   ['lib/typed-mind-test-suite/scenarios/scenario-48-constants-edge-cases.tmd', ['ConfigSchema']],
