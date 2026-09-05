@@ -831,6 +831,7 @@ export class TypeScriptToTypedMindConverter {
 
       // Convert TypeScript constructs to TypedMind entities
       this.convertModules(filteredModules);
+      this.foldFactoryHeritage(filteredModules);
 
       // SST-referenced-module orphan flags (lead-authorized amendment,
       // half 1 of 2 — see `foldSstHandlerImportsIntoSourceFiles`'s own doc
@@ -2151,6 +2152,60 @@ export class TypeScriptToTypedMindConverter {
   // through `typeNameRemap`. Optional because the converter's own unit tests
   // construct classes without a surrounding module; a missing module falls
   // back to the bare name, the pre-change behaviour.
+  private foldFactoryHeritage(modules: readonly ParsedModule[]): void {
+    // The returned class need not be written in the heritage expression.
+    // Resolve its full source identity against retained declarations only,
+    // after allocation has established the actual emitted entity names.
+    const targets = new Map<string, string>();
+    const declarationsByName = new Map<string, Set<string>>();
+    const key = (identity: NonNullable<ParsedClass['declaration']>): string =>
+      JSON.stringify([identity.filePath, identity.name, identity.start, identity.end]);
+    for (const module of modules) {
+      for (const cls of module.classes) {
+        if (cls.declaration === undefined) continue;
+        const name = this.resolveTypeEntityName(module, cls.name);
+        const identities = declarationsByName.get(name) ?? new Set<string>();
+        identities.add(key(cls.declaration));
+        declarationsByName.set(name, identities);
+      }
+    }
+    for (const [name, identities] of declarationsByName) {
+      const emitted = this.entities.filter((entity) => entity.name === name);
+      if (identities.size !== 1 || emitted.length !== 1) continue;
+      if (!(emitted[0] instanceof ClassNode || emitted[0] instanceof ClassFileNode)) continue;
+      for (const identity of identities) targets.set(identity, name);
+    }
+    for (const module of modules) {
+      for (const cls of module.classes) {
+        const heritage = cls.factoryHeritage?.find((entry) => entry.index === 0);
+        if (heritage?.origin.kind !== 'project') continue;
+        const name = this.resolveTypeEntityName(module, cls.name);
+        if (cls.declaration === undefined || targets.get(key(cls.declaration)) !== name) {
+          this.addWarning(
+            `Factory heritage source '${cls.name}' was not uniquely emitted; its inheritance was not changed`,
+            module.filePath,
+          );
+          continue;
+        }
+        const target = targets.get(key(heritage.origin.declaration));
+        if (target === undefined) {
+          this.addWarning(
+            `Factory heritage of '${cls.name}' resolves to a class that was not uniquely emitted; retaining the factory fallback`,
+            module.filePath,
+          );
+          continue;
+        }
+        const index = this.entities.findIndex((entity) => entity.name === name);
+        const entity = this.entities[index];
+        if (entity instanceof ClassFileNode) {
+          this.entities[index] = new ClassFileNode({ ...entity, extends: target });
+        } else if (entity instanceof ClassNode) {
+          this.entities[index] = new ClassNode({ ...entity, extends: target });
+        }
+      }
+    }
+  }
+
   private convertClass(cls: ParsedClass, sourceFile?: string, module?: ParsedModule): void {
     const entityName = this.resolveTypeEntityName(module, cls.name);
 

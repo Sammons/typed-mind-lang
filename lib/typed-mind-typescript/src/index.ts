@@ -13,6 +13,7 @@ export type {
   ParsedConstant,
   ParsedEnum,
   ParsedExport,
+  ParsedFactoryHeritage,
   ParsedFunction,
   ParsedImport,
   ParsedInterface,
