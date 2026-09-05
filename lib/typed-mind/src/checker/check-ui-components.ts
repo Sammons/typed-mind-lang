@@ -25,7 +25,7 @@ export const checkUiComponentRelationships = (context: CheckContext): void => {
       continue;
     }
     for (const childName of entity.contains ?? []) {
-      const child = context.byName.get(childName);
+      const child = context.names.target(childName);
       if (child === undefined) {
         context.addFinding({
           code: 'checker/contains-unknown',
@@ -45,7 +45,7 @@ export const checkUiComponentRelationships = (context: CheckContext): void => {
       }
     }
     for (const parentName of entity.declaredContainedBy ?? []) {
-      const parent = context.byName.get(parentName);
+      const parent = context.names.target(parentName);
       if (parent === undefined) {
         context.addFinding({
           code: 'checker/containedby-unknown-parent',
@@ -73,7 +73,7 @@ export const checkFunctionUiComponentAffects = (context: CheckContext): void => 
       continue;
     }
     for (const componentName of entity.affects ?? []) {
-      const component = context.byName.get(componentName);
+      const component = context.names.target(componentName);
       if (component === undefined) {
         context.addFinding({
           code: 'checker/affects-unknown',
@@ -106,7 +106,7 @@ export const checkFunctionUiComponentAffects = (context: CheckContext): void => 
     }
     const functionsAffecting = context.links.affectedBy(entity.name);
     for (const funcName of declared) {
-      if (!functionsAffecting.includes(funcName)) {
+      if (!functionsAffecting.includes(context.names.target(funcName)?.name ?? funcName)) {
         context.addFinding({
           code: 'checker/affectedby-disagreement',
           severity: 'error',

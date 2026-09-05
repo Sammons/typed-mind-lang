@@ -33,6 +33,7 @@ import type { Diagnostic } from '../ast/diagnostic.ts';
 import type { EntityKind } from '../ast/entity-kind.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
+import { QualifiedNameResolver, resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 
 const CALL_KINDS: readonly EntityKind[] = ['Function', 'Class', 'ClassFile'];
 const CONSUMED_KINDS: readonly EntityKind[] = ['Asset', 'RunParameter', 'Constants'];
@@ -61,7 +62,7 @@ const extraInputDtoDiagnostic = (fn: FunctionNode, extraDto: string, firstDto: s
   };
 };
 
-const distributeOne = (fn: FunctionNode, byName: ReadonlyMap<string, EntityNode>, diagnostics: Diagnostic[]): FunctionNode => {
+const distributeOne = (fn: FunctionNode, names: QualifiedNameResolver, diagnostics: Diagnostic[]): FunctionNode => {
   const unresolved: string[] = [];
   const dtos: string[] = [];
   const calls = [...fn.calls];
@@ -70,7 +71,12 @@ const distributeOne = (fn: FunctionNode, byName: ReadonlyMap<string, EntityNode>
   let input = fn.input;
 
   for (const dependencyName of fn.pendingDependencies) {
-    const target = byName.get(dependencyName);
+    const resolution = names.resolve(dependencyName);
+    const target = resolvedNameTarget(resolution);
+    if (resolution.kind === 'external') {
+      unresolved.push(dependencyName);
+      continue;
+    }
     if (target === undefined) {
       unresolved.push(dependencyName);
     } else if (target.kind === 'DTO') {
@@ -126,9 +132,10 @@ export const distributeForwardSemantics = (entities: EntityNode[]): Diagnostic[]
     byName.set(entity.name, entity);
   }
   const diagnostics: Diagnostic[] = [];
+  const names = new QualifiedNameResolver(byName);
   for (const [index, entity] of entities.entries()) {
     if (entity instanceof FunctionNode && entity.pendingDependencies.length > 0) {
-      entities[index] = distributeOne(entity, byName, diagnostics);
+      entities[index] = distributeOne(entity, names, diagnostics);
     }
   }
   return diagnostics;

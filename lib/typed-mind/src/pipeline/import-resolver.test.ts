@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { ClassNode } from '../ast/class-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { ImportStatementNode } from '../ast/import-statement-node.ts';
+import { QualifiedNameResolver } from '../ast/qualified-name-resolver.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 import { type DocumentParser, ImportResolver } from './import-resolver.ts';
 import type { ParseOutcome } from './parse-outcome.ts';
@@ -106,13 +107,51 @@ describe('ImportResolver (§3.7 port)', () => {
         databaseFileExports: databaseFile instanceof FileNode ? databaseFile.exports : undefined,
       },
       {
-        names: ['DB.Connection', 'DB.DatabaseFile', 'DB.query', 'UI.Button', 'UI.ComponentsFile', 'UI.Form', 'UI.Input', 'UI.Modal'],
+        names: [
+          'DB',
+          'DB.Connection',
+          'DB.DatabaseFile',
+          'DB.query',
+          'UI',
+          'UI.Button',
+          'UI.ComponentsFile',
+          'UI.Form',
+          'UI.Input',
+          'UI.Modal',
+        ],
         diagnostics: [],
         buttonShape: { name: 'UI.Button', purpose: 'Reusable button component', root: true },
         formContains: ['Input', 'Button'],
         databaseFileExports: ['Connection', 'query'],
       },
     );
+  });
+
+  it('TM13 Q: import aliases carry real paths and checked public members', () => {
+    const result = resolveScenario(parser, 'scenario-21-aliased-import.tmd');
+    const owner = result.resolvedEntities.get('UI');
+    assert.ok(owner instanceof FileNode);
+    assert.equal(owner.path, './imports/ui/components.tmd');
+    assert.deepEqual([...owner.exports].sort(), ['UI.Button', 'UI.ComponentsFile', 'UI.Form', 'UI.Input', 'UI.Modal']);
+    const names = new QualifiedNameResolver(result.resolvedEntities);
+    assert.equal(names.resolve('UI.Button', { importingFile: 'MainFile' }).kind, 'entity');
+    assert.equal(names.resolve('UI.Missing').kind, 'unresolved');
+    const withoutOwner = new Map([...result.resolvedEntities].filter(([name]) => name !== 'UI'));
+    assert.equal(new QualifiedNameResolver(withoutOwner).resolve('UI.Button').kind, 'unresolved');
+  });
+
+  it('TM13 Q: alias collisions report once and preserve the first namespace', () => {
+    const resolver = new ImportResolver(parser);
+    const result = resolver.resolveImports(
+      [syntheticImport('./imports/ui/components.tmd', 2, 'UI'), syntheticImport('./imports/shared/database.tmd', 3, 'UI')],
+      scenariosDir,
+    );
+    assert.deepEqual(
+      result.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.span.start.line]),
+      [['imports/duplicate-name', 3]],
+    );
+    assert.equal(result.resolvedEntities.has('UI.Connection'), false);
+    assert.equal(new QualifiedNameResolver(result.resolvedEntities).resolve('UI.Button').kind, 'entity');
   });
 
   it('scenario-22: nested imports resolve transitively with the outer prefix applied', () => {

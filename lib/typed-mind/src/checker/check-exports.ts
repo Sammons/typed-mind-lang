@@ -19,6 +19,7 @@ import type { EntityNode } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
+import { resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import type { CheckContext } from './check-context.ts';
 
 const importsOf = (entity: EntityNode): readonly string[] | undefined => {
@@ -52,6 +53,8 @@ export const checkClassAndFunctionExports = (context: CheckContext): void => {
   for (const entity of context.byName.values()) {
     for (const exported of exportsOf(entity) ?? []) {
       exportedEntities.add(exported);
+      const resolved = resolvedNameTarget(context.names.resolveExport(entity.name, exported));
+      if (resolved !== undefined) exportedEntities.add(resolved.name);
     }
     for (const method of methodsOf(entity) ?? []) {
       classMethods.add(method);
@@ -59,6 +62,8 @@ export const checkClassAndFunctionExports = (context: CheckContext): void => {
   }
 
   for (const [name, entity] of context.byName) {
+    // An explicitly owned declaration may be private to its real file.
+    if (name.includes('.') && context.names.resolve(name).kind === 'entity') continue;
     if (entity instanceof ClassNode && !exportedEntities.has(name)) {
       context.addFinding({
         code: 'checker/class-not-exported',
@@ -110,7 +115,7 @@ export const checkClassAndFunctionExports = (context: CheckContext): void => {
 // live, honestly-disposed residual (doc §7, §14).
 const filesReachableFromEntry = (context: CheckContext, entryName: string): ReadonlySet<string> => {
   const reachable = new Set<string>();
-  const queue = [entryName];
+  const queue = [context.names.target(entryName)?.name ?? entryName];
   while (queue.length > 0) {
     const current = queue.shift();
     if (current === undefined || reachable.has(current)) {
@@ -125,12 +130,12 @@ const filesReachableFromEntry = (context: CheckContext, entryName: string): Read
       if (imported.includes('*') || reachable.has(imported)) {
         continue;
       }
-      const importedEntity = context.byName.get(imported);
+      const importedEntity = context.names.target(imported);
       // Only follow the edge onward when the imported name resolves to
       // another File-like entity — an individual function/class/DTO name
       // in `imports` is a leaf for this walk, not a File to recurse into.
       if (importedEntity instanceof FileNode || importedEntity instanceof ClassFileNode) {
-        queue.push(imported);
+        queue.push(importedEntity.name);
       }
     }
   }
@@ -154,9 +159,10 @@ export const checkDuplicateExports = (context: CheckContext): void => {
 
   for (const entity of context.byName.values()) {
     for (const exported of exportsOf(entity) ?? []) {
-      const exporters = exportMap.get(exported) ?? [];
-      exporters.push(entity);
-      exportMap.set(exported, exporters);
+      const canonicalName = resolvedNameTarget(context.names.resolveExport(entity.name, exported))?.name ?? exported;
+      const exporters = exportMap.get(canonicalName) ?? [];
+      if (!exporters.includes(entity)) exporters.push(entity);
+      exportMap.set(canonicalName, exporters);
     }
   }
 
@@ -197,7 +203,11 @@ export const checkUndefinedExports = (context: CheckContext): void => {
       continue; // Dependencies export external types (validator.ts:926)
     }
     for (const exported of exportsOf(entity) ?? []) {
-      if (!context.byName.has(exported)) {
+      if (exported.includes('.')) {
+        context.resolveExport(entity.name, exported, entity.span);
+        continue;
+      }
+      if (context.names.resolveExport(entity.name, exported).kind === 'unresolved') {
         context.addFinding({
           code: 'checker/undefined-export',
           severity: 'error',

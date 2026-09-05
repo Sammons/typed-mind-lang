@@ -9,7 +9,7 @@ export const checkAssetProgramRelationships = (context: CheckContext): void => {
     if (!(entity instanceof AssetNode) || entity.containsProgram === undefined) {
       continue;
     }
-    const program = context.byName.get(entity.containsProgram);
+    const program = context.names.target(entity.containsProgram);
     if (program === undefined) {
       context.addFinding({
         code: 'checker/asset-program-unknown',
