@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { TypedMind } from '@sammons/typed-mind';
+import { FunctionNode, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -77,16 +77,21 @@ describe('artifice rung, FIXTURE 94: a Constants generic type annotation must de
   });
 });
 
-describe('artifice rung, KNOWN GAP 95: a generic function type parameter leaks into the output slot', () => {
-  it('KNOWN GAP — `T` is still reported as a missing output DTO (analyzer never reads node.typeParameters)', async () => {
+describe('artifice rung, FIXED GAP 95: a generic function binds its return type locally', () => {
+  it('G.5 retains T on the function and creates no global output DTO edge', async () => {
     const result = convert('95-generic-function-type-parameter');
     assert.equal(result.success, true);
-    const diagnostics = await diagnose(result.tmdContent);
-    const finding = diagnostics.find((d) => /Function output DTO 'T' not found/.test(d.message));
-    assert.notEqual(
-      finding,
-      undefined,
-      `the generic-type-parameter gap must still be present and annotated; got: ${JSON.stringify(diagnostics.map((d) => d.message))}`,
+    assert.deepEqual(await diagnose(result.tmdContent), []);
+    const fn = result.entities.find((entity) => entity.name === 'withTransaction');
+    assert.ok(fn instanceof FunctionNode);
+    assert.deepEqual(
+      fn.typeParameters?.map((parameter) => parameter.name),
+      ['T'],
+    );
+    assert.equal(fn.output, undefined);
+    assert.equal(
+      result.entities.some((entity) => entity.name === 'T'),
+      false,
     );
   });
 

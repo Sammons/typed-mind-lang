@@ -3,7 +3,17 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { it } from 'node:test';
-import { ClassFileNode, ClassNode, DtoNode, FunctionNode, printHeritage, TypeDefNode, TypedMind } from '@sammons/typed-mind';
+import {
+  ClassFileNode,
+  ClassNode,
+  DtoNode,
+  FunctionNode,
+  ProgramNode,
+  printHeritage,
+  SyntaxEmitter,
+  TypeDefNode,
+  TypedMind,
+} from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
 
@@ -184,4 +194,27 @@ it('G.5 constraints and defaults use exact A2 origins while raw source aliases r
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+it('G.5 async Promise inline output synthesis retains generic bindings without consuming a global namesake', async () => {
+  const { result } = convert(
+    'export interface T { unrelated: string } export async function wrap<T>(value: T): Promise<{ value: T; nested: { other: T } }> { return { value, nested: { other: value } }; }',
+  );
+  assert.equal(result.success, true);
+  const fn = result.entities.find((entity) => entity.name === 'wrap');
+  assert.ok(fn instanceof FunctionNode);
+  assert.equal(fn.output, undefined);
+  assert.match(fn.signature, /Promise<[^>]+<T>>/);
+  const synthesized = result.entities.filter((entity) => entity instanceof DtoNode && entity.name !== 'T');
+  assert.equal(synthesized.length, 2);
+  assert.ok(synthesized.every((entity) => entity instanceof DtoNode && entity.typeParameters?.[0]?.name === 'T'));
+  const entities = result.entities.map((entity) =>
+    entity instanceof ProgramNode ? new ProgramNode({ ...entity, exports: entity.exports?.filter((name) => name !== 'T') }) : entity,
+  );
+  const text = new SyntaxEmitter().emitLongform({ entities, imports: [], suppressions: [], diagnostics: [] });
+  const mind = await TypedMind.create();
+  assert.deepEqual(
+    mind.check(text).diagnostics.map(({ code, message }) => ({ code, message })),
+    [{ code: 'checker/orphaned-entity', message: "Orphaned entity 'T'" }],
+  );
 });

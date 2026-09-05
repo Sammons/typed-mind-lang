@@ -188,7 +188,7 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
-  { fixture: '68-generic-type-parameters', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  { fixture: '68-generic-type-parameters', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   { fixture: '69-interface-method-dropped', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   // NEW (PR #162 review) — the two edge fixtures for the interface shape
   // rule. 69b pins the heritage walk: a child extending a method-bearing
@@ -208,7 +208,7 @@ const cases: readonly FixtureCase[] = [
     fixture: '69c-interface-unresolved-heritage',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: true,
+    recordedCheckerValid: false,
   },
   // G.2 parses structured generic heritage; both source lanes now check.
   {

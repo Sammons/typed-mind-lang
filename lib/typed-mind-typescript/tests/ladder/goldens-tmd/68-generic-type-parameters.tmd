@@ -10,10 +10,10 @@ IndexFile @ src/index.ts:
 
 unwrap :: unwrap(envelope: HalEnvelope<string>, pair: Pair<number, string>) => void
 
-HalEnvelope %
+HalEnvelope<T> %
   - data: T
   - self: string
 
-Pair %
+Pair<A, B> %
   - left: A
   - right: B

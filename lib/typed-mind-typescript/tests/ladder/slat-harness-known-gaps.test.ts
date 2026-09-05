@@ -26,9 +26,9 @@
 //     side. Both slots widen because shortform collapses them into one `<:`
 //     list (emit-shortform.ts `inheritanceSuffix`).
 //
-// 68 (generic type parameters) is UNTOUCHED and its pins below still assert
-// the gap is present — it is a separate, unowned root cause (the analyzer
-// never reads `node.typeParameters`).
+// RFC-TM-13 G now closes68 with declared parameters and lexical binding;
+// its controls retain the exact source declarations and remove a binding
+// to restore the original undefined-field diagnostic.
 //
 // The PR #162 review added two more suites, both enforcing the same standard
 // fixture 69's header sets — nothing this converter drops may drop silently:
@@ -45,7 +45,7 @@ import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { ClassNode, printHeritage, SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
+import { ClassNode, DtoNode, printHeritage, SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -128,23 +128,38 @@ describe('slat-harness rung, FIXED GAP 67: a class may implement a data-shaped i
   });
 });
 
-describe('slat-harness rung, KNOWN GAP 68: generic type parameters are unmodeled', () => {
-  it('KNOWN GAP — an interface type parameter leaks as an undefined field type', async () => {
+describe('slat-harness rung, FIXED GAP 68: generic interface and alias parameters bind their fields', () => {
+  it('G.5 retains the interface binding and removing it restores only the undefined field type', async () => {
     const result = convert('68-generic-type-parameters');
-    const diagnostics = await diagnose(result.entities);
-    const finding = diagnostics.find((d) => /DTO 'HalEnvelope' field 'data' references undefined type 'T'/.test(d.message));
-    assert.notEqual(
-      finding,
-      undefined,
-      `the interface generic-parameter gap must still be present; got: ${JSON.stringify(diagnostics.map((d) => d.message))}`,
+    assert.deepEqual(await diagnose(result.entities), []);
+    const envelope = result.entities.find((entity) => entity.name === 'HalEnvelope');
+    assert.ok(envelope instanceof DtoNode);
+    assert.deepEqual(
+      envelope.typeParameters?.map((parameter) => parameter.name),
+      ['T'],
+    );
+    const removed = result.entities.map((entity) =>
+      entity === envelope ? new DtoNode({ ...envelope, typeParameters: undefined }) : entity,
+    );
+    assert.deepEqual(
+      (await diagnose(removed)).map(({ code, message }) => ({ code, message })),
+      [{ code: 'checker/dto-field-unknown-type', message: "DTO 'HalEnvelope' field 'data' references undefined type 'T'" }],
     );
   });
 
-  it('KNOWN GAP — the type-alias spelling leaks the same way (a separate converter path)', async () => {
+  it('G.5 preserves both type-alias bindings without synthesizing global A or B entities', async () => {
     const result = convert('68-generic-type-parameters');
-    const diagnostics = await diagnose(result.entities);
-    const leaked = diagnostics.filter((d) => /DTO 'Pair' field '(left|right)' references undefined type '(A|B)'/.test(d.message));
-    assert.equal(leaked.length, 2, `both type-alias parameters must still leak; got: ${JSON.stringify(diagnostics.map((d) => d.message))}`);
+    const pair = result.entities.find((entity) => entity.name === 'Pair');
+    assert.ok(pair instanceof DtoNode);
+    assert.deepEqual(
+      pair.typeParameters?.map((parameter) => parameter.name),
+      ['A', 'B'],
+    );
+    assert.deepEqual(await diagnose(result.entities), []);
+    assert.equal(
+      result.entities.some((entity) => ['A', 'B'].includes(entity.name)),
+      false,
+    );
   });
 });
 
@@ -313,6 +328,14 @@ describe('slat-harness rung, 69b: the interface shape decision walks the heritag
 });
 
 describe('slat-harness rung, 69c: an unresolvable parent falls back to own members AND warns', () => {
+  it('G.5 retains the unresolved DTO base and reports exactly its missing declaration', async () => {
+    const result = convert('69c-interface-unresolved-heritage');
+    assert.deepEqual(
+      (await diagnose(result.entities)).map(({ code, message }) => ({ code, message })),
+      [{ code: 'checker/unknown-base-class', message: "DTO 'ExtendsUnknown' extends 'ExternalShape' which does not exist" }],
+    );
+  });
+
   it('the interface still converts, on the own-member rule', () => {
     // Conservative by design: an unresolvable parent must never flip a
     // property-only interface onto the Class lane, because that would strip

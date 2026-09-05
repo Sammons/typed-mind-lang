@@ -13,6 +13,9 @@ visitTree :: visitTree(visitor: TreeVisitor<void>, predicate: NodePredicate) => 
 NodeInfo %
   - name: string
 
-TreeVisitor = (node: NodeInfo, depth: number, parent?: NodeInfo) => T
+typedef TreeVisitor {
+  typeParameter: "T = void"
+  type: "(node: NodeInfo, depth: number, parent?: NodeInfo) => T"
+}
 
 NodePredicate = (node: NodeInfo, depth: number) => boolean

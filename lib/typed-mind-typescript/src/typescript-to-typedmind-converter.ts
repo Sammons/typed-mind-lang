@@ -2561,7 +2561,11 @@ export class TypeScriptToTypedMindConverter {
           this.addError(`Unsupported signature type in '${entityName}': ${canonical}; source text retained`, module.filePath);
           return text;
         }
-        return isInlineObjectLiteralType(canonical.text) ? this.synthesizeInlineDTO(canonical.text, name, typeParameters) : canonical.text;
+        if (isInlineObjectLiteralType(canonical.text)) return this.synthesizeInlineDTO(canonical.text, name, typeParameters);
+        const wrapped = splitGenericWrappedObjectLiteral(canonical.text);
+        return wrapped === undefined
+          ? canonical.text
+          : `${wrapped.wrapper}<${this.synthesizeInlineDTO(wrapped.inner, name, typeParameters)}>`;
       };
       const parameters = func.parameters.map((parameter) => ({
         ...parameter,
