@@ -55,6 +55,10 @@ export class AstValidator {
       parseDiagnostics: outcome.diagnostics,
     });
 
+    for (const entity of context.byName.values()) {
+      if (entity.name.includes('.')) context.resolveName(entity.name, entity.span);
+    }
+
     // Legacy orchestration order (validator.ts:117-145).
     checkReferenceLegality(context);
     checkDuplicateNames(context);

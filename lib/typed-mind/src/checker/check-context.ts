@@ -9,6 +9,7 @@
 
 import type { Diagnostic } from '../ast/diagnostic.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
+import { type QualifiedNameResolution, QualifiedNameResolver } from '../ast/qualified-name-resolver.ts';
 import type { Span } from '../ast/span.ts';
 import type { LinkIndex } from '../pipeline/link-index.ts';
 import type { CheckerFinding } from './finding.ts';
@@ -26,6 +27,8 @@ export class CheckContext {
   readonly entities: readonly EntityNode[];
   readonly byName: ReadonlyMap<string, EntityNode>;
   readonly links: LinkIndex;
+  readonly names: QualifiedNameResolver;
+  readonly #qualifiedFindings = new Set<string>();
   readonly parseDiagnostics: readonly Diagnostic[];
   readonly #findings: CheckerFinding[] = [];
 
@@ -40,8 +43,42 @@ export class CheckContext {
       byName.set(entity.name, entity);
     }
     this.byName = byName;
+    this.names = new QualifiedNameResolver(byName);
     this.links = args.links;
     this.parseDiagnostics = args.parseDiagnostics;
+  }
+
+  resolveName(name: string, span: Span, importingFile?: string): QualifiedNameResolution {
+    const result = this.names.resolve(name, importingFile === undefined ? {} : { importingFile });
+    return this.reportNameResolution(name, span, result);
+  }
+
+  resolveExport(ownerName: string, name: string, span: Span): QualifiedNameResolution {
+    return this.reportNameResolution(name, span, this.names.resolveExport(ownerName, name));
+  }
+
+  private reportNameResolution(name: string, span: Span, result: QualifiedNameResolution): QualifiedNameResolution {
+    if (name.includes('.') && result.kind === 'unresolved') {
+      const key = `${name}:${span.start.line}:${span.start.column}:${result.reason}`;
+      if (!this.#qualifiedFindings.has(key)) {
+        this.#qualifiedFindings.add(key);
+        const explanation = {
+          'missing-name': 'is not declared',
+          'missing-owner': `has no declared owner '${result.ownerName}'`,
+          'invalid-owner': `has an invalid owner '${result.ownerName}'`,
+          'missing-member': `has no declared member '${result.member}' on '${result.ownerName}'`,
+          'private-member': `is owned by '${result.ownerName}' but is not exported for this reference`,
+        }[result.reason];
+        this.addFinding({
+          code: 'checker/qualified-name-unresolved',
+          severity: 'error',
+          span,
+          message: `Qualified name '${name}' ${explanation}`,
+          suggestion: 'Declare the owner and member, and export the member before importing it from another file',
+        });
+      }
+    }
+    return result;
   }
 
   addFinding(finding: CheckerFinding): void {

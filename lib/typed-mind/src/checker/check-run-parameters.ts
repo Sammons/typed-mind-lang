@@ -21,7 +21,7 @@ export const checkRunParameterConsumedBy = (context: CheckContext): void => {
     }
     const consumedBy = context.links.consumedBy(entity.name);
     for (const funcName of consumedBy) {
-      const funcEntity = context.byName.get(funcName);
+      const funcEntity = context.names.target(funcName);
       if (funcEntity === undefined) {
         context.addFinding({
           code: 'checker/consumedby-unknown-function',
@@ -38,7 +38,7 @@ export const checkRunParameterConsumedBy = (context: CheckContext): void => {
           message: `RunParameter '${entity.name}' claims to be consumed by '${funcName}' which is not a Function`,
           suggestion: `Change '${funcName}' to a Function entity that consumes '${entity.name}'`,
         });
-      } else if (!(funcEntity.consumes ?? []).includes(entity.name)) {
+      } else if (!(funcEntity.consumes ?? []).some((name) => context.names.target(name)?.name === entity.name)) {
         context.addFinding({
           code: 'checker/consumedby-disagreement',
           severity: 'error',

@@ -8,7 +8,7 @@
 // survives (I-2), so highlighting/references/word-ranges cannot drift from
 // the grammar's real name class again.
 
-import type { CstNode, CstSourceFile } from '@sammons/typed-mind';
+import type { CstNode, CstSourceFile, EntityNode } from '@sammons/typed-mind';
 
 export interface NameOccurrence {
   readonly name: string;
@@ -19,12 +19,54 @@ export interface NameOccurrence {
   // A declaration occurrence is the entity_name token of a *_declaration
   // header; every other occurrence (list_entry) is a reference.
   readonly isDeclaration: boolean;
+  readonly isExport?: boolean;
+  readonly exportingOwner?: string;
 }
 
-const NAME_BEARING_TYPES = new Set(['entity_name', 'list_entry']);
+const NAME_BEARING_TYPES = new Set(['entity_name', 'list_entry', 'type_named']);
+
+const isExportOccurrence = (node: CstNode): boolean => {
+  let ancestor = node.syntaxNode.parent;
+  while (ancestor !== null) {
+    const kind = ancestor.type.replace(/_final$/, '');
+    if (kind === 'export_list') return true;
+    if (kind === 'property_list') return ancestor.namedChildren.some((child) => child.type === 'property_key' && child.text === 'exports');
+    ancestor = ancestor.parent;
+  }
+  return false;
+};
 
 const collectOccurrences = (node: CstNode, out: NameOccurrence[]): void => {
-  const concreteType = node.syntaxNode.type;
+  const concreteType = node.syntaxNode.type.replace(/_final$/, '');
+  const syntax = node.syntaxNode;
+  if (concreteType === 'block_header' || concreteType === 'suppress_line') {
+    const keyword = syntax.namedChildren.find((child) => child.type === (concreteType === 'block_header' ? 'block_kw' : 'suppress_kw'));
+    const rest = syntax.childForFieldName(concreteType === 'block_header' ? 'name' : 'target');
+    if (keyword !== undefined && !keyword.text.endsWith('"')) {
+      out.push({
+        name: keyword.text.slice(-1) + (rest?.text ?? ''),
+        startLine: keyword.endPosition.row + 1,
+        startColumn: keyword.endPosition.column,
+        endLine: (rest ?? keyword).endPosition.row + 1,
+        endColumn: (rest ?? keyword).endPosition.column + 1,
+        isDeclaration: concreteType === 'block_header',
+      });
+    }
+  }
+  if (concreteType === 'type_readonly_array') {
+    const keyword = syntax.namedChildren.find((child) => child.type === 'readonly_kw');
+    const rest = syntax.childForFieldName('element');
+    if (keyword !== undefined && rest?.type === 'readonly_name_rest') {
+      out.push({
+        name: keyword.text.slice(-1) + rest.text,
+        startLine: keyword.endPosition.row + 1,
+        startColumn: keyword.endPosition.column,
+        endLine: rest.endPosition.row + 1,
+        endColumn: rest.endPosition.column + 1,
+        isDeclaration: false,
+      });
+    }
+  }
   if (NAME_BEARING_TYPES.has(concreteType)) {
     const span = node.span();
     out.push({
@@ -33,7 +75,8 @@ const collectOccurrences = (node: CstNode, out: NameOccurrence[]): void => {
       startColumn: span.start.column,
       endLine: span.end.line,
       endColumn: span.end.column,
-      isDeclaration: concreteType === 'entity_name',
+      isDeclaration: concreteType === 'entity_name' && /_declaration(?:_final)?$/.test(syntax.parent?.type ?? ''),
+      ...(isExportOccurrence(node) ? { isExport: true } : {}),
     });
     // entity_name/list_entry are grammar leaves (no name-bearing descendants);
     // stop the walk here rather than recursing into token internals.
@@ -54,12 +97,16 @@ export class NameOccurrenceIndex {
   readonly #occurrences: readonly NameOccurrence[];
   readonly #byName: ReadonlyMap<string, readonly NameOccurrence[]>;
 
-  constructor(cst: CstSourceFile) {
+  constructor(cst: CstSourceFile, entities: readonly EntityNode[] = []) {
     const occurrences: NameOccurrence[] = [];
     collectOccurrences(cst, occurrences);
-    this.#occurrences = occurrences;
+    this.#occurrences = occurrences.map((occurrence) => {
+      if (!occurrence.isExport) return occurrence;
+      const owner = entities.findLast((entity) => entity.span.start.line <= occurrence.startLine);
+      return owner === undefined ? occurrence : { ...occurrence, exportingOwner: owner.name };
+    });
     const byName = new Map<string, NameOccurrence[]>();
-    for (const occurrence of occurrences) {
+    for (const occurrence of this.#occurrences) {
       const bucket = byName.get(occurrence.name) ?? [];
       bucket.push(occurrence);
       byName.set(occurrence.name, bucket);

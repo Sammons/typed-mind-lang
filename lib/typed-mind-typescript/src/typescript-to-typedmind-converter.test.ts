@@ -284,7 +284,7 @@ describe('TypeScriptToTypedMindConverter', () => {
     assert.equal(createdAtField.isOptional, true);
   });
 
-  it('falls back to opaque for a qualified/dotted property type, not a silently-truncated named type (review finding B1)', () => {
+  it('retains the complete structured qualified property type (TM13 Q)', () => {
     const converter = new TypeScriptToTypedMindConverter();
     const analysis = createMockAnalysis();
     // biome-ignore lint/suspicious/noExplicitAny: matches this file's existing convention for mutating a readonly test fixture (see "should skip private members by default")
@@ -308,11 +308,10 @@ describe('TypeScriptToTypedMindConverter', () => {
     assert.notEqual(projectConfigField, undefined);
     // The raw `type` string is preserved verbatim regardless of structure.
     assert.equal(projectConfigField.type, 'ts.CompilerOptions');
-    // typeExpr must NOT silently truncate to { kind: 'named', name: 'ts' } —
-    // a dotted/qualified reference has no structured production and must
-    // fall to opaque, carrying the full text.
-    assert.equal(projectConfigField.typeExpr.kind, 'opaque');
-    assert.equal(projectConfigField.typeExpr.text, 'ts.CompilerOptions');
+    // The qualified name is structured and remains complete; checking its
+    // declared namespace owner is a separate validation step.
+    assert.equal(projectConfigField.typeExpr.kind, 'named');
+    assert.equal(projectConfigField.typeExpr.name, 'ts.CompilerOptions');
   });
 
   it('should generate programs by default', () => {

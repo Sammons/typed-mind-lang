@@ -24,7 +24,7 @@ import type {
 import { createConnection, MarkupKind, ProposedFeatures, TextDocumentSyncKind, TextDocuments } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { provideCompletionsForEntities } from './completions.ts';
-import { buildDocumentState, type DocumentState } from './document-state.ts';
+import { buildDocumentState, type DocumentState, targetOfOccurrence } from './document-state.ts';
 import { renderHoverContents } from './hover.ts';
 import { toLspDiagnostics } from './lsp-diagnostics.ts';
 import { provideReferencesForName } from './references.ts';
@@ -152,7 +152,7 @@ export class TypedMindLanguageServer {
     if (occurrence === undefined) {
       return null;
     }
-    const entity = state.byName.get(occurrence.name);
+    const entity = targetOfOccurrence(occurrence, state.names);
     if (entity === undefined) {
       return null;
     }
@@ -173,7 +173,7 @@ export class TypedMindLanguageServer {
     if (occurrence === undefined) {
       return null;
     }
-    const entity = state.byName.get(occurrence.name);
+    const entity = targetOfOccurrence(occurrence, state.names);
     if (entity === undefined) {
       return null;
     }
@@ -195,7 +195,7 @@ export class TypedMindLanguageServer {
     if (occurrence === undefined) {
       return [];
     }
-    return provideReferencesForName(params.textDocument.uri, occurrence.name, state.nameIndex);
+    return provideReferencesForName(params.textDocument.uri, occurrence.name, state.nameIndex, state.names, occurrence.exportingOwner);
   }
 
   private provideSemanticTokens(params: SemanticTokensParams): SemanticTokens {

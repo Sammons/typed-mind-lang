@@ -18,8 +18,8 @@
 //   - imports containing '*' are skipped; an import whose target is a
 //     Dependency lands in importedBy INSTEAD of referencedBy (the legacy
 //     routing at validator.ts:1305-1320 that fed DependencyEntity.importedBy);
-//   - dotted call targets resolve to the base name before the first '.'
-//     (validator.ts:1336).
+//   - qualified targets use checked ownership and the longest declared prefix
+//     (RFC-TM-13 Q supersedes validator.ts:1336's first-dot truncation).
 // Reference = { from, fromType } is the pinned shape (LSP hover,
 // server.ts:309-316); references dedupe per target by `from`.
 
@@ -33,6 +33,7 @@ import type { EntityNode } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
+import { QualifiedNameResolver, resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 
 export interface Reference {
@@ -80,7 +81,7 @@ export class LinkIndex {
 }
 
 class LinkCollector {
-  readonly #byName: ReadonlyMap<string, EntityNode>;
+  readonly #names: QualifiedNameResolver;
   readonly referencedBy = new Map<string, Reference[]>();
   readonly containedBy = new Map<string, string[]>();
   readonly affectedBy = new Map<string, string[]>();
@@ -88,11 +89,12 @@ class LinkCollector {
   readonly importedBy = new Map<string, string[]>();
 
   constructor(byName: ReadonlyMap<string, EntityNode>) {
-    this.#byName = byName;
+    this.#names = new QualifiedNameResolver(byName);
   }
 
-  addReference(targetName: string, from: EntityNode): void {
-    if (!this.#byName.has(targetName)) {
+  addReference(name: string, from: EntityNode): void {
+    const targetName = this.#names.target(name)?.name;
+    if (targetName === undefined) {
       return;
     }
     const bucket = this.referencedBy.get(targetName) ?? [];
@@ -102,8 +104,9 @@ class LinkCollector {
     this.referencedBy.set(targetName, bucket);
   }
 
-  addName(map: Map<string, string[]>, targetName: string, fromName: string): void {
-    if (!this.#byName.has(targetName)) {
+  addName(map: Map<string, string[]>, name: string, fromName: string): void {
+    const targetName = this.#names.target(name)?.name;
+    if (targetName === undefined) {
       return;
     }
     const bucket = map.get(targetName) ?? [];
@@ -118,7 +121,7 @@ class LinkCollector {
       if (imported.includes('*')) {
         continue;
       }
-      const target = this.#byName.get(imported);
+      const target = resolvedNameTarget(this.#names.resolve(imported, { importingFile: from.name }));
       if (target === undefined) {
         continue;
       }
@@ -127,6 +130,13 @@ class LinkCollector {
       } else {
         this.addReference(imported, from);
       }
+    }
+  }
+
+  addExports(from: EntityNode, exports: readonly string[] | undefined): void {
+    for (const exported of exports ?? []) {
+      const target = resolvedNameTarget(this.#names.resolveExport(from.name, exported));
+      if (target !== undefined) this.addReference(target.name, from);
     }
   }
 
@@ -139,8 +149,7 @@ class LinkCollector {
 
 const collectFunctionLinks = (collector: LinkCollector, fn: FunctionNode): void => {
   for (const call of fn.calls) {
-    const callTarget = call.includes('.') ? (call.split('.').at(0) ?? call) : call;
-    collector.addReference(callTarget, fn);
+    collector.addReference(call, fn);
   }
   if (fn.input !== undefined) {
     collector.addReference(fn.input, fn);
@@ -163,13 +172,13 @@ const collectEntityLinks = (collector: LinkCollector, entity: EntityNode): void 
     if (entity.entry !== '') {
       collector.addReference(entity.entry, entity);
     }
-    collector.addAll(entity.exports, entity);
+    collector.addExports(entity, entity.exports);
   } else if (entity instanceof FileNode) {
     collector.addImports(entity, entity.imports);
-    collector.addAll(entity.exports, entity);
+    collector.addExports(entity, entity.exports);
   } else if (entity instanceof ClassFileNode) {
     collector.addImports(entity, entity.imports);
-    collector.addAll(entity.exports, entity);
+    collector.addExports(entity, entity.exports);
     collector.addAll(entity.implements, entity);
     if (entity.extends !== undefined) {
       collector.addReference(entity.extends, entity);
@@ -195,7 +204,7 @@ const collectEntityLinks = (collector: LinkCollector, entity: EntityNode): void 
       collector.addReference(entity.schema, entity);
     }
   } else if (entity instanceof DependencyNode) {
-    collector.addAll(entity.exports, entity);
+    collector.addExports(entity, entity.exports);
   }
   // DtoNode and RunParameterNode carry no forward reference fields.
 };

@@ -1252,7 +1252,7 @@
       "type": "IMMEDIATE_TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "\\w*"
+        "value": "\\w*(?:\\.[A-Za-z_]\\w*)*"
       }
     },
     "classfile_block_sigil": {
@@ -1513,8 +1513,13 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SYMBOL",
-              "name": "entity_name"
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_property_identifier_name"
+              },
+              "named": true,
+              "value": "entity_name"
             },
             {
               "type": "ALIAS",
@@ -1773,8 +1778,13 @@
               "name": "bool_literal"
             },
             {
-              "type": "SYMBOL",
-              "name": "entity_name"
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_property_identifier_name"
+              },
+              "named": true,
+              "value": "entity_name"
             },
             {
               "type": "ALIAS",
@@ -1989,6 +1999,10 @@
           }
         ]
       }
+    },
+    "_property_identifier_name": {
+      "type": "PATTERN",
+      "value": "[A-Za-z_]\\w*"
     },
     "property_key": {
       "type": "PATTERN",
@@ -4402,15 +4416,6 @@
           "type": "ALIAS",
           "content": {
             "type": "SYMBOL",
-            "name": "_qualified_name_opaque_token"
-          },
-          "named": true,
-          "value": "type_opaque"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "SYMBOL",
             "name": "_paramlist_opaque_run"
           },
           "named": true,
@@ -4586,8 +4591,17 @@
       }
     },
     "type_named": {
-      "type": "SYMBOL",
-      "name": "entity_name"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "entity_name"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_qualified_name_opaque_token"
+        }
+      ]
     },
     "type_generic": {
       "type": "SEQ",
@@ -4805,7 +4819,7 @@
       "type": "IMMEDIATE_TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "\\w*"
+        "value": "\\w*(?:\\.[A-Za-z_]\\w*)*"
       }
     },
     "readonly_paren_rest": {
@@ -5088,7 +5102,7 @@
     },
     "entity_name": {
       "type": "PATTERN",
-      "value": "[A-Za-z_]\\w*"
+      "value": "[A-Za-z_]\\w*(?:\\.[A-Za-z_]\\w*)*"
     },
     "dependency_name": {
       "type": "PATTERN",

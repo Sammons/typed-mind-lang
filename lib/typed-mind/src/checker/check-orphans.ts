@@ -17,6 +17,7 @@ import type { EntityNode } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
+import { type QualifiedNameResolver, resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 import type { CheckContext } from './check-context.ts';
@@ -35,25 +36,31 @@ const importsOf = (entity: EntityNode): readonly string[] | undefined => {
 // Every non-terminal kind recurses; `literal` and `opaque` are terminal
 // leaves that carry no reference (matching walkTypeExpr's own no-op/no-finding
 // treatment of those two kinds).
-const collectTypeExprReferences = (node: TypeExprNode, referenced: Set<string>): void => {
+const addReference = (name: string, referenced: Set<string>, names: QualifiedNameResolver): void => {
+  const resolved = names.target(name);
+  if (resolved !== undefined) referenced.add(resolved.name);
+  else if (!name.includes('.')) referenced.add(name);
+};
+
+const collectTypeExprReferences = (node: TypeExprNode, referenced: Set<string>, names: QualifiedNameResolver): void => {
   switch (node.kind) {
     case 'named':
-      referenced.add(node.name);
+      addReference(node.name, referenced, names);
       return;
     case 'generic':
-      referenced.add(node.base.name);
+      addReference(node.base.name, referenced, names);
       for (const arg of node.args) {
-        collectTypeExprReferences(arg, referenced);
+        collectTypeExprReferences(arg, referenced, names);
       }
       return;
     case 'union':
     case 'intersection':
       for (const member of node.members) {
-        collectTypeExprReferences(member, referenced);
+        collectTypeExprReferences(member, referenced, names);
       }
       return;
     case 'array':
-      collectTypeExprReferences(node.element, referenced);
+      collectTypeExprReferences(node.element, referenced, names);
       return;
     case 'literal':
       return; // terminal, no reference
@@ -67,45 +74,46 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
   for (const entity of context.byName.values()) {
     for (const imported of importsOf(entity) ?? []) {
       if (!imported.includes('*')) {
-        referenced.add(imported);
+        const target = resolvedNameTarget(context.names.resolve(imported, { importingFile: entity.name }));
+        if (target !== undefined) referenced.add(target.name);
       }
     }
     if (entity instanceof FunctionNode) {
       for (const call of entity.calls) {
-        referenced.add(call); // the RAW call string, dotted included (validator.ts:262)
+        addReference(call, referenced, context.names); // the RAW call string, dotted included (validator.ts:262)
       }
       if (entity.input !== undefined) {
-        referenced.add(entity.input);
+        addReference(entity.input, referenced, context.names);
       }
       if (entity.output !== undefined) {
-        referenced.add(entity.output);
+        addReference(entity.output, referenced, context.names);
       }
       for (const consumed of entity.consumes ?? []) {
-        referenced.add(consumed);
+        addReference(consumed, referenced, context.names);
       }
     }
     if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
       for (const method of entity.methods) {
-        referenced.add(method);
+        addReference(method, referenced, context.names);
       }
     }
     if (entity instanceof ProgramNode) {
-      referenced.add(entity.entry);
+      addReference(entity.entry, referenced, context.names);
       for (const exported of entity.exports ?? []) {
-        referenced.add(exported); // program exports are public API (validator.ts:272-278)
+        addReference(exported, referenced, context.names); // program exports are public API (validator.ts:272-278)
       }
     }
     if (entity instanceof UiComponentNode) {
       for (const child of entity.contains ?? []) {
-        referenced.add(child);
+        addReference(child, referenced, context.names);
       }
     }
     if (entity instanceof AssetNode && entity.containsProgram !== undefined) {
-      referenced.add(entity.containsProgram);
+      addReference(entity.containsProgram, referenced, context.names);
     }
     if (entity instanceof DtoNode) {
       for (const field of entity.fields) {
-        collectTypeExprReferences(field.typeExpr, referenced);
+        collectTypeExprReferences(field.typeExpr, referenced, context.names);
       }
     }
   }
@@ -115,7 +123,7 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
 const isEntityImported = (context: CheckContext, entityName: string): boolean => {
   for (const entity of context.byName.values()) {
     for (const imported of importsOf(entity) ?? []) {
-      if (imported === entityName) {
+      if (resolvedNameTarget(context.names.resolve(imported, { importingFile: entity.name }))?.name === entityName) {
         return true;
       }
       if (imported.includes('*')) {
@@ -165,12 +173,12 @@ const isEntityImported = (context: CheckContext, entityName: string): boolean =>
 // that contains it).
 const isFileConsumed = (context: CheckContext, file: FileNode): boolean => {
   for (const exportName of file.exports) {
-    if (isEntityImported(context, exportName)) {
+    if (isEntityImported(context, resolvedNameTarget(context.names.resolveExport(file.name, exportName))?.name ?? exportName)) {
       return true;
     }
   }
   for (const reExportName of file.reExports) {
-    if (isEntityImported(context, reExportName)) {
+    if (isEntityImported(context, resolvedNameTarget(context.names.resolveExport(file.name, reExportName))?.name ?? reExportName)) {
       return true;
     }
   }

@@ -80,6 +80,7 @@ export const CHECK_CODES = [
   'checker/unknown-method',
   // check-orphans.ts
   'checker/orphaned-entity',
+  'checker/qualified-name-unresolved',
   'checker/orphaned-file',
   // check-reference-legality.ts
   'checker/reference-from-illegal',
