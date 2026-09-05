@@ -230,8 +230,7 @@ const cases: readonly FixtureCase[] = [
   // its `StringBox extends Container<string>` carries the generic-base
   // finding of gap 68, which is the PRICE of property 1 being correct —
   // preserving the type arguments is what the reconciliation restores.
-  // 66c records `false` for its own known gap (a zero-identifier mixin
-  // falls back to the factory name, which the checker rejects).
+  // RFC-TM-13 H resolves 66c through the named constructor return identity.
   {
     fixture: '66b-mixin-heritage-controls',
     entrySegments: ['src', 'index.ts'],
@@ -242,7 +241,7 @@ const cases: readonly FixtureCase[] = [
     fixture: '66c-mixin-no-base-argument',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   // NEW — the architecture-notebook ladder rung (a Lit web app plus a
   // node:http server). Three gaps the real target surfaced, each with its
