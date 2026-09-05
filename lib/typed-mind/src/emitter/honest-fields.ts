@@ -54,18 +54,18 @@ export const honestFieldsOf = (entity: EntityNode): Record<string, unknown> => {
   const fields: Record<string, unknown> = { ...baseFields };
   const parameters = parametersOf(entity);
   if (parameters !== undefined)
-    fields.typeParameters = parameters.map(({ span: _parameterSpan, raw: _parameterRaw, constraint, defaultType, ...parameter }) => ({
+    fields['typeParameters'] = parameters.map(({ span: _parameterSpan, raw: _parameterRaw, constraint, defaultType, ...parameter }) => ({
       ...parameter,
       constraint: constraint === undefined ? undefined : honestTypeExprOf(constraint),
       defaultType: defaultType === undefined ? undefined : honestTypeExprOf(defaultType),
     }));
   if (entity instanceof ClassNode || entity instanceof ClassFileNode)
-    fields.heritage = {
+    fields['heritage'] = {
       extends: entity.heritage.extends === undefined ? undefined : honestHeritageOf(entity.heritage.extends),
       implements: entity.heritage.implements.map(honestHeritageOf),
     };
   if (entity instanceof DtoNode && entity.extendsReferences !== undefined)
-    fields.extendsReferences = entity.extendsReferences.map(honestHeritageOf);
+    fields['extendsReferences'] = entity.extendsReferences.map(honestHeritageOf);
   if (entity instanceof DtoNode) {
     return {
       ...fields,
