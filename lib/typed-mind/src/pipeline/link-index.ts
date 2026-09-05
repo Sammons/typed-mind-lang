@@ -189,7 +189,7 @@ const collectEntityLinks = (collector: LinkCollector, entity: EntityNode): void 
       collector.addReference(entity.containsProgram, entity);
     }
   } else if (entity instanceof ConstantsNode) {
-    collector.addAll(entity.calls, entity);
+    for (const call of entity.calls) collector.addReference(call, entity);
     if (entity.schema !== undefined) {
       collector.addReference(entity.schema, entity);
     }
