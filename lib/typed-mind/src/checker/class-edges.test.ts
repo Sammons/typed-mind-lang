@@ -111,6 +111,30 @@ it('TM14 U3: Class and ClassFile calls and consumes round-trip in both forms and
   }
 });
 
+it('TM14 U3: a ClassFile with visible exports keeps exports after the calls and consumes lines', async () => {
+  const parser = await parserPromise;
+  const emitter = new SyntaxEmitter();
+  const text = source.replace('Store #: store.ts\n  => [load]', 'Store #: store.ts\n  => [load]\n  -> [helper]');
+  let outcome = parser.parse(text);
+  for (const form of ['shortform', 'longform', 'shortform'] as const) {
+    assert.deepEqual(outcome.diagnostics, []);
+    const store = outcome.entities.find((entity) => entity.name === 'Store');
+    assert.ok(store instanceof ClassFileNode);
+    assert.deepEqual(
+      { exports: store.exports, calls: store.calls, consumes: store.consumes },
+      { exports: ['helper', 'Store'], calls: ['helper', 'Widget.render'], consumes: ['LIMIT', 'PORT'] },
+    );
+    const emitted = emitter.emit(outcome, { forceForm: form });
+    if (form === 'shortform') {
+      assert.ok(
+        emitted.includes('Store #: store.ts\n  => [load]\n  ~> [helper, Widget.render]\n  $< [LIMIT, PORT]\n  -> [helper, Store]'),
+        emitted,
+      );
+    }
+    outcome = parser.parse(emitted);
+  }
+});
+
 it('TM14 U3: removing a Class edge restores exactly that orphan', async () => {
   const orphans = async (text: string) =>
     codes(await findingsOf(text), 'checker/orphaned-entity')
