@@ -5,9 +5,12 @@ program MainApp {
   exports: [handleRequest]
 }
 
+ScopeCoreClientIp ^ "core library"
+  -> [getClientIp]
+
 ClientIpFile @ src/lib/client-ip.ts:
   -> [formatIp]
-  <-> [getClientIp]
+  <-> [ScopeCoreClientIp.getClientIp]
 
 MainFile @ src/main.ts:
   <- [formatIp, ClientIpFile]

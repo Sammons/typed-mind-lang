@@ -160,7 +160,20 @@ export const checkDuplicateExports = (context: CheckContext): void => {
 
   for (const entity of context.byName.values()) {
     for (const exported of exportsOf(entity) ?? []) {
-      const canonicalName = resolvedNameTarget(context.names.resolveExport(entity.name, exported))?.name ?? exported;
+      // RFC-TM-15 §S2 (rfc-tm-15-diamond.md, leaf X1) — a Dependency's
+      // export entry names a member of the external package (the resolver's
+      // Dependency arm resolves `Dep.member` to `external`;
+      // `checkUndefinedExports` exempts the entry as an external name), so
+      // it is never the same entity as a project declaration that happens
+      // to share its spelling. Keying it by its qualified member keeps a
+      // Dependency exporter out of a File's exporter set: fixture 110's
+      // `VehicleVendorSdk -> [normalizeVehicleString]` beside
+      // `NormalizeFile -> [normalizeVehicleString]` is two bindings, not one
+      // entity exported twice. Files, ClassFiles and Programs are unchanged.
+      const canonicalName =
+        entity instanceof DependencyNode
+          ? `${entity.name}.${exported}`
+          : (resolvedNameTarget(context.names.resolveExport(entity.name, exported))?.name ?? exported);
       const exporters = exportMap.get(canonicalName) ?? [];
       if (!exporters.includes(entity)) exporters.push(entity);
       exportMap.set(canonicalName, exporters);

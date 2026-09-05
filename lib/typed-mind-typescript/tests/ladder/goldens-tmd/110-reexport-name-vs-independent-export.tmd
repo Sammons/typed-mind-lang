@@ -5,6 +5,9 @@ program MainApp {
   exports: [run]
 }
 
+VehicleVendorSdk ^ "vehicle vendor sdk library"
+  -> [normalizeVehicleString]
+
 BarrelFile @ src/barrel.ts:
   <- [normalizeVehicleString]
   <-> [normalizeVehicleString]
@@ -17,7 +20,7 @@ NormalizeFile @ src/normalize.ts:
   -> [normalizeVehicleString]
 
 VendorSurfaceFile @ src/vendor-surface.ts:
-  <-> [normalizeVehicleString]
+  <-> [VehicleVendorSdk.normalizeVehicleString]
 
 run :: run(raw: string) => string
 

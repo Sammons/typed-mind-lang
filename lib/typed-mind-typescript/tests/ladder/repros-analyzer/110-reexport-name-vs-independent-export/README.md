@@ -20,45 +20,55 @@ diagnostics. This is the behaviour RX-3 designed and the reason RX-A was
 deferred: a `reExports`-aware duplicate check would flag this legitimate
 shape unless it could tell A from B.
 
-## Shape B — `vendor-surface.ts`, the deferral's concern: PINNED, not fixed
+## Shape B — `vendor-surface.ts`, the deferral's concern: FIXED (RFC-TM-15 §S2, leaf X1)
 
 ```ts
 export { normalizeVehicleString } from 'vehicle-vendor-sdk';
 ```
 
-The external binding shares its spelling with the local declaration. The
-emitted document has one entity called `normalizeVehicleString`, so
-`VendorSurfaceFile: <-> [normalizeVehicleString]` (with no `<-`, since the
-external import resolves to no entity) names normalize.ts's entity by
-coincidence. The checker is silent: `valid: true`, zero diagnostics. The
-analyzer knows the truth (`ParsedExport.source = 'vehicle-vendor-sdk'`),
-but the `.tmd` language has no slot to carry it — a `reexports:` entry is a
-bare name.
+The external binding shares its spelling with the local declaration. Before
+RFC-TM-15 the emitted document had one entity called
+`normalizeVehicleString`, so `VendorSurfaceFile: <-> [normalizeVehicleString]`
+named normalize.ts's entity by coincidence and the checker was silent. The
+analyzer knew the truth (`ParsedExport.source = 'vehicle-vendor-sdk'`) and
+the converter dropped it.
 
-### Mechanism needed
+### Mechanism (rfc-tm-15-diamond.md §S2)
 
-A per-entry provenance slot on `reexports:` (RX-A's own prescription:
-"the fix ... is the provenance field, not a `reExports`-specific patch"),
-or an equivalent language-level statement of WHICH binding a re-export
-forwards. Converter-only options were measured and rejected:
+A `reexports:` entry is bare when the re-exported binding resolves to a
+project declaration and `Owner.member` when its source is external
+(`isExternalPackage`, which also treats tsconfig-paths aliases and
+workspace packages as external). No grammar change: `list_entry` already
+accepts dotted tokens and the resolver gives a qualified name checked
+ownership.
 
-- Dropping an external re-export name that collides with a local entity
-  empties `VendorSurfaceFile.reExports`, so RX-6's
-  `foldReExportedNamesIntoImporterFiles` no longer folds the barrel's name
-  into `main.ts`'s imports and the barrel becomes a false
-  `checker/orphaned-file` — trading a silent misattribution for a false
-  positive.
-- A converter warning changes no emitted fact.
+- Converter (`convertExports` -> `reExportEntryWithProvenance`): creates the
+  Dependency for the external source through `createDependencyEntity` (name
+  pre-reserved in `reserveEntityNames`), appends the re-exported name to its
+  `exports`, and emits `VendorSurfaceFile: <-> [VehicleVendorSdk.normalizeVehicleString]`
+  beside `VehicleVendorSdk ^ "vehicle vendor sdk library" -> [normalizeVehicleString]`.
+- Fold (`foldReExportedNamesIntoImporterFiles`): matches on the member part,
+  so `MainFile: <- [..., VendorSurfaceFile]` survives and no
+  `checker/orphaned-file` fires.
+- Resolver (`qualified-name-resolver.ts`): a qualified re-export entry is
+  matched on its member part and resolved on its own — `external` for the
+  Dependency owner — instead of binding the same-spelled local entity.
+- Checker (`check-orphans.ts isFileConsumed`): an entry that resolves
+  `external` credits nothing; `check-exports.ts checkDuplicateExports` keys a
+  Dependency exporter by its qualified member, so the Dependency's
+  `-> [normalizeVehicleString]` is not a duplicate of `NormalizeFile`'s.
 
-Zero corpus instances of shape B exist (RX-A: "re-exported names are drawn
-from real TypeScript re-export statements, not invented"); the deferral
-stays theoretical.
+Rejected converter-only options (measured before the fix): dropping the
+colliding name emptied `VendorSurfaceFile.reExports` and turned the barrel
+into a false `checker/orphaned-file`; a converter warning changed no emitted
+fact.
 
 ## What the test pins
 
 `reexport-provenance-residuals.test.ts` (Q7 item 2) asserts shape A's
 clean check with the barrel's `exports` empty and `reExports` populated,
-and pins shape B's current output (empty `exports`, empty `imports`,
-`reExports` = the colliding name, zero diagnostics). The Q7 control
-rewrites this fixture's barrel `<->` to `->` — the pre-R emission — and
-asserts exactly one `checker/multi-exported` naming both files.
+and (`TM15 V2: ...`) shape B's qualified entry, the Dependency with its
+export, the surviving RX-6 fold in `MainFile.imports`, and zero
+diagnostics. The Q7 control rewrites this fixture's barrel `<->` to `->` —
+the pre-R emission — and asserts exactly one `checker/multi-exported`
+naming both files.

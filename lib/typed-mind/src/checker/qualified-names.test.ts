@@ -157,6 +157,32 @@ it('TM13 Q: explicit dependency namespaces validate exports', () => {
   );
 });
 
+// RFC-TM-15 §S2 (rfc-tm-15-diamond.md, leaf X1) — a `reexports:` entry may
+// be `Owner.member`; the resolver matches on the member part and follows the
+// qualified entry instead of binding the same-spelled local entity.
+it('TM15 V2: a qualified re-export entry resolves to the external member, not the same-spelled local entity', () => {
+  const source = [
+    'Vendor ^ "vendor"',
+    '  -> [helper]',
+    'Surface @ src/surface.ts:',
+    '  <-> [Vendor.helper]',
+    'Origin @ src/origin.ts:',
+    '  -> [helper]',
+    'helper :: () => void',
+    '',
+  ].join('\n');
+  const { names, byName } = namesFor(source);
+  const viaSurface = names.resolve('Surface.helper', { importingFile: 'Origin' });
+  assert.equal(viaSurface.kind, 'external');
+  assert.equal(viaSurface.kind === 'external' ? viaSurface.owner.name : undefined, 'Vendor');
+  assert.equal(names.resolveExport('Surface', 'Vendor.helper').kind, 'external');
+  assert.equal(names.target('Origin.helper'), byName.get('helper'));
+  const missingMember = namesFor(source.replace('-> [helper]\nSurface', '-> [other]\nSurface')).names.resolve('Surface.helper');
+  assert.deepEqual(missingMember.kind === 'unresolved' ? missingMember.reason : missingMember.kind, 'missing-member');
+  const missingOwner = namesFor(source.replace('Vendor ^ "vendor"\n  -> [helper]\n', '')).names.resolve('Surface.helper');
+  assert.deepEqual(missingOwner.kind === 'unresolved' ? missingOwner.reason : missingOwner.kind, 'missing-owner');
+});
+
 it('TM13 Q: qualified navigation links and checker targets agree', () => {
   const { outcome, names } = namesFor(
     'File @ file.ts:\nFile.Service <:\n  => [run]\nFile.handler :: () => void\nCaller :: () => void\n  ~> [File.Service.run, File.handler]\n',
@@ -281,6 +307,18 @@ it('TM13 Q: a barrel cannot launder private exposure through a qualified export 
   if (result.kind === 'unresolved') assert.equal(result.reason, 'private-member');
   const publicNames = namesFor(source.replace('Left @ left.ts:\n', 'Left @ left.ts:\n  -> [Left.Private]\n')).names;
   assert.equal(publicNames.resolve('Barrel.Left.Private').kind, 'entity');
+});
+
+// RFC-TM-15 §S2 (leaf X1) — the `<->` mirror of the `->` control above: a
+// qualified re-export entry is resolved as imported by the forwarding File.
+it('TM15 V2: a barrel cannot launder private exposure through a qualified re-export entry', () => {
+  const source = 'Left @ left.ts:\nLeft.Private %\nBarrel @ barrel.ts:\n  <-> [Left.Private]\n';
+  const { names } = namesFor(source);
+  const result = names.resolve('Barrel.Private');
+  assert.equal(result.kind, 'unresolved');
+  if (result.kind === 'unresolved') assert.equal(result.reason, 'private-member');
+  const publicNames = namesFor(source.replace('Left @ left.ts:\n', 'Left @ left.ts:\n  -> [Left.Private]\n')).names;
+  assert.equal(publicNames.resolve('Barrel.Private').kind, 'entity');
 });
 
 it('TM13 Q+B1: signature-only qualified aliases use canonical declarations without leaking binders', () => {
