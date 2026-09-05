@@ -1346,6 +1346,12 @@ export class TypeScriptAnalyzer {
     };
     const visit = (node: ts.Node): void => {
       if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isClassExpression(node)) return;
+      if (ts.isExpressionWithTypeArguments(node)) {
+        // An instantiation expression (`make<string>`) is classified as a
+        // type node by `ts.isTypeNode`; its expression is still a value use.
+        visit(node.expression);
+        return;
+      }
       if (ts.isTypeNode(node)) return;
       if ((ts.isCallExpression(node) || ts.isNewExpression(node)) && ts.isIdentifier(node.expression)) {
         record(ts.isNewExpression(node) ? 'construct' : 'call', node.expression);
@@ -1597,9 +1603,8 @@ export class TypeScriptAnalyzer {
       description: description || undefined,
       decorators: [],
       // An arrow function's concise (non-block) body is itself a single
-      // expression; `collectBodyReferences` starts from `ts.forEachChild`,
-      // which recurses into an expression body's own descendants the same way
-      // it does a block's statements.
+      // expression; `collectBodyReferences` visits the body node itself, so
+      // `() => new Cursor()` records the construct.
       bodyReferences: this.collectBodyReferences(node.body),
       origin: 'declaration',
     } as const;
