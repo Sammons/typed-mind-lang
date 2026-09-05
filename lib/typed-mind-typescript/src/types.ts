@@ -20,10 +20,16 @@ export type ReferenceOrigin =
   | { readonly kind: 'typescript-lib'; readonly declaration: DeclarationIdentity }
   | {
       readonly kind: 'unresolved';
-      readonly reason: 'missing-symbol' | 'missing-declaration' | 'checker-unavailable' | 'ambiguous-declaration';
+      readonly reason:
+        | 'missing-symbol'
+        | 'missing-declaration'
+        | 'checker-unavailable'
+        | 'ambiguous-declaration'
+        | 'unsupported-heritage-type';
     };
 
 export interface TypeReferenceOccurrence {
+  readonly externalBinding?: { readonly specifier: string; readonly exportName: string };
   readonly writtenName: string;
   readonly source: SourceRange;
   readonly start: number;
@@ -74,7 +80,14 @@ export interface ParsedParameter {
   readonly hasDefaultValue: boolean;
 }
 
+export interface ParsedFactoryHeritage {
+  readonly index: number;
+  readonly source: SourceRange;
+  readonly origin: ReferenceOrigin;
+}
+
 export interface ParsedClass {
+  readonly factoryHeritage?: readonly ParsedFactoryHeritage[];
   readonly implementsTypeInfo?: readonly ParsedTypeText[];
   readonly extendsTypeInfo?: readonly ParsedTypeText[];
   readonly typeParameters?: readonly ParsedTypeParameter[];
@@ -274,9 +287,11 @@ export interface AnalyzerDiagnostic {
     | 'unresolvable-import'
     | 'non-literal-dynamic-import'
     | 'skipped-module'
+    | 'unrepresented-type-source'
     | 'zero-entities'
     | 'recognizer-not-found'
-    | 'recognizer-module-standalone-parsed';
+    | 'recognizer-module-standalone-parsed'
+    | 'unresolved-factory-heritage';
   readonly message: string;
   readonly filePath: string | undefined;
   readonly specifier: string | undefined;

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as ts from 'typescript';
+import { getModuleTypeInfos } from './parsed-type-slots.ts';
 import { getDeclarationIdentity, parseTypeTextOrigins, resolveReferenceOrigin, sourceRange } from './type-reference-origins.ts';
 import type {
   AnalyzerDiagnostic,
@@ -11,6 +12,7 @@ import type {
   ParsedConstant,
   ParsedEnum,
   ParsedExport,
+  ParsedFactoryHeritage,
   ParsedFunction,
   ParsedImport,
   ParsedInterface,
@@ -527,6 +529,29 @@ export class TypeScriptAnalyzer {
       }
       const module = this.analyzeModule(sourceFile);
       modules.push(module);
+
+      // A2 semantic type dependencies share the queue but are not import edges.
+      const referencedSources = new Set(
+        getModuleTypeInfos(module)
+          .flatMap((info) => info.references)
+          .filter((reference) => reference.origin.kind === 'project')
+          .map((reference) => (reference.origin.kind === 'project' ? reference.origin.declaration.filePath : '')),
+      );
+      for (const referencedPath of referencedSources) {
+        if (visitedModules.has(referencedPath)) continue;
+        const referencedFile = this.program.getSourceFile(referencedPath);
+        if (referencedFile !== undefined && !referencedFile.isDeclarationFile) {
+          if (!traverseQueue.includes(referencedPath)) traverseQueue.push(referencedPath);
+        } else {
+          this.diagnostics.push({
+            severity: 'warning',
+            category: 'unrepresented-type-source',
+            message: `Referenced project declaration has no source module in the TypeScript program: ${referencedPath}`,
+            filePath: currentPath,
+            specifier: undefined,
+          });
+        }
+      }
 
       // X-AN-10 — opt-in recognizer scan. No-op (and no diagnostic
       // surface) when --recognize was not passed for this convention name,
@@ -1285,17 +1310,37 @@ export class TypeScriptAnalyzer {
 
     // Handle export { name1, name2 } from 'module'
     if (node.exportClause && ts.isNamedExports(node.exportClause)) {
-      const source = node.moduleSpecifier ? (node.moduleSpecifier as ts.StringLiteral).text : undefined;
+      const explicitSource = node.moduleSpecifier ? (node.moduleSpecifier as ts.StringLiteral).text : undefined;
 
-      return node.exportClause.elements.map((element) => ({
-        name: element.name.text,
-        isDefault: false,
-        type: this.inferExportType(element.name.text, source),
-        source: source || undefined,
-      }));
+      return node.exportClause.elements.map((element) => {
+        const source = explicitSource ?? this.namedImportSourceForExport(element);
+        return {
+          name: element.name.text,
+          isDefault: false,
+          type: this.inferExportType(element.name.text, source),
+          source: source || undefined,
+        };
+      });
     }
 
     return exports;
+  }
+
+  // A separate import followed by a bare export has the same provenance as
+  // `export { name } from 'source'`. Resolve its local binding, not its text:
+  // import aliases and exports before imports must identify the same owner.
+  private namedImportSourceForExport(element: ts.ExportSpecifier): string | undefined {
+    const symbol = this.checker.getExportSpecifierLocalTargetSymbol(element);
+    for (const declaration of symbol?.declarations ?? []) {
+      if (!ts.isImportSpecifier(declaration) || declaration.getSourceFile() !== element.getSourceFile()) {
+        continue;
+      }
+      const importDeclaration = declaration.parent.parent.parent;
+      if (ts.isImportDeclaration(importDeclaration) && ts.isStringLiteral(importDeclaration.moduleSpecifier)) {
+        return importDeclaration.moduleSpecifier.text;
+      }
+    }
+    return undefined;
   }
 
   private inferExportType(name: string, _source?: string): 'function' | 'class' | 'interface' | 'type' | 'constant' | 'variable' {
@@ -1381,6 +1426,7 @@ export class TypeScriptAnalyzer {
     const name = node.name?.text || '<anonymous>';
     const isAbstract = this.hasAbstractModifier(node);
     const extendsClasses: string[] = [];
+    const factoryHeritage: ParsedFactoryHeritage[] = [];
     const implementsInterfaces: string[] = [];
     const methods: ParsedMethod[] = [];
     const properties: ParsedProperty[] = [];
@@ -1390,7 +1436,22 @@ export class TypeScriptAnalyzer {
     if (node.heritageClauses) {
       for (const clause of node.heritageClauses) {
         if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-          extendsClasses.push(...clause.types.map((type) => this.getExtendsTargetName(type)));
+          for (const type of clause.types) {
+            if (ts.isCallExpression(type.expression) && this.findMixinBaseExpression(type.expression) === undefined) {
+              const origin = this.resolveFactoryHeritage(type.expression);
+              factoryHeritage.push({ index: extendsClasses.length, source: sourceRange(type.expression), origin });
+              if (origin.kind !== 'project') {
+                this.diagnostics.push({
+                  severity: 'warning',
+                  category: 'unresolved-factory-heritage',
+                  message: `Factory heritage '${type.expression.getText()}' of '${name}' has no proven named project class (${origin.kind === 'unresolved' ? origin.reason : origin.kind}); retaining the factory fallback`,
+                  filePath: node.getSourceFile().fileName,
+                  specifier: undefined,
+                });
+              }
+            }
+            extendsClasses.push(this.getExtendsTargetName(type));
+          }
         } else if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
           implementsInterfaces.push(...clause.types.map((type) => this.getTypeString(type)));
         }
@@ -1482,6 +1543,7 @@ export class TypeScriptAnalyzer {
           .flatMap((clause) => clause.types.map((type) => this.getTypeInfo(type))) ?? [],
       isAbstract,
       extends: extendsClasses,
+      ...(factoryHeritage.length > 0 ? { factoryHeritage } : {}),
       implements: implementsInterfaces,
       implementsTypeInfo:
         node.heritageClauses
@@ -2034,6 +2096,21 @@ export class TypeScriptAnalyzer {
 
     const base = this.findMixinBaseExpression(expression);
     return base !== undefined ? base.getText() : this.mixinFactoryFallbackName(expression);
+  }
+
+  private resolveFactoryHeritage(call: ts.CallExpression): ReferenceOrigin {
+    if (this.program.getSourceFile(call.getSourceFile().fileName) !== call.getSourceFile()) {
+      return { kind: 'unresolved', reason: 'checker-unavailable' };
+    }
+    const type = this.checker.getTypeAtLocation(call);
+    if (type.isUnionOrIntersection() || type.getConstructSignatures().length === 0) {
+      return { kind: 'unresolved', reason: 'unsupported-heritage-type' };
+    }
+    const classes = type.getSymbol()?.getDeclarations()?.filter(ts.isClassDeclaration) ?? [];
+    if (classes.length !== 1 || classes[0]?.name === undefined) {
+      return { kind: 'unresolved', reason: classes.length > 1 ? 'ambiguous-declaration' : 'unsupported-heritage-type' };
+    }
+    return this.resolveReferenceOriginAtLocation(classes[0].name);
   }
 
   // Finds the base among a mixin call's arguments. Recurses into a nested

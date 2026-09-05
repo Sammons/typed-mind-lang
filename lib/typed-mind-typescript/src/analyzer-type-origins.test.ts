@@ -193,6 +193,12 @@ it('TM13 A1: origin-only extraction is byte-identical', () => {
   // Captured with the unmodified analyzer from 8559841, before A1. These
   // fixtures had no complete checked-in output snapshots in the main suite.
   const baseline = JSON.parse(readFileSync(join(import.meta.dirname, 'goldens/type-origins/baseline-8559841.json'), 'utf8'));
+  // E changes only Program/source identities and canonical emission order.
+  // Keep the immutable A1 proof and its exact graph/diagnostics; pin E's
+  // emitted names separately. A2 now consumes origins intentionally; this
+  // historical compatibility proof converts metadata-stripped analysis.
+  // A2's own exact-output and removal controls cover origin-aware conversion.
+  const emittedNames = JSON.parse(readFileSync(join(import.meta.dirname, 'goldens/type-origins/emitted-names-tm13-e.json'), 'utf8'));
   const fixtures = [
     ['77-same-name-interface-two-files', 'main.ts'],
     ['96-same-name-type-alias-two-files', 'index.ts'],
@@ -216,10 +222,11 @@ it('TM13 A1: origin-only extraction is byte-identical', () => {
   for (const [name, entry] of fixtures) {
     const root = resolve(import.meta.dirname, '../tests/ladder/repros-analyzer', name);
     const analysis = new TypeScriptAnalyzer(root).analyzeFromEntrypoint(join(root, 'src', entry));
+    const stripped = strip(analysis) as TypeScriptProjectAnalysis;
     assert.deepEqual(
       JSON.parse(
         JSON.stringify({
-          tmdContent: new TypeScriptToTypedMindConverter().convert(analysis).tmdContent,
+          tmdContent: new TypeScriptToTypedMindConverter().convert(stripped).tmdContent,
           moduleGraph: analysis.moduleGraph,
           diagnostics: analysis.diagnostics.map((diagnostic) => ({
             ...diagnostic,
@@ -228,10 +235,9 @@ it('TM13 A1: origin-only extraction is byte-identical', () => {
           })),
         }),
       ),
-      baseline[name],
+      { ...baseline[name], tmdContent: emittedNames[name] },
     );
-    const stripped = strip(analysis) as TypeScriptProjectAnalysis;
-    assert.deepEqual(new TypeScriptToTypedMindConverter().convert(analysis), new TypeScriptToTypedMindConverter().convert(stripped), name);
+
     assert.deepEqual(analysis.moduleGraph, stripped.moduleGraph);
     assert.deepEqual(analysis.diagnostics, stripped.diagnostics);
   }

@@ -228,7 +228,7 @@ const cases: readonly FixtureCase[] = [
     fixture: '66c-mixin-no-base-argument',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   // NEW — the architecture-notebook ladder rung (a Lit web app plus a
   // node:http server). Three gaps the real target surfaced, each with its
