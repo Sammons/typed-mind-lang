@@ -1,4 +1,5 @@
 import { ClassFileNode } from '../ast/class-file-node.ts';
+import { constructorSignature, methodSignature } from '../ast/class-members.ts';
 import { ClassNode } from '../ast/class-node.ts';
 import { parametersOf } from '../ast/declared-type-parameters.ts';
 import { DtoNode } from '../ast/dto-node.ts';
@@ -10,7 +11,15 @@ import type { TypeExprNode, TypeNamedNode, TypeOpaqueNode } from '../ast/type-ex
 import type { TypeParameterNode } from '../ast/type-parameter-node.ts';
 import { type ParsedSignature, parseSignatureText, type SignatureTypePosition } from './parse-signature-text.ts';
 
-export type TypeReferencePosition = 'field' | 'alias' | 'signature' | 'constraint' | 'default' | 'heritage-base' | 'heritage-argument';
+export type TypeReferencePosition =
+  | 'field'
+  | 'alias'
+  | 'signature'
+  | 'member-signature'
+  | 'constraint'
+  | 'default'
+  | 'heritage-base'
+  | 'heritage-argument';
 export interface TypeReferenceHooks {
   readonly reference: (node: TypeNamedNode, args: readonly TypeExprNode[], position: TypeReferencePosition) => void;
   readonly parameters?: (parameters: readonly TypeParameterNode[]) => void;
@@ -95,6 +104,16 @@ export const walkEntityTypeReferences = (entity: EntityNode, hooks: TypeReferenc
   } else if (entity instanceof FunctionNode) {
     const parsed = parseSignatureText(entity.signature, { baseLine: entity.span.start.line, baseColumn: entity.span.start.column });
     if (parsed.kind === 'parsed') walkSignatureTypes(parsed.signature, binders, hooks, 'signature', parameters === undefined);
+  }
+  if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
+    for (const member of entity.members?.methods ?? []) {
+      const signature = methodSignature(member);
+      if (signature !== undefined) walkSignatureTypes(signature, binders, hooks, 'member-signature');
+    }
+    for (const member of entity.members?.constructors ?? []) {
+      const signature = constructorSignature(member);
+      if (signature !== undefined) walkSignatureTypes(signature, binders, hooks, 'member-signature');
+    }
   }
   const heritage = (reference: HeritageReference, role: 'extends' | 'implements'): void => {
     hooks.heritage?.(reference, role, binders);
