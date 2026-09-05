@@ -314,6 +314,8 @@ export class TypeScriptToTypedMindConverter {
   private readonly nameAllocator = new EmittedNameAllocator();
   private readonly fusedModulePaths = new Set<string>();
   private synthesizedNameSequence = 0;
+  private readonly sourceDeclarationIdentities = new Map<string, DeclarationIdentity[]>();
+  private readonly sourceDeclarationsWithoutIdentity = new Set<string>();
   // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) — a
   // top-level function that collided on its bare name and was renamed to
   // `<FileEntity>.<name>` by `convertFunction`. `convertExports` consults
@@ -905,6 +907,8 @@ export class TypeScriptToTypedMindConverter {
     this.entities.length = 0;
     this.entityNames.clear();
     this.nameAllocator.clear();
+    this.sourceDeclarationIdentities.clear();
+    this.sourceDeclarationsWithoutIdentity.clear();
     this.fusedModulePaths.clear();
     this.synthesizedNameSequence = 0;
     this.functionNameRemap.clear();
@@ -2111,18 +2115,39 @@ export class TypeScriptToTypedMindConverter {
     const orderedModules = [...modules].sort((left, right) => this.compareModulePaths(left.filePath, right.filePath));
     type Declaration = { module: ParsedModule; name: string; function: boolean };
     const groups = new Map<string, Declaration[]>();
-    const add = (module: ParsedModule, name: string, isFunction: boolean): void => {
+    const add = (
+      module: ParsedModule,
+      declaration: { readonly name: string; readonly declaration?: DeclarationIdentity },
+      isFunction: boolean,
+    ): void => {
+      const name = declaration.name;
+      const key = `${module.filePath}::${name}`;
+      const identity = declaration.declaration;
+      if (identity === undefined) {
+        this.sourceDeclarationsWithoutIdentity.add(key);
+      } else {
+        const identities = this.sourceDeclarationIdentities.get(key) ?? [];
+        if (!identities.some((existing) => this.sameDeclarationIdentity(existing, identity))) {
+          identities.push(identity);
+          this.sourceDeclarationIdentities.set(key, identities);
+          if (identities.length === 2)
+            this.addError(
+              `Distinct source declarations named '${name}' share one allocation key in '${this.getRelativePath(module.filePath)}'; their lexical identities cannot be represented by one emitted entity name`,
+              module.filePath,
+            );
+        }
+      }
       const group = groups.get(name) ?? [];
       if (!group.some((entry) => entry.module.filePath === module.filePath)) group.push({ module, name, function: isFunction });
       groups.set(name, group);
     };
     for (const module of orderedModules) {
-      for (const cls of module.classes) add(module, cls.name, false);
-      for (const iface of module.interfaces) if (this.isInterfaceExported(iface, module)) add(module, iface.name, false);
-      for (const type of module.types) if (this.isTypeAliasExported(type, module)) add(module, type.name, false);
-      for (const item of module.enums ?? []) if (this.isEnumExported(item, module)) add(module, item.name, false);
-      for (const constant of module.constants) if (this.isConstantExported(constant, module)) add(module, constant.name, false);
-      for (const fn of module.functions) if (this.isFunctionExported(fn, module)) add(module, fn.name, true);
+      for (const cls of module.classes) add(module, cls, false);
+      for (const iface of module.interfaces) if (this.isInterfaceExported(iface, module)) add(module, iface, false);
+      for (const type of module.types) if (this.isTypeAliasExported(type, module)) add(module, type, false);
+      for (const item of module.enums ?? []) if (this.isEnumExported(item, module)) add(module, item, false);
+      for (const constant of module.constants) if (this.isConstantExported(constant, module)) add(module, constant, false);
+      for (const fn of module.functions) if (this.isFunctionExported(fn, module)) add(module, fn, true);
     }
     const sourceKey = (entry: Declaration): string => `source:${entry.module.filePath}::${entry.name}`;
     const store = (entry: Declaration, name: string): void => {
@@ -2258,6 +2283,22 @@ export class TypeScriptToTypedMindConverter {
       if (imp.namespaceImport !== undefined) this.reserveNamespaceImportName(module.filePath, imp.namespaceImport, imp.specifier);
   }
 
+  private sameDeclarationIdentity(left: DeclarationIdentity, right: DeclarationIdentity): boolean {
+    return left.filePath === right.filePath && left.name === right.name && left.start === right.start && left.end === right.end;
+  }
+
+  // F/H/A2 may consult this identity-proven allocation after the prepass.
+  // Consumers that need an emitted entity must separately verify exactly
+  // one final instance and its kind; a reservation is not an emitted node.
+  private getAssignedDeclarationName(identity: DeclarationIdentity): string | undefined {
+    const key = `${identity.filePath}::${identity.name}`;
+    const declarations = this.sourceDeclarationIdentities.get(key);
+    if (this.sourceDeclarationsWithoutIdentity.has(key) || declarations?.length !== 1) return undefined;
+    const declaration = declarations[0];
+    if (declaration === undefined || !this.sameDeclarationIdentity(declaration, identity)) return undefined;
+    return this.functionNameRemap.get(key) ?? this.typeNameRemap.get(key);
+  }
+
   // decision-same-named-entities PR 1 — resolve a declaration's final entity
   // name through `typeNameRemap`. `reserveEntityNames` runs as a
   // whole-run pre-pass over every module, so every class/interface/type-
@@ -2269,7 +2310,14 @@ export class TypeScriptToTypedMindConverter {
     if (module === undefined) {
       return createEntityName(declName);
     }
-    return this.typeNameRemap.get(`${module.filePath}::${declName}`) ?? createEntityName(declName);
+    const key = `${module.filePath}::${declName}`;
+    const identities = this.sourceDeclarationIdentities.get(key);
+    const identity = identities?.length === 1 ? identities[0] : undefined;
+    return (
+      (identity === undefined ? undefined : this.getAssignedDeclarationName(identity)) ??
+      this.typeNameRemap.get(key) ??
+      createEntityName(declName)
+    );
   }
 
   // decision-same-named-entities PR 1, INTERIM WINDOW instrumentation.
