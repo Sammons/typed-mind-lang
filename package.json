@@ -12,7 +12,7 @@
     "url": "https://github.com/Sammons/typed-mind-lang"
   },
   "scripts": {
-    "build": "pnpm run -r build",
+    "build": "pnpm --filter @sammons/typed-mind run prebuild && pnpm run -r build",
     "build:bundled": "pnpm --filter @sammons/typed-mind-lsp run build:bundled",
     "test": "pnpm run -r test",
     "lint": "biome check .",
