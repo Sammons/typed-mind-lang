@@ -43,7 +43,7 @@ describe('TypedMind facade — cross-file @import resolution (filePath wiring)',
     typedMind = await TypedMind.create({ wasmPath });
   });
 
-  it('scenario-21 (aliased import): filePath resolves imports into 11 merged entities, matching legacy', () => {
+  it('scenario-21 (aliased import): filePath resolves imports into 13 entities including checked alias owners', () => {
     const path = join(scenariosDir, 'scenario-21-aliased-import.tmd');
     const source = readFileSync(path, 'utf8');
     const parsed = typedMind.parse(source, path);
@@ -55,15 +55,16 @@ describe('TypedMind facade — cross-file @import resolution (filePath wiring)',
         linksIsPresent: typeof parsed.links.referencedBy === 'function',
       },
       {
-        // Legacy (DSLChecker.parse(source, path)) resolves to 11 entities —
-        // the local WebApp/AppFile/initializeApp trio plus the 4-entity
-        // aliased UI.* import and the 4-entity aliased DB.* import.
-        entityCount: 11,
+        // Q retains the 11 original entities and adds explicit UI/DB
+        // File carriers for the aliased imported documents.
+        entityCount: 13,
         names: [
           'AppFile',
+          'DB',
           'DB.Connection',
           'DB.DatabaseFile',
           'DB.query',
+          'UI',
           'UI.Button',
           'UI.ComponentsFile',
           'UI.Form',
@@ -107,7 +108,7 @@ describe('TypedMind facade — cross-file @import resolution (filePath wiring)',
         withoutPathEntityCount: withoutPath.entities.length,
         cstSpanMatches: withPath.cst.span().end.line === withoutPath.cst.span().end.line,
       },
-      { withPathEntityCount: 11, withoutPathEntityCount: 3, cstSpanMatches: true },
+      { withPathEntityCount: 13, withoutPathEntityCount: 3, cstSpanMatches: true },
     );
   });
 
