@@ -2239,7 +2239,7 @@ export class TypeScriptToTypedMindConverter {
       typeParameters: convertSourceTypeParameters(primaryClass.typeParameters, this.genericMetadataContext(module.filePath)),
       ...this.convertMembers(primaryClass, module.filePath),
       imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
-      exports: [...this.convertExports(module, entityName).exportNames, ...this.claimStubExportNames(stubNames)],
+      exports: [...this.convertExports(module, entityName, false).exportNames, ...this.claimStubExportNames(stubNames)],
       purpose: primaryClass.description ? collapseDescription(primaryClass.description) : undefined,
     });
 
@@ -2321,7 +2321,7 @@ export class TypeScriptToTypedMindConverter {
       // name (issue #109) no longer vanishes when every one of a File's
       // exports is a re-export. It is destructured into `reExports`
       // instead of being silently dropped from `exportNames`.
-      const { exportNames, reExportNames } = this.convertExports(module);
+      const { exportNames, reExportNames } = this.convertExports(module, undefined, true);
       const fileEntity = new FileNode({
         name: fileEntityName,
         span: SYNTHETIC_SPAN,
@@ -4652,7 +4652,16 @@ export class TypeScriptToTypedMindConverter {
   // non-re-export branch only), but the excluded name is no longer
   // discarded — it is returned as the RFC's new `reExports` field's
   // source. Every call site now destructures the pair.
-  private convertExports(module: ParsedModule, excludeName?: string): { exportNames: string[]; reExportNames: string[] } {
+  //
+  // RFC-TM-15 §S2 (leaf X1) — `qualifyExternalReExports` is `true` only for
+  // the File path, which consumes `reExportNames`; the ClassFile-fusion
+  // path discards them (RX-1: ClassFile carries no `reexports:` slot), so
+  // it must not create a Dependency that nothing in the document references.
+  private convertExports(
+    module: ParsedModule,
+    excludeName: string | undefined,
+    qualifyExternalReExports: boolean,
+  ): { exportNames: string[]; reExportNames: string[] } {
     const exportNames: string[] = [];
     const reExportNames: string[] = [];
     const seenNames = new Set<string>();
@@ -4681,7 +4690,7 @@ export class TypeScriptToTypedMindConverter {
       }
       if (exp.name !== excludeName && this.isValidEntityName(exp.name) && !seenNames.has(exp.name)) {
         if (this.isReExport(exp)) {
-          reExportNames.push(this.reExportEntryWithProvenance(exp));
+          reExportNames.push(qualifyExternalReExports ? this.reExportEntryWithProvenance(exp) : exp.name);
         } else if (!this.isPredictedTypeDef(exp.name)) {
           // issue #88 — a TypeDef-predicted export name (a non-object-like
           // `type` alias, or an enum) is excluded here: `exports.to`
@@ -4737,6 +4746,12 @@ export class TypeScriptToTypedMindConverter {
   // Dependency arm resolves the entry to `external` instead of
   // `missing-member`. The Dependency's name is pre-reserved in
   // `reserveEntityNames` alongside the import-derived specifiers.
+  //
+  // Known limit (recorded, not fixed here): `ParsedExport` carries only the
+  // PUBLIC spelling, so for `export { a as b } from 'pkg'` the entry is
+  // `Pkg.b` and `b` lands on the Dependency's `exports`. The public spelling
+  // is what importers name (and what the RX-6 fold matches); carrying the
+  // package-side name needs a new analyzer field, which is outside X1.
   private reExportEntryWithProvenance(exp: ParsedExport): string {
     const source = this.externalReExportSource(exp);
     if (source === undefined) {

@@ -138,3 +138,28 @@ it('TM13 EXIT: TypeDef, external and ordinary reexports retain their existing la
       .diagnostics.some((item) => item.code === 'checker/multi-exported'),
   );
 });
+
+// RFC-TM-15 §S2 (leaf X1) — the ClassFile-fusion path discards
+// `reExportNames` (RFC-TM-11 §RX-1: a ClassFile carries no `reexports:`
+// slot), so it must not create a Dependency for an external re-export that
+// nothing in the document would then reference. The File path (index.ts)
+// still creates the Dependency for its own external re-export.
+it('TM15 V2: a ClassFile that re-exports an external name creates no unreferenced Dependency', (context) => {
+  const analysis = project(context, {
+    'index.ts':
+      'import { Engine } from "./engine.js"; export { unavailable as Remote } from "missing-package"; export function use(): Engine { return new Engine(); }',
+    'engine.ts': 'export { unavailable as Fused } from "fused-package"; export class Engine { run(): void {} }',
+  });
+  const result = convert(analysis);
+  assert.equal(result.success, true);
+  const fused = result.entities.find((entity) => entity.kind === 'ClassFile' && entity.name === 'Engine');
+  assert.ok(fused, result.tmdContent);
+  assert.deepEqual(
+    result.entities.filter((entity) => entity.kind === 'Dependency').map((entity) => entity.name),
+    ['MissingPackage'],
+    result.tmdContent,
+  );
+  const owner = result.entities.find((entity) => entity instanceof FileNode && entity.path === 'index.ts');
+  assert.ok(owner instanceof FileNode);
+  assert.deepEqual(owner.reExports, ['MissingPackage.Remote']);
+});

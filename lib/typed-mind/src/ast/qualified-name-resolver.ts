@@ -135,7 +135,11 @@ export class QualifiedNameResolver {
         return { kind: 'entity', entity: declared };
       }
       if (!exported && reExportEntry !== undefined && reExportEntry.includes('.')) {
-        return this.resolveWithState(reExportEntry, {}, active);
+        // The forwarding File is the importer of the forwarded entry, so a
+        // File-owned entry keeps its owner's privacy check (a barrel cannot
+        // launder a private declaration through `reexports:` any more than
+        // through `exports:`); a Dependency owner has no privacy.
+        return this.resolveWithState(reExportEntry, { importingFile: ownerName }, active);
       }
       if (exported || reExported) {
         const target = this.#byName.get(name) ?? this.#byName.get(member);
