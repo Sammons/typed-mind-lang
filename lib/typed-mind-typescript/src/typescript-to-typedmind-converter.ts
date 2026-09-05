@@ -1354,6 +1354,17 @@ export class TypeScriptToTypedMindConverter {
       const source = sourceName === undefined ? undefined : actualByName.get(sourceName);
       const hasUniqueOwner = source?.length === 1 && (source[0] instanceof FileNode || source[0] instanceof ClassFileNode);
       const imports: string[] = [];
+      // A named export-from depends on its actual source declaration, even
+      // when its public spelling is an alias. Keep that spelling in reExports;
+      // importing the proven target does not claim a second local export.
+      if (hasUniqueOwner) {
+        for (const exp of module.exports) {
+          if (exp.source === undefined || exp.declaration === undefined || exp.name === exp.declaration.name) continue;
+          const target = publicTargets.get(this.declarationKey(exp.declaration));
+          if (target !== undefined && ['Function', 'Class', 'ClassFile', 'DTO', 'Constants', 'File'].includes(target.kind))
+            imports.push(target.name);
+        }
+      }
       for (const imp of module.imports) {
         if (!this.isExternalPackage(imp.specifier)) continue;
         for (const member of [...imp.namedImports, ...(imp.defaultImport === undefined ? [] : ['default'])]) {
