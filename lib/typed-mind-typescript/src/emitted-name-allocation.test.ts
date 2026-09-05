@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { it } from 'node:test';
 import { ClassFileNode, ClassNode, FileNode, FunctionNode, QualifiedNameResolver, TypedMind } from '@sammons/typed-mind';
 import type { ParsedClass, ParsedFunction, ParsedModule, ParsedTypeAlias, TypeScriptProjectAnalysis } from './types.ts';
+import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
 
 const fn = (name: string, inline = false): ParsedFunction => ({
@@ -182,4 +186,40 @@ it('TM13 E: namespace import stubs share source reservations and import their ac
   assert.ok(owner instanceof FileNode);
   assert.ok(owner.imports.includes('Ns2'));
   assert.equal(owner.imports.includes('Ns'), false);
+});
+
+it('TM13 E: distinct lexical declarations cannot silently share one source allocation key', () => {
+  const root = mkdtempSync(join(tmpdir(), 'tm13-e-identity-'));
+  try {
+    writeFileSync(
+      join(root, 'tsconfig.json'),
+      JSON.stringify({ compilerOptions: { target: 'esnext', module: 'esnext' }, include: ['index.ts'] }),
+    );
+    writeFileSync(join(root, 'index.ts'), 'export class Hidden {}\nexport function factory() { class Hidden {} return Hidden; }\n');
+    const source = new TypeScriptAnalyzer(root).analyzeFromEntrypoint(join(root, 'index.ts'));
+    const declarations = source.modules.flatMap((item) => item.classes.filter((item) => item.name === 'Hidden'));
+    assert.equal(declarations.length, 2);
+    assert.notDeepEqual(declarations[0]?.declaration, declarations[1]?.declaration);
+    const result = new TypeScriptToTypedMindConverter().convert(source);
+    assert.equal(result.errors.filter((error) => error.message.includes("Distinct source declarations named 'Hidden'")).length, 1);
+
+    // Canonical overload identities are one declaration identity, not a
+    // lexical collision. Existing overload emission policy is unchanged.
+    writeFileSync(
+      join(root, 'index.ts'),
+      'export function go(x: string): void;\nexport function go(x: number): void;\nexport function go(x: unknown): void {}\n',
+    );
+    const overloaded = new TypeScriptAnalyzer(root).analyzeFromEntrypoint(join(root, 'index.ts'));
+    const identities = overloaded.modules.flatMap((item) => item.functions.map((item) => item.declaration));
+    assert.equal(identities.length, 3);
+    assert.deepEqual(identities, [identities[0], identities[0], identities[0]]);
+    assert.equal(
+      new TypeScriptToTypedMindConverter()
+        .convert(overloaded)
+        .errors.some((error) => error.message.includes('Distinct source declarations')),
+      false,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
