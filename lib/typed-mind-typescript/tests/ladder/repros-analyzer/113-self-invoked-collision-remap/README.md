@@ -1,4 +1,4 @@
-# 112 — a collision-losing entrypoint's self-invoked function reached Program.exports under its raw name
+# 113 — a collision-losing entrypoint's self-invoked function reached Program.exports under its raw name
 
 Reproduced by the PR #186 reviewer on main (typedmind residual burndown Q10, 2026-09-05).
 

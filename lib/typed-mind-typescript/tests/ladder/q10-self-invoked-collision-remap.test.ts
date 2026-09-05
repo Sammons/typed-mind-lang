@@ -15,10 +15,10 @@
 //
 // Fix: the fold resolves each name through the same
 // `remapEntrypointExportName` chain the public exports use. Check bindings:
-//   (a) fixture 112 `index.ts` (collision LOSER: `src/engine.ts` <
+//   (a) fixture 113 `index.ts` (collision LOSER: `src/engine.ts` <
 //       `src/index.ts`): Program.exports contains exactly the remapped
 //       `IndexFile.runWorker`, once, and the checker reports zero findings.
-//   (b) control — fixture 112 `main.ts` (collision WINNER: `src/main.ts` <
+//   (b) control — fixture 113 `main.ts` (collision WINNER: `src/main.ts` <
 //       `src/support.ts`): Program.exports is the bare `runWorker`, zero
 //       findings — unchanged behaviour.
 //   (c) fixture 100 (Q3) and fixture 20 (X-AN-11) still pass.
@@ -33,7 +33,7 @@ import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmin
 const testDir = dirname(fileURLToPath(import.meta.url));
 const reprosDir = join(testDir, 'repros-analyzer');
 const fixturePath = (name: string, ...segments: string[]): string => join(reprosDir, name, ...segments);
-const fixture = '112-self-invoked-collision-remap';
+const fixture = '113-self-invoked-collision-remap';
 
 const analyze = (name: string, entry: string) => {
   const analyzer = new TypeScriptAnalyzer(fixturePath(name));
