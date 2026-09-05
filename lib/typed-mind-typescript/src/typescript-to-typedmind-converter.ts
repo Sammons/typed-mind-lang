@@ -4070,7 +4070,22 @@ export class TypeScriptToTypedMindConverter {
     const entryEntityName = this.findEntryEntityName(entryFilePath);
 
     // Extract public exports from the entry point for library support
-    const publicExports = this.extractPublicExportsFromEntrypoint(entryFilePath);
+    const entryModuleExports = this.findEntrypointModuleExports(entryFilePath);
+    const publicExports = this.extractPublicExportsFromEntrypoint(entryFilePath, entryModuleExports);
+
+    // Q10 (typedmind residual burndown) — the self-invoked names arrive as
+    // RAW source names (`emittedSelfInvokedFunctionNames`), while
+    // `publicExports` above is already collision-remapped. When the
+    // entrypoint's guarded function LOST a bare-name collision
+    // (decision-same-named-entities: the later path-sorted declaration
+    // becomes `<FileEntity>.<name>`), the raw fold named the OTHER module's
+    // entity — `checker/multi-exported` against the bare-name holder's
+    // File, or `checker/undefined-export` when nothing holds the bare name.
+    // Resolve through the same remap the public exports use, so the fold
+    // can only ever name the entrypoint's own emitted entity.
+    const remappedSelfInvokedFunctionNames = selfInvokedFunctionNames.map((name) =>
+      this.remapEntrypointExportName(entryFilePath, entryModuleExports, name),
+    );
 
     // SST-referenced-module orphan flags — resolve this Program's own
     // handler-string references (if any) to their target functions' final
@@ -4089,7 +4104,7 @@ export class TypeScriptToTypedMindConverter {
     // genuinely references the handler function via the handler string, so
     // pushing it into Program.exports makes the graph a true statement
     // instead of suppressing a false one.
-    const allPublicExports = Array.from(new Set([...publicExports, ...selfInvokedFunctionNames, ...sstHandlerExportNames]));
+    const allPublicExports = Array.from(new Set([...publicExports, ...remappedSelfInvokedFunctionNames, ...sstHandlerExportNames]));
 
     // RC-C (issue #102): shortform's `program_declaration` (grammar.js) has
     // no exports continuation slot — attachment-rules.ts's `export_list`
@@ -4114,35 +4129,47 @@ export class TypeScriptToTypedMindConverter {
     this.entities.push(programEntity);
   }
 
-  private extractPublicExportsFromEntrypoint(entryFilePath: string): string[] {
+  // Look up the entrypoint's registered exports under every key shape
+  // `registerModuleExports` may have written for it. Shared by
+  // `extractPublicExportsFromEntrypoint` and the self-invoked fold in
+  // `createProgramEntity` so both remap against the same record.
+  private findEntrypointModuleExports(entryFilePath: string): ExportRegistry[string] | undefined {
     const relativePath = this.getRelativePath(entryFilePath);
-    // decision-same-named-entities PR 1 — Program.exports is the FOURTH site
-    // building an `exports` list out of raw source names (alongside
-    // `convertExports`, `isDTOLikeType`, and `resolveImportToEntity`), and it
-    // needs the same remap: when the ENTRYPOINT module is the one that lost a
-    // bare-name collision, its own declaration is emitted under the qualified
-    // name while this list still said the bare one — naming an entity the
-    // document does not contain, and colliding with the real bare-name holder
-    // as `checker/multi-exported`. Resolved through the same
-    // `${filePath}::${name}` key the reservation pass wrote; every export that
-    // is not a collision-renamed declaration resolves to `undefined`, which is
-    // exactly when the raw name is already correct.
-    const remapExportName = (name: string): string => {
-      const identity = moduleExports?.localDeclarations.get(name);
-      return (
-        (identity !== undefined ? this.getAssignedDeclarationName(identity) : undefined) ??
-        this.functionNameRemap.get(`${entryFilePath}::${name}`) ??
-        this.typeNameRemap.get(`${entryFilePath}::${name}`) ??
-        name
-      );
-    };
-
-    // Look up exports from this entry file in our export registry
-    const moduleExports =
+    return (
       this.exportRegistry[relativePath] ||
       this.exportRegistry[relativePath.replace(/\.(ts|tsx|js|jsx)$/, '')] ||
       this.exportRegistry[`./${relativePath}`] ||
-      this.exportRegistry[`./${relativePath.replace(/\.(ts|tsx|js|jsx)$/, '')}`];
+      this.exportRegistry[`./${relativePath.replace(/\.(ts|tsx|js|jsx)$/, '')}`]
+    );
+  }
+
+  // decision-same-named-entities PR 1 — Program.exports is the FOURTH site
+  // building an `exports` list out of raw source names (alongside
+  // `convertExports`, `isDTOLikeType`, and `resolveImportToEntity`), and it
+  // needs the same remap: when the ENTRYPOINT module is the one that lost a
+  // bare-name collision, its own declaration is emitted under the qualified
+  // name while this list still said the bare one — naming an entity the
+  // document does not contain, and colliding with the real bare-name holder
+  // as `checker/multi-exported`. Resolved through the same
+  // `${filePath}::${name}` key the reservation pass wrote; every export that
+  // is not a collision-renamed declaration resolves to `undefined`, which is
+  // exactly when the raw name is already correct.
+  //
+  // Q10 — hoisted out of `extractPublicExportsFromEntrypoint` so the
+  // self-invoked fold in `createProgramEntity` resolves through the SAME
+  // lookup chain instead of pushing raw source names.
+  private remapEntrypointExportName(entryFilePath: string, moduleExports: ExportRegistry[string] | undefined, name: string): string {
+    const identity = moduleExports?.localDeclarations.get(name);
+    return (
+      (identity !== undefined ? this.getAssignedDeclarationName(identity) : undefined) ??
+      this.functionNameRemap.get(`${entryFilePath}::${name}`) ??
+      this.typeNameRemap.get(`${entryFilePath}::${name}`) ??
+      name
+    );
+  }
+
+  private extractPublicExportsFromEntrypoint(entryFilePath: string, moduleExports: ExportRegistry[string] | undefined): string[] {
+    const remapExportName = (name: string): string => this.remapEntrypointExportName(entryFilePath, moduleExports, name);
 
     if (!moduleExports) {
       return [];
