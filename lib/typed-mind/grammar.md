@@ -62,11 +62,13 @@ Indented lines that attach properties to the most recently declared entity.
 | Consumes | `$< [...]` |
 | Comment | `# ...` |
 
+A calls entry is `fn`, `File.fn`, `Class.method`, or `Class.constructor` (constructs the class).
+
 ```tmd
 TodoApp -> main v1.0.0
 main @ src/index.ts:
   <- [App, Logo, DATABASE_URL, startApp, formatDate]
-  -> [startApp, UserDTO]
+  -> [startApp, UserDTO, Widget]
 
 App &! "Root component"
   > [Header]
@@ -80,8 +82,12 @@ DATABASE_URL $env "DB connection" (required)
 
 startApp :: () => void
   <- UserDTO
+  ~> [Widget.constructor]
   ~ [App]
   $< [DATABASE_URL, Logo]
+
+Widget <:
+  => [render]
 
 UserDTO %
   - name: string "User name"

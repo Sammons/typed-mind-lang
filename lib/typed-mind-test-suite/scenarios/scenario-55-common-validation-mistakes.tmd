@@ -15,7 +15,7 @@ DataProcessor #: src/processor.ts
   => [process, validate]
 
 runProcessor :: () => void
-  ~> [DataProcessor]  # Wrong! Should be DataProcessor.process or just process
+  ~> [DataProcessor]  # Wrong! Should be DataProcessor.process, DataProcessor.constructor (constructs it), or just process
 
 # Mistake 4: DTO with function-like field names (confusing but valid)
 ConfigDTO %

@@ -4,7 +4,16 @@
  * Author: Enhanced by Claude Code in Matt Pocock style
  */
 
-import { ClassFileNode, ClassNode, type EntityKind, type EntityNode, FileNode, FunctionNode, type ParseOutput } from '@sammons/typed-mind';
+import {
+  ClassFileNode,
+  ClassNode,
+  type EntityKind,
+  type EntityNode,
+  FileNode,
+  FunctionNode,
+  type ParseOutput,
+  QualifiedNameResolver,
+} from '@sammons/typed-mind';
 
 /**
  * Architectural pattern definition
@@ -365,9 +374,10 @@ class MVCPatternMatcher implements PatternMatcher {
 
   private findRelatedEntities(entity: EntityNode, candidates: EntityNode[], graph: ParseOutput): EntityNode[] {
     const related: EntityNode[] = [];
+    const names = new QualifiedNameResolver(new Map(graph.entities.map((candidate) => [candidate.name, candidate])));
 
     for (const candidate of candidates) {
-      if (this.entitiesAreRelated(entity, candidate, graph)) {
+      if (this.entitiesAreRelated(entity, candidate, names)) {
         related.push(candidate);
       }
     }
@@ -379,11 +389,14 @@ class MVCPatternMatcher implements PatternMatcher {
   // subclasses replaces the legacy 'imports' in entity1 / 'calls' in entity1
   // / 'affects' in entity1 duck-typing. File/ClassFile carry imports,
   // Function carries calls/affects/input/output — same field set the legacy
-  // duck-typing probed.
-  private entitiesAreRelated(entity1: EntityNode, entity2: EntityNode, _graph: ParseOutput): boolean {
+  // duck-typing probed. RFC-TM-14 §S2 — calls resolve through the
+  // qualified-name resolver so `Owner.constructor` relates to the owner; the
+  // exact-name test is the legacy fallback for a declared dotted entity the
+  // resolver rejects (`invalid-owner`).
+  private entitiesAreRelated(entity1: EntityNode, entity2: EntityNode, names: QualifiedNameResolver): boolean {
     if ((entity1 instanceof FileNode || entity1 instanceof ClassFileNode) && entity1.imports.includes(entity2.name)) return true;
     if (entity1 instanceof FunctionNode) {
-      if (entity1.calls.includes(entity2.name)) return true;
+      if (entity1.calls.some((call) => call === entity2.name || names.target(call) === entity2)) return true;
       if (entity1.affects?.includes(entity2.name)) return true;
       if (entity1.input === entity2.name) return true;
       if (entity1.output === entity2.name) return true;

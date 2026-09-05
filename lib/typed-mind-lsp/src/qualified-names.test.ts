@@ -111,3 +111,26 @@ it('TM13 Q: LSP rejects private import navigation with the same exposure as link
     assert.deepEqual(provideReferencesForName('file:///test.tmd', 'File.Private', state.nameIndex, state.names, imported), []);
   }
 });
+
+it('TM14 U2: LSP navigation and references resolve Owner.constructor to the owner', async () => {
+  const typedMind = await TypedMind.create();
+  const constructed = 'Walker <:\n  => [walk]\nCursor #: cursor.ts\nwalk :: () => number\n  ~> [Walker.constructor, Cursor.constructor]\n';
+  const output = typedMind.parseWithCst(constructed);
+  assert.deepEqual(output.diagnostics, []);
+  const state = buildDocumentState(output);
+  for (const [name, owner] of [
+    ['Walker.constructor', 'Walker'],
+    ['Cursor.constructor', 'Cursor'],
+  ] as const) {
+    const occurrences = state.nameIndex.occurrencesOf(name);
+    assert.equal(occurrences.length, 1);
+    const occurrence = occurrences[0];
+    assert.ok(occurrence);
+    assert.equal(occurrence.isDeclaration, false);
+    assert.equal(state.nameIndex.occurrenceAt(occurrence.startLine, occurrence.startColumn + owner.length + 3)?.name, name);
+    assert.equal(targetOfOccurrence(occurrence, state.names)?.name, owner);
+    assert.equal(provideReferencesForName('file:///test.tmd', owner, state.nameIndex, state.names).length, 2);
+  }
+  assert.ok(output.links.referencedBy('Walker').some((reference) => reference.from === 'walk'));
+  assert.ok(output.links.referencedBy('Cursor').some((reference) => reference.from === 'walk'));
+});

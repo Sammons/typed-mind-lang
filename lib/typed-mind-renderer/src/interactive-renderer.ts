@@ -278,7 +278,13 @@ ${classMethods}
 
       if (entity instanceof FunctionNode || entity instanceof ConstantsNode) {
         for (const call of entity.calls) {
-          const target = entity instanceof ConstantsNode ? names.target(call)?.name : byName.get(call)?.name;
+          // RFC-TM-14 §S2 — call entries resolve through the qualified-name
+          // resolver so `Owner.constructor` and `Owner.method` draw an edge
+          // to the owner, as the Constants arm already did (TM13 F+Q). The
+          // exact-name fallback keeps the legacy link for a declared dotted
+          // entity the resolver rejects (a non-File owner, `invalid-owner`);
+          // the checker reports that document, the graph still draws it.
+          const target = names.target(call)?.name ?? byName.get(call)?.name;
           if (target !== undefined) {
             links.push({ source: entity.name, target, type: 'call' });
           }
