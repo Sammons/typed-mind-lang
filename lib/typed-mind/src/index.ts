@@ -90,6 +90,14 @@ export { type EmitOptions, SyntaxEmitter } from './emitter/syntax-emitter.ts';
 // `LinkReference` for call-site stability.
 export { LinkIndex, type Reference as LinkReference } from './pipeline/link-index.ts';
 export type { ParseOutcome } from './pipeline/parse-outcome.ts';
+export {
+  type ParsedSignature,
+  type ParseSignatureTextOptions,
+  parseSignatureText,
+  type SignatureParameter,
+  type SignatureParseResult,
+  type SignatureTypePosition,
+} from './pipeline/parse-signature-text.ts';
 export { type ParseTypeExprTextOptions, type ParseTypeExprTextResult, parseTypeExprText } from './pipeline/type-expr-from-text.ts';
 // RFC-TM-4 §3 (rfc-tm-4-diamond.md) — the new primary surface (the flip's
 // original new export). This is the only checker/parser entry point left —

@@ -19,7 +19,9 @@ import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
+import { parseSignatureText } from '../pipeline/parse-signature-text.ts';
 import type { CheckContext } from './check-context.ts';
+import { collectSignatureReferences } from './collect-signature-references.ts';
 
 const importsOf = (entity: EntityNode): readonly string[] | undefined => {
   if (entity instanceof FileNode || entity instanceof ClassFileNode) {
@@ -71,6 +73,10 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
       }
     }
     if (entity instanceof FunctionNode) {
+      const signature = parseSignatureText(entity.signature);
+      if (signature.kind === 'parsed') {
+        collectSignatureReferences(signature.signature, referenced);
+      }
       for (const call of entity.calls) {
         referenced.add(call); // the RAW call string, dotted included (validator.ts:262)
       }

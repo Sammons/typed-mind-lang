@@ -312,6 +312,13 @@ const cases: readonly FixtureCase[] = [
   // goldens live in rung-code-outline-cli.test.ts and in each fixture's own
   // module-graph.json and README.md.
   //
+  // RFC-TM-13 B1: signature references close fixture 84 without changing its bytes.
+  {
+    fixture: '84-function-io-generic-orphan',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
   // 86 records `false`: the PIPELINE half is fixed (the emitted field text
   // round-trips, asserted directly in rung-bens-almanac.test.ts), but the
   // tree-sitter grammar is a separate parser with the same blind spot and
