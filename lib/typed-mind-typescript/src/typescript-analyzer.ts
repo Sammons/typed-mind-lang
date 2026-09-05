@@ -1330,7 +1330,8 @@ export class TypeScriptAnalyzer {
   // Constants entity. A `ShorthandPropertyAssignment`
   // (`{ LIMIT }`) resolves through `getShorthandAssignmentValueSymbol`
   // (A-10). Every origin is resolved with `resolveReferenceOriginAtLocation`
-  // at the identifier; classification happens on the SYMBOL, never on the
+  // at the identifier, except a `ShorthandPropertyAssignment`, whose origin
+  // resolves from the value symbol; classification happens on the SYMBOL, never on the
   // spelling, so a parameter or local named after a top-level constant is
   // not a reference to it.
   private collectBodyReferences(body: ts.Node | undefined): readonly ParsedBodyReference[] {
