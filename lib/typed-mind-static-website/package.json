@@ -20,6 +20,6 @@
   "devDependencies": {
     "monaco-editor": "0.44.0",
     "prismjs": "1.30.0",
-    "wrangler": "^4.125.0"
+    "wrangler": "^4.129.0"
   }
 }
