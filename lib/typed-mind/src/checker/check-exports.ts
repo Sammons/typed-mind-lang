@@ -13,6 +13,7 @@
 // guard produced.
 
 import { ClassFileNode } from '../ast/class-file-node.ts';
+import { legacyMethodNames } from '../ast/class-members.ts';
 import { ClassNode } from '../ast/class-node.ts';
 import { DependencyNode } from '../ast/dependency-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
@@ -41,7 +42,7 @@ const exportsOf = (entity: EntityNode): readonly string[] | undefined => {
 
 const methodsOf = (entity: EntityNode): readonly string[] | undefined => {
   if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
-    return entity.methods;
+    return legacyMethodNames(entity);
   }
   return undefined;
 };

@@ -41,7 +41,18 @@ enclosing generic, so an unmatched `>` is ordinary opaque text and the counter
 clamps at zero. After the fix all four probe shapes return an empty remainder
 and one opaque leaf.
 
-## knownGap — the grammar half
+## Fixed by RFC-TM-13 C — the grammar half
+
+The atomic `_opaque_angle_group` scanner now owns `<` on opaque derivations;
+the fallback chunk excludes it. It balances nested groups and quoted payloads
+without exposing their unions to the surrounding field. The original fixture
+checks with zero findings; removing its closing `>` restores a syntax error.
+Fixtures82 and87 share this fix. Structured generic CSTs and outer union and
+description boundaries retain their existing shape.
+
+The following records the historical diagnosis before that fix.
+
+### Historical grammar gap
 
 The emitted `.tmd` is now correct, but `--check` still reports one
 `syntax/error` on the field, because the tree-sitter grammar is a **separate

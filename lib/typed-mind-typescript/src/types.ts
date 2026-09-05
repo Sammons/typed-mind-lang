@@ -29,6 +29,7 @@ export type ReferenceOrigin =
     };
 
 export interface TypeReferenceOccurrence {
+  readonly externalBinding?: { readonly specifier: string; readonly exportName: string };
   readonly writtenName: string;
   readonly source: SourceRange;
   readonly start: number;
@@ -72,6 +73,7 @@ export interface ParsedFunction {
 }
 
 export interface ParsedParameter {
+  readonly isRest?: boolean;
   readonly typeInfo?: ParsedTypeText;
   readonly name: string;
   readonly type: string;
@@ -85,7 +87,19 @@ export interface ParsedFactoryHeritage {
   readonly origin: ReferenceOrigin;
 }
 
+export interface ParsedMixinHeritage {
+  readonly index: number;
+  readonly base: ParsedTypeText;
+}
+export interface ParsedConstructor {
+  readonly signature: string;
+  readonly parameters: readonly ParsedParameter[];
+  readonly isPrivate: boolean;
+  readonly isProtected: boolean;
+}
 export interface ParsedClass {
+  readonly mixinHeritage?: readonly ParsedMixinHeritage[];
+  readonly constructors?: readonly ParsedConstructor[];
   readonly factoryHeritage?: readonly ParsedFactoryHeritage[];
   readonly implementsTypeInfo?: readonly ParsedTypeText[];
   readonly extendsTypeInfo?: readonly ParsedTypeText[];
@@ -176,6 +190,8 @@ export interface ParsedModule {
 }
 
 export interface ParsedImport {
+  /** Checker-proven identities of actual named/default import bindings. */
+  readonly bindings?: readonly { readonly localName: string; readonly exportName: string; readonly origin: ReferenceOrigin }[];
   readonly specifier: string;
   readonly defaultImport: string | undefined;
   readonly namedImports: readonly string[];
@@ -184,6 +200,7 @@ export interface ParsedImport {
 }
 
 export interface ParsedExport {
+  readonly declaration?: DeclarationIdentity;
   readonly name: string;
   readonly isDefault: boolean;
   // X-AN-3: 'namespace-reexport' models `export * from '<source>'` — `name`
@@ -286,10 +303,12 @@ export interface AnalyzerDiagnostic {
     | 'unresolvable-import'
     | 'non-literal-dynamic-import'
     | 'skipped-module'
+    | 'unrepresented-type-source'
     | 'zero-entities'
     | 'recognizer-not-found'
     | 'recognizer-module-standalone-parsed'
-    | 'unresolved-factory-heritage';
+    | 'unresolved-factory-heritage'
+    | 'unsupported-default-export';
   readonly message: string;
   readonly filePath: string | undefined;
   readonly specifier: string | undefined;

@@ -12,6 +12,7 @@ export type {
   ParsedCallReference,
   ParsedClass,
   ParsedConstant,
+  ParsedConstructor,
   ParsedEnum,
   ParsedExport,
   ParsedFactoryHeritage,

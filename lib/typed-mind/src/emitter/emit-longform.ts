@@ -1,3 +1,5 @@
+import { legacyMethodNames } from '../ast/class-members.ts';
+import { printSignature } from './print-signature.ts';
 // RFC-TM-4 §2 (rfc-tm-4-diamond.md) — longform emission, ported from the
 // legacy per-kind longform converters (syntax-generator.ts:733-1011) with the
 // ClassFile keyword-header form as the canonical longform (the RFC: "the
@@ -34,6 +36,7 @@ import type { ProgramNode } from '../ast/program-node.ts';
 import type { RunParameterNode } from '../ast/run-parameter-node.ts';
 import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
+import { genericEmissionDiagnostics, heritageLines, parameterLines, printHeritage } from './generic-declaration-emission.ts';
 import { printTypeExpr } from './print-type-expr.ts';
 import { quoteStringLiteral } from './quote-string-literal.ts';
 
@@ -125,6 +128,7 @@ const fileToLongform = (entity: FileNode): string[] => {
 
 const functionToLongform = (entity: FunctionNode): string[] => {
   const body: string[] = [`type: Function`, `signature: ${entity.signature}`];
+  body.push(...parameterLines(entity));
   if (entity.description !== undefined) {
     body.push(`description: ${quoteStringLiteral(entity.description)}`);
   }
@@ -156,34 +160,34 @@ const functionToLongform = (entity: FunctionNode): string[] => {
 
 const classToLongform = (entity: ClassNode): string[] => {
   const body: string[] = [`type: Class`];
-  if (entity.extends !== undefined) {
-    body.push(`extends: ${entity.extends}`);
-  }
-  if (entity.implements.length > 0) {
-    body.push(`implements: [${entity.implements.join(', ')}]`);
-  }
+  body.push(...parameterLines(entity));
+  body.push(...heritageLines(entity));
   body.push(...descriptionAndPurposeLines(entity.comment, entity.purpose));
-  if (entity.methods.length > 0) {
-    body.push(`methods: [${entity.methods.join(', ')}]`);
+  const legacy = legacyMethodNames(entity);
+  if (legacy.length > 0) body.push(`methods: [${legacy.join(', ')}]`);
+  for (const method of entity.members?.methods ?? []) {
+    if (method.signature !== undefined) body.push(`method: ${quoteStringLiteral(printSignature(method.signature))}`);
   }
+  for (const constructorMember of entity.members?.constructors ?? [])
+    body.push(`constructor: ${quoteStringLiteral(printSignature(constructorMember.signature))}`);
   return [`class ${entity.name} {`, ...indent(body), '}'];
 };
 
 const classFileToLongform = (entity: ClassFileNode): string[] => {
   const body: string[] = [`type: ClassFile`, `path: ${entity.path}`];
-  if (entity.extends !== undefined) {
-    body.push(`extends: ${entity.extends}`);
-  }
-  if (entity.implements.length > 0) {
-    body.push(`implements: [${entity.implements.join(', ')}]`);
-  }
+  body.push(...parameterLines(entity));
+  body.push(...heritageLines(entity));
   body.push(...descriptionAndPurposeLines(entity.comment, entity.purpose));
   if (entity.imports.length > 0) {
     body.push(`imports: [${entity.imports.join(', ')}]`);
   }
-  if (entity.methods.length > 0) {
-    body.push(`methods: [${entity.methods.join(', ')}]`);
+  const legacy = legacyMethodNames(entity);
+  if (legacy.length > 0) body.push(`methods: [${legacy.join(', ')}]`);
+  for (const method of entity.members?.methods ?? []) {
+    if (method.signature !== undefined) body.push(`method: ${quoteStringLiteral(printSignature(method.signature))}`);
   }
+  for (const constructorMember of entity.members?.constructors ?? [])
+    body.push(`constructor: ${quoteStringLiteral(printSignature(constructorMember.signature))}`);
   // The auto-self-export (ClassFileNode constructor) reconstructs itself on
   // re-parse even if omitted; emit the full declared list including it (the
   // constructor's `.includes` guard makes this idempotent, never a duplicate).
@@ -230,6 +234,8 @@ const dtoFieldToLongform = (field: DtoNode['fields'][number]): string[] => {
 
 const dtoToLongform = (entity: DtoNode): string[] => {
   const body: string[] = [`type: DTO`, ...descriptionAndPurposeLines(entity.comment, entity.purpose)];
+  body.push(...parameterLines(entity));
+  body.push(...(entity.extendsReferences ?? []).map((reference) => `extends: ${quoteStringLiteral(printHeritage(reference))}`));
   if (entity.fields.length > 0) {
     const fieldLines = entity.fields.flatMap((field) => dtoFieldToLongform(field));
     body.push('fields: {', ...indent(fieldLines), '}');
@@ -304,6 +310,7 @@ const dependencyToLongform = (entity: DependencyNode): string[] => {
 // without ever printing a redundant `variant: alias` line.
 const typeDefToLongform = (entity: TypeDefNode): string[] => {
   const body: string[] = [];
+  body.push(...parameterLines(entity));
   if (entity.variant === 'enum') {
     body.push('variant: enum');
     body.push(`members: [${(entity.members ?? []).join(', ')}]`);
@@ -349,5 +356,5 @@ export const emitLongform = (entity: EntityNode): string[] => {
 
 // The diagnostic API remains available; escaped output requires no mutation warning.
 export const emitLongformWithDiagnostics = (entity: EntityNode): { lines: string[]; diagnostics: Diagnostic[] } => {
-  return { lines: emitLongform(entity), diagnostics: [] };
+  return { lines: emitLongform(entity), diagnostics: genericEmissionDiagnostics(entity) };
 };

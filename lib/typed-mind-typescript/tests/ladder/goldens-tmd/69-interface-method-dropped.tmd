@@ -8,7 +8,9 @@ program IndexApp {
 IndexFile @ src/index.ts:
   -> [Repository, persist]
 
-Repository <:
-  => [save]
+class Repository {
+  type: Class
+  method: "save(row: string) => void"
+}
 
 persist :: persist(repository: Repository) => void

@@ -16,6 +16,7 @@
 import type { LinkIndex } from '../pipeline/link-index.ts';
 import type { ParseOutcome } from '../pipeline/parse-outcome.ts';
 import { checkAssetProgramRelationships } from './check-assets.ts';
+import { checkClassMembers } from './check-class-members.ts';
 import { CheckContext } from './check-context.ts';
 import { checkCircularDeps, checkCircularUiContainment, checkInheritanceChains } from './check-cycles.ts';
 import { checkDtoFieldTypes } from './check-dto-fields.ts';
@@ -23,6 +24,7 @@ import { checkDuplicateNames } from './check-duplicate-names.ts';
 import { checkEntryPoint } from './check-entry-point.ts';
 import { checkClassAndFunctionExports, checkDuplicateExports, checkUndefinedExports } from './check-exports.ts';
 import { checkFunctionConsumption, checkFunctionDependencies, checkFunctionDtos } from './check-function-graph.ts';
+import { checkGenericDeclarations } from './check-generic-declarations.ts';
 import { checkImports } from './check-imports.ts';
 import { checkMethodCalls } from './check-method-calls.ts';
 import { checkOrphans } from './check-orphans.ts';
@@ -78,6 +80,8 @@ export class AstValidator {
     checkFunctionDtos(context);
     checkFunctionDependencies(context);
     checkDtoFieldTypes(context);
+    checkGenericDeclarations(context);
+    checkClassMembers(context);
     checkUiComponentRelationships(context);
     checkFunctionUiComponentAffects(context);
     checkAssetProgramRelationships(context);

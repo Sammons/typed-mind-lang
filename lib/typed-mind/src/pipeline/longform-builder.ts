@@ -18,6 +18,7 @@
 // imports per the §2.2 F3 ruling, so the property becomes
 // `semantics/illegal-continuation` instead of silent data loss.
 
+import type { ConstructorDeclarationNode, MethodDeclarationNode } from '../ast/class-members.ts';
 import type { Diagnostic } from '../ast/diagnostic.ts';
 import { DtoFieldNode } from '../ast/dto-field-node.ts';
 import type { EntityKind } from '../ast/entity-kind.ts';
@@ -33,6 +34,9 @@ import type { Span } from '../ast/span.ts';
 import { decodeQuotedString } from '../quoted-string.ts';
 import { illegalContinuationDiagnostic } from './attachment-rules.ts';
 import { EntityAccumulator } from './entity-accumulator.ts';
+import { attachHeaderTypeParameters, attachParameterProperties, heritageFromCst } from './generic-declaration-syntax.ts';
+import { parseHeritageText } from './parse-heritage-text.ts';
+import { parseQuotedSignature } from './parse-quoted-signature.ts';
 import { tokenSpanOf } from './spans.ts';
 import { parseTypeExprText } from './type-expr-from-text.ts';
 
@@ -65,6 +69,7 @@ const LONGFORM_KIND_BY_KEYWORD: Record<string, EntityKind> = {
 };
 
 interface ScalarProperty {
+  quoted?: { text: string; span: Span };
   kind: 'scalar';
   key: string;
   value: string;
@@ -190,6 +195,10 @@ const classifyBlockProperty = (property: CstBlockProperty): LongformProperty | u
     return {
       kind: 'scalar',
       key: stringProperty.propertyKeyChildren().at(0)?.text ?? '',
+      quoted: {
+        text: stringProperty.stringChildren().at(0)?.text ?? '""',
+        span: stringProperty.stringChildren().at(0)?.span() ?? span,
+      },
       value: decodeQuotedString(stringProperty.stringChildren().at(0)?.text ?? '""'),
       span,
     };
@@ -479,6 +488,78 @@ const applyProperties = (accumulator: EntityAccumulator, collected: CollectedPro
 const buildResult = (accumulator: EntityAccumulator, collected: CollectedProperties): LongformBuildResult => {
   const diagnostics: Diagnostic[] = [];
   applyProperties(accumulator, collected, diagnostics);
+  for (const property of collected.all) {
+    if (property.key === 'typeParameter' && property.kind !== 'scalar')
+      diagnostics.push({
+        code: 'semantics/invalid-type-parameter',
+        severity: 'error',
+        span: property.span,
+        message: `Invalid type parameter in '${accumulator.name}'; write each parameter in its own quoted property.`,
+      });
+  }
+  diagnostics.push(
+    ...attachParameterProperties(
+      accumulator,
+      collected.all.filter((property): property is ScalarProperty => property.kind === 'scalar' && property.key === 'typeParameter'),
+    ),
+  );
+  const heritageProperties = (key: string) =>
+    collected.all.flatMap((property) => {
+      if (property.key !== key) return [];
+      const values = property.kind === 'scalar' ? [property.value] : property.kind === 'list' ? property.names : [];
+      return values.map((value) =>
+        parseHeritageText(value, { baseLine: property.span.start.line, baseColumn: property.span.start.column }),
+      );
+    });
+  const extendsReferences = heritageProperties('extends');
+  const implementsReferences = heritageProperties('implements');
+  if (accumulator.kind === 'DTO' && extendsReferences.length > 0) accumulator.slots.extendsReferences = extendsReferences;
+  if (accumulator.kind === 'Class' || accumulator.kind === 'ClassFile') {
+    if (extendsReferences.length > 1)
+      diagnostics.push({
+        code: 'semantics/multiple-class-bases',
+        severity: 'error',
+        span: accumulator.span,
+        message: 'A class may extend one base; use implements for additional contracts.',
+      });
+    const existing = accumulator.slots.heritage;
+    accumulator.slots.heritage = {
+      extends: extendsReferences[0] ?? existing?.extends,
+      implements: collected.all.some((property) => property.key === 'implements') ? implementsReferences : (existing?.implements ?? []),
+    };
+  }
+  const memberProperties = collected.all.filter((property) => property.key === 'method' || property.key === 'constructor');
+  if (memberProperties.length > 0) {
+    const methods: MethodDeclarationNode[] = (accumulator.slots.methods ?? []).map((name) => ({
+      name,
+      signature: undefined,
+      span: accumulator.span,
+    }));
+    const constructors: ConstructorDeclarationNode[] = [];
+    for (const property of memberProperties) {
+      if ((accumulator.kind !== 'Class' && accumulator.kind !== 'ClassFile') || property.kind !== 'scalar' || !property.quoted) {
+        diagnostics.push({
+          code: 'semantics/invalid-member-property',
+          severity: 'error',
+          span: property.span,
+          message: `Invalid member property in '${accumulator.name}'; use a quoted method or constructor property on a Class or ClassFile.`,
+        });
+        continue;
+      }
+      const signature = parseQuotedSignature(property.quoted.text, property.quoted.span, property.key === 'constructor');
+      if (property.key === 'constructor') constructors.push({ signature, span: property.span });
+      else
+        methods.push({
+          name:
+            signature.kind === 'parsed' && /^[A-Za-z_]\w*$/.test(signature.signature.displayName ?? '')
+              ? signature.signature.displayName
+              : undefined,
+          signature,
+          span: property.span,
+        });
+    }
+    if (accumulator.kind === 'Class' || accumulator.kind === 'ClassFile') accumulator.slots.classMembers = { methods, constructors };
+  }
   const attachments = collected.all.map((property) => ({
     entityName: accumulator.name,
     group: property.key,
@@ -510,6 +591,7 @@ export const buildFromLongformBlock = (block: CstLongformBlock): LongformBuildRe
     // RFC-TM-4 §2 (rfc-tm-4-diamond.md): a brace-block header is 'longform'.
     sourceForm: 'longform',
   });
+  attachHeaderTypeParameters(accumulator, header.typeParametersChildren().at(0));
   return buildResult(accumulator, collected);
 };
 
@@ -527,16 +609,7 @@ export const buildFromClassfileBlockSigil = (block: CstClassfileBlockSigil): Lon
   });
   // Header parts win their slots first; block properties may override.
   accumulator.slots.path = (block.pathChildren().at(0)?.text ?? '').trim();
-  const inheritNames =
-    block
-      .inheritListChildren()
-      .at(0)
-      ?.entityNameChildren()
-      .map((entityName) => entityName.text) ?? [];
-  const [extendsName, ...implementsList] = inheritNames;
-  if (extendsName !== undefined) {
-    accumulator.slots.extendsName = extendsName;
-    accumulator.slots.implementsList = implementsList;
-  }
+  accumulator.slots.heritage = heritageFromCst(block.inheritListChildren().at(0));
+  attachHeaderTypeParameters(accumulator, block.typeParametersChildren().at(0));
   return buildResult(accumulator, collected);
 };

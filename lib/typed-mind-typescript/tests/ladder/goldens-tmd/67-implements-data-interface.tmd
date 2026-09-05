@@ -8,7 +8,10 @@ program IndexApp {
 IndexFile @ src/index.ts:
   -> [Span, NoopSpan, endSpan]
 
-NoopSpan <: Span
+class NoopSpan {
+  type: Class
+  implements: [Span]
+}
 
 endSpan :: endSpan(span: Span) => void
   <- Span

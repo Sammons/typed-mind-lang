@@ -118,11 +118,15 @@
       }
     },
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
         {
           "type": "block_kw",
+          "named": true
+        },
+        {
+          "type": "type_parameters",
           "named": true
         }
       ]
@@ -228,6 +232,10 @@
         {
           "type": "inline_comment",
           "named": true
+        },
+        {
+          "type": "type_parameters",
+          "named": true
         }
       ]
     }
@@ -250,6 +258,10 @@
         },
         {
           "type": "inline_comment",
+          "named": true
+        },
+        {
+          "type": "type_parameters",
           "named": true
         }
       ]
@@ -282,6 +294,10 @@
         {
           "type": "path",
           "named": true
+        },
+        {
+          "type": "type_parameters",
+          "named": true
         }
       ]
     }
@@ -309,6 +325,10 @@
         {
           "type": "path",
           "named": true
+        },
+        {
+          "type": "type_parameters",
+          "named": true
         }
       ]
     }
@@ -335,6 +355,10 @@
         },
         {
           "type": "path",
+          "named": true
+        },
+        {
+          "type": "type_parameters",
           "named": true
         }
       ]
@@ -725,6 +749,10 @@
         {
           "type": "string",
           "named": true
+        },
+        {
+          "type": "type_parameters",
+          "named": true
         }
       ]
     }
@@ -747,6 +775,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_parameters",
           "named": true
         }
       ]
@@ -1060,6 +1092,10 @@
         {
           "type": "signature",
           "named": true
+        },
+        {
+          "type": "type_parameters",
+          "named": true
         }
       ]
     }
@@ -1083,6 +1119,10 @@
         {
           "type": "signature",
           "named": true
+        },
+        {
+          "type": "type_parameters",
+          "named": true
         }
       ]
     }
@@ -1091,6 +1131,25 @@
     "type": "header_name_rest",
     "named": true,
     "fields": {}
+  },
+  {
+    "type": "heritage_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "type_generic",
+          "named": true
+        },
+        {
+          "type": "type_named",
+          "named": true
+        }
+      ]
+    }
   },
   {
     "type": "import_list",
@@ -1177,7 +1236,7 @@
       "required": true,
       "types": [
         {
-          "type": "entity_name",
+          "type": "heritage_type",
           "named": true
         }
       ]
@@ -2261,6 +2320,26 @@
     }
   },
   {
+    "type": "type_parameter_name",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "type_parameters",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "type_parameter_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "type_postfix",
     "named": true,
     "fields": {},
@@ -2345,6 +2424,10 @@
           "named": true
         },
         {
+          "type": "type_parameters",
+          "named": true
+        },
+        {
           "type": "typedef_enum_variant",
           "named": true
         }
@@ -2369,6 +2452,10 @@
         },
         {
           "type": "type_expr",
+          "named": true
+        },
+        {
+          "type": "type_parameters",
           "named": true
         },
         {
@@ -2509,6 +2596,10 @@
   },
   {
     "type": "<:",
+    "named": false
+  },
+  {
+    "type": "<=",
     "named": false
   },
   {

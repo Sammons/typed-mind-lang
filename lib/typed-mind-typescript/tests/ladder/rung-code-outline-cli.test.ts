@@ -19,7 +19,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, wr
 import { dirname, join } from 'node:path';
 import { before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { TypedMind } from '@sammons/typed-mind';
+import { printTypeParameter, TypeDefNode, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -189,20 +189,28 @@ describe('79 — a function-type alias loses its parameter list and return type'
   // as a parenthesized type GROUP: it returned the inner type and left
   // `) => T` in `remainder`, which every call site discards. The emitted
   // TypeDef was the bare parameter text, spread over the source's own lines.
-  it('keeps the parameter list and the return type in the emitted alias', () => {
+  it('keeps the whole callable alias and its declared generic default', () => {
     const result = convertSimple('79-function-type-alias-remainder');
     assert.equal(result.success, true);
-    assert.match(
-      result.tmdContent,
-      /TreeVisitor = \(node: NodeInfo, depth: number, parent\?: NodeInfo\) => T/,
-      `the whole function type is one opaque leaf. Got:\n${result.tmdContent}`,
-    );
+    const visitor = result.entities.find((entity) => entity.name === 'TreeVisitor');
+    assert.ok(visitor instanceof TypeDefNode);
+    assert.equal(visitor.aliasType?.kind, 'opaque');
+    assert.equal(visitor.aliasType?.kind === 'opaque' && visitor.aliasType.text, '(node: NodeInfo, depth: number, parent?: NodeInfo) => T');
+    assert.deepEqual(visitor.typeParameters?.map(printTypeParameter), ['T = void']);
   });
 
-  it('emits the alias on a single line', () => {
+  it('promotes the defaulted alias to longform while keeping its callable payload on one line', () => {
     const result = convertSimple('79-function-type-alias-remainder');
-    const treeVisitorLines = result.tmdContent.split('\n').filter((line) => line.startsWith('TreeVisitor'));
-    assert.equal(treeVisitorLines.length, 1, 'every text-carrying grammar token in this family excludes newlines');
+    assert.ok(
+      result.tmdContent.includes(
+        [
+          'typedef TreeVisitor {',
+          '  typeParameter: "T = void"',
+          '  type: "(node: NodeInfo, depth: number, parent?: NodeInfo) => T"',
+          '}',
+        ].join('\n'),
+      ),
+    );
     // The three-line source must not leak its own line breaks into the token.
     assert.equal(result.tmdContent.includes('TreeVisitor = node: NodeInfo,'), false);
   });

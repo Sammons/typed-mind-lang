@@ -13,13 +13,23 @@ MixinFile @ src/mixin.ts:
   <- [BaseWidget]
   -> [WithLogging]
 
-BaseWidget #: src/base.ts
-  => [render]
+classfile BaseWidget {
+  type: ClassFile
+  path: src/base.ts
+  method: "render() => string"
+  exports: [BaseWidget]
+}
 
-PlainWidget <: BaseWidget
-  => [describe]
+class PlainWidget {
+  type: Class
+  extends: BaseWidget
+  method: "describe() => string"
+}
 
-LoggedWidget <: BaseWidget
-  => [describe]
+class LoggedWidget {
+  type: Class
+  extends: BaseWidget
+  method: "describe() => string"
+}
 
 WithLogging :: WithLogging(Base: (typeof BaseWidget)) => (typeof BaseWidget)

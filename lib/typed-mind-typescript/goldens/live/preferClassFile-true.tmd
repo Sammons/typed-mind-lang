@@ -9,9 +9,16 @@ IndexFile @ project/src/index.ts:
   <- [UserService]
   -> [main]
 
-UserService #: project/src/services/user-service.ts <: BaseService, IUserService
-  <- [UserDTO, CreateUserDTO]
-  => [createUser, findUser]
+classfile UserService {
+  type: ClassFile
+  path: project/src/services/user-service.ts
+  extends: BaseService
+  implements: [IUserService]
+  imports: [UserDTO, CreateUserDTO]
+  method: "async createUser(data: CreateUserDTO) => Promise<UserDTO>"
+  method: "async findUser(id: string) => Promise<UserDTO | null>"
+  exports: [UserService]
+}
 
 main :: async main() => Promise<void>
 

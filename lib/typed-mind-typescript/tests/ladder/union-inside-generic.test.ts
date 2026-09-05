@@ -1,20 +1,10 @@
-// Adversarial-review regression fixture (PR #115 comment) — issue #114's
-// fix (isUnionOfObjectLiterals) originally tracked bracket depth for
-// `{()[]}` only, not `<>`. A union of object literals NESTED inside a
-// generic (`Record<string, { a: string } | { b: string }>`) has its `|`
-// sitting inside Record's OWN angle brackets, not at the alias's top
-// level — the un-fixed depth tracker misread it as top-level the instant
-// the first `{...}` member closed, misrouting `Shapes` to the TypeDef
-// path and corrupting a PREVIOUSLY-correct emission (confirmed: without
-// tracking `<`/`>`, the emitted text was
-// `Record<string, { a: string } | { b: string }>>` — a doubled trailing
-// `>>` the grammar rejects as unparsable). Fixed by counting `<`/`>`
-// alongside the existing three bracket pairs.
+// RFC-TM-13 EXIT: preserve the complete generic alias now that the grammar
+// handles nested object unions. The historical empty DTO lost these facts.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
+import { FunctionNode, SyntaxEmitter, TypeDefNode, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -30,12 +20,14 @@ const convert = () => {
 };
 
 describe('regression: a union nested inside a generic must not trip isUnionOfObjectLiterals', () => {
-  it('Shapes (Record<string, {a}|{b}>) still converts as a DTO, not a TypeDef', () => {
+  it('Shapes preserves its generic and object-union alias', () => {
     const result = convert();
     assert.equal(result.success, true);
     const shapes = result.entities.find((e) => e.name === 'Shapes');
     assert.notEqual(shapes, undefined, 'Shapes must be extracted as a real entity');
-    assert.equal(shapes?.kind, 'DTO', `expected Shapes to stay a DTO (matching pre-#114-fix behavior), got kind: ${shapes?.kind}`);
+    assert.ok(shapes instanceof TypeDefNode);
+    assert.ok(result.tmdContent.includes('Shapes = Record<string, { a: string } | { b: string }>'));
+    for (const fn of result.entities) if (fn instanceof FunctionNode) assert.equal(fn.input, undefined);
   });
 
   it('the emitted .tmd has no doubled/unbalanced angle bracket and parses cleanly', async () => {

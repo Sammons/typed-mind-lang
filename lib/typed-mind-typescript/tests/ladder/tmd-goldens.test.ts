@@ -188,7 +188,7 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
-  { fixture: '68-generic-type-parameters', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: false },
+  { fixture: '68-generic-type-parameters', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   { fixture: '69-interface-method-dropped', entrySegments: ['src', 'index.ts'], expectConversionSuccess: true, recordedCheckerValid: true },
   // NEW (PR #162 review) — the two edge fixtures for the interface shape
   // rule. 69b pins the heritage walk: a child extending a method-bearing
@@ -208,34 +208,21 @@ const cases: readonly FixtureCase[] = [
     fixture: '69c-interface-unresolved-heritage',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: true,
+    recordedCheckerValid: false,
   },
-  // 69d records `false`, and the `false` is the POINT of the fixture: a
-  // generic heritage target emits its argument list verbatim into `<:`
-  // (`GenericChild <: Repo<Item>`), which shortform cannot parse. Both the
-  // interface lane and the real-class lane do this identically — the fixture
-  // pins them together — and the residual finding is gap 68's (type
-  // parameters are unmodeled), the same adjudication 66b already carries for
-  // `StringBox <: Container<string>`. Stripping the arguments to make this
-  // green is PR #152's original bug, which
-  // slat-harness-mixin-heritage-controls.test.ts exists to prevent.
+  // G.2 parses structured generic heritage; both source lanes now check.
   {
     fixture: '69d-generic-heritage-both-lanes',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
-  // Reconciliation controls for the single mixin-heritage helper (PR #152
-  // + PR #153 merged into `getExtendsTargetName`). 66b records `false`:
-  // its `StringBox extends Container<string>` carries the generic-base
-  // finding of gap 68, which is the PRICE of property 1 being correct —
-  // preserving the type arguments is what the reconciliation restores.
-  // RFC-TM-13 H resolves 66c through the named constructor return identity.
+  // G.2 resolves Container<string> without discarding its arguments.
   {
     fixture: '66b-mixin-heritage-controls',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   {
     fixture: '66c-mixin-no-base-argument',
@@ -314,38 +301,32 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
-  // 86 records `false`: the PIPELINE half is fixed (the emitted field text
-  // round-trips, asserted directly in rung-bens-almanac.test.ts), but the
-  // tree-sitter grammar is a separate parser with the same blind spot and
-  // still reports one `syntax/error` on the spaced `|` inside `<...>`. That
-  // residual is the committed grammar knownGap — see
-  // repros-analyzer/86-fn-type-union-in-generic-return/README.md.
+  // B3 retains constructor and method references; both original false orphans close.
+  {
+    fixture: '85-classfile-method-signature-types',
+    entrySegments: ['src', 'server.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
+  // TM13 C closes the shared grammar gap: both fixtures now check clean.
   {
     fixture: '86-fn-type-union-in-generic-return',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
-  // 87 records `false`: the multi-line field now collapses to one line (the
-  // fix, asserted in the rung test), and the residual findings are the SAME
-  // grammar knownGap as 86 — both surviving fields return a generic over a
-  // union, which the grammar rejects for the reason 86's README records.
   {
     fixture: '87-multiline-dto-field-type',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
-  // 88 records `false`: it is a knownGap fixture. `export default <identifier>`
-  // never reaches the export registry, so the route file's exports go unimported
-  // and the checker reports the orphan. Root cause and the reason it is not
-  // fixed here (two layers plus a missing constant-name reservation pass) are in
-  // repros-analyzer/88-export-assignment-default/README.md.
+  // RFC-TM-13 D/F: canonical default identity and actual initializer call close fixture88.
   {
     fixture: '88-export-assignment-default',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   // 89 records `true`: the barrel no longer double-claims its re-exported
   // names, so the fixture checks clean end to end.

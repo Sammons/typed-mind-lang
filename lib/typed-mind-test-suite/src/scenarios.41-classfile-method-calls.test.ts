@@ -18,7 +18,7 @@ describe('scenario-41-classfile-method-calls', () => {
 
     // Should be invalid due to issues with method calls and entity resolution (based on actual error output)
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 6);
+    assert.equal(result.diagnostics.length, 5);
 
     const diagnosticMessages = result.diagnostics.map((diagnostic) => diagnostic.message);
 

@@ -207,7 +207,7 @@ UserController #: src/controllers/user.ts <: BaseController {
     (entity_name)
     (path)
     (inherit_list
-      (entity_name))))
+      (heritage_type (type_named (entity_name))))))
 
 ============================================================
 H1-H11 single-character name (header_name_rest absent — the name-split's

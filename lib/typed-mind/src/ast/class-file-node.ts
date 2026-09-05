@@ -3,38 +3,50 @@
 // exports. Language-optional: extends, purpose. Auto-self-export replicated
 // from parser.ts:287: construction always includes `name` in `exports`.
 
+import type { ClassMemberArgs, ClassMembers } from './class-members.ts';
 import { EntityNode, type EntityNodeArgs } from './entity-node.ts';
+import { type ClassHeritage, type ClassHeritageArgs, classHeritageFromArgs } from './heritage-reference.ts';
+import type { TypeParameterNode } from './type-parameter-node.ts';
 
 export class ClassFileNode extends EntityNode {
   override readonly kind = 'ClassFile' as const;
   readonly path: string;
   readonly implements: readonly string[];
   readonly methods: readonly string[];
+  readonly members: ClassMembers | undefined;
   readonly imports: readonly string[];
   readonly exports: readonly string[];
   readonly extends: string | undefined;
   readonly purpose: string | undefined;
+  readonly heritage: ClassHeritage;
+  readonly typeParameters: readonly TypeParameterNode[] | undefined;
 
   constructor(
-    args: EntityNodeArgs & {
-      path: string;
-      implements: readonly string[];
-      methods: readonly string[];
-      imports: readonly string[];
-      exports: readonly string[];
-      extends?: string;
-      purpose?: string;
-    },
+    args: EntityNodeArgs &
+      ClassHeritageArgs &
+      ClassMemberArgs & {
+        path: string;
+        imports: readonly string[];
+        exports: readonly string[];
+        purpose?: string;
+        typeParameters?: readonly TypeParameterNode[];
+      },
   ) {
     super(args);
     this.path = args.path;
-    this.implements = args.implements;
-    this.methods = args.methods;
+    this.heritage = classHeritageFromArgs(args, args.span);
+    this.implements = this.heritage.implements.flatMap((reference) => (reference.kind === 'named' ? [reference.base.name] : []));
+    this.members = args.members;
+    this.methods =
+      args.members === undefined
+        ? args.methods
+        : args.members.methods.flatMap((method) => (method.name === undefined ? [] : [method.name]));
     this.imports = args.imports;
     // Fusion auto-self-export (parser.ts:287): the class name is always
     // exported by its own file. Pure expression, assign-only constructor.
     this.exports = args.exports.includes(args.name) ? args.exports : [...args.exports, args.name];
-    this.extends = args.extends;
+    this.extends = this.heritage.extends?.kind === 'named' ? this.heritage.extends.base.name : undefined;
     this.purpose = args.purpose;
+    this.typeParameters = args.typeParameters;
   }
 }

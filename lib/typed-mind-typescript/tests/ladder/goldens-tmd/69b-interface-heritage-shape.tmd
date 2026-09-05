@@ -8,8 +8,10 @@ program IndexApp {
 IndexFile @ src/index.ts:
   -> [HasMethod, ChildOfMethodIface, ChildWithOwnProps, PropertyOnlyParent, ChildOfPropertyOnly, inspect]
 
-HasMethod <:
-  => [doIt]
+class HasMethod {
+  type: Class
+  method: "doIt() => void"
+}
 
 ChildOfMethodIface <: HasMethod
 
@@ -20,5 +22,12 @@ inspect :: inspect(a: ChildOfMethodIface, b: ChildWithOwnProps, c: ChildOfProper
 PropertyOnlyParent %
   - size: number
 
-ChildOfPropertyOnly %
-  - color: string
+dto ChildOfPropertyOnly {
+  type: DTO
+  extends: "PropertyOnlyParent"
+  fields: {
+    color: {
+      type: "string"
+    }
+  }
+}

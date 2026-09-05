@@ -72,7 +72,7 @@ it('TM13 F: unresolved calls and source labels cannot borrow exported function i
 });
 
 it('TM13 F: same-file lexical declarations do not collapse into one callable identity', (context) => {
-  const { converted } = fixture(
+  const { analysis, converted } = fixture(
     context,
     `
     export function helper() { return 'outer'; }
@@ -82,7 +82,15 @@ it('TM13 F: same-file lexical declarations do not collapse into one callable ide
   );
   const app = converted.entities.find((entity) => entity.name === 'app');
   assert.ok(app instanceof ConstantsNode);
-  assert.deepEqual(app.calls, []);
+  assert.equal(converted.entities.filter((entity) => entity.name === 'helper').length, 1);
+  assert.deepEqual(app.calls, ['helper']);
+  const control = new TypeScriptToTypedMindConverter({ preferClassFile: false }).convert({
+    ...analysis,
+    modules: analysis.modules.map((module) => ({ ...module, exports: module.exports.map(({ declaration: _declaration, ...exp }) => exp) })),
+  });
+  const oldApp = control.entities.find((entity) => entity.name === 'app');
+  assert.ok(oldApp instanceof ConstantsNode);
+  assert.deepEqual(oldApp.calls, [], 'without exact public declaration identity the original ambiguity remains');
 });
 
 it('TM13 F: registration callbacks count real helper calls without crediting private constructors', (context) => {

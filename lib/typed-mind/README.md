@@ -86,6 +86,34 @@ every registered code's current message against the guide (100% of the
 registry, checked for completeness via `pnpm run check:diagnostic-code-audit`)
 — grade a new code there when adding one.
 
+## Generic declarations
+
+DTO, alias, Function, Class and ClassFile heads accept names-only parameters,
+including qualified names: `Owner.Pair<T, U> %`, `Owner.Alias<T> = T`, and
+`Owner.Child<T> <: Owner.Base<T>`. Constraints, defaults and `const`/`in`/`out`
+modifiers use repeated quoted longform properties:
+
+```tmd
+dto Owner.Pair {
+  typeParameter: "out T extends Constraint = Default"
+  typeParameter: "U = Map<T, Other>"
+  extends: "Owner.Base<T>"
+}
+```
+
+Class longform accepts a quoted `extends` and repeated quoted `implements`
+properties; DTO inheritance uses repeated `extends`. Formatting promotes to
+longform whenever shortform cannot retain parameters or inheritance roles.
+Inline constrained/defaulted declaration heads are unsupported. Local parameters
+are declaration metadata, never separate global entities.
+
+The shared parameter parser retains raw source for inspection and canonicalizes
+whitespace/comments outside literals for emission. Physical newlines inside
+literal values are unsupported and produce an explicit parse diagnostic.
+`emitWithDiagnostics` also reports invalid programmatically constructed generic
+metadata. The string-only `emit` API keeps its existing behavior; callers using
+it must validate unsupported metadata before emission.
+
 ## Requirements
 
 - Node.js >= 22.0.0

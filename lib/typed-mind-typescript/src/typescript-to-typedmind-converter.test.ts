@@ -395,10 +395,11 @@ describe('TypeScriptToTypedMindConverter', () => {
     assert.ok(!result.tmdContent.includes('# Programs'));
     assert.ok(!result.tmdContent.includes('# ClassFiles'));
     assert.ok(!result.tmdContent.includes('# DTOs'));
-    assert.ok(result.tmdContent.includes('UserService #:'));
+    assert.ok(result.tmdContent.includes('classfile UserService {'));
     assert.ok(result.tmdContent.includes('UserDTO %'));
-    assert.ok(result.tmdContent.includes('=> [createUser, findUser]'));
-    assert.ok(result.tmdContent.indexOf('UserService #:') < result.tmdContent.indexOf('UserDTO %'));
+    assert.ok(result.tmdContent.includes('method: "async createUser(data: CreateUserDTO) => Promise<UserDTO>"'));
+    assert.ok(result.tmdContent.includes('method: "async findUser(id: string) => Promise<UserDTO | null>"'));
+    assert.ok(result.tmdContent.indexOf('classfile UserService {') < result.tmdContent.indexOf('UserDTO %'));
   });
 
   // decision-same-named-entities PR 1 — RE-PINNED. This test previously

@@ -26,9 +26,9 @@
 //     side. Both slots widen because shortform collapses them into one `<:`
 //     list (emit-shortform.ts `inheritanceSuffix`).
 //
-// 68 (generic type parameters) is UNTOUCHED and its pins below still assert
-// the gap is present — it is a separate, unowned root cause (the analyzer
-// never reads `node.typeParameters`).
+// RFC-TM-13 G now closes68 with declared parameters and lexical binding;
+// its controls retain the exact source declarations and remove a binding
+// to restore the original undefined-field diagnostic.
 //
 // The PR #162 review added two more suites, both enforcing the same standard
 // fixture 69's header sets — nothing this converter drops may drop silently:
@@ -45,7 +45,7 @@ import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
+import { ClassNode, DtoNode, printHeritage, SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -128,23 +128,38 @@ describe('slat-harness rung, FIXED GAP 67: a class may implement a data-shaped i
   });
 });
 
-describe('slat-harness rung, KNOWN GAP 68: generic type parameters are unmodeled', () => {
-  it('KNOWN GAP — an interface type parameter leaks as an undefined field type', async () => {
+describe('slat-harness rung, FIXED GAP 68: generic interface and alias parameters bind their fields', () => {
+  it('G.5 retains the interface binding and removing it restores only the undefined field type', async () => {
     const result = convert('68-generic-type-parameters');
-    const diagnostics = await diagnose(result.entities);
-    const finding = diagnostics.find((d) => /DTO 'HalEnvelope' field 'data' references undefined type 'T'/.test(d.message));
-    assert.notEqual(
-      finding,
-      undefined,
-      `the interface generic-parameter gap must still be present; got: ${JSON.stringify(diagnostics.map((d) => d.message))}`,
+    assert.deepEqual(await diagnose(result.entities), []);
+    const envelope = result.entities.find((entity) => entity.name === 'HalEnvelope');
+    assert.ok(envelope instanceof DtoNode);
+    assert.deepEqual(
+      envelope.typeParameters?.map((parameter) => parameter.name),
+      ['T'],
+    );
+    const removed = result.entities.map((entity) =>
+      entity === envelope ? new DtoNode({ ...envelope, typeParameters: undefined }) : entity,
+    );
+    assert.deepEqual(
+      (await diagnose(removed)).map(({ code, message }) => ({ code, message })),
+      [{ code: 'checker/dto-field-unknown-type', message: "DTO 'HalEnvelope' field 'data' references undefined type 'T'" }],
     );
   });
 
-  it('KNOWN GAP — the type-alias spelling leaks the same way (a separate converter path)', async () => {
+  it('G.5 preserves both type-alias bindings without synthesizing global A or B entities', async () => {
     const result = convert('68-generic-type-parameters');
-    const diagnostics = await diagnose(result.entities);
-    const leaked = diagnostics.filter((d) => /DTO 'Pair' field '(left|right)' references undefined type '(A|B)'/.test(d.message));
-    assert.equal(leaked.length, 2, `both type-alias parameters must still leak; got: ${JSON.stringify(diagnostics.map((d) => d.message))}`);
+    const pair = result.entities.find((entity) => entity.name === 'Pair');
+    assert.ok(pair instanceof DtoNode);
+    assert.deepEqual(
+      pair.typeParameters?.map((parameter) => parameter.name),
+      ['A', 'B'],
+    );
+    assert.deepEqual(await diagnose(result.entities), []);
+    assert.equal(
+      result.entities.some((entity) => ['A', 'B'].includes(entity.name)),
+      false,
+    );
   });
 });
 
@@ -165,9 +180,9 @@ describe('slat-harness rung, FIXED GAP 69: a method-bearing interface extracts a
     assert.equal(repository?.extends, undefined);
   });
 
-  it('the emitted .tmd carries the method continuation, so the contract is visible in the DSL', () => {
+  it('the emitted .tmd carries the typed method, so the contract is visible in the DSL', () => {
     const result = convert('69-interface-method-dropped');
-    assert.match(result.tmdContent, /Repository <:\n\s+=> \[save\]/);
+    assert.match(result.tmdContent, /class Repository \{\n {2}type: Class\n {2}method: "save\(row: string\) => void"\n\}/);
   });
 
   it('FIXED — and the fixture still checks clean, now for the right reason', async () => {
@@ -313,6 +328,14 @@ describe('slat-harness rung, 69b: the interface shape decision walks the heritag
 });
 
 describe('slat-harness rung, 69c: an unresolvable parent falls back to own members AND warns', () => {
+  it('G.5 retains the unresolved DTO base and reports exactly its missing declaration', async () => {
+    const result = convert('69c-interface-unresolved-heritage');
+    assert.deepEqual(
+      (await diagnose(result.entities)).map(({ code, message }) => ({ code, message })),
+      [{ code: 'checker/unknown-base-class', message: "DTO 'ExtendsUnknown' extends 'ExternalShape' which does not exist" }],
+    );
+  });
+
   it('the interface still converts, on the own-member rule', () => {
     // Conservative by design: an unresolvable parent must never flip a
     // property-only interface onto the Class lane, because that would strip
@@ -374,58 +397,27 @@ describe('slat-harness rung, 69d: a generic heritage target behaves identically 
     // would fall to the DTO lane and silently drop the contract.
     const result = convert('69d-generic-heritage-both-lanes');
     assert.equal(result.success, true);
-    const child = result.entities.find((e) => e.name === 'GenericChild') as { kind?: string; extends?: string } | undefined;
+    const child = result.entities.find((e) => e.name === 'GenericChild');
+    assert.ok(child instanceof ClassNode && child.heritage.extends !== undefined);
     assert.equal(child?.kind, 'Class', 'a generic method-bearing parent must still make the child Class-like');
-    assert.equal(child?.extends, 'Repo<Item>', 'the emitted target keeps its type arguments verbatim (property 1)');
+    assert.equal(printHeritage(child.heritage.extends), 'Repo<Item>', 'the emitted target keeps its type arguments verbatim (property 1)');
   });
 
   it('the real-class lane emits the SAME shape — the lanes agree, so this is not an interface-lane defect', () => {
     const result = convert('69d-generic-heritage-both-lanes');
-    const derived = result.entities.find((e) => e.name === 'GenericDerived') as { kind?: string; extends?: string } | undefined;
+    const derived = result.entities.find((e) => e.name === 'GenericDerived');
+    assert.ok(derived instanceof ClassNode && derived.heritage.extends !== undefined);
     assert.equal(derived?.kind, 'Class');
-    assert.equal(derived?.extends, 'GenericBase<string>');
+    assert.equal(printHeritage(derived.heritage.extends), 'GenericBase<string>');
   });
 
-  it('KNOWN GAP (68) — in LONGFORM, each lane yields one unknown-base-class finding and nothing else', async () => {
-    // `diagnose` round-trips through longform, which preserves the slot, so
-    // the generic base surfaces as an unresolvable NAME. This is the exact
-    // finding slat-harness-mixin-heritage-controls.test.ts pins for
-    // `StringBox <: Container<string>` on the real-class lane — the same
-    // defect, the same adjudication (gap 68).
+  it('FIXED G.2 — full instantiated heritage checks clean in longform and shortform', async () => {
     const result = convert('69d-generic-heritage-both-lanes');
-    const diagnostics = await diagnose(result.entities);
-    const messages = diagnostics.map((d) => d.message).sort();
-    // Asserting the exact pair (rather than "at least one") is what makes
-    // this fail if either lane is changed in isolation.
-    assert.deepEqual(messages, [
-      "Class 'GenericChild' extends 'Repo<Item>' which does not exist",
-      "Class 'GenericDerived' extends 'GenericBase<string>' which does not exist",
-    ]);
-  });
-
-  it('KNOWN GAP (68) — in SHORTFORM, the same pair surfaces as unparsable text', async () => {
-    // The emitted `.tmd` is shortform, where `<:` takes a bare entity_name,
-    // so the argument list is unparsable rather than merely unresolvable.
-    // Both spellings of the same defect are pinned because a future fix
-    // could plausibly address one and not the other. This is the same
-    // shortform/longform split fixture 67's header documents for its own
-    // extends/implements collapse.
-    const result = convert('69d-generic-heritage-both-lanes');
-    const originalCwd = process.cwd();
-    process.chdir('/');
-    try {
-      const typedMind = await TypedMind.create();
-      const messages = typedMind
-        .check(result.tmdContent)
-        .diagnostics.map((d) => d.message)
-        .sort();
-      assert.deepEqual(messages, [
-        'Unparsable text: `<Item>` — check this line against the grammar and fix or remove it',
-        'Unparsable text: `<string>` — check this line against the grammar and fix or remove it',
-      ]);
-    } finally {
-      process.chdir(originalCwd);
-    }
+    assert.deepEqual(await diagnose(result.entities), []);
+    const mind = await TypedMind.create();
+    assert.deepEqual(mind.check(result.tmdContent).diagnostics, []);
+    assert.match(result.tmdContent, /Repo<Item>/);
+    assert.match(result.tmdContent, /GenericBase<string>/);
   });
 
   it('the generic child still warns about its own dropped property', () => {

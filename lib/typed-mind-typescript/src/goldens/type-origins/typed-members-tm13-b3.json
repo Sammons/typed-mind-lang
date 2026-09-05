@@ -1,0 +1,3 @@
+{
+  "85-classfile-method-signature-types": "program ServerApp {\n  type: Program\n  entry: ServerFile\n  version: 1.0.0\n  exports: [runServer]\n}\n\nServerFile @ src/server.ts:\n  <- [LeaseStore, Lease]\n  -> [runServer]\n\nclassfile LeaseStore {\n  type: ClassFile\n  path: src/store.ts\n  method: \"allocate(worktreePath: string) => Lease | AllocationFailure\"\n  method: \"list() => readonly Lease[]\"\n  constructor: \"(config: StoreConfig, leases?: Lease[])\"\n  exports: [Lease, StoreConfig, AllocationFailure, LeaseStore]\n}\n\nrunServer :: runServer() => readonly Lease[]\n\nLease %\n  - id: string\n  - portBase: number\n\nStoreConfig %\n  - rangeBase: number\n  - rangeCount: number\n\nAllocationFailure %\n  - kind: 'no_capacity'"
+}

@@ -14,8 +14,13 @@
 // SuppressionNode is handled by the caller (it is not an EntityNode, so it
 // never reaches honestFieldsOf) via the sibling honestSuppressionOf export.
 
+import type { ParsedSignature, SignatureParseResult, SignatureTypePosition } from '../ast/callable-signature.ts';
+import { ClassFileNode } from '../ast/class-file-node.ts';
+import { ClassNode } from '../ast/class-node.ts';
+import { parametersOf } from '../ast/declared-type-parameters.ts';
 import { DtoNode } from '../ast/dto-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
+import type { HeritageReference } from '../ast/heritage-reference.ts';
 import type { SuppressionNode } from '../ast/suppression-node.ts';
 import { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
@@ -37,6 +42,10 @@ export const honestTypeExprOf = (typeExpr: TypeExprNode): unknown => {
     const { span: _baseSpan, ...baseRest } = rest.base;
     return { ...rest, base: baseRest, args: rest.args.map(honestTypeExprOf) };
   }
+  if (rest.kind === 'opaque') {
+    const { textOffsets: _textOffsets, ...opaque } = rest;
+    return opaque;
+  }
   return rest;
 };
 
@@ -46,7 +55,30 @@ export const honestTypeExprOf = (typeExpr: TypeExprNode): unknown => {
 // span tree, stripped the same way one level down. TypeDefNode's aliasType
 // carries the identical span tree one level down (X-TYPE-7's alias variant).
 export const honestFieldsOf = (entity: EntityNode): Record<string, unknown> => {
-  const { span: _span, raw: _raw, ...fields } = { ...entity };
+  const { span: _span, raw: _raw, ...baseFields } = { ...entity };
+  const fields: Record<string, unknown> = { ...baseFields };
+  const parameters = parametersOf(entity);
+  if (parameters !== undefined)
+    fields['typeParameters'] = parameters.map(({ span: _parameterSpan, raw: _parameterRaw, constraint, defaultType, ...parameter }) => ({
+      ...parameter,
+      constraint: constraint === undefined ? undefined : honestTypeExprOf(constraint),
+      defaultType: defaultType === undefined ? undefined : honestTypeExprOf(defaultType),
+    }));
+  if (entity instanceof ClassNode || entity instanceof ClassFileNode)
+    fields['heritage'] = {
+      extends: entity.heritage.extends === undefined ? undefined : honestHeritageOf(entity.heritage.extends),
+      implements: entity.heritage.implements.map(honestHeritageOf),
+    };
+  if ((entity instanceof ClassNode || entity instanceof ClassFileNode) && entity.members !== undefined)
+    fields['members'] = {
+      methods: entity.members.methods.map(({ name, signature }) => ({
+        name,
+        signature: signature === undefined ? undefined : honestSignatureOf(signature),
+      })),
+      constructors: entity.members.constructors.map(({ signature }) => ({ signature: honestSignatureOf(signature) })),
+    };
+  if (entity instanceof DtoNode && entity.extendsReferences !== undefined)
+    fields['extendsReferences'] = entity.extendsReferences.map(honestHeritageOf);
   if (entity instanceof DtoNode) {
     return {
       ...fields,
@@ -60,6 +92,37 @@ export const honestFieldsOf = (entity: EntityNode): Record<string, unknown> => {
     return { ...fields, aliasType: honestTypeExprOf(entity.aliasType) };
   }
   return fields;
+};
+
+const honestSignaturePosition = (position: SignatureTypePosition): unknown =>
+  position.kind === 'callable'
+    ? { kind: position.kind, signature: honestParsedSignature(position.signature) }
+    : { kind: position.kind, typeExpr: honestTypeExprOf(position.typeExpr) };
+
+const honestParsedSignature = (signature: ParsedSignature): unknown => ({
+  displayName: signature.displayName,
+  async: signature.async,
+  typeParameterText: signature.typeParameters === undefined ? signature.typeParameterText : undefined,
+  typeParameterNames: signature.typeParameterNames,
+  typeParameters: signature.typeParameters?.map(({ span: _span, raw: _raw, constraint, defaultType, ...parameter }) => ({
+    ...parameter,
+    constraint: constraint === undefined ? undefined : honestTypeExprOf(constraint),
+    defaultType: defaultType === undefined ? undefined : honestTypeExprOf(defaultType),
+  })),
+  parameters: signature.parameters.map(({ span: _span, type, ...parameter }) => ({
+    ...parameter,
+    type: type === undefined ? undefined : honestSignaturePosition(type),
+  })),
+  returnType: signature.returnType === undefined ? undefined : honestSignaturePosition(signature.returnType),
+});
+const honestSignatureOf = (signature: SignatureParseResult): unknown =>
+  signature.kind === 'opaque'
+    ? { kind: signature.kind, text: signature.text, reason: signature.reason }
+    : { kind: signature.kind, signature: honestParsedSignature(signature.signature) };
+
+const honestHeritageOf = (reference: HeritageReference): unknown => {
+  if (reference.kind === 'opaque') return { kind: reference.kind, text: reference.text };
+  return { kind: reference.kind, base: honestTypeExprOf(reference.base), args: reference.args.map(honestTypeExprOf) };
 };
 
 // SuppressionNode is document-level, not an EntityNode (ast/suppression-node.ts's

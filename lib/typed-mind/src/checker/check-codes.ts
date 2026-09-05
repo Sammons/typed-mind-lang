@@ -36,6 +36,9 @@ export const CHECK_CODES = [
   // check-assets.ts
   'checker/asset-contains-non-program',
   'checker/asset-program-unknown',
+  'checker/invalid-member-signature',
+  'checker/unsupported-member-signature',
+  'semantics/invalid-member-property',
   // check-cycles.ts
   'checker/circular-containment',
   'checker/circular-import',
@@ -115,6 +118,20 @@ export const CHECK_CODES = [
   // pipeline/attachment-rules.ts
   'semantics/illegal-continuation',
   'semantics/orphan-continuation',
+  // Generic declaration header/property validation.
+  'checker/conflicting-signature-type-parameters',
+  'checker/duplicate-type-parameter',
+  'checker/invalid-type-parameter-modifiers',
+  'checker/generic-arity',
+  'checker/generic-unknown-type',
+  'checker/generic-non-data-type',
+  'checker/unsupported-generic-type',
+  'checker/unsupported-heritage',
+  'checker/type-parameter-heritage-base',
+  'semantics/conflicting-type-parameters',
+  'semantics/invalid-type-parameter',
+  'semantics/multiple-class-bases',
+  'semantics/unsupported-generic-declaration',
   // pipeline/syntax-diagnostics.ts
   'syntax/error',
   'syntax/missing',

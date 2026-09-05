@@ -75,14 +75,14 @@ export const VALID_REFERENCES: Record<ReferenceKind, ReferenceLegality> = {
   // would leave fixture 67 failing in shortform while passing in longform —
   // the exact split the fixture's own header documents.
   //
-  // What stays enforced: the `from` side is untouched (only a Class or
-  // ClassFile can declare inheritance), the target must still EXIST
+  // RFC-TM-13 G adds DTO extends declarations; implements remains class-only.
+  // What stays enforced: the target must still EXIST
   // (`unknown-base-class` in check-cycles.ts), and inheritance cycles are
   // still rejected. Widening the `to` side does not open Function, File,
   // Program, or any other kind — only the second of the two kinds a
   // TypeScript interface legitimately converts to.
   extends: {
-    from: ['Class', 'ClassFile'],
+    from: ['Class', 'ClassFile', 'DTO'],
     to: ['Class', 'ClassFile', 'DTO'],
   },
   implements: {

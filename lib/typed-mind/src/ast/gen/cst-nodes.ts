@@ -1,16 +1,16 @@
 // GENERATED FILE — DO NOT EDIT.
 // Emitted by lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs (RFC-TM-3 §2.1)
-// from lib/typed-mind/grammar/src/node-types.json: 123 named nodes,
-// 31 `_final` twins → 92 wrapper classes (one per logical production).
+// from lib/typed-mind/grammar/src/node-types.json: 126 named nodes,
+// 31 `_final` twins → 95 wrapper classes (one per logical production).
 // Regenerate: node lib/typed-mind/grammar/codegen/generate-cst-nodes.mjs
 // CI diff-gates this file via scripts/check-generated.mjs step 2b.
 
 import type { Node as SyntaxNode } from 'web-tree-sitter';
 import type { Span } from '../span.ts';
 
-export const CST_NAMED_NODE_TYPE_COUNT = 123;
+export const CST_NAMED_NODE_TYPE_COUNT = 126;
 export const CST_FINAL_TWIN_COUNT = 31;
-export const CST_LOGICAL_CLASS_COUNT = 92;
+export const CST_LOGICAL_CLASS_COUNT = 95;
 
 const spanOf = (syntaxNode: SyntaxNode): Span => ({
   start: { line: syntaxNode.startPosition.row + 1, column: syntaxNode.startPosition.column + 1 },
@@ -126,6 +126,9 @@ export class CstBlockHeader extends CstNode {
   blockKwChildren(): CstBlockKw[] {
     return this.childrenOfTypes(['block_kw'], CstBlockKw);
   }
+  typeParametersChildren(): CstTypeParameters[] {
+    return this.childrenOfTypes(['type_parameters'], CstTypeParameters);
+  }
   headerName(): string {
     const nameField = this.nameField();
     if (nameField instanceof CstHeaderQuotedName) {
@@ -219,6 +222,9 @@ export class CstClassDeclaration extends CstNode {
   inlineCommentChildren(): CstInlineComment[] {
     return this.childrenOfTypes(['inline_comment'], CstInlineComment);
   }
+  typeParametersChildren(): CstTypeParameters[] {
+    return this.childrenOfTypes(['type_parameters'], CstTypeParameters);
+  }
 }
 
 export class CstClassfileBlockSigil extends CstNode {
@@ -241,6 +247,9 @@ export class CstClassfileBlockSigil extends CstNode {
   pathChildren(): CstPath[] {
     return this.childrenOfTypes(['path'], CstPath);
   }
+  typeParametersChildren(): CstTypeParameters[] {
+    return this.childrenOfTypes(['type_parameters'], CstTypeParameters);
+  }
 }
 
 export class CstClassfileDeclaration extends CstNode {
@@ -259,6 +268,9 @@ export class CstClassfileDeclaration extends CstNode {
   }
   pathChildren(): CstPath[] {
     return this.childrenOfTypes(['path'], CstPath);
+  }
+  typeParametersChildren(): CstTypeParameters[] {
+    return this.childrenOfTypes(['type_parameters'], CstTypeParameters);
   }
 }
 
@@ -415,6 +427,9 @@ export class CstDtoDeclaration extends CstNode {
   }
   stringChildren(): CstString[] {
     return this.childrenOfTypes(['string'], CstString);
+  }
+  typeParametersChildren(): CstTypeParameters[] {
+    return this.childrenOfTypes(['type_parameters'], CstTypeParameters);
   }
 }
 
@@ -585,6 +600,9 @@ export class CstFunctionDeclaration extends CstNode {
   signatureChildren(): CstSignature[] {
     return this.childrenOfTypes(['signature'], CstSignature);
   }
+  typeParametersChildren(): CstTypeParameters[] {
+    return this.childrenOfTypes(['type_parameters'], CstTypeParameters);
+  }
 }
 
 export class CstHeaderNameRest extends CstNode {
@@ -598,6 +616,19 @@ export class CstHeaderQuotedName extends CstNode {
   static readonly nodeTypes: readonly string[] = ['header_quoted_name'];
   constructor(syntaxNode: SyntaxNode) {
     super(syntaxNode, CstHeaderQuotedName.nodeTypes);
+  }
+}
+
+export class CstHeritageType extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['heritage_type'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstHeritageType.nodeTypes);
+  }
+  typeGenericChildren(): CstTypeGeneric[] {
+    return this.childrenOfTypes(['type_generic'], CstTypeGeneric);
+  }
+  typeNamedChildren(): CstTypeNamed[] {
+    return this.childrenOfTypes(['type_named'], CstTypeNamed);
   }
 }
 
@@ -639,8 +670,8 @@ export class CstInheritList extends CstNode {
   constructor(syntaxNode: SyntaxNode) {
     super(syntaxNode, CstInheritList.nodeTypes);
   }
-  entityNameChildren(): CstEntityName[] {
-    return this.childrenOfTypes(['entity_name'], CstEntityName);
+  heritageTypeChildren(): CstHeritageType[] {
+    return this.childrenOfTypes(['heritage_type'], CstHeritageType);
   }
 }
 
@@ -1299,6 +1330,23 @@ export class CstTypeOpaque extends CstNode {
   }
 }
 
+export class CstTypeParameterName extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_parameter_name'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeParameterName.nodeTypes);
+  }
+}
+
+export class CstTypeParameters extends CstNode {
+  static readonly nodeTypes: readonly string[] = ['type_parameters'];
+  constructor(syntaxNode: SyntaxNode) {
+    super(syntaxNode, CstTypeParameters.nodeTypes);
+  }
+  typeParameterNameChildren(): CstTypeParameterName[] {
+    return this.childrenOfTypes(['type_parameter_name'], CstTypeParameterName);
+  }
+}
+
 export class CstTypePostfix extends CstNode {
   static readonly nodeTypes: readonly string[] = ['type_postfix'];
   constructor(syntaxNode: SyntaxNode) {
@@ -1358,6 +1406,9 @@ export class CstTypedefDeclaration extends CstNode {
   }
   typeExprChildren(): CstTypeExpr[] {
     return this.childrenOfTypes(['type_expr'], CstTypeExpr);
+  }
+  typeParametersChildren(): CstTypeParameters[] {
+    return this.childrenOfTypes(['type_parameters'], CstTypeParameters);
   }
   typedefEnumVariantChildren(): CstTypedefEnumVariant[] {
     return this.childrenOfTypes(['typedef_enum_variant'], CstTypedefEnumVariant);
@@ -1440,6 +1491,7 @@ export type CstNamedNode =
   | CstFunctionDeclaration
   | CstHeaderNameRest
   | CstHeaderQuotedName
+  | CstHeritageType
   | CstImportHead
   | CstImportList
   | CstImportStatement
@@ -1486,6 +1538,8 @@ export type CstNamedNode =
   | CstTypeLiteralString
   | CstTypeNamed
   | CstTypeOpaque
+  | CstTypeParameterName
+  | CstTypeParameters
   | CstTypePostfix
   | CstTypeReadonlyArray
   | CstTypeUnion
@@ -1559,6 +1613,7 @@ export const cstNodeClassByType: ReadonlyMap<string, new (syntaxNode: SyntaxNode
   ['function_declaration_final', CstFunctionDeclaration],
   ['header_name_rest', CstHeaderNameRest],
   ['header_quoted_name', CstHeaderQuotedName],
+  ['heritage_type', CstHeritageType],
   ['import_head', CstImportHead],
   ['import_list', CstImportList],
   ['import_list_final', CstImportList],
@@ -1614,6 +1669,8 @@ export const cstNodeClassByType: ReadonlyMap<string, new (syntaxNode: SyntaxNode
   ['type_literal_string', CstTypeLiteralString],
   ['type_named', CstTypeNamed],
   ['type_opaque', CstTypeOpaque],
+  ['type_parameter_name', CstTypeParameterName],
+  ['type_parameters', CstTypeParameters],
   ['type_postfix', CstTypePostfix],
   ['type_readonly_array', CstTypeReadonlyArray],
   ['type_union', CstTypeUnion],

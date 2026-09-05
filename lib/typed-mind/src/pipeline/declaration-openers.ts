@@ -15,7 +15,6 @@ import {
   CstDtoDeclaration,
   CstFileDeclaration,
   CstFunctionDeclaration,
-  type CstInheritList,
   CstProgramDeclaration,
   CstRunparameterDeclaration,
   CstTypedefDeclaration,
@@ -23,6 +22,7 @@ import {
 } from '../ast/gen/cst-nodes.ts';
 import { decodeQuotedString } from '../quoted-string.ts';
 import { EntityAccumulator, type EntityAccumulatorArgs } from './entity-accumulator.ts';
+import { attachHeaderTypeParameters, heritageFromCst } from './generic-declaration-syntax.ts';
 import { tokenSpanOf } from './spans.ts';
 import { typeExprFromCst } from './type-expr-from-cst.ts';
 
@@ -86,14 +86,6 @@ export const fileDeclarationOpensClassFile = (sourceLines: readonly string[], de
   return false;
 };
 
-const inheritanceOf = (inheritList: CstInheritList | undefined): { extendsName?: string; implementsList: string[] } => {
-  // Legacy split: first entry is the base class, the rest are interfaces
-  // (parser.ts:266-277, 296-307).
-  const names = inheritList === undefined ? [] : inheritList.entityNameChildren().map((entityName) => entityName.text);
-  const [extendsName, ...implementsList] = names;
-  return extendsName === undefined ? { implementsList: [] } : { extendsName, implementsList };
-};
-
 export const openProgram = (syntaxNode: SyntaxNode): EntityAccumulator => {
   const declaration = new CstProgramDeclaration(syntaxNode);
   const names = declaration.entityNameChildren();
@@ -132,6 +124,7 @@ export const openFunction = (syntaxNode: SyntaxNode): EntityAccumulator => {
     baseArgs('Function', declaration.entityNameChildren().at(0)?.text ?? '', syntaxNode, inlineCommentTextOf(declaration)),
   );
   accumulator.slots.signature = (declaration.signatureChildren().at(0)?.text ?? '').trim();
+  attachHeaderTypeParameters(accumulator, declaration.typeParametersChildren().at(0));
   return accumulator;
 };
 
@@ -140,11 +133,8 @@ export const openClass = (syntaxNode: SyntaxNode): EntityAccumulator => {
   const accumulator = new EntityAccumulator(
     baseArgs('Class', declaration.entityNameChildren().at(0)?.text ?? '', syntaxNode, inlineCommentTextOf(declaration)),
   );
-  const inheritance = inheritanceOf(declaration.inheritListChildren().at(0));
-  if (inheritance.extendsName !== undefined) {
-    accumulator.slots.extendsName = inheritance.extendsName;
-  }
-  accumulator.slots.implementsList = inheritance.implementsList;
+  accumulator.slots.heritage = heritageFromCst(declaration.inheritListChildren().at(0));
+  attachHeaderTypeParameters(accumulator, declaration.typeParametersChildren().at(0));
   return accumulator;
 };
 
@@ -154,11 +144,8 @@ export const openClassFile = (syntaxNode: SyntaxNode): EntityAccumulator => {
     baseArgs('ClassFile', declaration.entityNameChildren().at(0)?.text ?? '', syntaxNode, inlineCommentTextOf(declaration)),
   );
   accumulator.slots.path = (declaration.pathChildren().at(0)?.text ?? '').trim();
-  const inheritance = inheritanceOf(declaration.inheritListChildren().at(0));
-  if (inheritance.extendsName !== undefined) {
-    accumulator.slots.extendsName = inheritance.extendsName;
-  }
-  accumulator.slots.implementsList = inheritance.implementsList;
+  accumulator.slots.heritage = heritageFromCst(declaration.inheritListChildren().at(0));
+  attachHeaderTypeParameters(accumulator, declaration.typeParametersChildren().at(0));
   return accumulator;
 };
 
@@ -183,6 +170,7 @@ export const openDto = (syntaxNode: SyntaxNode): EntityAccumulator => {
   if (purposeText !== undefined) {
     accumulator.slots.purpose = decodeQuotedString(purposeText);
   }
+  attachHeaderTypeParameters(accumulator, declaration.typeParametersChildren().at(0));
   return accumulator;
 };
 
@@ -259,11 +247,13 @@ export const openTypeDef = (syntaxNode: SyntaxNode): EntityAccumulator => {
   if (enumVariant !== undefined) {
     accumulator.slots.typeDefVariant = 'enum';
     accumulator.slots.members = enumVariant.listEntryChildren().map((entry) => entry.text);
+    attachHeaderTypeParameters(accumulator, declaration.typeParametersChildren().at(0));
     return accumulator;
   }
   accumulator.slots.typeDefVariant = 'alias';
   const typeExprCst = declaration.typeExprChildren().at(0);
   accumulator.slots.aliasType =
     typeExprCst === undefined ? { kind: 'opaque', text: '', span: accumulator.span } : typeExprFromCst(typeExprCst);
+  attachHeaderTypeParameters(accumulator, declaration.typeParametersChildren().at(0));
   return accumulator;
 };

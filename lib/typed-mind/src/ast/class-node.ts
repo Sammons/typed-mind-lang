@@ -7,20 +7,34 @@
 // enumerated for TM-4's S-TEST-1 amendments). ClassNode carries NO
 // declaredImports field — that is the F3 disposition, not an omission.
 
+import type { ClassMemberArgs, ClassMembers } from './class-members.ts';
 import { EntityNode, type EntityNodeArgs } from './entity-node.ts';
+import { type ClassHeritage, type ClassHeritageArgs, classHeritageFromArgs } from './heritage-reference.ts';
+import type { TypeParameterNode } from './type-parameter-node.ts';
 
 export class ClassNode extends EntityNode {
   override readonly kind = 'Class' as const;
   readonly implements: readonly string[];
   readonly methods: readonly string[];
+  readonly members: ClassMembers | undefined;
   readonly extends: string | undefined;
   readonly purpose: string | undefined;
+  readonly heritage: ClassHeritage;
+  readonly typeParameters: readonly TypeParameterNode[] | undefined;
 
-  constructor(args: EntityNodeArgs & { implements: readonly string[]; methods: readonly string[]; extends?: string; purpose?: string }) {
+  constructor(
+    args: EntityNodeArgs & ClassHeritageArgs & ClassMemberArgs & { purpose?: string; typeParameters?: readonly TypeParameterNode[] },
+  ) {
     super(args);
-    this.implements = args.implements;
-    this.methods = args.methods;
-    this.extends = args.extends;
+    this.heritage = classHeritageFromArgs(args, args.span);
+    this.implements = this.heritage.implements.flatMap((reference) => (reference.kind === 'named' ? [reference.base.name] : []));
+    this.members = args.members;
+    this.methods =
+      args.members === undefined
+        ? args.methods
+        : args.members.methods.flatMap((method) => (method.name === undefined ? [] : [method.name]));
+    this.extends = this.heritage.extends?.kind === 'named' ? this.heritage.extends.base.name : undefined;
     this.purpose = args.purpose;
+    this.typeParameters = args.typeParameters;
   }
 }

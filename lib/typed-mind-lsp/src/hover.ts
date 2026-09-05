@@ -22,6 +22,9 @@ import {
   FunctionNode,
   type LinkIndex,
   ProgramNode,
+  printHeritage,
+  printSignature,
+  printTypeParameter,
   RunParameterNode,
   TypeDefNode,
   UiComponentNode,
@@ -61,6 +64,16 @@ const renderReferencedBy = (entity: EntityNode, links: LinkIndex): string | unde
 
 const renderCommon = (entity: EntityNode): string[] => {
   const lines: string[] = [`**${entity.kind}**: ${entity.name}`];
+  if (
+    entity instanceof ClassNode ||
+    entity instanceof ClassFileNode ||
+    entity instanceof DtoNode ||
+    entity instanceof FunctionNode ||
+    entity instanceof TypeDefNode
+  ) {
+    const parameters = listSection('Type parameters', entity.typeParameters?.map(printTypeParameter));
+    if (parameters !== undefined) lines.push(parameters);
+  }
   if (entity.comment !== undefined && entity.comment.length > 0) {
     lines.push(`💬 *${entity.comment}*`);
   }
@@ -100,9 +113,17 @@ const renderFunction = (entity: FunctionNode): string[] => {
 const renderClass = (entity: ClassNode): string[] => {
   return [
     section('Purpose', entity.purpose),
-    section('Extends', entity.extends),
-    listSection('Implements', entity.implements),
-    listSection('Methods', entity.methods),
+    section('Extends', entity.heritage.extends === undefined ? undefined : printHeritage(entity.heritage.extends)),
+    listSection('Implements', entity.heritage.implements.map(printHeritage)),
+    listSection(
+      'Methods',
+      entity.members?.methods.map((member) => (member.signature === undefined ? (member.name ?? '') : printSignature(member.signature))) ??
+        entity.methods,
+    ),
+    listSection(
+      'Constructors',
+      entity.members?.constructors.map((member) => printSignature(member.signature)),
+    ),
   ].filter((line): line is string => line !== undefined);
 };
 
@@ -114,9 +135,17 @@ const renderClassFile = (entity: ClassFileNode): string[] => {
   return [
     section('Path', entity.path),
     section('Purpose', entity.purpose),
-    section('Extends', entity.extends),
-    listSection('Implements', entity.implements),
-    listSection('Methods', entity.methods),
+    section('Extends', entity.heritage.extends === undefined ? undefined : printHeritage(entity.heritage.extends)),
+    listSection('Implements', entity.heritage.implements.map(printHeritage)),
+    listSection(
+      'Methods',
+      entity.members?.methods.map((member) => (member.signature === undefined ? (member.name ?? '') : printSignature(member.signature))) ??
+        entity.methods,
+    ),
+    listSection(
+      'Constructors',
+      entity.members?.constructors.map((member) => printSignature(member.signature)),
+    ),
     listSection('Imports', entity.imports),
     listSection('Exports', entity.exports),
   ].filter((line): line is string => line !== undefined);
@@ -133,6 +162,8 @@ const renderConstants = (entity: ConstantsNode): string[] => {
 
 const renderDto = (entity: DtoNode): string[] => {
   const lines: string[] = [];
+  const inheritance = listSection('Extends', entity.extendsReferences?.map(printHeritage));
+  if (inheritance !== undefined) lines.push(inheritance);
   const purpose = section('Purpose', entity.purpose);
   if (purpose !== undefined) {
     lines.push(purpose);

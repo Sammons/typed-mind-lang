@@ -87,15 +87,7 @@ describe('mixin heritage reconciliation, property 2: the base is searched for am
   });
 
   it('the two mixin classes emit no diagnostic of their own', async () => {
-    // Scoped deliberately to the mixin classes rather than asserting a
-    // globally-clean fixture. `StringBox extends Container<string>` DOES
-    // carry one finding — `checker/unknown-base-class`, because a generic
-    // base name is unresolvable while type parameters stay unmodeled
-    // (gap 68, pinned in slat-harness-known-gaps.test.ts). That finding is
-    // the price of property 1 being correct: dropping the type arguments
-    // would silence it by discarding real information, which is exactly
-    // the blocker this reconciliation fixes. Asserting zero diagnostics
-    // here would therefore pressure a future author to reintroduce the bug.
+    // G.2 resolves the independent generic base while retaining its arguments.
     const result = convert('66b-mixin-heritage-controls');
     assert.equal(result.success, true);
     const diagnostics = await diagnose(result.entities);
@@ -104,22 +96,13 @@ describe('mixin heritage reconciliation, property 2: the base is searched for am
     assert.deepEqual(mixinFindings, [], `the mixin-resolved classes must be clean: ${JSON.stringify(mixinFindings.map((d) => d.message))}`);
 
     const unrelated = diagnostics.filter((d) => !/'StringBox'/.test(d.message));
-    assert.deepEqual(
-      unrelated,
-      [],
-      `the only expected finding is StringBox's generic-base gap: ${JSON.stringify(unrelated.map((d) => d.message))}`,
-    );
+    assert.deepEqual(unrelated, [], `no unrelated findings should appear: ${JSON.stringify(unrelated.map((d) => d.message))}`);
   });
 
-  it('the generic-base finding on StringBox is gap 68, not a heritage-helper defect', async () => {
+  it('FIXED G.2 — the generic base resolves with its arguments intact', async () => {
     const result = convert('66b-mixin-heritage-controls');
-    const diagnostics = await diagnose(result.entities);
-    const finding = diagnostics.find((d) => /Class 'StringBox' extends 'Container<string>' which does not exist/.test(d.message));
-    assert.notEqual(
-      finding,
-      undefined,
-      `the generic base must still be recorded verbatim (property 1) even though the checker cannot resolve it; got: ${JSON.stringify(diagnostics.map((d) => d.message))}`,
-    );
+    assert.deepEqual(await diagnose(result.entities), []);
+    assert.match(result.tmdContent, /Container<string>/);
   });
 });
 
@@ -136,7 +119,7 @@ describe('mixin heritage reconciliation, property 3: named factory-return identi
   it('emits the actual Widget base and the original fixture checks clean', async () => {
     const result = convert('66c-mixin-no-base-argument');
     assert.equal(result.success, true);
-    assert.match(result.tmdContent, /SelfMadeWidget <: Widget/);
+    assert.match(result.tmdContent, /class SelfMadeWidget \{\n {2}type: Class\n {2}extends: Widget\n {2}method: "label\(\) => string"/);
     assert.deepEqual(await diagnose(result.entities), []);
   });
 });

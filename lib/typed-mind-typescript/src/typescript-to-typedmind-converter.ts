@@ -2,8 +2,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   ClassFileNode,
+  type ClassMemberArgs,
   ClassNode,
   ConstantsNode,
+  canonicalizeTypeText,
   DependencyNode,
   DtoFieldNode,
   DtoNode,
@@ -12,15 +14,21 @@ import {
   FileNode,
   FunctionNode,
   ProgramNode,
+  parseSignatureText,
   parseTypeExprText,
   type Span,
   SuppressionNode,
   SyntaxEmitter,
   TypeDefNode,
   type TypeExprNode,
+  type TypeParameterNode,
 } from '@sammons/typed-mind';
+import { convertSourceHeritage, convertSourceTypeParameters, type GenericMetadataContext } from './convert-generic-metadata.ts';
 import { EmittedNameAllocator } from './emitted-name-allocator.ts';
-import { mapStructuralSegments, stripComments } from './type-text-segments.ts';
+import { getModuleTypeInfos } from './parsed-type-slots.ts';
+import { rewriteParsedTypeSlots } from './rewrite-parsed-type-slots.ts';
+import { rewriteTypeReferences, type TypeReferenceRewriteResult } from './type-reference-rewrite.ts';
+import { mapStructuralSegments, segmentTypeText, stripComments } from './type-text-segments.ts';
 import type {
   ConversionError,
   ConversionOptions,
@@ -28,13 +36,19 @@ import type {
   ConversionWarning,
   DeclarationIdentity,
   ParsedClass,
+  ParsedConstructor,
   ParsedExport,
   ParsedFunction,
   ParsedImport,
   ParsedInterface,
+  ParsedMethod,
   ParsedModule,
+  ParsedParameter,
+  ParsedTypeParameter,
+  ParsedTypeText,
   SstHandlerReference,
   SuppressionReason,
+  TypeReferenceOccurrence,
   TypeScriptProjectAnalysis,
 } from './types.ts';
 import { createEntityName } from './types.ts';
@@ -207,7 +221,26 @@ const normalizeUnionAliasText = (type: string): string => {
 // `synthesizeInlineDTO` (below) instead of the exclusion — the same
 // "detect the special shape ahead of the general classifier" pattern
 // `isDTOLikeType`'s own `"`-prefix / `{`-prefix branches already use.
-const isInlineObjectLiteralType = (type: string): boolean => type.trim().startsWith('{') && type.trim().endsWith('}');
+const isInlineObjectLiteralType = (type: string): boolean => {
+  const text = stripComments(type).trim();
+  if (!text.startsWith('{') || !text.endsWith('}')) return false;
+  let depth = 0;
+  let offset = 0;
+  for (const segment of segmentTypeText(text)) {
+    if (!segment.isLiteral) {
+      for (let index = 0; index < segment.text.length; index += 1) {
+        const char = segment.text[index];
+        if (char === '{') depth += 1;
+        else if (char === '}') {
+          depth -= 1;
+          if (depth < 0 || (depth === 0 && offset + index !== text.length - 1)) return false;
+        }
+      }
+    }
+    offset += segment.text.length;
+  }
+  return depth === 0;
+};
 
 // Fixture 74 (itp-maker `functions/procore-worker.ts:149-165`) — issue
 // #72's `isInlineObjectLiteralType` requires the trimmed text to BOTH
@@ -269,6 +302,7 @@ interface ExportRegistry {
   [moduleSpecifier: string]: {
     defaultExport?: string;
     namedExports: Set<string>;
+    localDeclarations: Map<string, DeclarationIdentity>;
     // The subset of `namedExports` that this module RE-exports from a sibling
     // (`export { a } from './other.ts'`) rather than declaring itself. Kept as
     // a parallel set because `namedExports` holds bare strings with no
@@ -299,7 +333,17 @@ interface EntityRegistry {
   files: Map<string, EntityInfo>;
 }
 
+interface OriginConversionContext {
+  readonly entitiesByName: ReadonlyMap<string, EntityNode>;
+  readonly replacementNames: ReadonlyMap<TypeReferenceOccurrence, string>;
+  readonly resolvedNames: ReadonlySet<string>;
+  readonly sourceModules: ReadonlyMap<string, ParsedModule>;
+  readonly bindings: readonly { specifier: string; exportName: string }[];
+}
+
 export class TypeScriptToTypedMindConverter {
+  private originContext: OriginConversionContext | undefined;
+
   // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — the shared SyntaxEmitter replaces the
   // converter's now-deleted private TMD-content emitter.
   private readonly emitter = new SyntaxEmitter();
@@ -316,6 +360,7 @@ export class TypeScriptToTypedMindConverter {
   private synthesizedNameSequence = 0;
   private readonly sourceDeclarationIdentities = new Map<string, DeclarationIdentity[]>();
   private readonly sourceDeclarationsWithoutIdentity = new Set<string>();
+  private readonly referencedPrivateTypes = new Set<string>();
   // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) — a
   // top-level function that collided on its bare name and was renamed to
   // `<FileEntity>.<name>` by `convertFunction`. `convertExports` consults
@@ -662,7 +707,156 @@ export class TypeScriptToTypedMindConverter {
   }
 
   convert(analysis: TypeScriptProjectAnalysis): ConversionResult {
+    const planning = this.convertOnce(analysis);
+    const entitiesByName = new Map<string, EntityNode>();
+    const ambiguousNames = new Set<string>();
+    for (const entity of planning.entities) {
+      if (entitiesByName.has(entity.name)) ambiguousNames.add(entity.name);
+      entitiesByName.set(entity.name, entity);
+    }
+    for (const name of ambiguousNames) entitiesByName.delete(name);
+    const chosen = new Map<string, EntityKind>();
+    const replacementNames = new Map<TypeReferenceOccurrence, string>();
+    const bindings = new Map<string, { specifier: string; exportName: string }>();
+    const warnings: ConversionWarning[] = [];
+    const warn = (message: string, filePath: string | undefined): void => {
+      if (!warnings.some((warning) => warning.message === message && warning.filePath === filePath))
+        warnings.push({ message, filePath, suggestion: undefined });
+    };
+    const entityFor = (identity: DeclarationIdentity | undefined): EntityNode | undefined => {
+      if (identity === undefined) return undefined;
+      const name = this.getAssignedDeclarationName(identity);
+      return name === undefined ? undefined : entitiesByName.get(name);
+    };
+    const replace = (reference: TypeReferenceOccurrence): string | undefined => {
+      if (reference.origin.kind === 'project') {
+        const target = entityFor(reference.origin.declaration);
+        if (target !== undefined) {
+          chosen.set(target.name, target.kind);
+          replacementNames.set(reference, target.name);
+          return target.name;
+        }
+        warn(
+          `Type reference '${reference.writtenName}' has no uniquely emitted declaration; retaining source text`,
+          reference.source.filePath,
+        );
+      } else if (reference.origin.kind === 'external-package') {
+        const binding = reference.externalBinding;
+        if (binding === undefined) {
+          warn(
+            `External type reference '${reference.writtenName}' has no proven public import binding; retaining source text`,
+            reference.source.filePath,
+          );
+          return undefined;
+        }
+        const dependencyName = this.createDependencyName(binding.specifier);
+        const dependency = entitiesByName.get(dependencyName);
+        if (!(dependency instanceof DependencyNode)) {
+          warn(
+            `External type reference '${reference.writtenName}' has no uniquely emitted dependency; retaining source text`,
+            reference.source.filePath,
+          );
+          return undefined;
+        }
+        chosen.set(dependencyName, 'Dependency');
+        bindings.set(JSON.stringify([binding.specifier, binding.exportName]), binding);
+        const name = `${dependencyName}.${binding.exportName}`;
+        replacementNames.set(reference, name);
+        return name;
+      }
+      return undefined;
+    };
+    const state = { changed: false };
+    const modules = rewriteParsedTypeSlots(
+      analysis.modules,
+      (identity) => {
+        const entity = entityFor(identity);
+        if (entity !== undefined) {
+          chosen.set(entity.name, entity.kind);
+          return true;
+        }
+        return false;
+      },
+      (info, fallback) => {
+        if (info === undefined) return fallback;
+        const result = rewriteTypeReferences(info, replace);
+        for (const reference of result.unsupported)
+          warn(
+            `Type reference '${reference.writtenName}' is inside unsupported syntax; retaining that source text`,
+            reference.source.filePath,
+          );
+        if (result.text === info.text) return fallback;
+        state.changed = true;
+        return result.text;
+      },
+    );
+    if (!state.changed) return { ...planning, warnings: [...planning.warnings, ...warnings] };
+    const finalConverter = new TypeScriptToTypedMindConverter(this.options);
+    const result = finalConverter.convertOnce(
+      { ...analysis, modules },
+      {
+        entitiesByName,
+        replacementNames,
+        resolvedNames: new Set(replacementNames.values()),
+        sourceModules: new Map(analysis.modules.map((module) => [module.filePath, module])),
+        bindings: [...bindings.values()],
+      },
+    );
+    const unstable = [...chosen].some(([name, kind]) => {
+      const emitted = result.entities.filter((entity) => entity.name === name);
+      return emitted.length !== 1 || emitted[0]?.kind !== kind;
+    });
+    if (unstable)
+      return {
+        ...planning,
+        warnings: [
+          ...planning.warnings,
+          ...warnings,
+          {
+            message: 'Type-reference rewriting changed an allocated identity or entity kind; retaining the complete planning result',
+            filePath: undefined,
+            suggestion: undefined,
+          },
+        ],
+      };
+    return { ...result, warnings: [...result.warnings, ...warnings] };
+  }
+
+  private rewriteTypeSlot(info: ParsedTypeText): TypeReferenceRewriteResult {
+    return rewriteTypeReferences(info, (reference) => this.originContext?.replacementNames.get(reference));
+  }
+
+  private genericMetadataContext(filePath?: string): GenericMetadataContext {
+    return { rewrite: (info) => this.rewriteTypeSlot(info).text, error: (message) => this.addError(message, filePath) };
+  }
+
+  private convertClassHeritage(cls: ParsedClass, filePath?: string) {
+    const context = this.genericMetadataContext(filePath);
+    const extendsReferences = cls.extends.map((target, index) => {
+      const selected = cls.mixinHeritage?.find((entry) => entry.index === index)?.base;
+      const reference = convertSourceHeritage(target, selected ?? cls.extendsTypeInfo?.[index], context);
+      if (reference.kind !== 'named') return reference;
+      const stub = this.ensureBuiltinExtendsStub(reference.base.name);
+      return stub === undefined ? reference : { ...reference, base: { ...reference.base, name: stub } };
+    });
+    const implementsReferences = cls.implements.map((target, index) => {
+      const reference = convertSourceHeritage(target, cls.implementsTypeInfo?.[index], context);
+      if (reference.kind !== 'named' || !reference.base.name.includes('.') || this.originContext?.resolvedNames.has(reference.base.name))
+        return reference;
+      return { ...reference, base: { ...reference.base, name: this.ensureNamespaceImplementsStub(reference.base.name) } };
+    });
+    return { extends: extendsReferences[0], implements: [...extendsReferences.slice(1), ...implementsReferences] };
+  }
+
+  private sourceHeritageBase(target: string | undefined): string | undefined {
+    if (target === undefined) return undefined;
+    const reference = convertSourceHeritage(target, undefined, this.genericMetadataContext());
+    return reference.kind === 'named' ? reference.base.name : undefined;
+  }
+
+  private convertOnce(analysis: TypeScriptProjectAnalysis, originContext?: OriginConversionContext): ConversionResult {
     this.reset();
+    this.originContext = originContext;
     // X-CONV-3 — every relativization this conversion performs targets the
     // analysis's own project root, not this process's cwd.
     this.projectRoot = analysis.projectRoot;
@@ -697,6 +891,7 @@ export class TypeScriptToTypedMindConverter {
       // Convert TypeScript constructs to TypedMind entities
       this.convertModules(filteredModules);
       this.foldFactoryHeritage(filteredModules);
+      this.foldProjectImportBindings(filteredModules);
 
       // SST-referenced-module orphan flags (lead-authorized amendment,
       // half 1 of 2 — see `foldSstHandlerImportsIntoSourceFiles`'s own doc
@@ -910,6 +1105,7 @@ export class TypeScriptToTypedMindConverter {
     this.nameAllocator.clear();
     this.sourceDeclarationIdentities.clear();
     this.sourceDeclarationsWithoutIdentity.clear();
+    this.referencedPrivateTypes.clear();
     this.fusedModulePaths.clear();
     this.synthesizedNameSequence = 0;
     this.functionNameRemap.clear();
@@ -1065,6 +1261,141 @@ export class TypeScriptToTypedMindConverter {
     return /[.*+?^${}()|[\]\\]/.test(char) ? `\\${char}` : char;
   }
 
+  private declarationKey(identity: DeclarationIdentity): string {
+    return JSON.stringify([identity.filePath, identity.name, identity.start, identity.end]);
+  }
+
+  private isReferencedPrivateType(identity: DeclarationIdentity | undefined): boolean {
+    return identity !== undefined && this.referencedPrivateTypes.has(this.declarationKey(identity));
+  }
+
+  // Retain only exact type declarations reached from surfaces already emitted.
+  // This selects declarations, never manufactures a source import or export.
+  private retainReferencedPrivateTypes(modules: readonly ParsedModule[]): void {
+    const candidates = new Map<string, ParsedModule[]>();
+    const pending: TypeReferenceOccurrence[] = [];
+    const enqueue = (module: ParsedModule): void => {
+      const visible = (member: { readonly isPrivate: boolean }): boolean => this.options.includePrivateMembers || !member.isPrivate;
+      const emittedSurfaces = {
+        ...module,
+        classes: module.classes.map((cls) => ({
+          ...cls,
+          properties: [],
+          methods: cls.methods.filter(visible),
+          constructors: cls.constructors?.filter(visible),
+        })),
+        interfaces: module.interfaces.map((iface) =>
+          this.isPredictedClassInterface(iface.name) ? { ...iface, properties: [], methods: iface.methods.filter(visible) } : iface,
+        ),
+      };
+      pending.push(...getModuleTypeInfos(emittedSurfaces).flatMap((info) => info.references));
+    };
+    for (const module of modules) {
+      const empty = { ...module, classes: [], interfaces: [], types: [], enums: [], functions: [], constants: [] };
+      for (const bucket of ['interfaces', 'types', 'enums'] as const) {
+        for (const declaration of module[bucket] ?? []) {
+          if (declaration.declaration === undefined) continue;
+          const key = this.declarationKey(declaration.declaration);
+          const group = candidates.get(key) ?? [];
+          group.push({ ...empty, [bucket]: [declaration] });
+          candidates.set(key, group);
+        }
+      }
+      enqueue({
+        ...module,
+        interfaces: module.interfaces.filter((item) => this.shouldEmitInterface(item, module)),
+        types: module.types.filter((item) => this.shouldEmitTypeAlias(item, module)),
+        enums: (module.enums ?? []).filter((item) => this.shouldEmitEnum(item, module)),
+        functions: module.functions.filter((item) => this.isFunctionExported(item, module)),
+        constants: module.constants.filter((item) => this.isConstantExported(item, module)),
+      });
+    }
+    for (let index = 0; index < pending.length; index += 1) {
+      const reference = pending[index];
+      if (reference?.origin.kind !== 'project') continue;
+      const key = this.declarationKey(reference.origin.declaration);
+      if (this.referencedPrivateTypes.has(key)) continue;
+      const group = candidates.get(key);
+      if (group?.length !== 1 || group[0] === undefined) continue;
+      this.referencedPrivateTypes.add(key);
+      enqueue(group[0]);
+    }
+  }
+
+  // The analyzer may resolve a package spelling into first-party source.
+  // Reconcile its import bindings only after actual emitted identities exist.
+  private foldProjectImportBindings(modules: readonly ParsedModule[]): void {
+    const actualByName = new Map<string, EntityNode[]>();
+    for (const entity of this.entities) {
+      const group = actualByName.get(entity.name) ?? [];
+      group.push(entity);
+      actualByName.set(entity.name, group);
+    }
+    const publicTargets = new Map<string, EntityNode>();
+    for (const module of modules) {
+      for (const exp of module.exports) {
+        const identity = exp.declaration;
+        if (identity === undefined) continue;
+        const name = this.getAssignedDeclarationName(identity);
+        const emitted = name === undefined ? undefined : actualByName.get(name);
+        if (emitted?.length !== 1 || emitted[0] === undefined) continue;
+        // The exact retained identity selects the name; a second conversion
+        // must also agree with the planning entity kind, as type rewrites do.
+        const planned = name === undefined ? undefined : this.originContext?.entitiesByName.get(name);
+        if (planned !== undefined && planned.kind !== emitted[0].kind) continue;
+        publicTargets.set(this.declarationKey(identity), emitted[0]);
+      }
+    }
+    const targetFor = (binding: NonNullable<ParsedImport['bindings']>[number]): EntityNode | undefined =>
+      binding.origin.kind === 'project' ? publicTargets.get(this.declarationKey(binding.origin.declaration)) : undefined;
+    const groups = new Map<string, { specifier: string; member: string; proven: boolean }>();
+    for (const module of modules) {
+      const sourceName = this.fileEntityNameByModulePath.get(module.filePath);
+      const source = sourceName === undefined ? undefined : actualByName.get(sourceName);
+      const hasUniqueOwner = source?.length === 1 && (source[0] instanceof FileNode || source[0] instanceof ClassFileNode);
+      const imports: string[] = [];
+      // A named export-from depends on its actual source declaration, even
+      // when its public spelling is an alias. Keep that spelling in reExports;
+      // importing the proven target does not claim a second local export.
+      if (hasUniqueOwner) {
+        for (const exp of module.exports) {
+          if (exp.source === undefined || exp.declaration === undefined || exp.name === exp.declaration.name) continue;
+          const target = publicTargets.get(this.declarationKey(exp.declaration));
+          if (target !== undefined && ['Function', 'Class', 'ClassFile', 'DTO', 'Constants', 'File'].includes(target.kind))
+            imports.push(target.name);
+        }
+      }
+      for (const imp of module.imports) {
+        if (!this.isExternalPackage(imp.specifier)) continue;
+        for (const member of [...imp.namedImports, ...(imp.defaultImport === undefined ? [] : ['default'])]) {
+          const matching = imp.bindings?.filter((binding) => binding.exportName === member);
+          const targets = matching?.map(targetFor);
+          const proven = targets !== undefined && targets.length > 0 && targets.every((target) => target !== undefined);
+          const key = JSON.stringify([imp.specifier, member]);
+          const previous = groups.get(key);
+          groups.set(key, { specifier: imp.specifier, member, proven: proven && (previous?.proven ?? true) });
+          if (hasUniqueOwner && proven) {
+            for (const target of targets ?? []) {
+              if (target !== undefined && ['Function', 'Class', 'ClassFile', 'DTO', 'Constants', 'File'].includes(target.kind))
+                imports.push(target.name);
+            }
+          }
+        }
+      }
+      if (hasUniqueOwner && sourceName !== undefined) this.foldImportNamesIntoFileEntity(sourceName, imports);
+    }
+    for (const { specifier, member, proven } of groups.values()) {
+      if (!proven || this.originContext?.bindings.some((binding) => binding.specifier === specifier && binding.exportName === member))
+        continue;
+      const dependency = this.dependencies.get(specifier);
+      if (dependency === undefined || !dependency.exports?.includes(member)) continue;
+      const replacement = new DependencyNode({ ...dependency, exports: dependency.exports.filter((name) => name !== member) });
+      this.dependencies.set(specifier, replacement);
+      const index = this.entities.indexOf(dependency);
+      if (index !== -1) this.entities[index] = replacement;
+    }
+  }
+
   private convertModules(modules: ParsedModule[]): void {
     // PHASE 1: Collection and Export Registration
 
@@ -1075,7 +1406,7 @@ export class TypeScriptToTypedMindConverter {
 
     // 1.3: Collect all entities information without processing imports
     for (const module of modules) {
-      this.collectModuleEntities(module);
+      this.collectModuleEntities(this.originContext?.sourceModules.get(module.filePath) ?? module);
     }
 
     // 1.4 (gap 69/67): resolve every interface's shape over its heritage
@@ -1084,8 +1415,19 @@ export class TypeScriptToTypedMindConverter {
     // later) and before any Phase-2 conversion reads the prediction.
     this.predictInterfaceKinds();
 
+    this.retainReferencedPrivateTypes(modules);
     this.reserveEntityNames(modules);
     for (const module of modules) this.extractDependencies(module);
+    for (const binding of this.originContext?.bindings ?? []) {
+      this.createDependencyEntity(binding.specifier);
+      const dependency = this.dependencies.get(binding.specifier);
+      if (dependency !== undefined && !dependency.exports?.includes(binding.exportName)) {
+        this.dependencies.set(
+          binding.specifier,
+          new DependencyNode({ ...dependency, exports: [...(dependency.exports ?? []), binding.exportName] }),
+        );
+      }
+    }
 
     // PHASE 2: Processing with Complete Knowledge
 
@@ -1148,7 +1490,7 @@ export class TypeScriptToTypedMindConverter {
           cls.declaration !== undefined &&
           name !== undefined &&
           isUnique(name) &&
-          module.exports.some((exp) => exp.name === cls.name) &&
+          module.exports.some((exp) => this.exportMatchesDeclaration(exp, cls)) &&
           byName.get(name) instanceof ClassNode
         ) {
           targets.set(key(cls.declaration), name);
@@ -1224,12 +1566,16 @@ export class TypeScriptToTypedMindConverter {
   private registerModuleExports(module: ParsedModule): void {
     const moduleExports = {
       namedExports: new Set<string>(),
+      localDeclarations: new Map<string, DeclarationIdentity>(),
       reExportedNames: new Set<string>(),
       filePath: module.filePath,
     } as ExportRegistry[string];
 
     // Register all exports from this module
     for (const exp of module.exports) {
+      if (exp.source === undefined && exp.declaration !== undefined) {
+        moduleExports.localDeclarations.set(exp.name, exp.declaration);
+      }
       if (exp.isDefault) {
         moduleExports.defaultExport = exp.name;
       } else {
@@ -1399,7 +1745,7 @@ export class TypeScriptToTypedMindConverter {
         name: cls.name,
         type: 'class',
         sourceFile,
-        exported: module.exports.some((exp) => exp.name === cls.name),
+        exported: module.exports.some((exp) => this.exportMatchesDeclaration(exp, cls)),
       };
       this.entityRegistry.classes.set(TypeScriptToTypedMindConverter.registryKey(sourceFile, cls.name), entityInfo);
       this.registryBareNames.classes.add(cls.name);
@@ -1627,7 +1973,7 @@ export class TypeScriptToTypedMindConverter {
   private convertTypesAndConstants(module: ParsedModule): void {
     // Convert all type aliases FIRST (they become TypeDef/DTO entities with their exact names)
     for (const typeAlias of module.types) {
-      if (this.isTypeAliasExported(typeAlias, module)) {
+      if (this.shouldEmitTypeAlias(typeAlias, module)) {
         this.convertTypeAliasToDTO(typeAlias, module);
       }
     }
@@ -1635,14 +1981,14 @@ export class TypeScriptToTypedMindConverter {
     // X-AN-7/X-CONV-2 — enums emit as TM-8's TypeDef entity kind (variant:
     // 'enum'), the same lane as type aliases, not the Constants lane.
     for (const enumDef of module.enums ?? []) {
-      if (this.isEnumExported(enumDef, module)) {
+      if (this.shouldEmitEnum(enumDef, module)) {
         this.convertEnumToTypeDef(enumDef, module);
       }
     }
 
     // Then convert interfaces to DTOs
     for (const iface of module.interfaces) {
-      if (this.isInterfaceExported(iface, module)) {
+      if (this.shouldEmitInterface(iface, module)) {
         this.convertInterface(iface, module);
       }
     }
@@ -1655,19 +2001,26 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
-  private isInterfaceExported(iface: { name: string }, module: ParsedModule): boolean {
-    return module.exports.some((exp) => exp.name === iface.name && exp.type === 'interface');
+  private shouldEmitInterface(iface: { name: string; declaration?: DeclarationIdentity }, module: ParsedModule): boolean {
+    return (
+      module.exports.some((exp) => exp.name === iface.name && exp.type === 'interface') || this.isReferencedPrivateType(iface.declaration)
+    );
   }
 
-  private isTypeAliasExported(typeAlias: { name: string }, module: ParsedModule): boolean {
-    return module.exports.some((exp) => exp.name === typeAlias.name && exp.type === 'type');
+  private shouldEmitTypeAlias(typeAlias: { name: string; declaration?: DeclarationIdentity }, module: ParsedModule): boolean {
+    return (
+      module.exports.some((exp) => exp.name === typeAlias.name && exp.type === 'type') ||
+      this.isReferencedPrivateType(typeAlias.declaration)
+    );
   }
 
   // X-AN-7 registers a real enum's export as `type: 'type'` (typescript-
   // analyzer.ts), matching the type-alias export lane — see that change's
   // comment for why 'type' rather than 'constant'.
-  private isEnumExported(enumDef: { name: string }, module: ParsedModule): boolean {
-    return module.exports.some((exp) => exp.name === enumDef.name && exp.type === 'type');
+  private shouldEmitEnum(enumDef: { name: string; declaration?: DeclarationIdentity }, module: ParsedModule): boolean {
+    return (
+      module.exports.some((exp) => exp.name === enumDef.name && exp.type === 'type') || this.isReferencedPrivateType(enumDef.declaration)
+    );
   }
 
   // X-CONV-5 — a class extending a global ambient builtin (`class
@@ -1750,6 +2103,7 @@ export class TypeScriptToTypedMindConverter {
   // Preserve the existing ambient heritage representation until A2 supplies
   // proven origins; reserve the generated class identity before emission.
   private ensureNamespaceImplementsStub(target: string): string {
+    if (this.originContext?.resolvedNames.has(target)) return target;
     const entityName = this.nameAllocator.reserve(`namespace-heritage:${target}`, [this.sanitizeEntityName(target)]);
 
     if (!this.namespaceImplementsStubNames.has(entityName)) {
@@ -1784,18 +2138,12 @@ export class TypeScriptToTypedMindConverter {
   // rewritten to follow a collision rename (PR 2's job). Warn once per
   // heritage target that names a renamed entity.
   private warnOnCollidedHeritageReferences(cls: ParsedClass, entityName: string, filePath: string): void {
-    for (const target of cls.extends) {
-      this.warnOnCollidedTypeReference(target, `extends target of class '${entityName}'`, filePath);
+    for (const [index, target] of cls.extends.entries()) {
+      this.warnOnCollidedTypeReference(target, `extends target of class '${entityName}'`, filePath, cls.extendsTypeInfo?.[index]);
     }
-    for (const target of cls.implements) {
-      this.warnOnCollidedTypeReference(target, `implements target of class '${entityName}'`, filePath);
+    for (const [index, target] of cls.implements.entries()) {
+      this.warnOnCollidedTypeReference(target, `implements target of class '${entityName}'`, filePath, cls.implementsTypeInfo?.[index]);
     }
-  }
-
-  private convertImplementsList(secondaryExtends: readonly string[], implementsTargets: readonly string[]): string[] {
-    return [...secondaryExtends, ...implementsTargets].map((target) =>
-      target.includes('.') ? this.ensureNamespaceImplementsStub(target) : target,
-    );
   }
 
   // Collects the namespace-implements stub names newly needed by a module's
@@ -1808,8 +2156,9 @@ export class TypeScriptToTypedMindConverter {
     const stubNames: string[] = [];
     for (const cls of classes) {
       for (const target of cls.implements) {
-        if (target.includes('.')) {
-          stubNames.push(this.ensureNamespaceImplementsStub(target));
+        const base = this.sourceHeritageBase(target);
+        if (base?.includes('.') && !this.originContext?.resolvedNames.has(base)) {
+          stubNames.push(this.ensureNamespaceImplementsStub(base));
         }
       }
     }
@@ -1828,7 +2177,7 @@ export class TypeScriptToTypedMindConverter {
   private collectBuiltinExtendsStubImports(classes: readonly ParsedClass[]): string[] {
     const stubNames: string[] = [];
     for (const cls of classes) {
-      const stubName = this.ensureBuiltinExtendsStub(cls.extends[0]);
+      const stubName = this.ensureBuiltinExtendsStub(this.sourceHeritageBase(cls.extends[0]));
       if (stubName !== undefined) {
         stubNames.push(stubName);
       }
@@ -1872,7 +2221,7 @@ export class TypeScriptToTypedMindConverter {
     // reference edge (extends is never counted as one). This ClassFile is
     // the only entity in this module with an honest claim to the ambient
     // global its source references, so it both imports and exports it.
-    const primaryStubName = this.ensureBuiltinExtendsStub(primaryClass.extends[0]);
+    const primaryStubName = this.ensureBuiltinExtendsStub(this.sourceHeritageBase(primaryClass.extends[0]));
     const otherStubNames = this.collectBuiltinExtendsStubImports(module.classes.filter((cls) => cls !== primaryClass));
     // D-LEG-3 — namespace-qualified `implements` targets (`ts.Foo`) get the
     // same stub-import-folding treatment as builtin-extends targets: a stub
@@ -1911,9 +2260,9 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} #: ${this.getRelativePath(module.filePath)}`,
       sourceForm: 'shortform',
       path: this.getRelativePath(module.filePath),
-      extends: primaryStubName ?? (primaryClass.extends[0] || undefined), // TypedMind supports single inheritance
-      implements: this.convertImplementsList(primaryClass.extends.slice(1), primaryClass.implements),
-      methods: this.convertMethods(primaryClass),
+      heritage: this.convertClassHeritage(primaryClass, module.filePath),
+      typeParameters: convertSourceTypeParameters(primaryClass.typeParameters, this.genericMetadataContext(module.filePath)),
+      ...this.convertMembers(primaryClass, module.filePath),
       imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
       exports: [...this.convertExports(module, entityName).exportNames, ...this.claimStubExportNames(stubNames)],
       purpose: primaryClass.description ? collapseDescription(primaryClass.description) : undefined,
@@ -1937,21 +2286,21 @@ export class TypeScriptToTypedMindConverter {
 
     // Convert interfaces as DTOs
     for (const iface of module.interfaces) {
-      if (this.isInterfaceExported(iface, module)) {
+      if (this.shouldEmitInterface(iface, module)) {
         this.convertInterface(iface, module);
       }
     }
 
     // Convert all type aliases (both object-like and union types)
     for (const typeAlias of module.types) {
-      if (this.isTypeAliasExported(typeAlias, module)) {
+      if (this.shouldEmitTypeAlias(typeAlias, module)) {
         this.convertTypeAliasToDTO(typeAlias, module);
       }
     }
 
     // X-AN-7/X-CONV-2 — enums emit as TM-8's TypeDef entity kind.
     for (const enumDef of module.enums ?? []) {
-      if (this.isEnumExported(enumDef, module)) {
+      if (this.shouldEmitEnum(enumDef, module)) {
         this.convertEnumToTypeDef(enumDef, module);
       }
     }
@@ -2029,21 +2378,21 @@ export class TypeScriptToTypedMindConverter {
     }
 
     for (const iface of module.interfaces) {
-      if (this.isInterfaceExported(iface, module)) {
+      if (this.shouldEmitInterface(iface, module)) {
         this.convertInterface(iface, module);
       }
     }
 
     // Convert all type aliases (both object-like and union types)
     for (const typeAlias of module.types) {
-      if (this.isTypeAliasExported(typeAlias, module)) {
+      if (this.shouldEmitTypeAlias(typeAlias, module)) {
         this.convertTypeAliasToDTO(typeAlias, module);
       }
     }
 
     // X-AN-7/X-CONV-2 — enums emit as TM-8's TypeDef entity kind.
     for (const enumDef of module.enums ?? []) {
-      if (this.isEnumExported(enumDef, module)) {
+      if (this.shouldEmitEnum(enumDef, module)) {
         this.convertEnumToTypeDef(enumDef, module);
       }
     }
@@ -2103,9 +2452,41 @@ export class TypeScriptToTypedMindConverter {
         const index = this.entities.findIndex((entity) => entity.name === name);
         const entity = this.entities[index];
         if (entity instanceof ClassFileNode) {
-          this.entities[index] = new ClassFileNode({ ...entity, extends: target });
+          this.entities[index] = new ClassFileNode({
+            ...entity,
+            ...(entity.members === undefined
+              ? { members: undefined, methods: entity.methods }
+              : { members: entity.members, methods: undefined }),
+            extends: undefined,
+            implements: undefined,
+            heritage: {
+              ...entity.heritage,
+              extends: {
+                kind: 'named',
+                base: { kind: 'named', name: target, span: entity.span },
+                args: entity.heritage.extends?.kind === 'named' ? entity.heritage.extends.args : [],
+                span: entity.span,
+              },
+            },
+          });
         } else if (entity instanceof ClassNode) {
-          this.entities[index] = new ClassNode({ ...entity, extends: target });
+          this.entities[index] = new ClassNode({
+            ...entity,
+            ...(entity.members === undefined
+              ? { members: undefined, methods: entity.methods }
+              : { members: entity.members, methods: undefined }),
+            extends: undefined,
+            implements: undefined,
+            heritage: {
+              ...entity.heritage,
+              extends: {
+                kind: 'named',
+                base: { kind: 'named', name: target, span: entity.span },
+                args: entity.heritage.extends?.kind === 'named' ? entity.heritage.extends.args : [],
+                span: entity.span,
+              },
+            },
+          });
         }
       }
     }
@@ -2128,9 +2509,9 @@ export class TypeScriptToTypedMindConverter {
       span: SYNTHETIC_SPAN,
       raw: `${entityName} <: ${cls.extends.join(', ')}`,
       sourceForm: 'shortform',
-      extends: this.ensureBuiltinExtendsStub(cls.extends[0]) ?? (cls.extends[0] || undefined), // TypedMind supports single inheritance
-      implements: this.convertImplementsList(cls.extends.slice(1), cls.implements),
-      methods: this.convertMethods(cls),
+      heritage: this.convertClassHeritage(cls, module?.filePath),
+      typeParameters: convertSourceTypeParameters(cls.typeParameters, this.genericMetadataContext(module?.filePath)),
+      ...this.convertMembers(cls, module?.filePath),
       purpose: cls.description ? collapseDescription(cls.description) : undefined,
     });
 
@@ -2180,9 +2561,9 @@ export class TypeScriptToTypedMindConverter {
     };
     for (const module of orderedModules) {
       for (const cls of module.classes) add(module, cls, false);
-      for (const iface of module.interfaces) if (this.isInterfaceExported(iface, module)) add(module, iface, false);
-      for (const type of module.types) if (this.isTypeAliasExported(type, module)) add(module, type, false);
-      for (const item of module.enums ?? []) if (this.isEnumExported(item, module)) add(module, item, false);
+      for (const iface of module.interfaces) if (this.shouldEmitInterface(iface, module)) add(module, iface, false);
+      for (const type of module.types) if (this.shouldEmitTypeAlias(type, module)) add(module, type, false);
+      for (const item of module.enums ?? []) if (this.shouldEmitEnum(item, module)) add(module, item, false);
       for (const constant of module.constants) if (this.isConstantExported(constant, module)) add(module, constant, false);
       for (const fn of module.functions) if (this.isFunctionExported(fn, module)) add(module, fn, true);
     }
@@ -2192,19 +2573,36 @@ export class TypeScriptToTypedMindConverter {
       (entry.function ? this.functionNameRemap : this.typeNameRemap).set(key, name);
     };
     const losers: Declaration[] = [];
+    const defaults: Declaration[] = [];
     for (const name of [...groups.keys()].sort()) {
       const group = groups.get(name) ?? [];
       group.sort((a, b) => this.compareModulePaths(a.module.filePath, b.module.filePath));
-      const first = group[0];
+      const ordinary = group.filter((entry) => {
+        const key = `${entry.module.filePath}::${entry.name}`;
+        const identities = this.sourceDeclarationIdentities.get(key);
+        const identity = identities?.length === 1 ? identities[0] : undefined;
+        const isDefault = entry.module.exports.some(
+          (exp) =>
+            exp.isDefault &&
+            exp.source === undefined &&
+            exp.declaration !== undefined &&
+            identity !== undefined &&
+            !this.sourceDeclarationsWithoutIdentity.has(key) &&
+            this.sameDeclarationIdentity(exp.declaration, identity),
+        );
+        if (isDefault) defaults.push(entry);
+        return !isDefault;
+      });
+      const first = ordinary[0];
       if (first === undefined) continue;
       store(first, this.nameAllocator.reserve(sourceKey(first), [name]));
       this.typeNameFirstDeclarer.set(name, this.getRelativePath(first.module.filePath));
-      losers.push(...group.slice(1));
+      losers.push(...ordinary.slice(1));
     }
 
     // A primary class that retained its bare identity can share it with the
     // physical file. A qualified primary class needs a separate real owner.
-    const needsOwner = new Set(losers.map((entry) => entry.module.filePath));
+    const needsOwner = new Set([...losers, ...defaults].map((entry) => entry.module.filePath));
     const fileModules: ParsedModule[] = [];
     for (const module of orderedModules) {
       const primary = this.primaryClassOf(module);
@@ -2235,13 +2633,31 @@ export class TypeScriptToTypedMindConverter {
       this.reservedFileEntityNameByModulePath.set(module.filePath, name);
       this.fileEntityNameByModulePath.set(module.filePath, name);
     }
+    for (const entry of defaults) {
+      const owner = this.fileEntityNameByModulePath.get(entry.module.filePath);
+      if (owner === undefined) {
+        this.addError('Missing reserved File owner for a default declaration', entry.module.filePath);
+        continue;
+      }
+      store(entry, this.nameAllocator.reserve(sourceKey(entry), [`${owner}.default`]));
+    }
     for (const entry of losers) {
       const owner = this.fileEntityNameByModulePath.get(entry.module.filePath);
       if (owner === undefined) {
         this.addError('Missing reserved File owner for a qualified declaration', entry.module.filePath);
         continue;
       }
-      const name = this.nameAllocator.reserve(sourceKey(entry), [`${owner}.${entry.name}`]);
+      const identities = this.sourceDeclarationIdentities.get(`${entry.module.filePath}::${entry.name}`);
+      const identity = identities?.length === 1 ? identities[0] : undefined;
+      const privateType =
+        this.isReferencedPrivateType(identity) &&
+        !entry.module.exports.some(
+          (exp) => identity !== undefined && exp.declaration !== undefined && this.sameDeclarationIdentity(exp.declaration, identity),
+        );
+      // A private declaration cannot claim public File membership. Its global
+      // collision name is standalone while its exact source identity survives.
+      const candidate = privateType ? `${owner}${this.sanitizeEntityName(entry.name)}` : `${owner}.${entry.name}`;
+      const name = this.nameAllocator.reserve(sourceKey(entry), [candidate]);
       store(entry, name);
       this.collidedTypeNames.add(entry.name);
       this.addWarning(
@@ -2277,7 +2693,7 @@ export class TypeScriptToTypedMindConverter {
         [
           ...module.classes.flatMap((cls) => [...cls.extends.slice(1), ...cls.implements]),
           ...module.interfaces
-            .filter((iface) => this.isInterfaceExported(iface, module) && this.isPredictedClassInterface(iface.name))
+            .filter((iface) => this.shouldEmitInterface(iface, module) && this.isPredictedClassInterface(iface.name))
             .flatMap((iface) => iface.extends.slice(1)),
         ].filter((name) => name.includes('.')),
       ),
@@ -2357,7 +2773,13 @@ export class TypeScriptToTypedMindConverter {
   // legitimately point at the first, un-renamed one). Establishing which is
   // precisely PR 2's job. A false positive here costs one warning; a false
   // negative costs an invisible dangling reference.
-  private warnOnCollidedTypeReference(typeText: string | undefined, referenceContext: string, filePath: string): void {
+  private warnOnCollidedTypeReference(
+    typeText: string | undefined,
+    referenceContext: string,
+    filePath: string,
+    info?: ParsedTypeText,
+  ): void {
+    if (this.originContext !== undefined && info !== undefined) return;
     if (typeText === undefined || typeText === '' || this.collidedTypeNames.size === 0) {
       return;
     }
@@ -2375,7 +2797,8 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
-  private convertFunction(func: ParsedFunction, module: ParsedModule): void {
+  private convertFunction(sourceFunction: ParsedFunction, module: ParsedModule): void {
+    let func = sourceFunction;
     const moduleFilePath = module.filePath;
     const remapKey = `${moduleFilePath}::${func.name}`;
     const entityName = this.functionNameRemap.get(remapKey);
@@ -2392,6 +2815,35 @@ export class TypeScriptToTypedMindConverter {
       return;
     }
 
+    const typeParameters = convertSourceTypeParameters(func.typeParameters, this.genericMetadataContext(module.filePath));
+    if (typeParameters !== undefined) {
+      const convertSlot = (text: string, name: string): string => {
+        const canonical = canonicalizeTypeText(text);
+        if (typeof canonical === 'string') {
+          this.addError(`Unsupported signature type in '${entityName}': ${canonical}; source text retained`, module.filePath);
+          return text;
+        }
+        if (isInlineObjectLiteralType(canonical.text)) return this.synthesizeInlineDTO(canonical.text, name, typeParameters);
+        const wrapped = splitGenericWrappedObjectLiteral(canonical.text);
+        return wrapped === undefined
+          ? canonical.text
+          : `${wrapped.wrapper}<${this.synthesizeInlineDTO(wrapped.inner, name, typeParameters)}>`;
+      };
+      const parameters = func.parameters.map((parameter) => ({
+        ...parameter,
+        type: convertSlot(parameter.type, `${entityName}${parameter.name}Input`),
+      }));
+      const returnType = convertSlot(func.returnType, `${entityName}Output`);
+      // Source parameter slots are authoritative after A2 rewriting. This
+      // preserves literal bytes and names synthesized generic DTO arguments.
+      func = {
+        ...func,
+        parameters,
+        returnType,
+        signature: `${func.isAsync ? 'async ' : ''}${func.name}(${parameters.map((parameter) => `${parameter.isRest ? '...' : ''}${parameter.name}${parameter.isOptional || parameter.hasDefaultValue ? '?' : ''}: ${parameter.type}`).join(', ')}) => ${returnType}`,
+      };
+    }
+
     // Extract input/output DTOs from signature. `entityName` (the
     // converter's own collision-resolved function name, X-CONV-4) seeds
     // issue #72's inline-DTO synthesis naming — see
@@ -2402,9 +2854,9 @@ export class TypeScriptToTypedMindConverter {
     // dangling edge is visible here, not only downstream as
     // `checker/input-dto-not-found`.
     for (const parameter of func.parameters) {
-      this.warnOnCollidedTypeReference(parameter.type, `input of function '${entityName}'`, moduleFilePath);
+      this.warnOnCollidedTypeReference(parameter.type, `input of function '${entityName}'`, moduleFilePath, parameter.typeInfo);
     }
-    this.warnOnCollidedTypeReference(func.returnType, `output of function '${entityName}'`, moduleFilePath);
+    this.warnOnCollidedTypeReference(func.returnType, `output of function '${entityName}'`, moduleFilePath, func.returnTypeInfo);
 
     const inputDTO = this.extractInputDTO(func, entityName);
     const outputDTO = this.extractOutputDTO(func, entityName);
@@ -2415,6 +2867,7 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} :: ${func.signature}`,
       sourceForm: 'shortform',
       signature: func.signature,
+      typeParameters,
       calls: this.resolveSameFileCallEdges(func, module),
       pendingDependencies: [],
       description: func.description ? collapseDescription(func.description) : undefined,
@@ -2703,24 +3156,18 @@ export class TypeScriptToTypedMindConverter {
       );
     }
 
-    // The inherit targets are recorded VERBATIM, type arguments included, so
-    // `extends Repo<Item>` emits `<: Repo<Item>`. That is intentional and
-    // matches `convertClass` (the real-class lane) exactly: dropping the
-    // arguments is PR #152's original bug, and
-    // slat-harness-mixin-heritage-controls.test.ts pins the verbatim form as
-    // property 1 of the #152/#153 reconciliation, warning that silencing the
-    // resulting diagnostic "would pressure a future author to reintroduce the
-    // bug". The unresolvable generic base is gap 68's territory (type
-    // parameters are unmodeled language-wide), NOT a defect of this lane —
-    // fixture 69d pins both lanes together so neither can be changed alone.
-    // `stripGenericArguments` is applied only to the heritage LOOKUP
-    // (`resolveInterfaceIsMethodBearing`), never to the emitted text.
+    // G retains full instantiated heritage and declaration parameters in both
+    // class lanes. A2 rewrites exact reference origins before the canonical
+    // base/argument parse below; raw analyzer text remains observational.
+    // Legacy strings here serve only collision reporting and raw source text.
     const inheritList = [...iface.extends];
-    // decision-same-named-entities PR 1, interim window — an interface's
-    // heritage targets are raw source identifiers, not rewritten to follow a
-    // collision rename (PR 2's job).
-    for (const target of inheritList) {
-      this.warnOnCollidedTypeReference(target, `extends target of interface-derived class '${entityName}'`, module?.filePath ?? '');
+    for (const [index, target] of inheritList.entries()) {
+      this.warnOnCollidedTypeReference(
+        target,
+        `extends target of interface-derived class '${entityName}'`,
+        module?.filePath ?? '',
+        iface.extendsTypeInfo?.[index],
+      );
     }
 
     const classEntity = new ClassNode({
@@ -2731,15 +3178,25 @@ export class TypeScriptToTypedMindConverter {
       // TypedMind supports single inheritance in the `extends` slot; every
       // further parent lands in `implements`, the same split `convertClass`
       // performs on a class's own heritage.
-      extends: inheritList[0] || undefined,
-      implements: this.convertImplementsList(inheritList.slice(1), []),
+      heritage: {
+        extends:
+          inheritList[0] === undefined
+            ? undefined
+            : convertSourceHeritage(inheritList[0], iface.extendsTypeInfo?.[0], this.genericMetadataContext(module?.filePath)),
+        implements: inheritList
+          .slice(1)
+          .map((target, index) =>
+            convertSourceHeritage(target, iface.extendsTypeInfo?.[index + 1], this.genericMetadataContext(module?.filePath)),
+          ),
+      },
+      typeParameters: convertSourceTypeParameters(iface.typeParameters, this.genericMetadataContext(module?.filePath)),
       // Private/protected modifiers do not exist on a `MethodSignature`, so
       // there is no `includePrivateMembers` filter to apply here — every
       // method an interface declares is part of its public contract by
       // construction. This is why the method list is taken directly rather
       // than through `convertMethods` (which filters `isPrivate` on a
       // ParsedClass).
-      methods: iface.methods.map((method) => method.name),
+      ...this.convertMembers(iface, module?.filePath),
       purpose: iface.description ? collapseDescription(iface.description) : undefined,
     });
 
@@ -2752,6 +3209,7 @@ export class TypeScriptToTypedMindConverter {
 
     this.addEntityName(entityName, 'convertInterfaceToDTO');
 
+    const typeParameters = convertSourceTypeParameters(iface.typeParameters, this.genericMetadataContext(module?.filePath));
     const fields = iface.properties.map((prop) => {
       // RC-D (ladder-diagnostic-disposition-2026-08-29.md rank 3, issue
       // #101) — issue #72's nested-inline-object-literal recursion
@@ -2778,7 +3236,7 @@ export class TypeScriptToTypedMindConverter {
       // `parseInlineObjectLiteralToFields` already establishes for a
       // function-signature-originated nested DTO.
       if (isInlineObjectLiteralType(prop.type)) {
-        const nestedDtoName = this.synthesizeInlineDTO(prop.type, this.sanitizeEntityName(`${entityName}_${prop.name}`));
+        const nestedDtoName = this.synthesizeInlineDTO(prop.type, this.sanitizeEntityName(`${entityName}_${prop.name}`), typeParameters);
         const typeExpr = parseTypeExprText(nestedDtoName).typeExpr;
         return new DtoFieldNode({
           name: prop.name,
@@ -2798,7 +3256,11 @@ export class TypeScriptToTypedMindConverter {
       const genericWrapped = splitGenericWrappedObjectLiteral(prop.type);
 
       if (genericWrapped) {
-        const nestedDtoName = this.synthesizeInlineDTO(genericWrapped.inner, this.sanitizeEntityName(`${entityName}_${prop.name}`));
+        const nestedDtoName = this.synthesizeInlineDTO(
+          genericWrapped.inner,
+          this.sanitizeEntityName(`${entityName}_${prop.name}`),
+          typeParameters,
+        );
         const wrappedType = `${genericWrapped.wrapper}<${nestedDtoName}>`;
         const typeExpr = parseTypeExprText(wrappedType).typeExpr;
         this.walkGenericArgsForExternalStubs(typeExpr);
@@ -2815,7 +3277,7 @@ export class TypeScriptToTypedMindConverter {
       // decision-same-named-entities PR 1, interim window — this field's type
       // is raw source text and is NOT rewritten to follow a collision rename
       // (PR 2's job). Warn if it names a renamed entity.
-      this.warnOnCollidedTypeReference(type, `DTO field '${entityName}.${prop.name}'`, module?.filePath ?? '');
+      this.warnOnCollidedTypeReference(type, `DTO field '${entityName}.${prop.name}'`, module?.filePath ?? '', prop.typeInfo);
       // RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2): the converter builds a
       // synthetic DtoFieldNode from an already-sanitized type string, not a
       // parsed CST subtree — parseTypeExprText (the same hand-rolled parser
@@ -2842,13 +3304,29 @@ export class TypeScriptToTypedMindConverter {
       sourceForm: 'shortform',
       fields,
       purpose: iface.description ? collapseDescription(iface.description) : undefined,
+      typeParameters,
+      extendsReferences:
+        iface.extends.length === 0
+          ? undefined
+          : iface.extends.map((target, index) =>
+              convertSourceHeritage(target, iface.extendsTypeInfo?.[index], this.genericMetadataContext(module?.filePath)),
+            ),
     });
 
     this.entities.push(dtoEntity);
   }
 
   // decision-same-named-entities PR 1 — see `convertInterfaceToClass`.
-  private convertTypeAliasToDTO(typeAliasInput: { name: string; type: string; description?: string }, module?: ParsedModule): void {
+  private convertTypeAliasToDTO(
+    typeAliasInput: {
+      name: string;
+      type: string;
+      description?: string;
+      typeInfo?: ParsedTypeText;
+      typeParameters?: readonly ParsedTypeParameter[];
+    },
+    module?: ParsedModule,
+  ): void {
     const entityName = this.resolveTypeEntityName(module, typeAliasInput.name);
 
     // Fixture 90 (mail-agent `src/harness/envelope.ts:266` `DispatchResult`,
@@ -2906,8 +3384,13 @@ export class TypeScriptToTypedMindConverter {
         span: SYNTHETIC_SPAN,
         raw: `${entityName} %`,
         sourceForm: 'shortform',
-        fields: this.parseInlineObjectLiteralToFields(typeAlias.type, entityName),
+        fields: this.parseInlineObjectLiteralToFields(
+          typeAlias.type,
+          entityName,
+          convertSourceTypeParameters(typeAlias.typeParameters, this.genericMetadataContext(module?.filePath)),
+        ),
         purpose: typeAlias.description ? collapseDescription(typeAlias.description) : undefined,
+        typeParameters: convertSourceTypeParameters(typeAlias.typeParameters, this.genericMetadataContext(module?.filePath)),
       });
 
       this.entities.push(dtoEntity);
@@ -2930,7 +3413,12 @@ export class TypeScriptToTypedMindConverter {
 
     // decision-same-named-entities PR 1, interim window — the alias's
     // right-hand side is raw source text, not rewritten to follow a rename.
-    this.warnOnCollidedTypeReference(typeAlias.type, `TypeDef '${entityName}' alias target`, module?.filePath ?? '');
+    this.warnOnCollidedTypeReference(
+      typeAlias.type,
+      `TypeDef '${entityName}' alias target`,
+      module?.filePath ?? '',
+      typeAliasInput.typeInfo,
+    );
 
     const aliasType = parseTypeExprText(typeAlias.type).typeExpr;
     // D-LEG-2 (rfc-tm-10-diamond.md §2, issue #65) — walk the alias's
@@ -2946,6 +3434,7 @@ export class TypeScriptToTypedMindConverter {
       variant: 'alias',
       aliasType,
       purpose: typeAlias.description ? collapseDescription(typeAlias.description) : undefined,
+      typeParameters: convertSourceTypeParameters(typeAlias.typeParameters, this.genericMetadataContext(module?.filePath)),
     });
 
     this.entities.push(typeDefEntity);
@@ -2958,7 +3447,10 @@ export class TypeScriptToTypedMindConverter {
   // entirely (the analyzer captured `isEnum`/`enumValues` but the converter
   // never read them — confirmed zero references before this Quantum).
   // decision-same-named-entities PR 1 — see `convertInterfaceToClass`.
-  private convertEnumToTypeDef(enumDef: { name: string; members: readonly string[]; description?: string }, module?: ParsedModule): void {
+  private convertEnumToTypeDef(
+    enumDef: { name: string; members: readonly string[]; description?: string; typeInfo?: ParsedTypeText },
+    module?: ParsedModule,
+  ): void {
     const entityName = this.resolveTypeEntityName(module, enumDef.name);
 
     this.addEntityName(entityName, 'convertEnumToTypeDef');
@@ -2989,7 +3481,10 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
-  private createConstantEntity(constant: { name: string; type: string; value?: string }, module: ParsedModule): void {
+  private createConstantEntity(
+    constant: { name: string; type: string; value?: string; typeInfo?: ParsedTypeText },
+    module: ParsedModule,
+  ): void {
     // decision-same-named-entities PR 1 — this site used to SILENTLY `return`
     // on a name collision, strictly worse than the six sibling `addError`
     // paths: the surviving Constants entity carried the wrong module's `path`
@@ -3014,9 +3509,10 @@ export class TypeScriptToTypedMindConverter {
 
     // decision-same-named-entities PR 1, interim window — the `schema` slot
     // carries the constant's type text, not rewritten to follow a rename.
-    this.warnOnCollidedTypeReference(constant.type, `Constants '${entityName}' schema`, module.filePath);
+    this.warnOnCollidedTypeReference(constant.type, `Constants '${entityName}' schema`, module.filePath, constant.typeInfo);
 
-    const constantSchema = constant.type && constant.type !== 'any' ? this.convertTypeToSchema(constant.type) : undefined;
+    const schemaText = constant.typeInfo === undefined ? constant.type : this.rewriteTypeSlot(constant.typeInfo).text;
+    const constantSchema = schemaText && schemaText !== 'any' ? this.convertTypeToSchema(schemaText) : undefined;
 
     const constantsEntity = new ConstantsNode({
       name: entityName,
@@ -3247,11 +3743,11 @@ export class TypeScriptToTypedMindConverter {
             comment: sourceEntity.comment,
             sourceForm: sourceEntity.sourceForm,
             path: sourceEntity.path,
-            implements: sourceEntity.implements,
-            methods: sourceEntity.methods,
+            heritage: sourceEntity.heritage,
+            typeParameters: sourceEntity.typeParameters,
+            ...(sourceEntity.members === undefined ? { methods: sourceEntity.methods } : { members: sourceEntity.members }),
             imports: [...sourceEntity.imports, ...newNames],
             exports: sourceEntity.exports,
-            extends: sourceEntity.extends,
             purpose: sourceEntity.purpose,
           });
   }
@@ -3362,11 +3858,11 @@ export class TypeScriptToTypedMindConverter {
                 comment: sourceEntity.comment,
                 sourceForm: sourceEntity.sourceForm,
                 path: sourceEntity.path,
-                implements: sourceEntity.implements,
-                methods: sourceEntity.methods,
+                heritage: sourceEntity.heritage,
+                typeParameters: sourceEntity.typeParameters,
+                ...(sourceEntity.members === undefined ? { methods: sourceEntity.methods } : { members: sourceEntity.members }),
                 imports: [...sourceEntity.imports, ...newNames],
                 exports: sourceEntity.exports,
-                extends: sourceEntity.extends,
                 purpose: sourceEntity.purpose,
               });
       }
@@ -3627,7 +4123,13 @@ export class TypeScriptToTypedMindConverter {
     // is not a collision-renamed declaration resolves to `undefined`, which is
     // exactly when the raw name is already correct.
     const remapExportName = (name: string): string => {
-      return this.functionNameRemap.get(`${entryFilePath}::${name}`) ?? this.typeNameRemap.get(`${entryFilePath}::${name}`) ?? name;
+      const identity = moduleExports?.localDeclarations.get(name);
+      return (
+        (identity !== undefined ? this.getAssignedDeclarationName(identity) : undefined) ??
+        this.functionNameRemap.get(`${entryFilePath}::${name}`) ??
+        this.typeNameRemap.get(`${entryFilePath}::${name}`) ??
+        name
+      );
     };
 
     // Look up exports from this entry file in our export registry
@@ -3712,7 +4214,7 @@ export class TypeScriptToTypedMindConverter {
       publicExports.push(remapExportName(moduleExports.namespaceExport));
     }
 
-    return publicExports;
+    return [...new Set(publicExports)];
   }
 
   // X-AN-3 residual — a bare `export * from '<source>'` produces NO
@@ -3866,15 +4368,52 @@ export class TypeScriptToTypedMindConverter {
     return claimed;
   }
 
-  private convertMethods(cls: ParsedClass): string[] {
-    const methods = cls.methods.filter((method) => {
-      if (!this.options.includePrivateMembers && method.isPrivate) {
-        return false;
-      }
-      return true;
-    });
-
-    return methods.map((method) => method.name);
+  private convertMembers(
+    owner: { methods: readonly ParsedMethod[]; constructors?: readonly ParsedConstructor[] },
+    filePath?: string,
+  ): ClassMemberArgs {
+    const typeText = (text: string): string => {
+      const canonical = canonicalizeTypeText(text);
+      if (typeof canonical !== 'string') return canonical.text;
+      this.addError(`Unsupported member type: ${canonical}; original type retained`, filePath);
+      return text;
+    };
+    const parametersText = (parameters: readonly ParsedParameter[]): string =>
+      parameters
+        .map(
+          (parameter) =>
+            `${parameter.isRest ? '...' : ''}${parameter.name}${parameter.isOptional || parameter.hasDefaultValue ? '?' : ''}: ${typeText(parameter.type)}`,
+        )
+        .join(', ');
+    const methods = owner.methods
+      .filter((method) => this.options.includePrivateMembers || !method.isPrivate)
+      .map((method) => {
+        const text = `${method.isAsync ? 'async ' : ''}${method.name}(${parametersText(method.parameters)}) => ${typeText(method.returnType)}`;
+        const parsed = parseSignatureText(text);
+        const typeParameters = convertSourceTypeParameters(method.typeParameters, {
+          rewrite: (info) => this.rewriteTypeSlot(info).text,
+          error: (message) => this.addError(message, filePath),
+        });
+        const signature =
+          parsed.kind !== 'parsed' || typeParameters === undefined
+            ? parsed
+            : {
+                kind: 'parsed' as const,
+                signature: { ...parsed.signature, typeParameters, typeParameterNames: typeParameters.map((parameter) => parameter.name) },
+              };
+        return {
+          name: signature.kind === 'parsed' && /^[A-Za-z_]\w*$/.test(method.name) ? method.name : undefined,
+          signature,
+          span: SYNTHETIC_SPAN,
+        };
+      });
+    const constructors = (owner.constructors ?? [])
+      .filter((member) => this.options.includePrivateMembers || !member.isPrivate)
+      .map((member) => ({
+        signature: parseSignatureText(`(${parametersText(member.parameters)})`, { allowMissingReturnType: true }),
+        span: SYNTHETIC_SPAN,
+      }));
+    return methods.length === 0 && constructors.length === 0 ? { methods: [] } : { members: { methods, constructors } };
   }
 
   // RC-A (issue #99) — `importerFilePath` is the ABSOLUTE path of the module
@@ -3899,7 +4438,7 @@ export class TypeScriptToTypedMindConverter {
         // Now using the complete export registry for proper resolution
 
         if (imp.defaultImport) {
-          const entityName = this.resolveImportToEntity(importerFilePath, imp.defaultImport, imp.specifier);
+          const entityName = this.resolveImportToEntity(importerFilePath, imp.defaultImport, imp.specifier, true);
           if (entityName) {
             importNames.push(entityName);
           }
@@ -3933,10 +4472,15 @@ export class TypeScriptToTypedMindConverter {
       }
     }
 
-    return importNames;
+    return [...new Set(importNames)];
   }
 
-  private resolveImportToEntity(importerFilePath: string, importName: string, specifier: string): string | undefined {
+  private resolveImportToEntity(
+    importerFilePath: string,
+    requestedName: string,
+    specifier: string,
+    defaultImport = false,
+  ): string | undefined {
     // Handle external packages
     if (this.isExternalPackage(specifier)) {
       const dependencyName = this.createDependencyName(specifier);
@@ -3973,11 +4517,15 @@ export class TypeScriptToTypedMindConverter {
       return undefined;
     }
 
+    const exportedName = defaultImport ? moduleExports.defaultExport : requestedName;
+    const importName = exportedName === undefined ? undefined : (moduleExports.localDeclarations.get(exportedName)?.name ?? exportedName);
+    if (importName === undefined) return undefined;
+
     // Check if this import name is actually exported by the target module
     const isExported =
-      moduleExports.defaultExport === importName ||
-      moduleExports.namedExports.has(importName) ||
-      moduleExports.namespaceExport === importName;
+      moduleExports.defaultExport === exportedName ||
+      (exportedName !== undefined && moduleExports.namedExports.has(exportedName)) ||
+      moduleExports.namespaceExport === exportedName;
 
     if (!isExported) {
       return undefined;
@@ -3994,13 +4542,15 @@ export class TypeScriptToTypedMindConverter {
     // reservation pass wrote. Falls through to the bare name when the target
     // module is unknown (empty `moduleGraph`, unit-test mock) or the name
     // never collided — both the pre-change behaviour.
-    const declaringModulePath =
-      resolvedTarget !== undefined ? this.modulePathByRelativePath.get(this.stripKnownSourceExtension(resolvedTarget)) : undefined;
+    const declaringModulePath = moduleExports.filePath;
+    const identity = exportedName === undefined ? undefined : moduleExports.localDeclarations.get(exportedName);
     const entityName =
+      (identity !== undefined ? this.getAssignedDeclarationName(identity) : undefined) ??
       (declaringModulePath !== undefined
         ? (this.functionNameRemap.get(`${declaringModulePath}::${importName}`) ??
           this.typeNameRemap.get(`${declaringModulePath}::${importName}`))
-        : undefined) ?? createEntityName(importName);
+        : undefined) ??
+      createEntityName(importName);
 
     // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — a `types`-registry name
     // predicted to become a TypeDef is EXCLUDED from import/export
@@ -4113,14 +4663,16 @@ export class TypeScriptToTypedMindConverter {
           // every export that is not a collision-renamed declaration, which is
           // exactly when the raw `exp.name` is already correct.
           const remapped =
-            this.functionNameRemap.get(`${module.filePath}::${exp.name}`) ?? this.typeNameRemap.get(`${module.filePath}::${exp.name}`);
-          exportNames.push(remapped ?? exp.name);
+            (exp.declaration !== undefined ? this.getAssignedDeclarationName(exp.declaration) : undefined) ??
+            this.functionNameRemap.get(`${module.filePath}::${exp.name}`) ??
+            this.typeNameRemap.get(`${module.filePath}::${exp.name}`);
+          if ((remapped ?? exp.name) !== excludeName) exportNames.push(remapped ?? exp.name);
         }
         seenNames.add(exp.name);
       }
     }
 
-    return { exportNames, reExportNames };
+    return { exportNames: [...new Set(exportNames)], reExportNames };
   }
 
   private isReExport(exportItem: ParsedExport): boolean {
@@ -4128,14 +4680,22 @@ export class TypeScriptToTypedMindConverter {
     return exportItem.source !== undefined;
   }
 
-  private isConstantExported(constant: { name: string }, module: ParsedModule): boolean {
-    return module.exports.some((exp) => exp.name === constant.name && exp.type === 'constant');
+  private exportMatchesDeclaration(exp: ParsedExport, declaration: { name: string; declaration?: DeclarationIdentity }): boolean {
+    if (exp.source === undefined && exp.declaration !== undefined) {
+      return declaration.declaration !== undefined && this.sameDeclarationIdentity(exp.declaration, declaration.declaration);
+    }
+    return exp.name === declaration.name;
+  }
+
+  private isConstantExported(constant: { name: string; declaration?: DeclarationIdentity }, module: ParsedModule): boolean {
+    return module.exports.some((exp) => this.exportMatchesDeclaration(exp, constant) && exp.type === 'constant');
   }
 
   private extractInputDTO(func: ParsedFunction, functionEntityName: string): string | undefined {
     // Look for single parameter that looks like a DTO
     if (func.parameters.length === 1) {
       const param = func.parameters[0];
+      if (param !== undefined && func.typeParameters?.some((parameter) => parameter.name === param.type.trim())) return undefined;
       if (param && isInlineObjectLiteralType(param.type)) {
         // issue #72 — synthesize a named DTO instead of D-LEG-1's
         // `isDTOLikeType` `{`-prefix exclusion (checked BEFORE that
@@ -4165,7 +4725,9 @@ export class TypeScriptToTypedMindConverter {
         // stays visible in `entity.signature` regardless (emitted verbatim,
         // `emit-shortform.ts`), so only the machine-checked graph edge is
         // lost, not the DSL reader's visibility into the real type.
-        return isBareEntityName(param.type) ? param.type : undefined;
+        return isBareEntityName(param.type) || this.originContext?.entitiesByName.get(param.type) instanceof DtoNode
+          ? param.type
+          : undefined;
       }
     }
     return undefined;
@@ -4182,6 +4744,7 @@ export class TypeScriptToTypedMindConverter {
     // one shape but leave the wrapper itself unstrippable whenever the
     // newline sits inside the `Promise<>` brackets.
     const returnType = collapseTypeWhitespace(collapseTypeWhitespace(func.returnType).replace(/^Promise<(.+)>$/, '$1'));
+    if (func.typeParameters?.some((parameter) => parameter.name === returnType)) return undefined;
     if (isInlineObjectLiteralType(returnType)) {
       // issue #72 — same synthesis path as `extractInputDTO`, applied to
       // the return-type position. `Output` is the codomain-disambiguation
@@ -4201,63 +4764,15 @@ export class TypeScriptToTypedMindConverter {
       this.walkGenericArgsForExternalStubs(parseTypeExprText(returnType).typeExpr);
       // issue #77 — same bare-`entity_name` guard as extractInputDTO above,
       // applied to the `output_name` grammar slot (grammar.js:815).
-      return isBareEntityName(returnType) ? returnType : undefined;
+      return isBareEntityName(returnType) || this.originContext?.entitiesByName.get(returnType) instanceof DtoNode ? returnType : undefined;
     }
     return undefined;
   }
 
-  // issue #114 — a naive `.includes('{')` check treats a UNION of object
-  // literals (`{ tagged: false } | { tagged: true; label: string }`, a
-  // TypeScript discriminated-union idiom) as "one object literal," routing
-  // it to `parseInlineObjectLiteralToFields`. That parser's own
-  // `startsWith('{') && endsWith('}')` slice then strips only the
-  // OUTERMOST leading `{` and trailing `}` of the whole multi-member text,
-  // leaving an unbalanced middle (`tagged: false } | { tagged: true; label:
-  // string`) that `splitObjectLiteralProperties` cannot recover — the
-  // corrupted `- tagged: false } | { tagged: true` field line issue #114
-  // reports. Detected here, BEFORE the DTO/TypeDef branch decision, so a
-  // union-shaped type routes to the TypeDef/alias path instead: that path's
-  // `parseTypeExprText` already parses a top-level `|` outside any bracket
-  // depth as a real `union` TypeExprNode (confirmed empirically — each
-  // `{...}` member individually balances and falls to the grammar's own
-  // `type_opaque` leaf, per type-expr-from-text.ts's opaque-run scanner),
-  // which is a real, parseable grammar production — the "degrade honestly,
-  // anything that parses" option the issue itself names, with no new
-  // grammar surface and no field-list modeling attempted for the union.
-  // Adversarial review finding, round 1 (PR #115) — the ORIGINAL depth
-  // tracker below counted `{()[]}` only, so a union nested inside a
-  // generic (`Record<string, { a: string } | { b: string }>`) misread its
-  // `|` as top-level the instant the first `{...}` member closed, routing
-  // an alias that should stay a DTO into the TypeDef/alias path and
-  // corrupting a PREVIOUSLY-correct emission.
-  //
-  // Adversarial review finding, round 2 (PR #115) — adding `<`/`>` to the
-  // depth tracker fixed that case but was still too permissive: a union
-  // whose top-level members are THEMSELVES generics each containing their
-  // own nested union of object literals (`Record<string, {a}|{b}> |
-  // Map<string, {c}|{d}>`) still has a genuinely top-level `|` between
-  // the two generics — so the OLD "any top-level `|` plus any `{`
-  // anywhere" test still fired, routing the whole thing into
-  // `parseTypeExprText`, which has its OWN pre-existing, PR-independent
-  // bug in `scanOpaqueRun` (lib/typed-mind/src/pipeline/
-  // type-expr-from-text.ts): its bracket-depth tracker ALSO omits `<`/`>`,
-  // so it mis-nests a top-level union of generics and corrupts the
-  // output — confirmed present on `main` too (`parseTypeExprText` on this
-  // exact text already mis-parses on `main`, unrelated to this PR).
-  // Fixing that shared core parser is design work (a broader bracket-depth
-  // fix touching every `parseTypeExprText` caller) outside this
-  // increment's mechanical-fix mandate — filed as issue #118 instead of
-  // silently routing more inputs into a parser known to mishandle them.
-  //
-  // The fix: narrow the check from "any top-level `|` plus any `{`" to
-  // "every top-level-split member is ITSELF a bare object literal"
-  // (`startsWith('{') && endsWith('}')`, the exact same test
-  // `isInlineObjectLiteralType` already uses) — this is precisely the
-  // shape `parseTypeExprText`'s opaque-run scanner can safely absorb (each
-  // member independently brace-balances with no unaccounted `<`/`>`
-  // inside it), and it correctly excludes a member that is a generic
-  // (`Record<...>`, `Map<...>`) since that member does not itself start
-  // with `{`.
+  // Issue #114 first preserved top-level object unions as aliases. RFC-TM-13
+  // EXIT extends preservation to every non-object-body alias, including
+  // generic wrappers and intersections. The final whole-body classifier below
+  // rejects those shapes even when they are not unions of object literals.
   private isUnionOfObjectLiterals(type: string): boolean {
     const trimmed = type.trim();
     if (!trimmed.includes('{') || !trimmed.includes('|')) {
@@ -4296,26 +4811,13 @@ export class TypeScriptToTypedMindConverter {
     return members;
   }
 
-  // Fixture 100 (`sammons/slat` rung) — a bare `Record<K, V>` / `Map<K, V>`
-  // alias (`type ExactRoutes = Record<string, RouteHandler>`) has NO `{` to
-  // split, so routing it to the DTO path produced a field-LESS `%` entity:
-  // the index and value types vanished, and a value type reachable only
-  // through the alias (`RouteHandler`) became `checker/orphaned-entity`.
-  //
-  // A mapped/indexed collection is only DTO-like when it actually carries an
-  // inline object literal to split into fields (`Record<string, { a: T }>`
-  // still contains a `{`, and the existing field-synthesis path handles it).
-  // Without a brace there are no fields to emit, and the TypeDef path
-  // preserves the whole `Record<string, RouteHandler>` text — which keeps
-  // the value type visible as a real reference instead of discarding it.
-  //
-  // Checked AFTER the union guard so a union of object literals keeps its
-  // existing issue #114 routing.
+  // Only one complete balanced object body can be synthesized into fields.
+  // Wrappers, intersections, callable and conditional aliases retain TypeDef text.
   private isObjectLikeType(type: string): boolean {
     if (this.isUnionOfObjectLiterals(type)) {
       return false;
     }
-    return type.includes('{');
+    return isInlineObjectLiteralType(type);
   }
 
   // RFC-TM-10 §1 (rfc-tm-10-diamond.md, D-LEG-1, issue #59) — REPLACES the
@@ -4349,6 +4851,8 @@ export class TypeScriptToTypedMindConverter {
   //     elimination — the same fallback the heuristic approximated, now
   //     gated by classification instead of a first-character guess.
   private isDTOLikeType(type: string): boolean {
+    const proven = this.originContext?.entitiesByName.get(type);
+    if (proven !== undefined) return proven instanceof DtoNode;
     const primitives = ['string', 'number', 'boolean', 'void', 'any', 'unknown', 'null', 'undefined'];
     const cleaned = type.replace(/\[\]$/, ''); // Remove array suffix
     if (primitives.includes(cleaned.toLowerCase())) {
@@ -4528,21 +5032,29 @@ export class TypeScriptToTypedMindConverter {
   // supported (`check-dto-fields.ts`'s `PRIMITIVES`-gated resolution accepts
   // DTO/Class/TypeDef kinds) — so recursing preserves strictly more
   // information than an opaque leaf would, at zero grammar cost.
-  private synthesizeInlineDTO(objectLiteralType: string, baseName: string): string {
+  private synthesizeInlineDTO(objectLiteralType: string, baseName: string, outerParameters?: readonly TypeParameterNode[]): string {
     const dtoName = this.reserveSynthesizedDTOName(this.sanitizeEntityName(baseName));
     this.addEntityName(dtoName, 'synthesizeInlineDTO');
 
+    const typeParameters = outerParameters?.map((parameter) => ({
+      ...parameter,
+      modifiers: [],
+      constraint: undefined,
+      defaultType: undefined,
+      raw: parameter.name,
+    }));
     const dtoEntity = new DtoNode({
       name: dtoName,
+      typeParameters,
       span: SYNTHETIC_SPAN,
       raw: `${dtoName} %`,
       sourceForm: 'shortform',
-      fields: this.parseInlineObjectLiteralToFields(objectLiteralType, dtoName),
+      fields: this.parseInlineObjectLiteralToFields(objectLiteralType, dtoName, typeParameters),
       purpose: 'Synthesized from an inline object-literal parameter/return type (issue #72).',
     });
 
     this.entities.push(dtoEntity);
-    return dtoName;
+    return typeParameters?.length ? `${dtoName}<${typeParameters.map((parameter) => parameter.name).join(', ')}>` : dtoName;
   }
 
   // Collision resolution shared by `synthesizeInlineDTO`'s two call sites
@@ -4677,7 +5189,11 @@ export class TypeScriptToTypedMindConverter {
     return { name: match[1], type: match[3].trim(), optional: !!match[2] };
   }
 
-  private parseInlineObjectLiteralToFields(objectLiteralType: string, dtoName: string): DtoFieldNode[] {
+  private parseInlineObjectLiteralToFields(
+    objectLiteralType: string,
+    dtoName: string,
+    typeParameters?: readonly TypeParameterNode[],
+  ): DtoFieldNode[] {
     const trimmed = objectLiteralType.trim();
     if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
       return [];
@@ -4701,7 +5217,7 @@ export class TypeScriptToTypedMindConverter {
       // reused rather than re-derived.
       if (isInlineObjectLiteralType(prop.type)) {
         const nestedBaseName = this.sanitizeEntityName(`${dtoName}_${prop.name}`);
-        const nestedDtoName = this.synthesizeInlineDTO(prop.type, nestedBaseName);
+        const nestedDtoName = this.synthesizeInlineDTO(prop.type, nestedBaseName, typeParameters);
         const typeExpr = parseTypeExprText(nestedDtoName).typeExpr;
         fields.push(
           new DtoFieldNode({
@@ -4822,6 +5338,7 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private convertTypeToSchema(type: string): string {
+    if (this.originContext?.entitiesByName.has(type)) return type;
     // Convert TypeScript types to schema names.
     //
     // The Constants type slot is grammatically an `entity_name`
@@ -4913,7 +5430,7 @@ export class TypeScriptToTypedMindConverter {
 
   private isFunctionExported(func: ParsedFunction, module: ParsedModule): boolean {
     // Check if function is in module exports
-    return module.exports.some((exp) => exp.name === func.name);
+    return module.exports.some((exp) => this.exportMatchesDeclaration(exp, func));
   }
 
   private isExternalPackage(specifier: string): boolean {

@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as ts from 'typescript';
+import { getModuleTypeInfos } from './parsed-type-slots.ts';
 import { getDeclarationIdentity, parseTypeTextOrigins, resolveReferenceOrigin, sourceRange } from './type-reference-origins.ts';
+import { mapStructuralSegments, stripComments } from './type-text-segments.ts';
 import type {
   AnalyzerDiagnostic,
   DeclarationIdentity,
@@ -9,6 +11,7 @@ import type {
   ParsedCallReference,
   ParsedClass,
   ParsedConstant,
+  ParsedConstructor,
   ParsedEnum,
   ParsedExport,
   ParsedFactoryHeritage,
@@ -16,6 +19,7 @@ import type {
   ParsedImport,
   ParsedInterface,
   ParsedMethod,
+  ParsedMixinHeritage,
   ParsedModule,
   ParsedParameter,
   ParsedProperty,
@@ -529,6 +533,29 @@ export class TypeScriptAnalyzer {
       const module = this.analyzeModule(sourceFile);
       modules.push(module);
 
+      // A2 semantic type dependencies share the queue but are not import edges.
+      const referencedSources = new Set(
+        getModuleTypeInfos(module)
+          .flatMap((info) => info.references)
+          .filter((reference) => reference.origin.kind === 'project')
+          .map((reference) => (reference.origin.kind === 'project' ? reference.origin.declaration.filePath : '')),
+      );
+      for (const referencedPath of referencedSources) {
+        if (visitedModules.has(referencedPath)) continue;
+        const referencedFile = this.program.getSourceFile(referencedPath);
+        if (referencedFile !== undefined && !referencedFile.isDeclarationFile) {
+          if (!traverseQueue.includes(referencedPath)) traverseQueue.push(referencedPath);
+        } else {
+          this.diagnostics.push({
+            severity: 'warning',
+            category: 'unrepresented-type-source',
+            message: `Referenced project declaration has no source module in the TypeScript program: ${referencedPath}`,
+            filePath: currentPath,
+            specifier: undefined,
+          });
+        }
+      }
+
       // X-AN-10 — opt-in recognizer scan. No-op (and no diagnostic
       // surface) when --recognize was not passed for this convention name,
       // matching the doc's "without the flag, behavior is unchanged."
@@ -959,24 +986,34 @@ export class TypeScriptAnalyzer {
       } else if (isExportDeclaration(node)) {
         exports.push(...this.parseExportDeclaration(node));
       } else if (isFunction(node)) {
+        if (!node.name && this.hasDefaultModifier(node)) {
+          this.reportUnsupportedDefault(sourceFile, node);
+          return;
+        }
         const func = this.parseFunction(node);
         functions.push(func);
 
         if (this.hasExportModifier(node)) {
           exports.push({
             name: func.name,
+            declaration: func.declaration,
             isDefault: this.hasDefaultModifier(node),
             type: 'function',
             source: undefined,
           } as const);
         }
       } else if (isClass(node)) {
+        if (!node.name && this.hasDefaultModifier(node)) {
+          this.reportUnsupportedDefault(sourceFile, node);
+          return;
+        }
         const cls = this.parseClass(node);
         classes.push(cls);
 
         if (this.hasExportModifier(node)) {
           exports.push({
             name: cls.name,
+            declaration: cls.declaration,
             isDefault: this.hasDefaultModifier(node),
             type: 'class',
             source: undefined,
@@ -989,6 +1026,7 @@ export class TypeScriptAnalyzer {
         if (this.hasExportModifier(node)) {
           exports.push({
             name: iface.name,
+            declaration: iface.declaration,
             isDefault: false,
             type: 'interface',
             source: undefined,
@@ -1001,6 +1039,7 @@ export class TypeScriptAnalyzer {
         if (this.hasExportModifier(node)) {
           exports.push({
             name: typeAlias.name,
+            declaration: typeAlias.declaration,
             isDefault: false,
             type: 'type',
             source: undefined,
@@ -1019,6 +1058,7 @@ export class TypeScriptAnalyzer {
           for (const func of arrowFunctions) {
             exports.push({
               name: func.name,
+              declaration: func.declaration,
               isDefault: false,
               type: 'function',
               source: undefined,
@@ -1027,6 +1067,7 @@ export class TypeScriptAnalyzer {
           for (const constant of plainConstants) {
             exports.push({
               name: constant.name,
+              declaration: constant.declaration,
               isDefault: false,
               type: 'constant',
               source: undefined,
@@ -1046,6 +1087,7 @@ export class TypeScriptAnalyzer {
         if (this.hasExportModifier(node)) {
           exports.push({
             name: parsedEnum.name,
+            declaration: parsedEnum.declaration,
             isDefault: false,
             type: 'type',
             source: undefined,
@@ -1073,6 +1115,12 @@ export class TypeScriptAnalyzer {
 
     ts.forEachChild(sourceFile, visit);
 
+    const defaultExports = this.collectDefaultExports(sourceFile, exports, [
+      ...functions.map((declaration) => ({ ...declaration, type: 'function' as const })),
+      ...classes.map((declaration) => ({ ...declaration, type: 'class' as const })),
+      ...constants.map((declaration) => ({ ...declaration, type: 'constant' as const })),
+    ]);
+
     // X-AN-8 — fold get/set accessor pairs discovered on classes during
     // `parseClass` into a single accessorKind: 'both' entry per name. The
     // per-class fold happens inside parseClass itself (it owns the member
@@ -1081,7 +1129,7 @@ export class TypeScriptAnalyzer {
     return {
       filePath: createFilePath(sourceFile.fileName),
       imports,
-      exports,
+      exports: defaultExports,
       functions,
       classes,
       interfaces,
@@ -1092,6 +1140,84 @@ export class TypeScriptAnalyzer {
       selfInvokedFunctionNames,
       hasTopLevelCallbackRegistration: this.hasTopLevelCallbackRegistration(sourceFile),
     } as const;
+  }
+
+  private collectDefaultExports(
+    source: ts.SourceFile,
+    exports: readonly ParsedExport[],
+    declarations: readonly { readonly name: string; readonly declaration?: DeclarationIdentity; readonly type: ParsedExport['type'] }[],
+  ): ParsedExport[] {
+    const key = (identity: DeclarationIdentity): string => JSON.stringify([identity.filePath, identity.name, identity.start, identity.end]);
+    const retained = new Map<string, (typeof declarations)[number]>();
+    for (const declaration of declarations) {
+      if (declaration.declaration !== undefined) retained.set(key(declaration.declaration), declaration);
+    }
+    // Local export clauses preserve their public spelling and carry the exact
+    // retained declaration. Default clauses use the declaration name, matching
+    // named default declarations and identifier export assignments.
+    const localClauses = new Map<string, (typeof declarations)[number]>();
+    const unsupportedDefaults = new Set<string>();
+    for (const statement of source.statements) {
+      if (
+        !ts.isExportDeclaration(statement) ||
+        statement.moduleSpecifier ||
+        !statement.exportClause ||
+        !ts.isNamedExports(statement.exportClause)
+      )
+        continue;
+      for (const element of statement.exportClause.elements) {
+        const origin = this.resolveReferenceOriginAtLocation(element.propertyName ?? element.name);
+        const target = origin.kind === 'project' ? retained.get(key(origin.declaration)) : undefined;
+        if (target !== undefined) localClauses.set(element.name.text, target);
+        else if (element.name.text === 'default') {
+          unsupportedDefaults.add(element.name.text);
+          this.reportUnsupportedDefault(source, element);
+        }
+      }
+    }
+    const result = exports
+      .filter((exp) => !unsupportedDefaults.has(exp.name))
+      .map((exp) => {
+        const local = exp.source === undefined ? localClauses.get(exp.name) : undefined;
+        if (local !== undefined)
+          return {
+            ...exp,
+            name: exp.name === 'default' ? local.name : exp.name,
+            isDefault: exp.isDefault || exp.name === 'default',
+            declaration: local.declaration,
+            type: local.type,
+          };
+        if (!exp.isDefault) return exp;
+        const matches = declarations.filter((declaration) => declaration.name === exp.name && declaration.declaration !== undefined);
+        const identities = new Set(
+          matches.flatMap((declaration) => (declaration.declaration === undefined ? [] : [key(declaration.declaration)])),
+        );
+        return identities.size === 1 ? { ...exp, declaration: matches[0]?.declaration } : exp;
+      });
+    for (const statement of source.statements) {
+      if (!ts.isExportAssignment(statement) || statement.isExportEquals) continue;
+      const origin = ts.isIdentifier(statement.expression) ? this.resolveReferenceOriginAtLocation(statement.expression) : undefined;
+      const target = origin?.kind === 'project' ? retained.get(key(origin.declaration)) : undefined;
+      const identity = target?.declaration;
+      if (target !== undefined && identity !== undefined) {
+        if (!result.some((exp) => exp.isDefault && exp.declaration !== undefined && key(exp.declaration) === key(identity))) {
+          result.push({ name: target.name, declaration: identity, isDefault: true, type: target.type, source: undefined });
+        }
+      } else {
+        this.reportUnsupportedDefault(source, statement.expression);
+      }
+    }
+    return result;
+  }
+
+  private reportUnsupportedDefault(source: ts.SourceFile, expression: ts.Node): void {
+    this.diagnostics.push({
+      severity: 'warning',
+      category: 'unsupported-default-export',
+      message: `Default export '${expression.getText()}' has no uniquely retained local declaration; no default identity was synthesized`,
+      filePath: source.fileName,
+      specifier: undefined,
+    });
   }
 
   // RC-F (issue #108) — `isPureTypesFile` (typescript-to-typedmind-
@@ -1227,11 +1353,13 @@ export class TypeScriptAnalyzer {
     }
 
     const namedImports: string[] = [];
+    const bindings: NonNullable<ParsedImport['bindings']>[number][] = [];
     let defaultImport: string | undefined;
     let namespaceImport: string | undefined;
 
     if (importClause.name) {
       defaultImport = importClause.name.text;
+      bindings.push({ localName: defaultImport, exportName: 'default', origin: this.resolveReferenceOriginAtLocation(importClause.name) });
     }
 
     if (importClause.namedBindings) {
@@ -1250,6 +1378,11 @@ export class TypeScriptAnalyzer {
           // The exported name is what the export registry is keyed by, so
           // that is what the import edge must carry.
           namedImports.push((element.propertyName ?? element.name).text);
+          bindings.push({
+            localName: element.name.text,
+            exportName: (element.propertyName ?? element.name).text,
+            origin: this.resolveReferenceOriginAtLocation(element.name),
+          });
         }
       }
     }
@@ -1260,6 +1393,7 @@ export class TypeScriptAnalyzer {
       namedImports,
       namespaceImport: namespaceImport || undefined,
       isTypeOnly: importClause.isTypeOnly || false,
+      bindings,
     } as const;
   }
 
@@ -1290,7 +1424,9 @@ export class TypeScriptAnalyzer {
 
       return node.exportClause.elements.map((element) => {
         const source = explicitSource ?? this.namedImportSourceForExport(element);
+        const origin = explicitSource === undefined ? undefined : this.resolveReferenceOriginAtLocation(element.name);
         return {
+          ...(origin?.kind === 'project' ? { declaration: origin.declaration } : {}),
           name: element.name.text,
           isDefault: false,
           type: this.inferExportType(element.name.text, source),
@@ -1403,8 +1539,10 @@ export class TypeScriptAnalyzer {
     const isAbstract = this.hasAbstractModifier(node);
     const extendsClasses: string[] = [];
     const factoryHeritage: ParsedFactoryHeritage[] = [];
+    const mixinHeritage: ParsedMixinHeritage[] = [];
     const implementsInterfaces: string[] = [];
     const methods: ParsedMethod[] = [];
+    const constructors: ParsedConstructor[] = [];
     const properties: ParsedProperty[] = [];
     const decorators = this.parseDecorators(node);
     const description = node.name ? this.extractJSDocDescription(node.name) : this.extractJSDocDescriptionFallback(node);
@@ -1413,7 +1551,22 @@ export class TypeScriptAnalyzer {
       for (const clause of node.heritageClauses) {
         if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
           for (const type of clause.types) {
-            if (ts.isCallExpression(type.expression) && this.findMixinBaseExpression(type.expression) === undefined) {
+            const selected = ts.isCallExpression(type.expression) ? this.findMixinBaseExpression(type.expression) : undefined;
+            if (selected !== undefined) {
+              const text = selected.getText();
+              const source = sourceRange(selected);
+              mixinHeritage.push({
+                index: extendsClasses.length,
+                base: {
+                  text,
+                  source,
+                  references: [
+                    { writtenName: text, start: 0, end: text.length, source, origin: this.resolveReferenceOriginAtLocation(selected) },
+                  ],
+                },
+              });
+            }
+            if (ts.isCallExpression(type.expression) && selected === undefined) {
               const origin = this.resolveFactoryHeritage(type.expression);
               factoryHeritage.push({ index: extendsClasses.length, source: sourceRange(type.expression), origin });
               if (origin.kind !== 'project') {
@@ -1453,7 +1606,15 @@ export class TypeScriptAnalyzer {
     const accessorsByKey = new Map<string, AccessorFold>();
 
     for (const member of node.members) {
-      if (ts.isMethodDeclaration(member)) {
+      if (ts.isConstructorDeclaration(member)) {
+        const parameters = this.parseParameters(member.parameters);
+        constructors.push({
+          signature: `(${parameters.map((parameter) => `${parameter.isRest ? '...' : ''}${parameter.name}${parameter.isOptional || parameter.hasDefaultValue ? '?' : ''}: ${mapStructuralSegments(stripComments(parameter.type), (segment) => segment.replace(/\s+/g, ' ')).trim()}`).join(', ')})`,
+          parameters,
+          isPrivate: this.hasPrivateModifier(member),
+          isProtected: this.hasProtectedModifier(member),
+        });
+      } else if (ts.isMethodDeclaration(member)) {
         methods.push(this.parseMethod(member));
       } else if (ts.isPropertyDeclaration(member)) {
         const { property, arrowMethod } = this.parseProperty(member);
@@ -1520,12 +1681,14 @@ export class TypeScriptAnalyzer {
       isAbstract,
       extends: extendsClasses,
       ...(factoryHeritage.length > 0 ? { factoryHeritage } : {}),
+      ...(mixinHeritage.length > 0 ? { mixinHeritage } : {}),
       implements: implementsInterfaces,
       implementsTypeInfo:
         node.heritageClauses
           ?.filter((clause) => clause.token === ts.SyntaxKind.ImplementsKeyword)
           .flatMap((clause) => clause.types.map((type) => this.getTypeInfo(type))) ?? [],
       methods,
+      ...(constructors.length > 0 ? { constructors } : {}),
       properties,
       decorators,
       description: description || undefined,
@@ -1861,6 +2024,7 @@ export class TypeScriptAnalyzer {
       typeInfo: this.getTypeInfo(param.type),
       isOptional: !!param.questionToken,
       hasDefaultValue: !!param.initializer,
+      ...(param.dotDotDotToken === undefined ? {} : { isRest: true }),
     }));
   }
 
