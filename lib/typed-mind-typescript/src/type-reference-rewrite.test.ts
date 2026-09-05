@@ -30,6 +30,15 @@ it('TM13 A2: structural type rewrites preserve untouched source bytes and callab
     ],
     ['Array<Model>', ['Array', 'Model'], 'Owner.Array<Owner.Model>'],
     ['((item: Model) => Result)[]', ['Model', 'Result'], '((item: Owner.Model) => Owner.Result)[]'],
+    // RFC-TM-14 S7: inline object-literal members are emitted as DTO fields,
+    // so their `key: type` slots are structural.
+    ['{ property: Model }', ['Model'], '{ property: Owner.Model }'],
+    [
+      "{ readonly list: Model[]; 'quoted'?: Array<Other>,\n nested: { inner: Result } }",
+      ['Model', 'Other', 'Result'],
+      "{ readonly list: Owner.Model[]; 'quoted'?: Array<Owner.Other>,\n nested: { inner: Owner.Result } }",
+    ],
+    ['Omit<Model, "k"> & { extra: Other }', ['Model', 'Other'], 'Omit<Owner.Model, "k"> & { extra: Owner.Other }'],
   ] as const) {
     const info = infoFor(text, names);
     const result = rewriteTypeReferences(info, replacement);
@@ -41,7 +50,12 @@ it('TM13 A2: structural type rewrites preserve untouched source bytes and callab
 });
 
 it('TM13 A2: opaque text and labels never become structural reference replacements', () => {
-  for (const text of ['{ property: Model }', 'T extends Model ? Yes : No', '(Model: string = Model) => string']) {
+  for (const text of [
+    '{ run(item: Model): void }',
+    '{ [key: string]: Model }',
+    'T extends Model ? Yes : No',
+    '(Model: string = Model) => string',
+  ]) {
     const info = infoFor(text, ['Model']);
     const result = rewriteTypeReferences(info, replacement);
     assert.equal(result.text, text);

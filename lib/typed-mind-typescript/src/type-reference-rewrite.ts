@@ -53,7 +53,11 @@ const structuralNames = (text: string): ReadonlyMap<number, number> => {
         case 'opaque': {
           const nested = raw.slice(start, end);
           const signature = parseSignatureText(nested);
-          if (signature.kind === 'parsed') visitSignature(signature.signature, nested, baseOffset + start);
+          if (signature.kind === 'parsed') {
+            visitSignature(signature.signature, nested, baseOffset + start);
+            break;
+          }
+          visitInlineObjectMembers(nested, baseOffset + start);
           break;
         }
         case 'literal':
@@ -61,6 +65,52 @@ const structuralNames = (text: string): ReadonlyMap<number, number> => {
       }
     };
     visit(parsed.typeExpr);
+  };
+  // RFC-TM-14 S7 — an inline object literal is an opaque leaf to the type
+  // parser, but the converter emits its `key: type` members as DTO fields
+  // (`parseInlineObjectLiteralToFields`), so a renamed identity inside one
+  // must be rewritten where it is emitted. Members are split at depth-0
+  // `;` / `,` / newline with the same depth and quote rules as the
+  // converter's `splitObjectLiteralProperties`; only `[readonly] key?: type`
+  // members are visited. Method and index-signature members stay unsupported.
+  const visitInlineObjectMembers = (raw: string, baseOffset: number): void => {
+    const open = raw.indexOf('{');
+    const close = raw.lastIndexOf('}');
+    if (open === -1 || close <= open || raw.slice(0, open).trim() !== '' || raw.slice(close + 1).trim() !== '') return;
+    const content = raw.slice(open + 1, close);
+    const contentOffset = open + 1;
+    const members: Array<{ readonly start: number; readonly end: number }> = [];
+    let depth = 0;
+    let angleDepth = 0;
+    let memberStart = 0;
+    let quoteChar: string | undefined;
+    for (let index = 0; index < content.length; index += 1) {
+      const char = content[index];
+      if (quoteChar !== undefined) {
+        if (char === '\\') index += 1;
+        else if (char === quoteChar) quoteChar = undefined;
+        continue;
+      }
+      if (char === "'" || char === '"') quoteChar = char;
+      else if (char === '{' || char === '(' || char === '[') depth += 1;
+      else if (char === '}' || char === ')' || char === ']') depth -= 1;
+      else if (char === '<') angleDepth += 1;
+      else if (char === '>') angleDepth = Math.max(0, angleDepth - 1);
+      else if ((char === ';' || char === ',' || char === '\n') && depth === 0 && angleDepth === 0) {
+        members.push({ start: memberStart, end: index });
+        memberStart = index + 1;
+      }
+    }
+    members.push({ start: memberStart, end: content.length });
+    for (const member of members) {
+      const text = content.slice(member.start, member.end);
+      const match = text.match(/^(\s*)(?:readonly\s+(?=[A-Za-z_$'"]))?(?:\w+|'[^']*'|"[^"]*")\s*\??\s*:\s*/);
+      if (match === null) continue;
+      const typeStart = member.start + match[0].length;
+      const typeText = text.slice(match[0].length).trimEnd();
+      if (typeText === '') continue;
+      visitType(typeText, baseOffset + contentOffset + typeStart);
+    }
   };
   const visitSignature = (signature: ParsedSignature, raw: string, baseOffset: number): void => {
     for (const parameter of signature.typeParameters ?? []) {

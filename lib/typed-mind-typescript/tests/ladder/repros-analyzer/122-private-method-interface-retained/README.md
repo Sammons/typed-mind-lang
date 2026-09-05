@@ -10,7 +10,8 @@ number 122 as the doc proposes. Test: `ladder/private-identities.test.ts`.
   `export async function run(c: ClientLike) {}` retains the interface.
 - `src/main.ts` (entry) imports `run` and the DTO `Job`.
 - `src/shapes.ts` is a pure-types module: a private method-bearing
-  `Reporter` reached from the exported DTO `Job`.
+  `Reporter` reached from two DTO carriers, `export interface Job` and the
+  type alias `export type Batch = { readonly reporters: Reporter[]; fallback?: Reporter }`.
 
 The package `update-client` is a stub the test writes into a tmpdir copy of
 this fixture (the repo ignores `node_modules/`), so the fixture is analyzed
@@ -46,8 +47,18 @@ Job %
   - reporter: ShapesFile.Reporter
 ```
 
+```
+Batch %
+  - reporters: ShapesFile.Reporter[]
+  - fallback?: ShapesFile.Reporter
+```
+
 Zero findings. `ShapesFile` exists only because a private Class needs an
-owner (`needsOwner`). Control: adding `RunFile.ClientLike` to `MainFile`'s
+owner (`needsOwner`). The `Batch` alias carrier needs the A2 rewrite to
+walk inline object-literal members (`type-reference-rewrite.ts`,
+`visitInlineObjectMembers`): before that walk the alias body kept the bare
+`Reporter` while the declaration was renamed, which produced
+`orphaned-entity` + `dto-field-unknown-type` (reviewer blocker B1 on PR #196). Control: adding `RunFile.ClientLike` to `MainFile`'s
 imports reports `Qualified name 'RunFile.ClientLike' is owned by 'RunFile'
 but is not exported for this reference` (`check-context.ts`, `private-member`).
 
@@ -58,3 +69,9 @@ non-exported interface on the Class lane (`isRetainedPrivateClassInterface`)
 is partitioned out of the bare-name contest and reserved as `${owner}.${name}`
 once File owners exist; its module joins `needsOwner`. Private DTO-lane
 interfaces and TypeDefs keep their standalone names (non-goal N-9u).
+
+`type-reference-rewrite.ts`: `structuralNames` descends into an opaque
+inline object literal and marks each `[readonly] key?: type` member's type
+slot structural (same depth/quote/separator rules as the converter's
+`splitObjectLiteralProperties`). Method and index-signature members stay
+unsupported.

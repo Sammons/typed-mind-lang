@@ -20,7 +20,10 @@
 //   (b) `run`'s signature reads `(c: RunFile.ClientLike)`.
 //   (c) `UpdateClient.UpdateCommand` (tmpdir stub package) resolves.
 //   (d) `ShapesFile` exists for the pure-types module and owns
-//       `ShapesFile.Reporter`; zero checker findings overall.
+//       `ShapesFile.Reporter`; both DTO carriers (`interface Job`, and the
+//       type alias `Batch` whose object-literal members the type parser
+//       treats as opaque) reference `ShapesFile.Reporter`; zero checker
+//       findings overall.
 //   (e) control: importing `RunFile.ClientLike` from `MainFile` reports the
 //       `private-member` wording from `check-context.ts`.
 import assert from 'node:assert/strict';
@@ -74,15 +77,18 @@ it('TM14 U7: a retained private interface is owner-qualified and passes export c
   // private Class; the DTO it exports stays bare.
   const shapesFile = byName.get('ShapesFile');
   assert.ok(shapesFile instanceof FileNode);
-  assert.deepEqual(shapesFile.exports, ['Job']);
+  assert.deepEqual(shapesFile.exports, ['Job', 'Batch']);
   assert.ok(byName.get('ShapesFile.Reporter') instanceof ClassNode, 'ShapesFile.Reporter is a Class');
+  assert.equal(byName.has('Reporter'), false, 'no bare Reporter');
   assert.ok(result.tmdContent.includes('- reporter: ShapesFile.Reporter'), result.tmdContent);
+  assert.ok(result.tmdContent.includes('- reporters: ShapesFile.Reporter[]'), result.tmdContent);
+  assert.ok(result.tmdContent.includes('- fallback?: ShapesFile.Reporter'), result.tmdContent);
 
   const mind = await TypedMind.create();
   assert.deepEqual(mind.check(result.tmdContent).diagnostics, []);
 
   // Control: the private identity is not importable by another file.
-  const control = result.tmdContent.replace('<- [run, Job]', '<- [run, Job, RunFile.ClientLike]');
+  const control = result.tmdContent.replace('<- [run, Batch, Job]', '<- [run, Batch, Job, RunFile.ClientLike]');
   assert.notEqual(control, result.tmdContent);
   assert.deepEqual(
     mind.check(control).diagnostics.map((finding) => [finding.code, finding.message]),

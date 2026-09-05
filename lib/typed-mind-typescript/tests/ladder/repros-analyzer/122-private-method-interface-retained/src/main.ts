@@ -1,6 +1,6 @@
 import { run } from './run.ts';
-import type { Job } from './shapes.ts';
+import type { Batch, Job } from './shapes.ts';
 
-export function main(job: Job) {
+export function main(job: Job, batch: Batch) {
   return run;
 }
