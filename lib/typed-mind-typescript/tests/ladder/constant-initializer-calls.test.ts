@@ -71,6 +71,20 @@ it('TM13 F: unresolved calls and source labels cannot borrow exported function i
   assert.deepEqual(other.calls, []);
 });
 
+it('TM13 F: same-file lexical declarations do not collapse into one callable identity', (context) => {
+  const { converted } = fixture(
+    context,
+    `
+    export function helper() { return 'outer'; }
+    export function factory() { function helper() { return 'inner'; } return helper(); }
+    export const app = { run() { return helper(); } };
+  `,
+  );
+  const app = converted.entities.find((entity) => entity.name === 'app');
+  assert.ok(app instanceof ConstantsNode);
+  assert.deepEqual(app.calls, []);
+});
+
 it('TM13 F: registration callbacks count real helper calls without crediting private constructors', (context) => {
   const { converted } = fixture(
     context,
