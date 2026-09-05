@@ -150,37 +150,35 @@ describe('82 — a function type returning a generic whose argument is a union',
   });
 });
 
-describe('83 — an external type in a generic BASE position gets no Dependency stub', () => {
+describe('83 — external generic types resolve through Dependency exports', () => {
   // Corpus: services/app/src/db-types.ts, whose kysely table types spell every
   // generated column `Generated<string>` / `Generated<Date>`. This produced all
   // 8 diagnostics on BOTH services/app entrypoints (server.ts and migrate.ts).
-  it('knownGap — the base name is never offered to the stub mechanism, and the stub would not satisfy the checker anyway', async () => {
-    const result = convertFixture('83-generic-base-external-stub', ['src', 'index.ts']);
+  it('TM13 B2: gap 83 clears exactly its two external field errors', async () => {
+    const fixture = '83-generic-base-external-stub';
+    const analysis = new TypeScriptAnalyzer(fixturePath(fixture)).analyzeFromEntrypoint(fixturePath(fixture, 'src', 'index.ts'));
+    assert.deepEqual(
+      analysis.moduleGraph,
+      [
+        {
+          sourceModule: 'src/index.ts',
+          specifier: 'external-lib',
+          resolvedTarget: undefined,
+          classification: 'unresolved',
+        },
+      ],
+      'the external-import fix preserves the baseline unresolved package edge',
+    );
+    const result = new TypeScriptToTypedMindConverter().convert(analysis);
     assert.equal(result.success, true);
-
-    // Defect (1), converter: `walkGenericArgsForExternalStubs`
-    // (typescript-to-typedmind-converter.ts:3648-3658) walks `node.args` and
-    // never `node.base`, so the ARGUMENT-position external type is stubbed
-    // onto the Dependency and the BASE-position one is not. The emitted
-    // Dependency export list is the direct evidence of that asymmetry.
-    assert.ok(
-      result.tmdContent.includes('-> [ExternalThing]'),
-      `the argument-position external type IS stubbed today. Got:\n${result.tmdContent}`,
-    );
-    assert.equal(
-      result.tmdContent.includes('Generated]') || result.tmdContent.includes('[Generated'),
-      false,
-      'the base-position external type is never stubbed — this is defect (1)',
-    );
-
-    // Defect (2), checker: a Dependency's `-> [...]` exports never enter
-    // `CheckContext.byName` (check-context.ts:38-42 maps ENTITY names only),
-    // and `checkNamedPart` (check-dto-fields.ts) resolves a field type solely
-    // through `byName`. So the stub that IS emitted buys nothing: both fields
-    // error identically. This is why fixing (1) alone would change nothing
-    // observable, and why this stays a knownGap rather than a one-line fix.
+    assert.ok(result.tmdContent.includes('-> [Generated, ExternalThing]'));
     const check = await checkTmd(result.tmdContent);
-    assert.deepEqual(messagesOf(check).toSorted(), [
+    assert.deepEqual(messagesOf(check), []);
+
+    // Removing only the dependency exports reproduces precisely the two
+    // original field findings; no unrelated checker rule was silenced.
+    const withoutExports = result.tmdContent.replace('  -> [Generated, ExternalThing]\n', '');
+    assert.deepEqual(messagesOf(await checkTmd(withoutExports)).toSorted(), [
       "DTO 'AccountsTable' field 'id' references undefined type 'Generated'",
       "DTO 'AccountsTable' field 'picked' references undefined type 'ExternalThing'",
     ]);
