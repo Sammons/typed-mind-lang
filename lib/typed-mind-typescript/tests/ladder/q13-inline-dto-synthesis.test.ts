@@ -175,7 +175,7 @@ describe('issue #72 check — collision of two identical-shaped inline types in 
     );
   });
 
-  it('a synthesized DTO name colliding with a plain function entity that already claims it falls back to the __2 disambiguator', () => {
+  it('a synthesized DTO name colliding with a plain function entity that already claims it falls back to the 2 disambiguator', () => {
     // `reserveFunctionEntityNames` is a pre-pass that reserves EVERY
     // exported function's bare name in `entityNames` before any function
     // actually converts (see its own doc comment). So by the time
@@ -184,7 +184,7 @@ describe('issue #72 check — collision of two identical-shaped inline types in 
     // DTO, but by the sibling function literally named `CraftInvoiceInput`
     // (declared immediately after `craftInvoice` in the fixture, on
     // purpose, to construct this exact collision). `craftInvoice`'s
-    // synthesis must fall back to `reserveSynthesizedDTOName`'s `__2`
+    // synthesis must fall back to `reserveSynthesizedDTOName`'s `2`
     // disambiguator rather than silently colliding with that function's
     // own entity name.
     const result = convert();
@@ -195,12 +195,12 @@ describe('issue #72 check — collision of two identical-shaped inline types in 
 
     assert.equal(
       craftInvoiceFn?.input,
-      'CraftInvoiceInput__2',
+      'CraftInvoiceInput2',
       'CraftInvoiceInput is already claimed by the sibling function of that exact name — the synthesized DTO must disambiguate',
     );
     assert.equal(collidingFn?.input, undefined, "CraftInvoiceInput's own parameter is a plain identifier, not DTO-shaped");
 
-    const synthesizedDto = findDTO(result.entities, 'CraftInvoiceInput__2');
+    const synthesizedDto = findDTO(result.entities, 'CraftInvoiceInput2');
     assert.notEqual(synthesizedDto, undefined, 'the disambiguated synthesized DTO must exist as its own entity');
     assert.deepEqual(
       synthesizedDto?.fields.map((f) => f.name),
@@ -229,7 +229,7 @@ describe('issue #72 check — collision of two identical-shaped inline types in 
     assert.notEqual(fn, undefined, 'the archiveOrder function entity must exist');
     assert.equal(
       fn?.input,
-      'ArchiveOrderInput__2',
+      'ArchiveOrderInput2',
       'ArchiveOrderInput is claimed by the hand-authored interface — the synthesized DTO must disambiguate',
     );
 
@@ -241,7 +241,7 @@ describe('issue #72 check — collision of two identical-shaped inline types in 
       'the hand-authored entity keeps its own original fields, unmodified by the collision',
     );
 
-    const synthesized = findDTO(result.entities, 'ArchiveOrderInput__2');
+    const synthesized = findDTO(result.entities, 'ArchiveOrderInput2');
     assert.notEqual(synthesized, undefined, 'the disambiguated synthesized DTO must exist as its own entity');
     assert.deepEqual(
       synthesized?.fields.map((f) => f.name),
@@ -288,7 +288,7 @@ describe('issue #72 check — collision of two identical-shaped inline types in 
     assert.notEqual(fn, undefined, 'the processBatch function entity must exist');
     assert.equal(
       fn?.input,
-      'ProcessBatchInput__2',
+      'ProcessBatchInput2',
       "ProcessBatchInput is claimed by types.ts's hand-authored interface — the synthesized DTO must disambiguate",
     );
 
@@ -300,7 +300,7 @@ describe('issue #72 check — collision of two identical-shaped inline types in 
       'the hand-authored entity keeps its own original fields, unmodified by the cross-module collision',
     );
 
-    const synthesized = findDTO(result.entities, 'ProcessBatchInput__2');
+    const synthesized = findDTO(result.entities, 'ProcessBatchInput2');
     assert.notEqual(synthesized, undefined, 'the disambiguated synthesized DTO must exist as its own entity');
     assert.deepEqual(
       synthesized?.fields.map((f) => f.name),

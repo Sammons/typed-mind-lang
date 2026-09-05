@@ -1,4 +1,4 @@
-program App__App {
+program AppApp {
   type: Program
   entry: AppFile
   version: 1.0.0

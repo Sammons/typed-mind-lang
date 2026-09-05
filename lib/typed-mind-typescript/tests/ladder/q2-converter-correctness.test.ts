@@ -3,7 +3,7 @@
 //   - hash-private repro passes with zero `#` tokens in emitted lists (X-CONV-1)
 //   - script-shaped entrypoint fixture extracts with a File entity, resolving
 //     Program entry, and project-root-relative paths from an external cwd (X-CONV-3)
-//   - App.tsx fixture extracts with `<Base>__App` naming; I-13 fixture — corrupted
+//   - App.tsx fixture extracts with `<Base>App` naming; I-13 fixture — corrupted
 //     input still writes partial output, exits nonzero (X-CONV-4)
 //   - builtin-extends fixture passes the checker (X-CONV-5)
 //   - the recognizer's not-found fixture surfaces the X-DIAG-1 warning (X-AN-10)
@@ -137,7 +137,7 @@ describe('RFC-TM-9 Q2 check — X-CONV-3: script-shaped entrypoint forces a File
 });
 
 describe('RFC-TM-9 Q2 check — X-CONV-4: collision-safe naming + I-13 degrade-never-discard', () => {
-  it('App.tsx extracts with <Base>__App naming, no collision, conversion succeeds', () => {
+  it('App.tsx extracts with <Base>App naming, no collision, conversion succeeds', () => {
     const analyzer = new TypeScriptAnalyzer(fixturePath('03-app-collision'));
     const analysis = analyzer.analyzeFromEntrypoint(fixturePath('03-app-collision', 'src', 'App.tsx'));
     const converter = new TypeScriptToTypedMindConverter();
@@ -145,7 +145,7 @@ describe('RFC-TM-9 Q2 check — X-CONV-4: collision-safe naming + I-13 degrade-n
 
     assert.equal(result.success, true, 'the App.tsx collision must no longer crash the conversion');
     const programEntity = result.entities.find((e) => e.kind === 'Program');
-    assert.equal(programEntity?.name, 'App__App');
+    assert.equal(programEntity?.name, 'AppApp');
     assert.ok(
       result.entities.some((e) => e.name === 'App' && (e.kind === 'Function' || e.kind === 'Class')),
       'the real App component keeps its own name, uncollided',
@@ -157,7 +157,7 @@ describe('RFC-TM-9 Q2 check — X-CONV-4: collision-safe naming + I-13 degrade-n
   // PARTIAL output. Fixture 18 is two files each declaring `class Widget`,
   // which is exactly the cross-module collision PR 1 resolves, so there is no
   // longer anything here to degrade FROM — the collision is renamed
-  // (`Other__Widget`) and the CLI exits 0 with COMPLETE output. Strictly
+  // (`OtherFile.Widget`) and the CLI exits 0 with COMPLETE output. Strictly
   // better than the behaviour this test pinned: the same entities, none lost,
   // and the collision reported as a warning that names both paths.
   //
@@ -191,7 +191,7 @@ describe('RFC-TM-9 Q2 check — X-CONV-4: collision-safe naming + I-13 degrade-n
       // name, the second is qualified by its sanitized module basename. Before
       // PR 1 only one survived, and the run failed.
       assert.ok(content.includes('Widget <:'), 'main.ts keeps the bare Widget');
-      assert.ok(content.includes('Other__Widget'), 'other.ts is renamed, not dropped');
+      assert.ok(content.includes('OtherFile.Widget'), 'other.ts is renamed, not dropped');
     } finally {
       rmSync(dirname(outputPath), { recursive: true, force: true });
     }
