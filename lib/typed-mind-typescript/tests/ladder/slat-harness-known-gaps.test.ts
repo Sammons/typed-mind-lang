@@ -180,9 +180,9 @@ describe('slat-harness rung, FIXED GAP 69: a method-bearing interface extracts a
     assert.equal(repository?.extends, undefined);
   });
 
-  it('the emitted .tmd carries the method continuation, so the contract is visible in the DSL', () => {
+  it('the emitted .tmd carries the typed method, so the contract is visible in the DSL', () => {
     const result = convert('69-interface-method-dropped');
-    assert.match(result.tmdContent, /Repository <:\n\s+=> \[save\]/);
+    assert.match(result.tmdContent, /class Repository \{\n {2}type: Class\n {2}method: "save\(row: string\) => void"\n\}/);
   });
 
   it('FIXED — and the fixture still checks clean, now for the right reason', async () => {
