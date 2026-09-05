@@ -45,6 +45,8 @@ export const buildDocumentState = (output: ParseWithCstOutput): DocumentState =>
 
 export const targetOfOccurrence = (occurrence: NameOccurrence, names: QualifiedNameResolver): EntityNode | undefined => {
   return occurrence.exportingOwner === undefined
-    ? names.target(occurrence.name)
+    ? resolvedNameTarget(
+        names.resolve(occurrence.name, occurrence.importingOwner === undefined ? {} : { importingFile: occurrence.importingOwner }),
+      )
     : resolvedNameTarget(names.resolveExport(occurrence.exportingOwner, occurrence.name));
 };

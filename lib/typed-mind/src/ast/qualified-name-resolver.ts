@@ -67,6 +67,20 @@ export class QualifiedNameResolver {
   }
 
   resolve(name: string, options: { readonly importingFile?: string } = {}): QualifiedNameResolution {
+    return this.resolveWithState(name, options, new Set());
+  }
+
+  private resolveWithState(name: string, options: { readonly importingFile?: string }, active: Set<string>): QualifiedNameResolution {
+    if (active.has(name)) {
+      return { kind: 'unresolved', name, ownerName: name, member: '', reason: 'invalid-owner' };
+    }
+    active.add(name);
+    const result = this.resolveOne(name, options, active);
+    active.delete(name);
+    return result;
+  }
+
+  private resolveOne(name: string, options: { readonly importingFile?: string }, active: Set<string>): QualifiedNameResolution {
     if (!name.includes('.')) {
       const entity = this.#byName.get(name);
       return entity === undefined
@@ -96,7 +110,7 @@ export class QualifiedNameResolver {
     // Shorter prefixes make recursion strictly decreasing; exact hits cannot
     // bypass the validity of the owner's own dotted declaration.
     if (ownerName.includes('.')) {
-      const ownerResult = this.resolve(ownerName, options);
+      const ownerResult = this.resolveWithState(ownerName, options, active);
       if (ownerResult.kind === 'unresolved') {
         return failure(ownerResult.reason === 'private-member' ? 'private-member' : 'invalid-owner');
       }
@@ -114,8 +128,11 @@ export class QualifiedNameResolver {
       if (exported || reExported) {
         const target = this.#byName.get(name) ?? this.#byName.get(member);
         if (target !== undefined) {
-          if (target.name.includes('.') && this.resolve(target.name).kind === 'unresolved') {
-            return failure('invalid-owner');
+          if (target.name.includes('.')) {
+            const targetResult = this.resolveWithState(target.name, { importingFile: ownerName }, active);
+            if (targetResult.kind === 'unresolved') {
+              return failure(targetResult.reason === 'private-member' ? 'private-member' : 'invalid-owner');
+            }
           }
           return { kind: 'entity', entity: target };
         }
@@ -132,10 +149,8 @@ export class QualifiedNameResolver {
       return owner.methods.includes(member) ? { kind: 'member', owner, member } : failure('missing-member');
     }
     if (owner instanceof ConstantsNode) {
-      const schema = owner.schema === undefined ? undefined : this.#byName.get(owner.schema);
-      return schema instanceof DtoNode &&
-        this.resolve(schema.name).kind === 'entity' &&
-        schema.fields.some((field) => field.name === member)
+      const schema = owner.schema === undefined ? undefined : resolvedNameTarget(this.resolveWithState(owner.schema, {}, active));
+      return schema instanceof DtoNode && schema.fields.some((field) => field.name === member)
         ? { kind: 'member', owner, member }
         : failure('missing-member');
     }

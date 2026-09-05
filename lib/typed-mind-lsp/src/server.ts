@@ -195,7 +195,7 @@ export class TypedMindLanguageServer {
     if (occurrence === undefined) {
       return [];
     }
-    return provideReferencesForName(params.textDocument.uri, occurrence.name, state.nameIndex, state.names, occurrence.exportingOwner);
+    return provideReferencesForName(params.textDocument.uri, occurrence.name, state.nameIndex, state.names, occurrence);
   }
 
   private provideSemanticTokens(params: SemanticTokensParams): SemanticTokens {

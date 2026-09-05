@@ -259,3 +259,26 @@ it('TM13 Q: an exact nested declaration cannot use a shorter export owner to rec
   }
   assert.ok(findingsFor(source).some((finding) => finding.code === 'checker/qualified-name-unresolved'));
 });
+
+it('TM13 Q: Constants schema members resolve qualified declarations and exported aliases', () => {
+  for (const schema of ['Types.Payload', 'Types.Exported']) {
+    const { names } = namesFor(
+      `Types @ types.ts:\n  -> [Exported]\nTypes.Payload %\n  - value: string\nExported %\n  - value: string\nConfig ! config.ts : ${schema}\n`,
+    );
+    assert.equal(names.resolve('Config.value').kind, 'member');
+    assert.equal(names.resolve('Config.missing').kind, 'unresolved');
+  }
+  const { names } = namesFor('Config ! config.ts : Other.value\nOther ! other.ts : Config.value\n');
+  assert.equal(names.resolve('Config.value').kind, 'unresolved');
+  assert.equal(names.resolve('Other.value').kind, 'unresolved');
+});
+
+it('TM13 Q: a barrel cannot launder private exposure through a qualified export alias', () => {
+  const source = 'Left @ left.ts:\nLeft.Private %\nBarrel @ barrel.ts:\n  -> [Left.Private]\n';
+  const { names } = namesFor(source);
+  const result = names.resolve('Barrel.Left.Private');
+  assert.equal(result.kind, 'unresolved');
+  if (result.kind === 'unresolved') assert.equal(result.reason, 'private-member');
+  const publicNames = namesFor(source.replace('Left @ left.ts:\n', 'Left @ left.ts:\n  -> [Left.Private]\n')).names;
+  assert.equal(publicNames.resolve('Barrel.Left.Private').kind, 'entity');
+});

@@ -19,21 +19,26 @@ export interface NameOccurrence {
   // A declaration occurrence is the entity_name token of a *_declaration
   // header; every other occurrence (list_entry) is a reference.
   readonly isDeclaration: boolean;
-  readonly isExport?: boolean;
+  readonly referenceKind?: 'imports' | 'exports';
   readonly exportingOwner?: string;
+  readonly importingOwner?: string;
 }
 
 const NAME_BEARING_TYPES = new Set(['entity_name', 'list_entry', 'type_named']);
 
-const isExportOccurrence = (node: CstNode): boolean => {
+const referenceKindOf = (node: CstNode): 'imports' | 'exports' | undefined => {
   let ancestor = node.syntaxNode.parent;
   while (ancestor !== null) {
     const kind = ancestor.type.replace(/_final$/, '');
-    if (kind === 'export_list') return true;
-    if (kind === 'property_list') return ancestor.namedChildren.some((child) => child.type === 'property_key' && child.text === 'exports');
+    if (kind === 'export_list') return 'exports';
+    if (kind === 'import_list') return 'imports';
+    if (kind === 'property_list') {
+      const key = ancestor.namedChildren.find((child) => child.type === 'property_key')?.text;
+      return key === 'exports' || key === 'imports' ? key : undefined;
+    }
     ancestor = ancestor.parent;
   }
-  return false;
+  return undefined;
 };
 
 const collectOccurrences = (node: CstNode, out: NameOccurrence[]): void => {
@@ -69,6 +74,7 @@ const collectOccurrences = (node: CstNode, out: NameOccurrence[]): void => {
   }
   if (NAME_BEARING_TYPES.has(concreteType)) {
     const span = node.span();
+    const referenceKind = referenceKindOf(node);
     out.push({
       name: node.text,
       startLine: span.start.line,
@@ -76,7 +82,7 @@ const collectOccurrences = (node: CstNode, out: NameOccurrence[]): void => {
       endLine: span.end.line,
       endColumn: span.end.column,
       isDeclaration: concreteType === 'entity_name' && /_declaration(?:_final)?$/.test(syntax.parent?.type ?? ''),
-      ...(isExportOccurrence(node) ? { isExport: true } : {}),
+      ...(referenceKind === undefined ? {} : { referenceKind }),
     });
     // entity_name/list_entry are grammar leaves (no name-bearing descendants);
     // stop the walk here rather than recursing into token internals.
@@ -101,9 +107,15 @@ export class NameOccurrenceIndex {
     const occurrences: NameOccurrence[] = [];
     collectOccurrences(cst, occurrences);
     this.#occurrences = occurrences.map((occurrence) => {
-      if (!occurrence.isExport) return occurrence;
+      if (occurrence.referenceKind === undefined) return occurrence;
       const owner = entities.findLast((entity) => entity.span.start.line <= occurrence.startLine);
-      return owner === undefined ? occurrence : { ...occurrence, exportingOwner: owner.name };
+      return owner === undefined
+        ? occurrence
+        : occurrence.referenceKind === 'exports'
+          ? { ...occurrence, exportingOwner: owner.name }
+          : owner.kind === 'File' || owner.kind === 'ClassFile'
+            ? { ...occurrence, importingOwner: owner.name }
+            : occurrence;
     });
     const byName = new Map<string, NameOccurrence[]>();
     for (const occurrence of this.#occurrences) {

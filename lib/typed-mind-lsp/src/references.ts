@@ -23,14 +23,16 @@ export const provideReferencesForName = (
   name: string,
   nameIndex: NameOccurrenceIndex,
   names?: QualifiedNameResolver,
-  exportingOwner?: string,
+  context: { readonly exportingOwner?: string; readonly importingOwner?: string } = {},
 ): Location[] => {
   const target =
     names === undefined
       ? undefined
-      : exportingOwner === undefined
-        ? names.target(name)?.name
-        : resolvedNameTarget(names.resolveExport(exportingOwner, name))?.name;
+      : context.exportingOwner === undefined
+        ? resolvedNameTarget(names.resolve(name, context.importingOwner === undefined ? {} : { importingFile: context.importingOwner }))
+            ?.name
+        : resolvedNameTarget(names.resolveExport(context.exportingOwner, name))?.name;
+  if (names !== undefined && target === undefined) return [];
   const occurrences =
     target === undefined || names === undefined
       ? nameIndex.occurrencesOf(name)

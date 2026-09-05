@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { TypedMind } from '@sammons/typed-mind';
-import { buildDocumentState } from './document-state.ts';
+import { buildDocumentState, targetOfOccurrence } from './document-state.ts';
 import { getSemanticTokenType } from './entity-kind-maps.ts';
 import { provideReferencesForName } from './references.ts';
 import { provideSemanticTokensForDocument } from './semantic-tokens.ts';
@@ -87,7 +87,7 @@ it('TM13 Q: LSP export suffixes navigate to the owning qualified declaration', a
     assert.deepEqual(state.output.diagnostics, []);
     const exported = state.nameIndex.occurrencesOf('Private')[0];
     assert.equal(exported?.exportingOwner, 'File');
-    assert.equal(provideReferencesForName('file:///test.tmd', 'Private', state.nameIndex, state.names, exported?.exportingOwner).length, 2);
+    assert.equal(provideReferencesForName('file:///test.tmd', 'Private', state.nameIndex, state.names, exported).length, 2);
   }
 });
 
@@ -97,4 +97,17 @@ it('TM13 Q: missing immediate owners do not recurse in LSP navigation', async ()
   assert.equal(state.names.target('File.Missing.Member'), undefined);
   assert.doesNotThrow(() => provideSemanticTokensForDocument(state));
   assert.doesNotThrow(() => provideReferencesForName('file:///test.tmd', 'File.Missing.Member', state.nameIndex, state.names));
+});
+
+it('TM13 Q: LSP rejects private import navigation with the same exposure as links', async () => {
+  const typedMind = await TypedMind.create();
+  for (const importer of ['Other @ other.ts:\n  <- [File.Private]\n', 'file Other {\n  path: other.ts\n  imports: [File.Private]\n}\n']) {
+    const state = buildDocumentState(typedMind.parseWithCst(`File @ file.ts:\nFile.Private %\n${importer}`));
+    const imported = state.nameIndex.occurrencesOf('File.Private').find((occurrence) => occurrence.importingOwner !== undefined);
+    assert.ok(imported);
+    assert.equal(targetOfOccurrence(imported, state.names), undefined);
+    assert.deepEqual(state.output.links.referencedBy('File.Private'), []);
+    assert.equal(provideReferencesForName('file:///test.tmd', 'File.Private', state.nameIndex, state.names).length, 1);
+    assert.deepEqual(provideReferencesForName('file:///test.tmd', 'File.Private', state.nameIndex, state.names, imported), []);
+  }
 });
