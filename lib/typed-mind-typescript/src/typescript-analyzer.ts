@@ -1072,6 +1072,12 @@ export class TypeScriptAnalyzer {
 
     ts.forEachChild(sourceFile, visit);
 
+    const defaultExports = this.collectDefaultExports(sourceFile, exports, [
+      ...functions.map((declaration) => ({ ...declaration, type: 'function' as const })),
+      ...classes.map((declaration) => ({ ...declaration, type: 'class' as const })),
+      ...constants.map((declaration) => ({ ...declaration, type: 'constant' as const })),
+    ]);
+
     // X-AN-8 — fold get/set accessor pairs discovered on classes during
     // `parseClass` into a single accessorKind: 'both' entry per name. The
     // per-class fold happens inside parseClass itself (it owns the member
@@ -1080,7 +1086,7 @@ export class TypeScriptAnalyzer {
     return {
       filePath: createFilePath(sourceFile.fileName),
       imports,
-      exports,
+      exports: defaultExports,
       functions,
       classes,
       interfaces,
@@ -1091,6 +1097,46 @@ export class TypeScriptAnalyzer {
       selfInvokedFunctionNames,
       hasTopLevelCallbackRegistration: this.hasTopLevelCallbackRegistration(sourceFile),
     } as const;
+  }
+
+  private collectDefaultExports(
+    source: ts.SourceFile,
+    exports: readonly ParsedExport[],
+    declarations: readonly { readonly name: string; readonly declaration?: DeclarationIdentity; readonly type: ParsedExport['type'] }[],
+  ): ParsedExport[] {
+    const key = (identity: DeclarationIdentity): string => JSON.stringify([identity.filePath, identity.name, identity.start, identity.end]);
+    const retained = new Map<string, (typeof declarations)[number]>();
+    for (const declaration of declarations) {
+      if (declaration.declaration !== undefined) retained.set(key(declaration.declaration), declaration);
+    }
+    const result = exports.map((exp) => {
+      if (!exp.isDefault) return exp;
+      const matches = declarations.filter((declaration) => declaration.name === exp.name && declaration.declaration !== undefined);
+      const identities = new Set(
+        matches.flatMap((declaration) => (declaration.declaration === undefined ? [] : [key(declaration.declaration)])),
+      );
+      return identities.size === 1 ? { ...exp, declaration: matches[0]?.declaration } : exp;
+    });
+    for (const statement of source.statements) {
+      if (!ts.isExportAssignment(statement) || statement.isExportEquals) continue;
+      const origin = ts.isIdentifier(statement.expression) ? this.resolveReferenceOriginAtLocation(statement.expression) : undefined;
+      const target = origin?.kind === 'project' ? retained.get(key(origin.declaration)) : undefined;
+      const identity = target?.declaration;
+      if (target !== undefined && identity !== undefined) {
+        if (!result.some((exp) => exp.isDefault && exp.declaration !== undefined && key(exp.declaration) === key(identity))) {
+          result.push({ name: target.name, declaration: identity, isDefault: true, type: target.type, source: undefined });
+        }
+      } else {
+        this.diagnostics.push({
+          severity: 'warning',
+          category: 'unsupported-default-export',
+          message: `Default export '${statement.expression.getText()}' has no uniquely retained local declaration; no default identity was synthesized`,
+          filePath: source.fileName,
+          specifier: undefined,
+        });
+      }
+    }
+    return result;
   }
 
   // RC-F (issue #108) — `isPureTypesFile` (typescript-to-typedmind-
