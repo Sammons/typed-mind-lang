@@ -217,8 +217,11 @@ describe('orphan check (validator.ts:245-367)', () => {
       '',
     ].join('\n');
 
+  // `Main` imports the Dependency too: without the `external` guard the
+  // resolved entry's target is `Vendor`, and that import would credit
+  // `Surface`.
   it('TM15 V2: an external-forwarding re-export entry does not credit the file through the same-spelled local entity', async () => {
-    const { result } = await check(externalForwardingBarrel('  <- [helper]'));
+    const { result } = await check(externalForwardingBarrel('  <- [helper, Vendor]'));
     assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), ["Orphaned file 'Surface' - none of its exports are imported"]);
     assert.deepEqual(messagesByCode(result, 'checker/qualified-name-unresolved'), []);
   });
