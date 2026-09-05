@@ -1127,9 +1127,10 @@ export class TypeScriptAnalyzer {
     // the JavaScript builtin `String` as a Program export and the checker
     // reported `Export 'String' is not defined anywhere in the codebase`.
     // The rule as intended is "the module's own functions the guard
-    // invokes": keep only names this module declares as top-level
-    // functions (declaration or arrow/function-expression initializer),
-    // in first-call order and deduplicated. Ambient globals (`String`,
+    // invokes": keep only names this module's walk collected into
+    // `functions` (function declarations and arrow/function-expression
+    // initializers, at any nesting `visit` reaches), in first-call order
+    // and deduplicated. Ambient globals (`String`,
     // `Number`, `setTimeout`, `require`) and imported functions never
     // become Program exports through this path. Filtered AFTER the walk
     // because a guard may precede the declarations it calls.
