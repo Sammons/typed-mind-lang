@@ -45,7 +45,7 @@ import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
+import { ClassNode, printHeritage, SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -374,58 +374,27 @@ describe('slat-harness rung, 69d: a generic heritage target behaves identically 
     // would fall to the DTO lane and silently drop the contract.
     const result = convert('69d-generic-heritage-both-lanes');
     assert.equal(result.success, true);
-    const child = result.entities.find((e) => e.name === 'GenericChild') as { kind?: string; extends?: string } | undefined;
+    const child = result.entities.find((e) => e.name === 'GenericChild');
+    assert.ok(child instanceof ClassNode && child.heritage.extends !== undefined);
     assert.equal(child?.kind, 'Class', 'a generic method-bearing parent must still make the child Class-like');
-    assert.equal(child?.extends, 'Repo<Item>', 'the emitted target keeps its type arguments verbatim (property 1)');
+    assert.equal(printHeritage(child.heritage.extends), 'Repo<Item>', 'the emitted target keeps its type arguments verbatim (property 1)');
   });
 
   it('the real-class lane emits the SAME shape — the lanes agree, so this is not an interface-lane defect', () => {
     const result = convert('69d-generic-heritage-both-lanes');
-    const derived = result.entities.find((e) => e.name === 'GenericDerived') as { kind?: string; extends?: string } | undefined;
+    const derived = result.entities.find((e) => e.name === 'GenericDerived');
+    assert.ok(derived instanceof ClassNode && derived.heritage.extends !== undefined);
     assert.equal(derived?.kind, 'Class');
-    assert.equal(derived?.extends, 'GenericBase<string>');
+    assert.equal(printHeritage(derived.heritage.extends), 'GenericBase<string>');
   });
 
-  it('KNOWN GAP (68) — in LONGFORM, each lane yields one unknown-base-class finding and nothing else', async () => {
-    // `diagnose` round-trips through longform, which preserves the slot, so
-    // the generic base surfaces as an unresolvable NAME. This is the exact
-    // finding slat-harness-mixin-heritage-controls.test.ts pins for
-    // `StringBox <: Container<string>` on the real-class lane — the same
-    // defect, the same adjudication (gap 68).
+  it('FIXED G.2 — full instantiated heritage checks clean in longform and shortform', async () => {
     const result = convert('69d-generic-heritage-both-lanes');
-    const diagnostics = await diagnose(result.entities);
-    const messages = diagnostics.map((d) => d.message).sort();
-    // Asserting the exact pair (rather than "at least one") is what makes
-    // this fail if either lane is changed in isolation.
-    assert.deepEqual(messages, [
-      "Class 'GenericChild' extends 'Repo<Item>' which does not exist",
-      "Class 'GenericDerived' extends 'GenericBase<string>' which does not exist",
-    ]);
-  });
-
-  it('KNOWN GAP (68) — in SHORTFORM, the same pair surfaces as unparsable text', async () => {
-    // The emitted `.tmd` is shortform, where `<:` takes a bare entity_name,
-    // so the argument list is unparsable rather than merely unresolvable.
-    // Both spellings of the same defect are pinned because a future fix
-    // could plausibly address one and not the other. This is the same
-    // shortform/longform split fixture 67's header documents for its own
-    // extends/implements collapse.
-    const result = convert('69d-generic-heritage-both-lanes');
-    const originalCwd = process.cwd();
-    process.chdir('/');
-    try {
-      const typedMind = await TypedMind.create();
-      const messages = typedMind
-        .check(result.tmdContent)
-        .diagnostics.map((d) => d.message)
-        .sort();
-      assert.deepEqual(messages, [
-        'Unparsable text: `<Item>` — check this line against the grammar and fix or remove it',
-        'Unparsable text: `<string>` — check this line against the grammar and fix or remove it',
-      ]);
-    } finally {
-      process.chdir(originalCwd);
-    }
+    assert.deepEqual(await diagnose(result.entities), []);
+    const mind = await TypedMind.create();
+    assert.deepEqual(mind.check(result.tmdContent).diagnostics, []);
+    assert.match(result.tmdContent, /Repo<Item>/);
+    assert.match(result.tmdContent, /GenericBase<string>/);
   });
 
   it('the generic child still warns about its own dropped property', () => {
