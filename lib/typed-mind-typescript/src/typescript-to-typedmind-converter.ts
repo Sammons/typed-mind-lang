@@ -2130,19 +2130,31 @@ export class TypeScriptToTypedMindConverter {
       (entry.function ? this.functionNameRemap : this.typeNameRemap).set(key, name);
     };
     const losers: Declaration[] = [];
+    const defaults: Declaration[] = [];
     for (const name of [...groups.keys()].sort()) {
       const group = groups.get(name) ?? [];
       group.sort((a, b) => this.compareModulePaths(a.module.filePath, b.module.filePath));
-      const first = group[0];
+      const ordinary = group.filter((entry) => {
+        const isDefault = entry.module.exports.some(
+          (exp) =>
+            exp.isDefault &&
+            exp.source === undefined &&
+            exp.declaration?.filePath === entry.module.filePath &&
+            exp.declaration.name === entry.name,
+        );
+        if (isDefault) defaults.push(entry);
+        return !isDefault;
+      });
+      const first = ordinary[0];
       if (first === undefined) continue;
       store(first, this.nameAllocator.reserve(sourceKey(first), [name]));
       this.typeNameFirstDeclarer.set(name, this.getRelativePath(first.module.filePath));
-      losers.push(...group.slice(1));
+      losers.push(...ordinary.slice(1));
     }
 
     // A primary class that retained its bare identity can share it with the
     // physical file. A qualified primary class needs a separate real owner.
-    const needsOwner = new Set(losers.map((entry) => entry.module.filePath));
+    const needsOwner = new Set([...losers, ...defaults].map((entry) => entry.module.filePath));
     const fileModules: ParsedModule[] = [];
     for (const module of orderedModules) {
       const primary = this.primaryClassOf(module);
@@ -2172,6 +2184,14 @@ export class TypeScriptToTypedMindConverter {
       const name = this.nameAllocator.reserve(`file:${module.filePath}`, candidates);
       this.reservedFileEntityNameByModulePath.set(module.filePath, name);
       this.fileEntityNameByModulePath.set(module.filePath, name);
+    }
+    for (const entry of defaults) {
+      const owner = this.fileEntityNameByModulePath.get(entry.module.filePath);
+      if (owner === undefined) {
+        this.addError('Missing reserved File owner for a default declaration', entry.module.filePath);
+        continue;
+      }
+      store(entry, this.nameAllocator.reserve(sourceKey(entry), [`${owner}.default`]));
     }
     for (const entry of losers) {
       const owner = this.fileEntityNameByModulePath.get(entry.module.filePath);
@@ -3814,7 +3834,7 @@ export class TypeScriptToTypedMindConverter {
         // Now using the complete export registry for proper resolution
 
         if (imp.defaultImport) {
-          const entityName = this.resolveImportToEntity(importerFilePath, imp.defaultImport, imp.specifier);
+          const entityName = this.resolveImportToEntity(importerFilePath, imp.defaultImport, imp.specifier, true);
           if (entityName) {
             importNames.push(entityName);
           }
@@ -3851,7 +3871,12 @@ export class TypeScriptToTypedMindConverter {
     return importNames;
   }
 
-  private resolveImportToEntity(importerFilePath: string, importName: string, specifier: string): string | undefined {
+  private resolveImportToEntity(
+    importerFilePath: string,
+    requestedName: string,
+    specifier: string,
+    defaultImport = false,
+  ): string | undefined {
     // Handle external packages
     if (this.isExternalPackage(specifier)) {
       const dependencyName = this.createDependencyName(specifier);
@@ -3887,6 +3912,9 @@ export class TypeScriptToTypedMindConverter {
     if (!moduleExports) {
       return undefined;
     }
+
+    const importName = defaultImport ? moduleExports.defaultExport : requestedName;
+    if (importName === undefined) return undefined;
 
     // Check if this import name is actually exported by the target module
     const isExported =
