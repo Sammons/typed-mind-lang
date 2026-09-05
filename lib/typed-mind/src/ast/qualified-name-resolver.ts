@@ -137,7 +137,7 @@ export class QualifiedNameResolver {
       if (!exported && reExportEntry !== undefined && reExportEntry.includes('.')) {
         // The forwarding File is the importer of the forwarded entry, so a
         // File-owned entry keeps its owner's privacy check (a barrel cannot
-        // launder a private declaration through `reexports:` any more than
+        // launder a private declaration through `reexports:` no more than
         // through `exports:`); a Dependency owner has no privacy.
         return this.resolveWithState(reExportEntry, { importingFile: ownerName }, active);
       }
