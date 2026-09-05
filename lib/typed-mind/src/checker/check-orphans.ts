@@ -4,7 +4,8 @@
 // field walks — imports (non-wildcard), calls (RAW call string, dotted names
 // included as written), methods, Program entry + exports, consumes, Function
 // input/output, UIComponent contains, Asset containsProgram — and from nothing
-// else (affects/extends/implements/schema never counted legacy-side). Exports
+// else (affects/extends/implements/schema never counted legacy-side).
+// RFC-TM-14 §S3 adds Class/ClassFile calls and consumes to the same walk. Exports
 // are NOT referenced (the legacy comment at :257-259 is the rule). Program and
 // Dependency entities are exempt candidates; Files get the
 // any-export-imported consumption escape.
@@ -75,6 +76,14 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
     if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
       for (const method of legacyMethodNames(entity)) {
         addReference(method, referenced, context.names);
+      }
+      // RFC-TM-14 §S3: member-body edges credit their targets as Function
+      // calls/consumes do (the RAW call string, dotted included).
+      for (const call of entity.calls) {
+        addReference(call, referenced, context.names);
+      }
+      for (const consumed of entity.consumes ?? []) {
+        addReference(consumed, referenced, context.names);
       }
     }
     if (entity instanceof ConstantsNode) {

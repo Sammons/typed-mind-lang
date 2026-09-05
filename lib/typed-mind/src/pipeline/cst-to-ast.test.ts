@@ -127,6 +127,8 @@ describe('CST→AST walk/attach layer', () => {
             methods: ['handle'],
             extends: 'Base',
             purpose: undefined,
+            calls: [],
+            consumes: undefined,
           },
           {
             kind: 'ClassFile',
@@ -143,6 +145,8 @@ describe('CST→AST walk/attach layer', () => {
             exports: ['helperFn', 'UserController'],
             extends: 'BaseController',
             purpose: undefined,
+            calls: [],
+            consumes: undefined,
           },
           {
             kind: 'Constants',

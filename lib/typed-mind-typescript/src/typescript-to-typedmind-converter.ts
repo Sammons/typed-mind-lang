@@ -2084,8 +2084,22 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private shouldEmitInterface(iface: { name: string; declaration?: DeclarationIdentity }, module: ParsedModule): boolean {
+    return this.isInterfaceExported(iface, module) || this.isReferencedPrivateType(iface.declaration);
+  }
+
+  private isInterfaceExported(iface: { name: string }, module: ParsedModule): boolean {
+    return module.exports.some((exp) => exp.name === iface.name && exp.type === 'interface');
+  }
+
+  // RFC-TM-14 S7 (P6): a retained non-exported interface that converts to
+  // a Class. Emitted as `Owner.Name`, absent from `Owner.exports`. The DTO
+  // lane and TypeDefs keep their standalone names (they trip no export
+  // check); unifying the three lanes is non-goal N-9u.
+  private isRetainedPrivateClassInterface(iface: { name: string; declaration?: DeclarationIdentity }, module: ParsedModule): boolean {
     return (
-      module.exports.some((exp) => exp.name === iface.name && exp.type === 'interface') || this.isReferencedPrivateType(iface.declaration)
+      !this.isInterfaceExported(iface, module) &&
+      this.isReferencedPrivateType(iface.declaration) &&
+      this.isPredictedClassInterface(iface.name)
     );
   }
 
@@ -2613,12 +2627,18 @@ export class TypeScriptToTypedMindConverter {
 
   private reserveEntityNames(modules: readonly ParsedModule[]): void {
     const orderedModules = [...modules].sort((left, right) => this.compareModulePaths(left.filePath, right.filePath));
-    type Declaration = { module: ParsedModule; name: string; function: boolean };
+    // `privateClass`: a retained non-exported interface on the Class lane
+    // (RFC-TM-14 S7). It never contests the bare name and is declared as
+    // `Owner.Name` under its physical file, the resolver's private-member
+    // model (`qualified-name-resolver.ts`), so `check-exports.ts` does not
+    // report `class-not-exported` for a class the source never exported.
+    type Declaration = { module: ParsedModule; name: string; function: boolean; privateClass: boolean };
     const groups = new Map<string, Declaration[]>();
     const add = (
       module: ParsedModule,
       declaration: { readonly name: string; readonly declaration?: DeclarationIdentity },
       isFunction: boolean,
+      privateClass = false,
     ): void => {
       const name = declaration.name;
       const key = `${module.filePath}::${name}`;
@@ -2638,12 +2658,14 @@ export class TypeScriptToTypedMindConverter {
         }
       }
       const group = groups.get(name) ?? [];
-      if (!group.some((entry) => entry.module.filePath === module.filePath)) group.push({ module, name, function: isFunction });
+      if (!group.some((entry) => entry.module.filePath === module.filePath))
+        group.push({ module, name, function: isFunction, privateClass });
       groups.set(name, group);
     };
     for (const module of orderedModules) {
       for (const cls of module.classes) add(module, cls, false);
-      for (const iface of module.interfaces) if (this.shouldEmitInterface(iface, module)) add(module, iface, false);
+      for (const iface of module.interfaces)
+        if (this.shouldEmitInterface(iface, module)) add(module, iface, false, this.isRetainedPrivateClassInterface(iface, module));
       for (const type of module.types) if (this.shouldEmitTypeAlias(type, module)) add(module, type, false);
       for (const item of module.enums ?? []) if (this.shouldEmitEnum(item, module)) add(module, item, false);
       for (const constant of module.constants) if (this.isConstantExported(constant, module)) add(module, constant, false);
@@ -2656,10 +2678,17 @@ export class TypeScriptToTypedMindConverter {
     };
     const losers: Declaration[] = [];
     const defaults: Declaration[] = [];
+    const privateClasses: Declaration[] = [];
     for (const name of [...groups.keys()].sort()) {
       const group = groups.get(name) ?? [];
       group.sort((a, b) => this.compareModulePaths(a.module.filePath, b.module.filePath));
       const ordinary = group.filter((entry) => {
+        // S7: the bare lane is public identity; a private Class takes the
+        // owner-qualified lane below, whichever file path sorts first.
+        if (entry.privateClass) {
+          privateClasses.push(entry);
+          return false;
+        }
         const key = `${entry.module.filePath}::${entry.name}`;
         const identities = this.sourceDeclarationIdentities.get(key);
         const identity = identities?.length === 1 ? identities[0] : undefined;
@@ -2684,7 +2713,9 @@ export class TypeScriptToTypedMindConverter {
 
     // A primary class that retained its bare identity can share it with the
     // physical file. A qualified primary class needs a separate real owner.
-    const needsOwner = new Set([...losers, ...defaults].map((entry) => entry.module.filePath));
+    // A pure-types module that declares a private Class gains a File owner
+    // for the same reason (S7).
+    const needsOwner = new Set([...losers, ...defaults, ...privateClasses].map((entry) => entry.module.filePath));
     const fileModules: ParsedModule[] = [];
     for (const module of orderedModules) {
       const primary = this.primaryClassOf(module);
@@ -2723,6 +2754,17 @@ export class TypeScriptToTypedMindConverter {
       }
       store(entry, this.nameAllocator.reserve(sourceKey(entry), [`${owner}.default`]));
     }
+    for (const entry of privateClasses) {
+      const owner = this.fileEntityNameByModulePath.get(entry.module.filePath);
+      if (owner === undefined) {
+        this.addError('Missing reserved File owner for a private class declaration', entry.module.filePath);
+        continue;
+      }
+      // Declared under the owner, never added to the owner's exports: the
+      // resolver answers same-file references and reports `private-member`
+      // from any other file (`qualified-name-resolver.ts`).
+      store(entry, this.nameAllocator.reserve(sourceKey(entry), [`${owner}.${entry.name}`]));
+    }
     for (const entry of losers) {
       const owner = this.fileEntityNameByModulePath.get(entry.module.filePath);
       if (owner === undefined) {
@@ -2736,8 +2778,10 @@ export class TypeScriptToTypedMindConverter {
         !entry.module.exports.some(
           (exp) => identity !== undefined && exp.declaration !== undefined && this.sameDeclarationIdentity(exp.declaration, identity),
         );
-      // A private declaration cannot claim public File membership. Its global
-      // collision name is standalone while its exact source identity survives.
+      // A private DTO-lane or TypeDef declaration cannot claim public File
+      // membership. Its global collision name is standalone while its exact
+      // source identity survives. (A private Class-lane interface never
+      // reaches this lane; see `privateClasses` above.)
       const candidate = privateType ? `${owner}${this.sanitizeEntityName(entry.name)}` : `${owner}.${entry.name}`;
       const name = this.nameAllocator.reserve(sourceKey(entry), [candidate]);
       store(entry, name);

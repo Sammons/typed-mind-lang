@@ -201,6 +201,21 @@ const classToShortform = (entity: ClassNode): string[] => {
   if (entity.methods.length > 0) {
     lines.push(`  => [${entity.methods.join(', ')}]`);
   }
+  lines.push(...classEdgeLines(entity));
+  return lines;
+};
+
+// RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class and ClassFile carry the
+// Function-shaped `~> [...]` / `$< [...]` continuations after the methods
+// list. Same guards as functionToShortform (empty lists are not emitted).
+const classEdgeLines = (entity: ClassNode | ClassFileNode): string[] => {
+  const lines: string[] = [];
+  if (entity.calls.length > 0) {
+    lines.push(`  ~> [${entity.calls.join(', ')}]`);
+  }
+  if (entity.consumes !== undefined && entity.consumes.length > 0) {
+    lines.push(`  $< [${entity.consumes.join(', ')}]`);
+  }
   return lines;
 };
 
@@ -219,6 +234,7 @@ const classFileToShortform = (entity: ClassFileNode): string[] => {
   if (entity.methods.length > 0) {
     lines.push(`  => [${entity.methods.join(', ')}]`);
   }
+  lines.push(...classEdgeLines(entity));
   // Auto-self-export (ClassFileNode constructor) is not re-emitted as a
   // visible export list unless something else is exported too, matching the
   // legacy behavior that only prints exports beyond the implicit self-export

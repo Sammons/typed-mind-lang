@@ -143,10 +143,25 @@ class LinkCollector {
   }
 }
 
-const collectFunctionLinks = (collector: LinkCollector, fn: FunctionNode): void => {
-  for (const call of fn.calls) {
-    collector.addReference(call, fn);
+// RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class and ClassFile share the Function
+// calls/consumes reference derivation. The `consumedBy` reverse index stays
+// Function-only: it is the RunParameter-side derivation whose consumers
+// (check-run-parameters.ts, valid-references.ts `consumedBy.to = ['Function']`)
+// model a consuming Function; a Class consumer is a `referencedBy` link.
+const collectCallsAndConsumes = (collector: LinkCollector, from: FunctionNode | ClassNode | ClassFileNode): void => {
+  for (const call of from.calls) {
+    collector.addReference(call, from);
   }
+  for (const consumed of from.consumes ?? []) {
+    collector.addReference(consumed, from);
+    if (from instanceof FunctionNode) {
+      collector.addName(collector.consumedBy, consumed, from.name);
+    }
+  }
+};
+
+const collectFunctionLinks = (collector: LinkCollector, fn: FunctionNode): void => {
+  collectCallsAndConsumes(collector, fn);
   if (fn.input !== undefined) {
     collector.addReference(fn.input, fn);
   }
@@ -156,10 +171,6 @@ const collectFunctionLinks = (collector: LinkCollector, fn: FunctionNode): void 
   for (const affected of fn.affects ?? []) {
     collector.addReference(affected, fn);
     collector.addName(collector.affectedBy, affected, fn.name);
-  }
-  for (const consumed of fn.consumes ?? []) {
-    collector.addReference(consumed, fn);
-    collector.addName(collector.consumedBy, consumed, fn.name);
   }
 };
 
@@ -175,8 +186,10 @@ const collectEntityLinks = (collector: LinkCollector, entity: EntityNode): void 
   } else if (entity instanceof ClassFileNode) {
     collector.addImports(entity, entity.imports);
     collector.addExports(entity, entity.exports);
+    collectCallsAndConsumes(collector, entity);
   } else if (entity instanceof ClassNode) {
     // Canonical heritage is walked below with the local binder scope.
+    collectCallsAndConsumes(collector, entity);
   } else if (entity instanceof FunctionNode) {
     collectFunctionLinks(collector, entity);
   } else if (entity instanceof UiComponentNode) {

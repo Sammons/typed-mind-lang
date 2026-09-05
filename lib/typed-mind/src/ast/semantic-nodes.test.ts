@@ -259,6 +259,9 @@ describe('ClassNode', () => {
         methods: ['create', 'list'],
         extends: 'BaseController',
         purpose: undefined,
+        // RFC-TM-14 §S3: FunctionNode's defaults.
+        calls: [],
+        consumes: undefined,
       },
     );
     // The F3 ruling is structural: a declared Class carries no imports/path.
@@ -292,6 +295,8 @@ describe('ClassNode', () => {
         methods: ['save'],
         extends: undefined,
         purpose: 'todo persistence model',
+        calls: [],
+        consumes: undefined,
       },
     );
   });
@@ -332,6 +337,9 @@ describe('ClassFileNode', () => {
         exports: ['UserController'],
         extends: 'BaseController',
         purpose: undefined,
+        // RFC-TM-14 §S3: FunctionNode's defaults.
+        calls: [],
+        consumes: undefined,
       },
     );
   });
@@ -369,6 +377,8 @@ describe('ClassFileNode', () => {
         exports: ['UserController', 'helper'],
         extends: undefined,
         purpose: 'controller with its file',
+        calls: [],
+        consumes: undefined,
       },
     );
   });

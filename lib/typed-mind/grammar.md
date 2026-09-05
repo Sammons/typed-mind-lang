@@ -64,11 +64,13 @@ Indented lines that attach properties to the most recently declared entity.
 
 A calls entry is `fn`, `File.fn`, `Class.method`, or `Class.constructor` (constructs the class).
 
+Each continuation attaches only to the entity kinds that carry its property; the checker rejects the others (`semantics/illegal-continuation`). `~> [...]` attaches to Function, Class, ClassFile and Constants; `$< [...]` attaches to Function, Class and ClassFile. On a Class or ClassFile, a calls or consumes entry means a member body of that class calls or reads the target (the slot is per class, not per member).
+
 ```tmd
 TodoApp -> main v1.0.0
 main @ src/index.ts:
-  <- [App, Logo, DATABASE_URL, startApp, formatDate]
-  -> [startApp, UserDTO, Widget]
+  <- [App, Logo, DATABASE_URL, startApp, formatDate, Scheduler]
+  -> [startApp, UserDTO, Widget, Scheduler]
 
 App &! "Root component"
   > [Header]
@@ -91,6 +93,11 @@ Widget <:
 
 UserDTO %
   - name: string "User name"
+
+Scheduler <:
+  => [tick]
+  ~> [formatDate, Widget.constructor]
+  $< [DATABASE_URL]
 
 DateUtilsImplFile @ src/date-utils-impl.ts:
   -> [formatDate]

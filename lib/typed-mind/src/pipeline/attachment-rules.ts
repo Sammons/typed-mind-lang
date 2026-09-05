@@ -14,7 +14,8 @@
 //                             doc §3.4)
 //   export_list `-> [..]`   → File/ClassFile exports (parser.ts:487-491);
 //                             Dependency exports (parser.ts:492-497)
-//   calls_list `~> [..]`    → Function calls (parser.ts:501-505)
+//   calls_list `~> [..]`    → Function calls (parser.ts:501-505); Constants
+//                             (TM-13 F); Class/ClassFile (RFC-TM-14 §S3)
 //   input_name `<- Name`    → Function input (parser.ts:507-513)
 //   output_name `-> Name`   → Function output (parser.ts:515-521)
 //   methods_list `=> [..]`  → Class/ClassFile methods (parser.ts:523-528)
@@ -33,7 +34,8 @@
 //                             a legacy Class, parser.ts:611-613)
 //   default_value `= "…"`   → RunParameter defaultValue (parser.ts:621-627)
 //   consumes_list `$< [..]` → Function consumes (parser.ts:629-649; inline
-//                             reverse write not replicated, as above)
+//                             reverse write not replicated, as above);
+//                             Class/ClassFile (RFC-TM-14 §S3)
 
 import type { Node as SyntaxNode } from 'web-tree-sitter';
 import type { Diagnostic } from '../ast/diagnostic.ts';
@@ -160,7 +162,9 @@ export const attachmentRules: Record<string, AttachmentRule> = {
   calls_list: {
     group: 'calls',
     label: 'calls list (`~> [...]`)',
-    accepts: (target) => target.kind === 'Function' || target.kind === 'Constants',
+    // RFC-TM-14 §S3: Class and ClassFile carry member-body call edges.
+    accepts: (target) =>
+      target.kind === 'Function' || target.kind === 'Constants' || target.kind === 'Class' || target.kind === 'ClassFile',
     apply: (target, syntaxNode) => {
       target.slots.calls = namesOf(new CstCallsList(syntaxNode));
     },
@@ -233,7 +237,8 @@ export const attachmentRules: Record<string, AttachmentRule> = {
   consumes_list: {
     group: 'consumes',
     label: 'consumes list (`$< [...]`)',
-    accepts: (target) => target.kind === 'Function',
+    // RFC-TM-14 §S3: Class and ClassFile carry member-body value reads.
+    accepts: (target) => target.kind === 'Function' || target.kind === 'Class' || target.kind === 'ClassFile',
     apply: (target, syntaxNode) => {
       target.slots.consumes = namesOf(new CstConsumesList(syntaxNode));
     },
