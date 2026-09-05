@@ -189,7 +189,7 @@ describe('Scenario 63: File isolation patterns', () => {
     assert.ok(prodEntry?.imports.includes('ProdFile'));
   });
 
-  it.skip('should handle multiple programs for different builds', async () => {
+  it('should handle multiple programs for different builds', async () => {
     const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
     const outcome = parser.parse(content);
 
@@ -204,9 +204,10 @@ describe('Scenario 63: File isolation patterns', () => {
     assert.equal(devApp?.entry, 'DevEntry');
     assert.equal(prodApp?.entry, 'ProdEntry');
 
-    // Different versions
-    assert.equal(devApp?.version, 'v1.0.0-dev');
-    assert.equal(prodApp?.version, 'v1.0.0');
+    // Different versions; stripVersionPrefix (declaration-openers.ts:29-30,
+    // :100) drops the `v` prefix, so Program.version carries the bare number.
+    assert.equal(devApp?.version, '1.0.0-dev');
+    assert.equal(prodApp?.version, '1.0.0');
   });
 
   it('should validate file isolation integrity', async () => {

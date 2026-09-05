@@ -59,19 +59,27 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     assert.ok(s3Upload?.consumes?.includes('@aws-sdk/client-s3'));
   });
 
-  it.skip('should auto-distribute mixed dependencies', async () => {
+  it('should auto-distribute mixed dependencies', async () => {
     const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
     const outcome = parser.parse(content);
 
     const mixedConsumer = outcome.entities.find((e): e is FunctionNode => e instanceof FunctionNode && e.name === 'mixedConsumer');
 
-    // lodash (Dependency) should go to consumes
-    assert.ok(mixedConsumer?.consumes?.includes('lodash'));
+    // RFC-TM-3 §3.4 (forward-semantics.ts:1-16): a Dependency in a Function's
+    // `<- [...]` list is NOT distributed to consumes — it stays on
+    // pendingDependencies and raises semantics/dependency-direct-consumption
+    // (docs/diagnostic-code-audit.md:107). Only a File may import a Dependency.
+    assert.equal(mixedConsumer?.consumes, undefined);
+    assert.deepEqual(mixedConsumer?.pendingDependencies, ['lodash']);
+    assert.ok(
+      outcome.diagnostics.some(
+        (d) =>
+          d.code === 'semantics/dependency-direct-consumption' && d.message.includes("'mixedConsumer'") && d.message.includes("'lodash'"),
+      ),
+    );
 
-    // helperFunction (Function) should go to calls
-    assert.ok(mixedConsumer?.calls.includes('helperFunction'));
-
-    // DataService (ClassFile) - might be in calls or its methods
+    // Function and ClassFile targets both distribute to calls (CALL_KINDS).
+    assert.deepEqual(mixedConsumer?.calls, ['helperFunction', 'DataService']);
   });
 
   it('should handle ClassFile importing dependencies', async () => {
@@ -178,9 +186,7 @@ describe('Scenario 62: Dependency consumption patterns', () => {
     assert.ok(complexMethod?.calls.includes('getData'));
   });
 
-  it.skip('should detect orphaned dependencies', async () => {
-    // TODO: This test needs investigation - dependencies don't get marked as orphaned
-    // Dependencies may be special entities that don't require consumption
+  it('should not report an unconsumed Dependency as orphaned', async () => {
     const parser = await TypedMindParser.create({ wasmPath: WASM_PATH });
     const outcome = parser.parse(content);
     const links = computeLinks(outcome.entities);
@@ -188,10 +194,12 @@ describe('Scenario 62: Dependency consumption patterns', () => {
 
     const errors = validation.findings.map((e) => e.message);
 
-    // unused-package is not consumed by anyone - should have an orphaned error
+    // RFC-TM-4 §1 (check-orphans.ts:8-9, :179): Program and Dependency entities
+    // are exempt orphan candidates, ported verbatim from the legacy validator.
+    // unused-package is consumed by nobody and still produces no finding.
     assert.equal(
-      errors.some((e) => e.includes('unused-package') && (e.includes('orphaned') || e.includes('Orphaned'))),
-      true,
+      errors.some((e) => e.includes('unused-package')),
+      false,
     );
   });
 
