@@ -1,4 +1,4 @@
-program Index__App {
+program IndexApp {
   type: Program
   entry: IndexFile
   version: 1.0.0
@@ -9,12 +9,12 @@ IndexFile @ src/index.ts:
   <- [list_types_route, TypesFile]
   -> [register_routes]
 
+TypesListFile @ src/routes/types-list.ts:
+  -> [list_types_route]
+
 TypesFile @ src/routes/types.ts:
   <- [list_types_route]
   <-> [list_types_route]
-
-TypesListFile @ src/routes/types-list.ts:
-  -> [list_types_route]
 
 register_routes :: register_routes() => string
 

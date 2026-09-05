@@ -107,7 +107,7 @@ describe('artifice rung, KNOWN GAP 95: a generic function type parameter leaks i
 // knownGaps it unblocks.
 //
 // The abort is GONE. The DECLARATION half is fixed: `reserveTypeEntityNames`
-// renames the second declarer to `Lifecycle__PublishState`, both TypeDefs
+// renames the second declarer to `LifecycleFile.PublishState`, both TypeDefs
 // survive carrying their own right-hand sides, and the run completes.
 //
 // The REFERENCE half is still the gap, so this fixture stays a pin for it —
@@ -134,11 +134,11 @@ describe('artifice rung, gap 96: same type alias in two files — declaration re
 
     const publishStateEntities = result.entities
       .map((entity) => entity.name)
-      .filter((name) => name === 'PublishState' || name.endsWith('__PublishState'))
+      .filter((name) => name === 'PublishState' || name.endsWith('.PublishState'))
       .sort();
     assert.deepEqual(
       publishStateEntities,
-      ['Lifecycle__PublishState', 'PublishState'],
+      ['LifecycleFile.PublishState', 'PublishState'],
       'index.ts keeps the bare name; lifecycle.ts is qualified by its sanitized module basename',
     );
 
@@ -149,7 +149,7 @@ describe('artifice rung, gap 96: same type alias in two files — declaration re
       `index.ts's own union must survive verbatim: ${result.tmdContent}`,
     );
     assert.ok(
-      result.tmdContent.includes('Lifecycle__PublishState = (typeof publishStates)[number]'),
+      result.tmdContent.includes('LifecycleFile.PublishState = (typeof publishStates)[number]'),
       `lifecycle.ts's own indexed-access alias must survive verbatim: ${result.tmdContent}`,
     );
   });
@@ -159,7 +159,7 @@ describe('artifice rung, gap 96: same type alias in two files — declaration re
     assert.deepEqual(
       result.warnings.map((warning) => warning.message).filter((message) => message.startsWith('Duplicate entity name ')),
       [
-        "Duplicate entity name 'PublishState' declared in both 'src/index.ts' and 'src/lifecycle.ts'; the declaration whose file path sorts first kept the bare name, so 'src/lifecycle.ts' was renamed to 'Lifecycle__PublishState'. TypedMind entity names are global to a document.",
+        "Duplicate entity name 'PublishState' declared in both 'src/index.ts' and 'src/lifecycle.ts'; the declaration whose file path sorts first kept the bare name, so 'src/lifecycle.ts' was renamed to 'LifecycleFile.PublishState'. TypedMind entity names are global to a document.",
       ],
     );
   });
@@ -205,7 +205,7 @@ describe('artifice rung, gap 96: same type alias in two files — declaration re
     );
     assert.deepEqual(
       diagnostics.filter((diagnostic) => diagnostic.code === 'checker/orphaned-entity').map((diagnostic) => diagnostic.message),
-      ["Orphaned entity 'Lifecycle__PublishState'"],
+      ["Orphaned entity 'LifecycleFile.PublishState'"],
     );
     const control = await diagnose(
       result.tmdContent
