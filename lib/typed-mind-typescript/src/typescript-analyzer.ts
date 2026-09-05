@@ -1424,7 +1424,9 @@ export class TypeScriptAnalyzer {
 
       return node.exportClause.elements.map((element) => {
         const source = explicitSource ?? this.namedImportSourceForExport(element);
+        const origin = explicitSource === undefined ? undefined : this.resolveReferenceOriginAtLocation(element.name);
         return {
+          ...(origin?.kind === 'project' ? { declaration: origin.declaration } : {}),
           name: element.name.text,
           isDefault: false,
           type: this.inferExportType(element.name.text, source),

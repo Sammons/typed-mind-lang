@@ -300,3 +300,11 @@ pnpm lint
 ## License
 
 MIT
+Named source reexports such as `export { encodeQuotedString as quoteStringLiteral }`
+retain the public alias and exact canonical declaration identity. When that identity
+selects one emitted import-legal target, the barrel records a dependency on the
+canonical entity; consumers retain their import of the barrel. This preserves the
+consumer → barrel → declaration path without inventing an alias entity or another
+local export. Unresolved/external targets and TypeDef import restrictions retain
+their existing behavior. Cross-file `Function.calls` expansion remains outside this
+change; the established call extractor records same-file call edges.
