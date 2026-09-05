@@ -390,11 +390,13 @@ class MVCPatternMatcher implements PatternMatcher {
   // / 'affects' in entity1 duck-typing. File/ClassFile carry imports,
   // Function carries calls/affects/input/output — same field set the legacy
   // duck-typing probed. RFC-TM-14 §S2 — calls resolve through the
-  // qualified-name resolver so `Owner.constructor` relates to the owner.
+  // qualified-name resolver so `Owner.constructor` relates to the owner; the
+  // exact-name test is the legacy fallback for a declared dotted entity the
+  // resolver rejects (`invalid-owner`).
   private entitiesAreRelated(entity1: EntityNode, entity2: EntityNode, names: QualifiedNameResolver): boolean {
     if ((entity1 instanceof FileNode || entity1 instanceof ClassFileNode) && entity1.imports.includes(entity2.name)) return true;
     if (entity1 instanceof FunctionNode) {
-      if (entity1.calls.some((call) => names.target(call) === entity2)) return true;
+      if (entity1.calls.some((call) => call === entity2.name || names.target(call) === entity2)) return true;
       if (entity1.affects?.includes(entity2.name)) return true;
       if (entity1.input === entity2.name) return true;
       if (entity1.output === entity2.name) return true;

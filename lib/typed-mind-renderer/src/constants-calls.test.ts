@@ -35,3 +35,17 @@ it('TM14 U2: renderer draws a Function construct edge spelled Owner.constructor 
     ],
   );
 });
+
+it('TM14 U2: renderer keeps the legacy exact-name call link for a dotted entity the resolver rejects', async () => {
+  const mind = await TypedMind.create();
+  const renderer = new InteractiveTypedMindRenderer({});
+  // `Holder.Service` declares a Class-owned dotted entity; the checker
+  // reports it (`qualified-name-unresolved`, invalid owner) and the resolver
+  // returns no target, but the graph drew the declared entity before U2
+  // through the exact-name lookup and still does.
+  renderer.setGraph(mind.parse('Holder <:\n  => [go]\nHolder.Service <:\n  => [run]\nuse :: () => void\n  ~> [Holder.Service]'));
+  assert.deepEqual(
+    renderer.getGraphSnapshot().links.filter((link) => link.type === 'call'),
+    [{ source: 'use', target: 'Holder.Service', type: 'call' }],
+  );
+});

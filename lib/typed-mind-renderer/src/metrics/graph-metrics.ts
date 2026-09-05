@@ -486,10 +486,10 @@ export class GraphMetricsAnalyzer {
       entity.imports.forEach(addDependency);
     } else if (entity instanceof FunctionNode) {
       // RFC-TM-14 §S2 — a qualified call (`Owner.constructor`, `Owner.method`)
-      // depends on its resolved owner, not on the raw dotted string.
+      // depends on its resolved owner; the raw string is the legacy fallback
+      // for a declared dotted entity the resolver rejects (`invalid-owner`).
       for (const call of entity.calls) {
-        const target = this.names.target(call);
-        if (target !== undefined) addDependency(target.name);
+        addDependency(this.names.target(call)?.name ?? call);
       }
       if (entity.input) addDependency(entity.input);
       if (entity.output) addDependency(entity.output);
