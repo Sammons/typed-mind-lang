@@ -8,8 +8,11 @@ program MainApp {
 MainFile @ src/main.ts:
   -> [describe]
 
-InternalRegistryEntry <:
-  => [describe]
+class InternalRegistryEntry {
+  type: Class
+  method: "describe() => string"
+  constructor: "(label: string)"
+}
 
 describe :: describe(label: string) => string
 

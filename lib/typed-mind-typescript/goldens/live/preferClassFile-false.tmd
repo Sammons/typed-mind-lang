@@ -13,8 +13,13 @@ UserServiceFile @ project/src/services/user-service.ts:
   <- [UserDTO, CreateUserDTO]
   -> [UserService]
 
-UserService <: BaseService, IUserService
-  => [createUser, findUser]
+class UserService {
+  type: Class
+  extends: BaseService
+  implements: [IUserService]
+  method: "async createUser(data: CreateUserDTO) => Promise<UserDTO>"
+  method: "async findUser(id: string) => Promise<UserDTO | null>"
+}
 
 main :: async main() => Promise<void>
 

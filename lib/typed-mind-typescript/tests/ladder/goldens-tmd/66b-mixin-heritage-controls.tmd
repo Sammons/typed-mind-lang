@@ -8,19 +8,33 @@ program IndexApp {
 IndexFile @ src/index.ts:
   -> [BaseWidget, Container, StringBox, configurableMixin, ConfiguredWidget, inner, outer, NestedWidget]
 
-BaseWidget <:
-  => [render]
+class BaseWidget {
+  type: Class
+  method: "render() => string"
+}
 
-Container <:
+class Container {
+  type: Class
+  constructor: "(value: T)"
+}
 
-StringBox <: Container<string>
-  => [unwrap]
+class StringBox {
+  type: Class
+  extends: Container<string>
+  method: "unwrap() => string"
+}
 
-ConfiguredWidget <: BaseWidget
-  => [label]
+class ConfiguredWidget {
+  type: Class
+  extends: BaseWidget
+  method: "label() => string"
+}
 
-NestedWidget <: BaseWidget
-  => [depth]
+class NestedWidget {
+  type: Class
+  extends: BaseWidget
+  method: "depth() => number"
+}
 
 configurableMixin :: configurableMixin(_options: { opt: number }, base: (typeof BaseWidget)) => (typeof BaseWidget)
 

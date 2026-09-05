@@ -8,5 +8,8 @@ program WidgetApp {
 WidgetFile @ src/widget.ts:
   -> [Widget]
 
-Widget <:
-  => [describe, name]
+class Widget {
+  type: Class
+  method: "describe() => string"
+  method: "name(value: string) => string"
+}

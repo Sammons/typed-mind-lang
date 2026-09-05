@@ -9,15 +9,21 @@ IndexFile @ src/index.ts:
   <- [CliArgumentParser, FileProcessor]
   -> [run]
 
-CliArgumentParser #: src/cli-argument-parser.ts
-  <- [Error]
-  => [parse]
-  -> [CliArgumentError, Error, CliArgumentParser]
+classfile CliArgumentParser {
+  type: ClassFile
+  path: src/cli-argument-parser.ts
+  imports: [Error]
+  method: "parse() => string"
+  exports: [CliArgumentError, Error, CliArgumentParser]
+}
 
-FileProcessor #: src/file-processor.ts
-  <- [Error]
-  => [process]
-  -> [FileProcessorError, FileProcessor]
+classfile FileProcessor {
+  type: ClassFile
+  path: src/file-processor.ts
+  imports: [Error]
+  method: "process() => string"
+  exports: [FileProcessorError, FileProcessor]
+}
 
 Error <:
   "Ambient global error type"

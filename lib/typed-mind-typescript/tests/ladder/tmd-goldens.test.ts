@@ -307,6 +307,13 @@ const cases: readonly FixtureCase[] = [
   // still reports one `syntax/error` on the spaced `|` inside `<...>`. That
   // residual is the committed grammar knownGap — see
   // repros-analyzer/86-fn-type-union-in-generic-return/README.md.
+  // B3 retains constructor and method references; both original false orphans close.
+  {
+    fixture: '85-classfile-method-signature-types',
+    entrySegments: ['src', 'server.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
   {
     fixture: '86-fn-type-union-in-generic-return',
     entrySegments: ['src', 'index.ts'],
