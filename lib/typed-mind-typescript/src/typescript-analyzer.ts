@@ -1166,7 +1166,7 @@ export class TypeScriptAnalyzer {
       }
     }
     const result = exports
-      .filter((exp) => exp.source !== undefined || !unsupportedDefaults.has(exp.name))
+      .filter((exp) => !unsupportedDefaults.has(exp.name))
       .map((exp) => {
         const local = exp.source === undefined ? localClauses.get(exp.name) : undefined;
         if (local !== undefined)
