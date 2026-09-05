@@ -2,6 +2,9 @@
 // Class+File fusion kind). Required: path, implements, methods, imports,
 // exports. Language-optional: extends, purpose. Auto-self-export replicated
 // from parser.ts:287: construction always includes `name` in `exports`.
+// RFC-TM-14 §S3 (rfc-tm-14-diamond.md): ClassFile gains `calls` and
+// `consumes` with FunctionNode's defaults, the same per-class slot as
+// ClassNode (see class-node.ts).
 
 import type { ClassMemberArgs, ClassMembers } from './class-members.ts';
 import { EntityNode, type EntityNodeArgs } from './entity-node.ts';
@@ -18,6 +21,8 @@ export class ClassFileNode extends EntityNode {
   readonly exports: readonly string[];
   readonly extends: string | undefined;
   readonly purpose: string | undefined;
+  readonly calls: readonly string[];
+  readonly consumes: readonly string[] | undefined;
   readonly heritage: ClassHeritage;
   readonly typeParameters: readonly TypeParameterNode[] | undefined;
 
@@ -29,6 +34,8 @@ export class ClassFileNode extends EntityNode {
         imports: readonly string[];
         exports: readonly string[];
         purpose?: string;
+        calls?: readonly string[];
+        consumes?: readonly string[];
         typeParameters?: readonly TypeParameterNode[];
       },
   ) {
@@ -47,6 +54,8 @@ export class ClassFileNode extends EntityNode {
     this.exports = args.exports.includes(args.name) ? args.exports : [...args.exports, args.name];
     this.extends = this.heritage.extends?.kind === 'named' ? this.heritage.extends.base.name : undefined;
     this.purpose = args.purpose;
+    this.calls = args.calls ?? [];
+    this.consumes = args.consumes;
     this.typeParameters = args.typeParameters;
   }
 }

@@ -292,6 +292,16 @@ const applyProperties = (accumulator: EntityAccumulator, collected: CollectedPro
   const list = (key: string): string[] | undefined => collected.lists.get(key)?.names;
   const description = scalar('description');
   const purposeOrDescription = scalar('purpose') ?? description;
+  // RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class and ClassFile read `calls:` /
+  // `consumes:` exactly as the Function arm below does (absent -> `[]` /
+  // undefined, so the accumulator defaults match FunctionNode's).
+  const readClassEdges = (): void => {
+    slots.calls = list('calls') ?? [];
+    const consumes = list('consumes');
+    if (consumes !== undefined) {
+      slots.consumes = consumes;
+    }
+  };
   switch (accumulator.kind) {
     case 'Program': {
       slots.entry = scalar('entry') ?? '';
@@ -360,6 +370,7 @@ const applyProperties = (accumulator: EntityAccumulator, collected: CollectedPro
       }
       slots.implementsList = list('implements') ?? [];
       slots.methods = list('methods') ?? [];
+      readClassEdges();
       if (purposeOrDescription !== undefined) {
         slots.purpose = purposeOrDescription;
       }
@@ -383,6 +394,7 @@ const applyProperties = (accumulator: EntityAccumulator, collected: CollectedPro
       }
       slots.implementsList = list('implements') ?? slots.implementsList ?? [];
       slots.methods = list('methods') ?? [];
+      readClassEdges();
       slots.imports = list('imports') ?? [];
       slots.exports = list('exports') ?? [];
       if (purposeOrDescription !== undefined) {

@@ -175,6 +175,9 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
       ...(slots.classMembers === undefined ? { methods: slots.methods ?? [] } : { members: slots.classMembers }),
       ...(slots.typeParameters !== undefined ? { typeParameters: slots.typeParameters } : {}),
       ...(slots.purpose !== undefined ? { purpose: slots.purpose } : {}),
+      // RFC-TM-14 §S3: the Function `calls`/`consumes` slots, reused as-is.
+      calls: slots.calls ?? [],
+      ...(slots.consumes !== undefined ? { consumes: slots.consumes } : {}),
     });
   },
   ClassFile: (accumulator) => {
@@ -191,6 +194,9 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
       exports: slots.exports ?? [],
       ...(slots.typeParameters !== undefined ? { typeParameters: slots.typeParameters } : {}),
       ...(slots.purpose !== undefined ? { purpose: slots.purpose } : {}),
+      // RFC-TM-14 §S3: the Function `calls`/`consumes` slots, reused as-is.
+      calls: slots.calls ?? [],
+      ...(slots.consumes !== undefined ? { consumes: slots.consumes } : {}),
     });
   },
   Constants: (accumulator) => {

@@ -6,6 +6,9 @@
 // `semantics/illegal-continuation` (zero corpus instances; verdict-moving,
 // enumerated for TM-4's S-TEST-1 amendments). ClassNode carries NO
 // declaredImports field — that is the F3 disposition, not an omission.
+// RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class gains `calls` and `consumes`
+// with FunctionNode's defaults (`[]` / undefined). The slot is per class —
+// "a member body of this class calls X / reads Y"; no per-member surface.
 
 import type { ClassMemberArgs, ClassMembers } from './class-members.ts';
 import { EntityNode, type EntityNodeArgs } from './entity-node.ts';
@@ -19,11 +22,20 @@ export class ClassNode extends EntityNode {
   readonly members: ClassMembers | undefined;
   readonly extends: string | undefined;
   readonly purpose: string | undefined;
+  readonly calls: readonly string[];
+  readonly consumes: readonly string[] | undefined;
   readonly heritage: ClassHeritage;
   readonly typeParameters: readonly TypeParameterNode[] | undefined;
 
   constructor(
-    args: EntityNodeArgs & ClassHeritageArgs & ClassMemberArgs & { purpose?: string; typeParameters?: readonly TypeParameterNode[] },
+    args: EntityNodeArgs &
+      ClassHeritageArgs &
+      ClassMemberArgs & {
+        purpose?: string;
+        calls?: readonly string[];
+        consumes?: readonly string[];
+        typeParameters?: readonly TypeParameterNode[];
+      },
   ) {
     super(args);
     this.heritage = classHeritageFromArgs(args, args.span);
@@ -35,6 +47,8 @@ export class ClassNode extends EntityNode {
         : args.members.methods.flatMap((method) => (method.name === undefined ? [] : [method.name]));
     this.extends = this.heritage.extends?.kind === 'named' ? this.heritage.extends.base.name : undefined;
     this.purpose = args.purpose;
+    this.calls = args.calls ?? [];
+    this.consumes = args.consumes;
     this.typeParameters = args.typeParameters;
   }
 }
