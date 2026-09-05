@@ -198,6 +198,7 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
     return new ConstantsNode({
       ...accumulator.baseArgs(),
       path: slots.path ?? '',
+      calls: slots.calls ?? [],
       ...(slots.schema !== undefined ? { schema: slots.schema } : {}),
       ...(slots.purpose !== undefined ? { purpose: slots.purpose } : {}),
     });

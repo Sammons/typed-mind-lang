@@ -6,12 +6,12 @@ program MainApp {
 }
 
 HelperFile @ src/helper.ts:
-  -> [helperFn]
+  -> [HelperFile.default]
 
 MainFile @ src/main.ts:
-  <- [helperFn]
+  <- [HelperFile.default]
   -> [mainFn]
 
-helperFn :: helperFn() => string
+HelperFile.default :: helperFn() => string
 
 mainFn :: mainFn() => string

@@ -198,6 +198,7 @@ export interface ParsedImport {
 }
 
 export interface ParsedExport {
+  readonly declaration?: DeclarationIdentity;
   readonly name: string;
   readonly isDefault: boolean;
   // X-AN-3: 'namespace-reexport' models `export * from '<source>'` — `name`
@@ -225,6 +226,14 @@ export interface ParsedConstant {
   readonly type: string;
   readonly value: string | undefined;
   readonly isConst?: boolean;
+  readonly callReferences?: readonly ParsedCallReference[];
+}
+
+export interface ParsedCallReference {
+  readonly kind: 'call' | 'construct';
+  readonly writtenName: string;
+  readonly source: SourceRange;
+  readonly origin: ReferenceOrigin;
 }
 
 // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-AN-7) — a real TS `enum` declaration
@@ -296,7 +305,8 @@ export interface AnalyzerDiagnostic {
     | 'zero-entities'
     | 'recognizer-not-found'
     | 'recognizer-module-standalone-parsed'
-    | 'unresolved-factory-heritage';
+    | 'unresolved-factory-heritage'
+    | 'unsupported-default-export';
   readonly message: string;
   readonly filePath: string | undefined;
   readonly specifier: string | undefined;

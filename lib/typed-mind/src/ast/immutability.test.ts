@@ -18,7 +18,7 @@ const fixtureDir = join(packageDir, 'test-fixtures', 'readonly');
 
 // One marker per attempted write. Update alongside the fixture when the
 // honest-fields table (doc §2.2) changes.
-const expectedMarkerCount = 80;
+const expectedMarkerCount = 82;
 
 describe('semantic classes are immutable after construction (tsc-checked)', () => {
   it('typechecks the readonly-violations fixture clean: every field write is still an error', () => {

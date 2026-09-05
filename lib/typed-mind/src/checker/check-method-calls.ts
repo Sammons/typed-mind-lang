@@ -4,16 +4,26 @@
 
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
+import { ConstantsNode } from '../ast/constants-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import type { CheckContext } from './check-context.ts';
 
 export const checkMethodCalls = (context: CheckContext): void => {
   for (const entity of context.byName.values()) {
-    if (!(entity instanceof FunctionNode)) {
+    if (!(entity instanceof FunctionNode || entity instanceof ConstantsNode)) {
       continue;
     }
     for (const call of entity.calls) {
       if (!call.includes('.')) {
+        if (entity instanceof ConstantsNode && !context.byName.has(call)) {
+          context.addFinding({
+            code: 'checker/unknown-call-target',
+            severity: 'error',
+            span: entity.span,
+            message: `Call to '${call}' references unknown entity '${call}'`,
+            suggestion: `Define '${call}' or remove the call reference`,
+          });
+        }
         continue;
       }
       const resolution = context.names.resolve(call);

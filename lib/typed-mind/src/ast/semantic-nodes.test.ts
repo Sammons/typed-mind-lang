@@ -390,6 +390,7 @@ describe('ConstantsNode', () => {
       { ...node },
       {
         kind: 'Constants',
+        calls: [],
         name: 'AppConfig',
         span: span(40, 1, 40, 41),
         raw,
@@ -416,6 +417,7 @@ describe('ConstantsNode', () => {
       { ...node },
       {
         kind: 'Constants',
+        calls: [],
         name: 'AppConfig',
         span: span(1, 1, 3, 2),
         raw,

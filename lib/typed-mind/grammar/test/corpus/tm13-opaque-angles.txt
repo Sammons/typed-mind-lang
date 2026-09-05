@@ -1,0 +1,177 @@
+==================
+TM13 C: nested function returns and structured generic control
+==================
+Data %
+  - structured: Box<Result<string>[]>
+  - opaque: (id: string) => Promise<Result<string | null>>
+  - arrow: (id: string) => Box<() => Promise<Result<string | null>>>
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_generic
+                  base: (type_named
+                    (entity_name))
+                  (type_expr
+                    (type_union
+                      (type_intersection
+                        (type_postfix
+                          (type_atom
+                            (type_generic
+                              base: (type_named
+                                (entity_name))
+                              (type_expr
+                                (type_union
+                                  (type_intersection
+                                    (type_postfix
+                                      (type_atom
+                                        (type_named
+                                          (entity_name)))))))))))))))))))))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque))))))))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque)))))))))
+
+==================
+TM13 C: quoted delimiters nested templates and outer boundaries
+==================
+Data %
+  - quoted: (id: string) => Box<"a > b" | "c">
+  - nested: (id: string) => Box<`outer ${`inner > value`} tail`>
+  - outer: (id: string) => Box<string | null> | undefined "description"
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque))))))))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque))))))))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque))))
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))
+    (string)))
+
+==================
+TM13 C: mismatched groups recover before the next declaration
+==================
+Data %
+  - value: (id: string) => Box<(X>
+Next %
+  - value: string
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque)))))))
+    (ERROR))
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))))
+
+==================
+TM13 C: unterminated quote recovers before the next declaration
+==================
+Data %
+  - value: (id: string) => Box<"unterminated>
+Next %
+  - value: string
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_opaque)))))))
+    (ERROR
+      (UNEXPECTED '\n')))
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_named
+                  (entity_name))))))))))
