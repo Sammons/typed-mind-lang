@@ -48,15 +48,9 @@ export interface ParseTypeExprTextResult {
   readonly remainder: string;
 }
 
-const NAMED_TOKEN = /^[A-Za-z_]\w*/;
+const NAMED_TOKEN = /^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*/;
 const NUMBER_TOKEN = /^-?\d+(\.\d+)?/;
 const READONLY_PREFIX = /^readonly[ \t]+(?=[A-Za-z_(])/;
-// Mirrors grammar.js's _qualified_name_opaque_token: a dotted/qualified type
-// reference (`ts.CompilerOptions`) has no structured production and must
-// fall to type_opaque, exactly like the grammar-side fix for the same shape
-// (review finding B1) — this is the longest-match check at the SAME position
-// a bare NAMED_TOKEN would also match, so it must be tried FIRST.
-const QUALIFIED_NAME_TOKEN = /^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+/;
 
 class TextCursor {
   readonly text: string;
@@ -493,17 +487,8 @@ const parseAtom = (cursor: TextCursor, inGenericArgs = false): TypeExprNode => {
   if (numberLiteral !== undefined) {
     return numberLiteral;
   }
-  // Qualified/dotted name check BEFORE the plain named-type check (review
-  // finding B1): both match the SAME leading identifier at this position,
-  // but the qualified form is the objectively longer match, so it must win
-  // outright — routing straight to opaque exactly like grammar.js's
-  // _qualified_name_opaque_token does for the identical shape.
-  const qualifiedMatch = QUALIFIED_NAME_TOKEN.exec(cursor.peek());
-  if (qualifiedMatch !== null) {
-    const startIndex = cursor.index;
-    cursor.index += qualifiedMatch[0].length;
-    return { kind: 'opaque', text: qualifiedMatch[0], span: spanFrom(cursor, startIndex, cursor.index) };
-  }
+  // One named-type parser owns both bare and qualified names, including
+  // qualified generic bases. This mirrors the grammar type_named production.
   const namedStartIndex = cursor.index;
   const named = parseNamed(cursor);
   if (named !== undefined) {

@@ -27,6 +27,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import type { Diagnostic } from '../ast/diagnostic.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
+import { FileNode } from '../ast/file-node.ts';
 import type { ImportStatementNode } from '../ast/import-statement-node.ts';
 import type { ParseOutcome } from './parse-outcome.ts';
 
@@ -109,7 +110,21 @@ export class ImportResolver {
         continue;
       }
 
-      const prefix = importStatement.alias === undefined ? '' : `${importStatement.alias}.`;
+      // RFC-TM-13 Q: an import alias is a real namespace owner, not merely
+      // a text prefix. Its imported document supplies the path and members.
+      const alias = importStatement.alias;
+      if (alias !== undefined && resolvedEntities.has(alias)) {
+        diagnostics.push({
+          code: 'imports/duplicate-name',
+          severity: 'error',
+          span: importStatement.span,
+          message: `Duplicate entity name '${alias}' from import; use an alias to avoid naming conflicts`,
+        });
+        this.#resolutionStack.pop();
+        continue;
+      }
+      const prefix = alias === undefined ? '' : `${alias}.`;
+      const aliasedNames: string[] = [];
       for (const [name, entity] of lastWinsByName(document.entities)) {
         const prefixedName = prefix + name;
         if (resolvedEntities.has(prefixedName)) {
@@ -123,6 +138,7 @@ export class ImportResolver {
           });
         } else {
           resolvedEntities.set(prefixedName, cloneWithName(entity, prefixedName));
+          aliasedNames.push(prefixedName);
         }
       }
 
@@ -134,11 +150,27 @@ export class ImportResolver {
           // resolution wins, no diagnostic (legacy import-resolver.ts:77-82).
           if (!resolvedEntities.has(nestedName)) {
             resolvedEntities.set(nestedName, cloneWithName(entity, nestedName));
+            aliasedNames.push(nestedName);
           }
         }
         diagnostics.push(...nested.diagnostics);
       }
 
+      if (alias !== undefined) {
+        resolvedEntities.set(
+          alias,
+          new FileNode({
+            name: alias,
+            path: importStatement.path,
+            imports: [],
+            exports: aliasedNames,
+            reExports: [],
+            span: importStatement.span,
+            raw: importStatement.raw,
+            sourceForm: 'shortform',
+          }),
+        );
+      }
       this.#resolutionStack.pop();
     }
 

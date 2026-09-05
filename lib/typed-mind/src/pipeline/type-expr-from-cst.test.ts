@@ -263,14 +263,14 @@ describe('X-TYPE-1/X-TYPE-2: per-shape shortform type-expression fixtures', () =
     assert.deepEqual(syntaxDiagnostics, []);
   });
 
-  it('regression fix: qualified/dotted type reference falls to opaque (lib/typed-mind-typescript/architecture.tmd:107 `ts.CompilerOptions`)', () => {
+  it('regression fix: qualified/dotted type reference is a structured named reference (lib/typed-mind-typescript/architecture.tmd:107 `ts.CompilerOptions`)', () => {
     const outcome = parser.parse('UserDTO %\n  - x: ts.CompilerOptions\n');
     const dto = outcome.entities.find((entity): entity is DtoNode => entity instanceof DtoNode);
     const field = dto?.fields.at(0);
     assert.notEqual(field, undefined);
     const typeExpr = field?.typeExpr;
-    assert.equal(typeExpr?.kind, 'opaque');
-    assert.equal(typeExpr !== undefined && typeExpr.kind === 'opaque' ? typeExpr.text : undefined, 'ts.CompilerOptions');
+    assert.equal(typeExpr?.kind, 'named');
+    assert.equal(typeExpr !== undefined && typeExpr.kind === 'named' ? typeExpr.name : undefined, 'ts.CompilerOptions');
     const syntaxDiagnostics = outcome.diagnostics.filter((diagnostic) => diagnostic.code.startsWith('syntax/'));
     assert.deepEqual(syntaxDiagnostics, []);
   });

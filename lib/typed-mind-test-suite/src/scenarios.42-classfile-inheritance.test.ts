@@ -18,12 +18,12 @@ describe('scenario-42-classfile-inheritance', () => {
 
     // Should be invalid due to import and export issues (based on actual error output)
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 10);
+    assert.equal(result.diagnostics.length, 8);
 
     const diagnosticMessages = result.diagnostics.map((diagnostic) => diagnostic.message);
 
-    // Should detect that calls cannot reference ClassFile entities
-    assert.equal(diagnosticMessages.filter((msg) => msg.includes("Cannot use 'calls' to reference ClassFile")).length, 2);
+    // Q permits both verified ClassFile method calls.
+    assert.equal(diagnosticMessages.filter((msg) => msg.includes("Cannot use 'calls' to reference ClassFile")).length, 0);
 
     // Should detect orphaned interface entities
     assert.ok(diagnosticMessages.includes("Orphaned entity 'IUserController'"));
@@ -42,7 +42,7 @@ describe('scenario-42-classfile-inheritance', () => {
     const callsError = result.diagnostics.find((diagnostic) =>
       diagnostic.message.includes("Cannot use 'calls' to reference ClassFile 'UserController'"),
     );
-    assert.equal(callsError?.span.start.line, 10);
+    assert.equal(callsError, undefined);
 
     // Verify the file contains expected ClassFile inheritance syntax
     assert.ok(content.includes('UserController #: src/controllers/user.ts <: BaseController, IUserController'));

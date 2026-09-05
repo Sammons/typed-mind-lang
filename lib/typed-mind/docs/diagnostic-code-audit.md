@@ -32,7 +32,7 @@ to each (see `diagnostic-style-guide.md`'s "A `CheckerFinding`..." paragraph):
 Completeness: `lib/typed-mind/scripts/check-diagnostic-code-audit.mjs` deep-
 equals this table's row set (below) against `extractCheckCodes`'s live-scanned
 set (`lib/typed-mind/src/checker/extract-check-codes.ts`, the same extractor
-`check-codes.test.ts` uses for the registry's own stability test). 62 rows,
+`check-codes.test.ts` uses for the registry's own stability test). 63 rows,
 100% of the registry, verified by that script — wired into `pnpm run ci`.
 
 RFC-TM-10 Q8 addendum (D-LEG-11, Diamond DAG Q8): the "Message text" column
@@ -160,3 +160,5 @@ surrounding prose must match.
   (`check-reference-legality.ts`'s own comment, "Unreachable with the closed
   table; ported for structure"). Its FIXED suggestion points at filing a bug
   rather than at a DSL-author fix, since no DSL document can trigger it.
+
+| `checker/qualified-name-unresolved` | check-context.ts:79 | `Qualified name 'Missing.Type' has no declared owner 'Missing'` (other variants identify an invalid owner, missing member, or private member not exported for this reference) | CheckerFinding | PASS | Suggests declaring owner/member and exporting before a cross-file reference. |

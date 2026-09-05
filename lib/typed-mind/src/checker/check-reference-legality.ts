@@ -14,7 +14,7 @@
 //     (validator.ts:1252-1253), so unresolved names produce nothing here;
 //   - wildcard imports are skipped and an import whose target is a Dependency
 //     takes the importedBy route with no legality check (validator.ts:1305-1321);
-//   - dotted call targets resolve to the base name (validator.ts:1336);
+//   - RFC-TM-13 Q replaces first-dot call truncation with checked qualified resolution;
 //   - extends/implements are walked only for referencers whose LEGACY type is
 //     'Class' (validator.ts:1400-1409): ClassNodes, plus lookahead-converted
 //     ClassFileNodes (raw lacks the '#:' sigil — the pinned P2 discriminant
@@ -32,6 +32,7 @@ import type { EntityNode } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
+import { resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import { RunParameterNode } from '../ast/run-parameter-node.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 import type { CheckContext } from './check-context.ts';
@@ -42,7 +43,19 @@ import { type ReferenceKind, VALID_REFERENCES } from './valid-references.ts';
 // AST walk (every walked field lives on a kind its from-list allows), so the
 // fixtures exercise this arm directly.
 export const checkSingleReference = (context: CheckContext, from: EntityNode, referenceKind: ReferenceKind, targetName: string): void => {
-  const target = context.byName.get(targetName);
+  const result =
+    referenceKind === 'calls'
+      ? context.names.resolve(targetName)
+      : referenceKind === 'exports'
+        ? context.resolveExport(from.name, targetName, from.span)
+        : context.resolveName(targetName, from.span, referenceKind === 'imports' ? from.name : undefined);
+  // Dependency exports represent external types/members without a local kind.
+  if (result.kind === 'external' && referenceKind !== 'calls') return;
+  const target =
+    resolvedNameTarget(result) ??
+    (referenceKind === 'calls' && result.kind === 'unresolved' && !result.ownerName.includes('.')
+      ? context.byName.get(result.ownerName)
+      : undefined);
   if (target === undefined) {
     return; // validator.ts:1252-1253 — missing targets short-circuit silently
   }
@@ -71,12 +84,13 @@ export const checkSingleReference = (context: CheckContext, from: EntityNode, re
     return;
   }
 
-  if (!legality.to.includes(target.kind)) {
+  const verifiedClassFileMethod = referenceKind === 'calls' && result.kind === 'member' && result.owner instanceof ClassFileNode;
+  if (!legality.to.includes(target.kind) && !verifiedClassFileMethod) {
     context.addFinding({
       code: 'checker/reference-to-illegal',
       severity: 'error',
       span: from.span,
-      message: `Cannot use '${referenceKind}' to reference ${target.kind} '${targetName}'`,
+      message: `Cannot use '${referenceKind}' to reference ${target.kind} '${referenceKind === 'calls' ? target.name : targetName}'`,
       suggestion: `'${referenceKind}' can only reference: ${legality.to.join(', ')}`,
     });
   }
@@ -104,8 +118,7 @@ const isLegacyClass = (entity: EntityNode): boolean => {
 
 const checkFunctionReferences = (context: CheckContext, fn: FunctionNode): void => {
   for (const call of fn.calls) {
-    const callTarget = call.includes('.') ? (call.split('.').at(0) ?? call) : call;
-    checkSingleReference(context, fn, 'calls', callTarget);
+    checkSingleReference(context, fn, 'calls', call);
   }
   if (fn.input !== undefined) {
     checkSingleReference(context, fn, 'input', fn.input);

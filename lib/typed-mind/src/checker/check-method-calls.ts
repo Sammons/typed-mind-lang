@@ -1,7 +1,6 @@
-// RFC-TM-4 §1 (rfc-tm-4-diamond.md) — DSLValidator.checkMethodCalls ported
-// verbatim (validator.ts:882-921), including the `split('.', 2)` quirk: for a
-// call 'A.B.C' the checked method name is 'B'. Only dotted calls are examined;
-// bare calls belong to the reference-legality arm.
+// Existing method diagnostics retain their wording. Qualified calls now use
+// checked ownership and the longest declared entity prefix, including an
+// explicitly declared File.handler identity before method-member fallback.
 
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
@@ -27,8 +26,17 @@ export const checkMethodCalls = (context: CheckContext): void => {
         }
         continue;
       }
-      const [objectName = '', methodName = ''] = call.split('.', 2);
+      const resolution = context.names.resolve(call);
+      if (resolution.kind !== 'unresolved') {
+        continue; // Qualified functions, verified methods/schema fields and dependency exports.
+      }
+      const objectName = resolution.ownerName;
+      const methodName = resolution.member;
       const targetEntity = context.byName.get(objectName);
+      if (objectName.includes('.') || targetEntity?.kind === 'File' || targetEntity?.kind === 'Dependency') {
+        context.resolveName(call, entity.span);
+        continue;
+      }
 
       if (targetEntity === undefined) {
         context.addFinding({

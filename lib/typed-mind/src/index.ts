@@ -26,6 +26,7 @@ export { FunctionNode } from './ast/function-node.ts';
 export { CstNode, CstSourceFile } from './ast/gen/cst-nodes.ts';
 export { ImportStatementNode } from './ast/import-statement-node.ts';
 export { ProgramNode } from './ast/program-node.ts';
+export { type QualifiedNameResolution, QualifiedNameResolver, resolvedNameTarget } from './ast/qualified-name-resolver.ts';
 export { RunParameterNode } from './ast/run-parameter-node.ts';
 export type { Span } from './ast/span.ts';
 // RFC-TM-8 §7/Q4 (rfc-tm-8-diamond.md, X-SUPP-2) — SuppressionNode joins the

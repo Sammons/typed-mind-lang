@@ -3,7 +3,9 @@
 // server.ts:507-530) is deleted; occurrence boundaries come from the grammar
 // via NameOccurrenceIndex, not a hand-rolled word-boundary character class.
 
+import { type QualifiedNameResolver, resolvedNameTarget } from '@sammons/typed-mind';
 import type { Location } from 'vscode-languageserver/node';
+import { targetOfOccurrence } from './document-state.ts';
 import type { NameOccurrence, NameOccurrenceIndex } from './name-occurrence-index.ts';
 
 export const toLspLocation = (uri: string, occurrence: NameOccurrence): Location => {
@@ -16,6 +18,24 @@ export const toLspLocation = (uri: string, occurrence: NameOccurrence): Location
   };
 };
 
-export const provideReferencesForName = (uri: string, name: string, nameIndex: NameOccurrenceIndex): Location[] => {
-  return nameIndex.occurrencesOf(name).map((occurrence) => toLspLocation(uri, occurrence));
+export const provideReferencesForName = (
+  uri: string,
+  name: string,
+  nameIndex: NameOccurrenceIndex,
+  names?: QualifiedNameResolver,
+  context: { readonly exportingOwner?: string; readonly importingOwner?: string } = {},
+): Location[] => {
+  const target =
+    names === undefined
+      ? undefined
+      : context.exportingOwner === undefined
+        ? resolvedNameTarget(names.resolve(name, context.importingOwner === undefined ? {} : { importingFile: context.importingOwner }))
+            ?.name
+        : resolvedNameTarget(names.resolveExport(context.exportingOwner, name))?.name;
+  if (names !== undefined && target === undefined) return [];
+  const occurrences =
+    target === undefined || names === undefined
+      ? nameIndex.occurrencesOf(name)
+      : nameIndex.all().filter((occurrence) => targetOfOccurrence(occurrence, names)?.name === target);
+  return occurrences.map((occurrence) => toLspLocation(uri, occurrence));
 };

@@ -102,20 +102,20 @@ describe('parseTypeExprText: the shared string-based type-expression parser', ()
     }
   });
 
-  it('falls back to opaque for a qualified/dotted type reference, not a truncated named type (review finding B1)', () => {
+  it('keeps a qualified/dotted type reference as one complete named type', () => {
     const result = parseTypeExprText('ts.CompilerOptions');
-    assert.equal(result.typeExpr.kind, 'opaque');
-    if (result.typeExpr.kind === 'opaque') {
-      assert.equal(result.typeExpr.text, 'ts.CompilerOptions');
+    assert.equal(result.typeExpr.kind, 'named');
+    if (result.typeExpr.kind === 'named') {
+      assert.equal(result.typeExpr.name, 'ts.CompilerOptions');
     }
     assert.equal(result.remainder, '');
   });
 
-  it('falls back to opaque for a multi-segment qualified name', () => {
+  it('keeps a multi-segment qualified name structured', () => {
     const result = parseTypeExprText('ns.inner.Deep');
-    assert.equal(result.typeExpr.kind, 'opaque');
-    if (result.typeExpr.kind === 'opaque') {
-      assert.equal(result.typeExpr.text, 'ns.inner.Deep');
+    assert.equal(result.typeExpr.kind, 'named');
+    if (result.typeExpr.kind === 'named') {
+      assert.equal(result.typeExpr.name, 'ns.inner.Deep');
     }
   });
 

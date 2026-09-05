@@ -18,12 +18,12 @@ describe('scenario-39-classfile-basic', () => {
 
     // Should be invalid due to issues with ClassFile parsing and orphaned entities
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 3);
+    assert.equal(result.diagnostics.length, 2);
 
     const diagnosticMessages = result.diagnostics.map((diagnostic) => diagnostic.message);
 
-    // Should detect that calls cannot reference ClassFile entities
-    assert.ok(diagnosticMessages.includes("Cannot use 'calls' to reference ClassFile 'TodoController'"));
+    // Q permits verified ClassFile method calls while retaining orphan diagnostics.
+    assert.equal(diagnosticMessages.includes("Cannot use 'calls' to reference ClassFile 'TodoController'"), false);
 
     // Should detect orphaned entities
     assert.ok(diagnosticMessages.includes("Orphaned entity 'startApp'"));
@@ -33,8 +33,7 @@ describe('scenario-39-classfile-basic', () => {
     const callDiagnostic = result.diagnostics.find((diagnostic) =>
       diagnostic.message.includes("Cannot use 'calls' to reference ClassFile 'TodoController'"),
     );
-    assert.equal(callDiagnostic?.span.start.line, 10);
-    assert.equal(callDiagnostic?.span.start.column, 1);
+    assert.equal(callDiagnostic, undefined);
 
     const orphanedStartAppDiagnostic = result.diagnostics.find((diagnostic) => diagnostic.message === "Orphaned entity 'startApp'");
     assert.equal(orphanedStartAppDiagnostic?.span.start.line, 10);

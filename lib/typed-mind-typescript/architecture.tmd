@@ -104,7 +104,7 @@ ParsedConstant %
 TypeScriptProjectAnalysis %
   - modules: readonly ParsedModule[]
   - entryPoints: readonly string[]
-  - projectConfig: ts.CompilerOptions
+  - projectConfig: TypeScript.CompilerOptions
 ConversionOptions %
   - preferClassFile: boolean
   - includePrivateMembers: boolean
@@ -148,3 +148,7 @@ isExportDeclaration ! lib/typed-mind-typescript/src/types.ts
 isImportDeclaration ! lib/typed-mind-typescript/src/types.ts
 createFilePath ! lib/typed-mind-typescript/src/types.ts
 createEntityName ! lib/typed-mind-typescript/src/types.ts
+
+# Qualified compiler types name their declared external owner.
+TypeScript ^ "TypeScript compiler API"
+  -> [CompilerOptions]
