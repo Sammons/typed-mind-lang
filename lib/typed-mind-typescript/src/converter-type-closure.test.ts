@@ -250,3 +250,16 @@ it('TM13 EXIT: omitted class properties and private members never seed type rete
     false,
   );
 });
+
+it('TM13 EXIT: folding a project binding preserves the importing File default declaration', (context) => {
+  const analysis = project(context, {
+    'index.ts': 'import { Row } from "project-model"; export default function run(row: Row): Row { return row; }',
+    'model.ts': 'export interface Row { value: string }',
+  });
+  const result = new TypeScriptToTypedMindConverter().convert(analysis);
+  const owner = result.entities.find((entity) => entity instanceof FileNode && entity.path === 'index.ts');
+  assert.ok(owner instanceof FileNode);
+  assert.ok(owner.imports.includes('Row'));
+  assert.deepEqual(owner.exports, [`${owner.name}.default`]);
+  assert.ok(result.entities.some((entity) => entity.name === `${owner.name}.default` && entity instanceof FunctionNode));
+});
