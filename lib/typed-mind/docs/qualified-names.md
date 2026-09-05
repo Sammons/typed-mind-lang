@@ -36,7 +36,10 @@ Method references use the longest declared entity prefix. For example,
 callable when the method exists; a bare ClassFile call retains its existing
 legality rule. An explicitly declared qualified entity wins over a same-spelling
 ClassFile method. Constants members require an existing field on their schema
-DTO; a field's existence alone does not make it callable.
+DTO, and only when the schema is a bare named type — a generic, array, union or
+opaque schema (`Rule[]`, `Record<string, Rule>`) has no member surface, so
+`LIST.ok` reports `missing-member`; a field's existence alone does not make it
+callable.
 
 External namespace references require a Dependency with an explicit export:
 
