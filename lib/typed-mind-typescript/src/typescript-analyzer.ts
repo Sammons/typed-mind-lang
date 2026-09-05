@@ -1902,6 +1902,13 @@ export class TypeScriptAnalyzer {
     const source = this.program.getSourceFile(sourcePath);
     const identity = getDeclarationIdentity(declaration);
     if (source === undefined || identity === undefined) return null;
+    const container =
+      ts.isVariableDeclaration(declaration) && ts.isVariableDeclarationList(declaration.parent)
+        ? declaration.parent.parent.parent
+        : declaration.parent;
+    // The mapping below proves only top-level declarations. A nested namespace
+    // or member with the same spelling must never borrow a top-level identity.
+    if (!ts.isSourceFile(container)) return null;
     // A source mapping identifies the file, not the declaration. Match only
     // a unique actual declaration with the same declared name and syntax kind.
     // Do not transfer positions from the emitted .d.ts into the source file.

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { it } from 'node:test';
 import type { ParsedTypeText, TypeScriptProjectAnalysis } from './types.ts';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
@@ -112,17 +112,19 @@ it('TM13 A1: referenced package declarations map to real source positions', () =
     const coreSourcePath = join(root, 'packages/core/src/index.ts');
     const coreSource = `${readFileSync(coreSourcePath, 'utf8')}\nexport function lookup(value: string): string;
 export function lookup(value: number): number;
-export function lookup(value: string | number): string | number { return value; }\n`;
+export function lookup(value: string | number): string | number { return value; }
+export interface NestedModel { topLevel: true }
+export namespace Namespace { export interface NestedModel { nested: true } }\n`;
     writeFileSync(coreSourcePath, coreSource);
     const declarationPath = join(root, 'packages/core/dist/index.d.ts');
     writeFileSync(
       declarationPath,
-      `${readFileSync(declarationPath, 'utf8')}\nexport declare function lookup(value: string): string;\nexport declare function lookup(value: number): number;\n`,
+      `${readFileSync(declarationPath, 'utf8')}\nexport declare function lookup(value: string): string;\nexport declare function lookup(value: number): number;\nexport interface NestedModel { topLevel: true }\nexport declare namespace Namespace { interface NestedModel { nested: true } }\n`,
     );
     const entryPath = join(cli, 'src/index.ts');
     writeFileSync(
       entryPath,
-      `${readFileSync(entryPath, 'utf8')}\nimport { lookup } from '@fixture/core';\nexport type LookupType = typeof lookup;\n`,
+      `${readFileSync(entryPath, 'utf8')}\nimport { lookup, Namespace } from '@fixture/core';\nexport type LookupType = typeof lookup;\nexport type Nested = Namespace.NestedModel;\n`,
     );
     const analysis = new TypeScriptAnalyzer(cli).analyzeFromEntrypoint(join(cli, 'src/index.ts'));
     const module = required(analysis.modules.find((candidate) => candidate.filePath === join(cli, 'src/index.ts')));
@@ -146,12 +148,21 @@ export function lookup(value: string | number): string | number { return value; 
         'export function lookup(value: string): string;',
       );
     }
+    const nested = module.types.find((candidate) => candidate.name === 'Nested')?.typeInfo?.references[0]?.origin;
+    assert.deepEqual(
+      nested,
+      { kind: 'unresolved', reason: 'ambiguous-declaration' },
+      'nested emitted declarations cannot borrow equal-spelling top-level source identity',
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
 it('TM13 A1: origin-only extraction is byte-identical', () => {
+  // Captured with the unmodified analyzer from 8559841, before A1. These
+  // fixtures had no complete checked-in output snapshots in the main suite.
+  const baseline = JSON.parse(readFileSync(join(import.meta.dirname, 'goldens/type-origins/baseline-8559841.json'), 'utf8'));
   const fixtures = [
     ['77-same-name-interface-two-files', 'main.ts'],
     ['96-same-name-type-alias-two-files', 'index.ts'],
@@ -175,6 +186,20 @@ it('TM13 A1: origin-only extraction is byte-identical', () => {
   for (const [name, entry] of fixtures) {
     const root = resolve(import.meta.dirname, '../tests/ladder/repros-analyzer', name);
     const analysis = new TypeScriptAnalyzer(root).analyzeFromEntrypoint(join(root, 'src', entry));
+    assert.deepEqual(
+      JSON.parse(
+        JSON.stringify({
+          tmdContent: new TypeScriptToTypedMindConverter().convert(analysis).tmdContent,
+          moduleGraph: analysis.moduleGraph,
+          diagnostics: analysis.diagnostics.map((diagnostic) => ({
+            ...diagnostic,
+            message: diagnostic.message.replaceAll(root, '<fixture>'),
+            filePath: diagnostic.filePath === undefined ? undefined : relative(root, diagnostic.filePath),
+          })),
+        }),
+      ),
+      baseline[name],
+    );
     const stripped = strip(analysis) as TypeScriptProjectAnalysis;
     assert.deepEqual(new TypeScriptToTypedMindConverter().convert(analysis), new TypeScriptToTypedMindConverter().convert(stripped), name);
     assert.deepEqual(analysis.moduleGraph, stripped.moduleGraph);
