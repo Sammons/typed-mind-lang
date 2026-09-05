@@ -154,6 +154,16 @@ export const honestSuppressionOf = (suppression: SuppressionNode): Record<string
 // which field carries it. This projection accepts that specific, harmless
 // re-attribution while still catching a REAL loss: if the text disappears
 // from BOTH slots, or changes value, the comparison still fails.
+//
+// A DISTINCT pair (`Foo ~ "description" # comment`, both set and different)
+// is never collapsed: both fields stay in the comparison. Longform carries
+// such a pair on every kind — `purpose:` beside `description:` for the seven
+// kinds whose longform block reads a `purpose:` key (Program, File, Class,
+// ClassFile, Constants, DTO, Dependency), and, since RFC-TM-15 leaf C1
+// (rfc-tm-15-diamond.md §S1), `comment:` beside `description:` for
+// Function, Asset, UIComponent and RunParameter (emit-longform.ts's
+// commentLine; longform-builder.ts reads it with precedence over
+// `description:` for the comment field).
 const FREE_TEXT_FIELD_BY_KIND: Partial<Record<EntityNode['kind'], string>> = {
   Program: 'purpose',
   File: 'purpose',
