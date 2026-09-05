@@ -71,7 +71,18 @@ it('TM13 H: ClassFile heritage resolves the named return and a forged range cann
   const unresolved = rejected.entities.find((entity) => entity.name === 'Derived');
   assert.ok(unresolved instanceof ClassNode || unresolved instanceof ClassFileNode);
   assert.equal(unresolved.extends, 'factory');
-  assert.ok(rejected.warnings.some((warning) => /not emitted/.test(warning.message)));
+  assert.ok(rejected.warnings.some((warning) => /not uniquely emitted/.test(warning.message)));
+});
+
+it('TM13 H: same-file lexical declarations cannot share a returned-class identity', (context) => {
+  const { converted } = fixture(context, {
+    'main.ts':
+      'export class Hidden {} export function factory() { class Hidden {} return Hidden; } export class Derived extends factory() {}',
+  });
+  const derived = converted.entities.find((entity) => entity.name === 'Derived');
+  assert.ok(derived instanceof ClassNode);
+  assert.equal(derived.extends, 'factory');
+  assert.ok(converted.warnings.some((warning) => /not uniquely emitted/.test(warning.message)));
 });
 
 it('TM13 H: anonymous structural union and missing factory returns retain explicit uncertainty', (context) => {
