@@ -248,6 +248,9 @@ export const parseSignatureText = (text: string, options: ParseSignatureTextOpti
     const cursor = { index: state.index + 1 };
     for (const stop of stops) {
       const binder = text.slice(cursor.index, stop).trim();
+      if (binder === '' && stop === binders.end && typeParameterNames.length > 0) {
+        break; // A trailing comma is valid in a generic arrow header.
+      }
       const match = /^(?:const\s+)?(?:(?:in|out)\s+)*([A-Za-z_$][\w$]*)(?=\s+extends\b|\s*=|\s*$)/.exec(binder);
       if (match?.[1] === undefined) {
         return source.failure('unsupported-shape');

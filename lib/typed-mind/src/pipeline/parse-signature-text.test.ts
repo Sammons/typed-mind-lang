@@ -29,6 +29,7 @@ it('TM13 B1: signature parser preserves parameter and return type structure', ()
   assert.equal(signature.returnType?.text, 'Promise<Wrapped>');
   assert.equal(parsed('async (value: Wrapped) => Boxed').displayName, undefined);
   assert.equal(parsed('(value: Wrapped) => Boxed').async, false);
+  assert.deepEqual(parsed('async <T,>(value: T) => Wrapped').typeParameterNames, ['T']);
 
   const callback = parsed('go(callback: (input: Store) => Lease | Failure) => void').parameters[0]?.type;
   assert.equal(callback?.kind, 'callable');
