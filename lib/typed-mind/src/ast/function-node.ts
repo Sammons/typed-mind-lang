@@ -6,6 +6,7 @@
 // validator needs for "Function dependency not found" (validator.ts:1449-1467).
 
 import { EntityNode, type EntityNodeArgs } from './entity-node.ts';
+import type { TypeParameterNode } from './type-parameter-node.ts';
 
 export class FunctionNode extends EntityNode {
   override readonly kind = 'Function' as const;
@@ -17,6 +18,7 @@ export class FunctionNode extends EntityNode {
   readonly output: string | undefined;
   readonly affects: readonly string[] | undefined;
   readonly consumes: readonly string[] | undefined;
+  readonly typeParameters: readonly TypeParameterNode[] | undefined;
 
   constructor(
     args: EntityNodeArgs & {
@@ -28,6 +30,7 @@ export class FunctionNode extends EntityNode {
       output?: string;
       affects?: readonly string[];
       consumes?: readonly string[];
+      typeParameters?: readonly TypeParameterNode[];
     },
   ) {
     super(args);
@@ -39,5 +42,6 @@ export class FunctionNode extends EntityNode {
     this.output = args.output;
     this.affects = args.affects;
     this.consumes = args.consumes;
+    this.typeParameters = args.typeParameters;
   }
 }

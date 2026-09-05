@@ -17,6 +17,7 @@ import type { FileNode } from '../../src/ast/file-node.ts';
 import type { FunctionNode } from '../../src/ast/function-node.ts';
 import type { ProgramNode } from '../../src/ast/program-node.ts';
 import type { RunParameterNode } from '../../src/ast/run-parameter-node.ts';
+import type { TypeDefNode } from '../../src/ast/type-def-node.ts';
 import type { UiComponentNode } from '../../src/ast/ui-component-node.ts';
 
 export const attemptProgramWrites = (node: ProgramNode) => {
@@ -56,6 +57,8 @@ export const attemptFileWrites = (node: FileNode) => {
 };
 
 export const attemptFunctionWrites = (node: FunctionNode) => {
+  // @ts-expect-error readonly generic declarations
+  node.typeParameters = [];
   // @ts-expect-error readonly kind discriminant
   node.kind = 'Function';
   // @ts-expect-error readonly field
@@ -79,6 +82,12 @@ export const attemptFunctionWrites = (node: FunctionNode) => {
 };
 
 export const attemptClassWrites = (node: ClassNode) => {
+  // @ts-expect-error readonly canonical heritage
+  node.heritage = { extends: undefined, implements: [] };
+  // @ts-expect-error readonly nested heritage
+  node.heritage.implements = [];
+  // @ts-expect-error readonly generic declarations
+  node.typeParameters = [];
   // @ts-expect-error readonly kind discriminant
   node.kind = 'Class';
   // @ts-expect-error readonly field
@@ -92,6 +101,12 @@ export const attemptClassWrites = (node: ClassNode) => {
 };
 
 export const attemptClassFileWrites = (node: ClassFileNode) => {
+  // @ts-expect-error readonly canonical heritage
+  node.heritage = { extends: undefined, implements: [] };
+  // @ts-expect-error readonly nested heritage
+  node.heritage.implements = [];
+  // @ts-expect-error readonly generic declarations
+  node.typeParameters = [];
   // @ts-expect-error readonly kind discriminant
   node.kind = 'ClassFile';
   // @ts-expect-error readonly field
@@ -126,6 +141,10 @@ export const attemptConstantsWrites = (node: ConstantsNode) => {
 };
 
 export const attemptDtoWrites = (node: DtoNode) => {
+  // @ts-expect-error readonly interface heritage
+  node.extendsReferences = [];
+  // @ts-expect-error readonly generic declarations
+  node.typeParameters = [];
   // @ts-expect-error readonly kind discriminant
   node.kind = 'DTO';
   // @ts-expect-error readonly field
@@ -197,4 +216,9 @@ export const attemptDtoFieldWrites = (node: DtoFieldNode) => {
   node.span = { start: { line: 1, column: 1 }, end: { line: 1, column: 2 } };
   // @ts-expect-error derived getter has no setter
   node.isOptional = true;
+};
+
+export const attemptGenericAliasWrites = (node: TypeDefNode) => {
+  // @ts-expect-error readonly generic declarations
+  node.typeParameters = [];
 };

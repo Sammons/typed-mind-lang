@@ -25,6 +25,11 @@ const packageDir = join(testDir, '..', '..');
 const repoRoot = join(packageDir, '..', '..');
 const wasmPath = join(packageDir, 'grammar', 'grammar.wasm');
 
+const expectedHeritage = (name: string, line: number, start: number, end: number) => {
+  const span = { start: { line, column: start }, end: { line, column: end } };
+  return { kind: 'named', base: { kind: 'named', name, span }, args: [], span };
+};
+
 describe('CST→AST walk/attach layer', () => {
   let parser: TypedMindParser;
 
@@ -97,6 +102,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'Function',
+            typeParameters: undefined,
             sourceForm: 'shortform',
             name: 'createUser',
             comment: undefined,
@@ -111,6 +117,8 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'Class',
+            typeParameters: undefined,
+            heritage: { extends: expectedHeritage('Base', 13, 19, 23), implements: [expectedHeritage('IController', 13, 25, 36)] },
             sourceForm: 'shortform',
             name: 'BaseController',
             comment: undefined,
@@ -121,6 +129,8 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'ClassFile',
+            typeParameters: undefined,
+            heritage: { extends: expectedHeritage('BaseController', 15, 46, 60), implements: [] },
             sourceForm: 'shortform',
             name: 'UserController',
             comment: undefined,

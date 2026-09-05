@@ -8,6 +8,8 @@
 // declaredImports field — that is the F3 disposition, not an omission.
 
 import { EntityNode, type EntityNodeArgs } from './entity-node.ts';
+import { type ClassHeritage, type ClassHeritageArgs, classHeritageFromArgs } from './heritage-reference.ts';
+import type { TypeParameterNode } from './type-parameter-node.ts';
 
 export class ClassNode extends EntityNode {
   override readonly kind = 'Class' as const;
@@ -15,12 +17,19 @@ export class ClassNode extends EntityNode {
   readonly methods: readonly string[];
   readonly extends: string | undefined;
   readonly purpose: string | undefined;
+  readonly heritage: ClassHeritage;
+  readonly typeParameters: readonly TypeParameterNode[] | undefined;
 
-  constructor(args: EntityNodeArgs & { implements: readonly string[]; methods: readonly string[]; extends?: string; purpose?: string }) {
+  constructor(
+    args: EntityNodeArgs &
+      ClassHeritageArgs & { methods: readonly string[]; purpose?: string; typeParameters?: readonly TypeParameterNode[] },
+  ) {
     super(args);
-    this.implements = args.implements;
+    this.heritage = classHeritageFromArgs(args, args.span);
+    this.implements = this.heritage.implements.flatMap((reference) => (reference.kind === 'named' ? [reference.base.name] : []));
     this.methods = args.methods;
-    this.extends = args.extends;
+    this.extends = this.heritage.extends?.kind === 'named' ? this.heritage.extends.base.name : undefined;
     this.purpose = args.purpose;
+    this.typeParameters = args.typeParameters;
   }
 }
