@@ -1,13 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as ts from 'typescript';
+import { getModuleTypeInfos } from './parsed-type-slots.ts';
+import { getDeclarationIdentity, parseTypeTextOrigins, resolveReferenceOrigin, sourceRange } from './type-reference-origins.ts';
 import type {
   AnalyzerDiagnostic,
+  DeclarationIdentity,
   ModuleGraphEdge,
   ParsedClass,
   ParsedConstant,
   ParsedEnum,
   ParsedExport,
+  ParsedFactoryHeritage,
   ParsedFunction,
   ParsedImport,
   ParsedInterface,
@@ -16,7 +20,10 @@ import type {
   ParsedParameter,
   ParsedProperty,
   ParsedTypeAlias,
+  ParsedTypeParameter,
+  ParsedTypeText,
   RecognizerName,
+  ReferenceOrigin,
   SstHandlerReference,
   TypeScriptProjectAnalysis,
 } from './types.ts';
@@ -87,6 +94,7 @@ export class CollectingParseConfigHost implements ts.ParseConfigFileHost {
 export class TypeScriptAnalyzer {
   private program: ts.Program;
   private checker: ts.TypeChecker;
+  private readonly typeInfoCache = new WeakMap<ts.TypeNode, ParsedTypeText>();
   private compilerOptions: ts.CompilerOptions;
   private readonly moduleResolutionCache: ts.ModuleResolutionCache;
   private readonly diagnostics: AnalyzerDiagnostic[] = [];
@@ -520,6 +528,29 @@ export class TypeScriptAnalyzer {
       }
       const module = this.analyzeModule(sourceFile);
       modules.push(module);
+
+      // A2 semantic type dependencies share the queue but are not import edges.
+      const referencedSources = new Set(
+        getModuleTypeInfos(module)
+          .flatMap((info) => info.references)
+          .filter((reference) => reference.origin.kind === 'project')
+          .map((reference) => (reference.origin.kind === 'project' ? reference.origin.declaration.filePath : '')),
+      );
+      for (const referencedPath of referencedSources) {
+        if (visitedModules.has(referencedPath)) continue;
+        const referencedFile = this.program.getSourceFile(referencedPath);
+        if (referencedFile !== undefined && !referencedFile.isDeclarationFile) {
+          if (!traverseQueue.includes(referencedPath)) traverseQueue.push(referencedPath);
+        } else {
+          this.diagnostics.push({
+            severity: 'warning',
+            category: 'unrepresented-type-source',
+            message: `Referenced project declaration has no source module in the TypeScript program: ${referencedPath}`,
+            filePath: currentPath,
+            specifier: undefined,
+          });
+        }
+      }
 
       // X-AN-10 — opt-in recognizer scan. No-op (and no diagnostic
       // surface) when --recognize was not passed for this convention name,
@@ -1278,17 +1309,37 @@ export class TypeScriptAnalyzer {
 
     // Handle export { name1, name2 } from 'module'
     if (node.exportClause && ts.isNamedExports(node.exportClause)) {
-      const source = node.moduleSpecifier ? (node.moduleSpecifier as ts.StringLiteral).text : undefined;
+      const explicitSource = node.moduleSpecifier ? (node.moduleSpecifier as ts.StringLiteral).text : undefined;
 
-      return node.exportClause.elements.map((element) => ({
-        name: element.name.text,
-        isDefault: false,
-        type: this.inferExportType(element.name.text, source),
-        source: source || undefined,
-      }));
+      return node.exportClause.elements.map((element) => {
+        const source = explicitSource ?? this.namedImportSourceForExport(element);
+        return {
+          name: element.name.text,
+          isDefault: false,
+          type: this.inferExportType(element.name.text, source),
+          source: source || undefined,
+        };
+      });
     }
 
     return exports;
+  }
+
+  // A separate import followed by a bare export has the same provenance as
+  // `export { name } from 'source'`. Resolve its local binding, not its text:
+  // import aliases and exports before imports must identify the same owner.
+  private namedImportSourceForExport(element: ts.ExportSpecifier): string | undefined {
+    const symbol = this.checker.getExportSpecifierLocalTargetSymbol(element);
+    for (const declaration of symbol?.declarations ?? []) {
+      if (!ts.isImportSpecifier(declaration) || declaration.getSourceFile() !== element.getSourceFile()) {
+        continue;
+      }
+      const importDeclaration = declaration.parent.parent.parent;
+      if (ts.isImportDeclaration(importDeclaration) && ts.isStringLiteral(importDeclaration.moduleSpecifier)) {
+        return importDeclaration.moduleSpecifier.text;
+      }
+    }
+    return undefined;
   }
 
   private inferExportType(name: string, _source?: string): 'function' | 'class' | 'interface' | 'type' | 'constant' | 'variable' {
@@ -1321,9 +1372,12 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
+      declaration: this.getRetainedDeclarationIdentity(node),
+      typeParameters: this.parseTypeParameters(node.typeParameters),
       signature,
       parameters,
       returnType,
+      returnTypeInfo: this.getTypeInfo(node.type),
       isAsync,
       description: description || undefined,
       decorators,
@@ -1349,9 +1403,12 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
+      declaration: ts.isVariableDeclaration(nameNode.parent) ? this.getRetainedDeclarationIdentity(nameNode.parent) : undefined,
+      typeParameters: this.parseTypeParameters(node.typeParameters),
       signature,
       parameters,
       returnType,
+      returnTypeInfo: this.getTypeInfo(node.type),
       isAsync,
       description: description || undefined,
       decorators: [],
@@ -1368,6 +1425,7 @@ export class TypeScriptAnalyzer {
     const name = node.name?.text || '<anonymous>';
     const isAbstract = this.hasAbstractModifier(node);
     const extendsClasses: string[] = [];
+    const factoryHeritage: ParsedFactoryHeritage[] = [];
     const implementsInterfaces: string[] = [];
     const methods: ParsedMethod[] = [];
     const properties: ParsedProperty[] = [];
@@ -1377,7 +1435,22 @@ export class TypeScriptAnalyzer {
     if (node.heritageClauses) {
       for (const clause of node.heritageClauses) {
         if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-          extendsClasses.push(...clause.types.map((type) => this.getExtendsTargetName(type)));
+          for (const type of clause.types) {
+            if (ts.isCallExpression(type.expression) && this.findMixinBaseExpression(type.expression) === undefined) {
+              const origin = this.resolveFactoryHeritage(type.expression);
+              factoryHeritage.push({ index: extendsClasses.length, source: sourceRange(type.expression), origin });
+              if (origin.kind !== 'project') {
+                this.diagnostics.push({
+                  severity: 'warning',
+                  category: 'unresolved-factory-heritage',
+                  message: `Factory heritage '${type.expression.getText()}' of '${name}' has no proven named project class (${origin.kind === 'unresolved' ? origin.reason : origin.kind}); retaining the factory fallback`,
+                  filePath: node.getSourceFile().fileName,
+                  specifier: undefined,
+                });
+              }
+            }
+            extendsClasses.push(this.getExtendsTargetName(type));
+          }
         } else if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
           implementsInterfaces.push(...clause.types.map((type) => this.getTypeString(type)));
         }
@@ -1436,7 +1509,18 @@ export class TypeScriptAnalyzer {
           const signature = this.buildFunctionSignature(parsedAccessor.name, parameters, returnType, false);
 
           accessorsByKey.set(key, {
-            method: { ...existing.method, accessorKind: 'both', parameters, returnType, signature },
+            method: {
+              ...existing.method,
+              accessorKind: 'both',
+              parameters,
+              returnType,
+              signature,
+              returnTypeInfo: isGet
+                ? parsedAccessor.returnTypeInfo
+                : existing.hasGet
+                  ? existing.method.returnTypeInfo
+                  : parsedAccessor.returnTypeInfo,
+            },
             hasGet: existing.hasGet || isGet,
             hasSet: existing.hasSet || !isGet,
           });
@@ -1450,9 +1534,20 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
+      declaration: this.getRetainedDeclarationIdentity(node),
+      typeParameters: this.parseTypeParameters(node.typeParameters),
+      extendsTypeInfo:
+        node.heritageClauses
+          ?.filter((clause) => clause.token === ts.SyntaxKind.ExtendsKeyword)
+          .flatMap((clause) => clause.types.map((type) => this.getTypeInfo(type))) ?? [],
       isAbstract,
       extends: extendsClasses,
+      ...(factoryHeritage.length > 0 ? { factoryHeritage } : {}),
       implements: implementsInterfaces,
+      implementsTypeInfo:
+        node.heritageClauses
+          ?.filter((clause) => clause.token === ts.SyntaxKind.ImplementsKeyword)
+          .flatMap((clause) => clause.types.map((type) => this.getTypeInfo(type))) ?? [],
       methods,
       properties,
       decorators,
@@ -1479,6 +1574,8 @@ export class TypeScriptAnalyzer {
       isAbstract: false,
       parameters,
       returnType,
+      typeParameters: [],
+      returnTypeInfo: isGet ? this.getTypeInfo(node.type) : { text: 'void', source: undefined, references: [] },
       isAsync: false,
       accessorKind: isGet ? 'get' : 'set',
     } as const;
@@ -1514,6 +1611,12 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
+      declaration: this.getRetainedDeclarationIdentity(node),
+      typeParameters: this.parseTypeParameters(node.typeParameters),
+      extendsTypeInfo:
+        node.heritageClauses
+          ?.filter((clause) => clause.token === ts.SyntaxKind.ExtendsKeyword)
+          .flatMap((clause) => clause.types.map((type) => this.getTypeInfo(type))) ?? [],
       extends: extendsInterfaces,
       properties,
       methods,
@@ -1529,6 +1632,9 @@ export class TypeScriptAnalyzer {
     return {
       name,
       type,
+      typeInfo: this.getTypeInfo(node.type),
+      typeParameters: this.parseTypeParameters(node.typeParameters),
+      declaration: this.getRetainedDeclarationIdentity(node),
       description: description || undefined,
     } as const;
   }
@@ -1544,6 +1650,7 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
+      declaration: this.getRetainedDeclarationIdentity(node),
       members,
       description: description || undefined,
     } as const;
@@ -1572,6 +1679,8 @@ export class TypeScriptAnalyzer {
       constants.push({
         name,
         type,
+        typeInfo: this.getTypeInfo(declaration.type),
+        declaration: this.getRetainedDeclarationIdentity(declaration),
         value: value || undefined,
         isConst,
       } as const);
@@ -1615,6 +1724,7 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
+      typeParameters: this.parseTypeParameters(node.typeParameters),
       signature,
       isStatic,
       isPrivate,
@@ -1622,6 +1732,7 @@ export class TypeScriptAnalyzer {
       isAbstract,
       parameters,
       returnType,
+      returnTypeInfo: this.getTypeInfo(node.type),
       isAsync,
       accessorKind: undefined,
     } as const;
@@ -1656,6 +1767,8 @@ export class TypeScriptAnalyzer {
           isAbstract: false,
           parameters,
           returnType,
+          returnTypeInfo: this.getTypeInfo(initializer.type),
+          typeParameters: this.parseTypeParameters(initializer.typeParameters),
           isAsync,
           accessorKind: undefined,
         },
@@ -1673,6 +1786,7 @@ export class TypeScriptAnalyzer {
       property: {
         name,
         type,
+        typeInfo: this.getTypeInfo(node.type),
         isReadonly,
         isStatic,
         isPrivate,
@@ -1691,6 +1805,7 @@ export class TypeScriptAnalyzer {
     return {
       name,
       type,
+      typeInfo: this.getTypeInfo(node.type),
       isReadonly: false,
       isStatic: false,
       isPrivate: false,
@@ -1708,6 +1823,7 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
+      typeParameters: this.parseTypeParameters(node.typeParameters),
       signature,
       isStatic: false,
       isPrivate: false,
@@ -1715,6 +1831,7 @@ export class TypeScriptAnalyzer {
       isAbstract: false,
       parameters,
       returnType,
+      returnTypeInfo: this.getTypeInfo(node.type),
       isAsync,
       accessorKind: undefined,
     } as const;
@@ -1742,6 +1859,7 @@ export class TypeScriptAnalyzer {
     return parameters.map((param, index) => ({
       name: this.getParameterName(param, index),
       type: this.getTypeString(param.type),
+      typeInfo: this.getTypeInfo(param.type),
       isOptional: !!param.questionToken,
       hasDefaultValue: !!param.initializer,
     }));
@@ -1806,69 +1924,104 @@ export class TypeScriptAnalyzer {
   }
 
   private getTypeString(typeNode: ts.TypeNode | undefined): string {
-    if (!typeNode) return 'any';
-    return this.parenthesizeTypeQueries(typeNode);
+    return this.getTypeInfo(typeNode).text;
   }
 
-  // Fixtures 92 / 93 (mail-agent `src/model/client.ts:19` `ModelDeps`'s
-  // `fetchImpl: typeof fetch`, and `src/http/routes-activity.ts:40`
-  // `ActivityRouteDeps`'s `revert: ReturnType<typeof makeRevert>`) — a TS
-  // TYPE QUERY (`typeof X`) reached the emitted `.tmd` as bare source text.
-  //
-  // The TypedMind grammar DOES have a `typeof` production, but its trigger
-  // token requires a leading `(` (grammar.js `_typeof_opaque_open`, added for
-  // issue #83's `(typeof CHECK_CODES)[number]`). A BARE `typeof fetch` never
-  // matches it, so `entity_name` matched `typeof` as an ordinary identifier
-  // and the checker then choked on the next token — reported as
-  // `Unparsable text: 'fetch'`. Nested inside a generic argument the same
-  // defect recurs one level deeper: `ReturnType<typeof makeRevert>` parsed
-  // its argument as a named type literally called `typeof`, which also fed
-  // `walkGenericArgsForExternalStubs` a bogus external type named `typeof`.
-  //
-  // Both are one defect — a type query that is not parenthesized — so the fix
-  // is one AST walk that wraps EVERY `TypeQuery` node in parens, wherever it
-  // sits in the type tree. That lands the text squarely inside the grammar's
-  // existing, already-correct `(typeof X)` production rather than widening the
-  // grammar to parse arbitrary TypeScript type-query syntax.
-  //
-  // The walk rebuilds text only along the path to a type query; a type node
-  // containing none returns `getText()` unchanged, so this is inert for every
-  // shape that already worked.
-  private parenthesizeTypeQueries(typeNode: ts.TypeNode): string {
-    if (ts.isTypeQueryNode(typeNode)) {
-      return `(${typeNode.getText()})`;
+  private getTypeInfo(typeNode: ts.TypeNode | undefined): ParsedTypeText {
+    if (typeNode === undefined) return { text: 'any', source: undefined, references: [] };
+    const cached = this.typeInfoCache.get(typeNode);
+    if (cached !== undefined) return cached;
+    const info = parseTypeTextOrigins(typeNode, this.program, this.checker, {
+      mapDeclaration: (declaration) => this.mapReferenceDeclarationToSource(declaration),
+    });
+    this.typeInfoCache.set(typeNode, info);
+    return info;
+  }
+
+  private parseTypeParameters(parameters: ts.NodeArray<ts.TypeParameterDeclaration> | undefined): readonly ParsedTypeParameter[] {
+    return (parameters ?? []).map((parameter) => ({
+      text: parameter.getText(),
+      name: parameter.name.text,
+      declaration: { ...sourceRange(parameter), name: parameter.name.text },
+      constraint: parameter.constraint ? this.getTypeInfo(parameter.constraint) : undefined,
+      defaultType: parameter.default ? this.getTypeInfo(parameter.default) : undefined,
+    }));
+  }
+
+  // Shared analyzer seam for type positions and later initializer/heritage
+  // references. Standalone parsed nodes cannot safely use this program's checker.
+  resolveReferenceOriginAtLocation(node: ts.Node): ReferenceOrigin {
+    if (this.program.getSourceFile(node.getSourceFile().fileName) !== node.getSourceFile()) {
+      return { kind: 'unresolved', reason: 'checker-unavailable' };
     }
+    return resolveReferenceOrigin(this.checker.getSymbolAtLocation(node), this.program, this.checker, {
+      mapDeclaration: (declaration) => this.mapReferenceDeclarationToSource(declaration),
+    });
+  }
 
-    if (ts.isTypeReferenceNode(typeNode) && typeNode.typeArguments !== undefined) {
-      const args = typeNode.typeArguments;
+  private getRetainedDeclarationIdentity(declaration: ts.Declaration): DeclarationIdentity | undefined {
+    const name = ts.getNameOfDeclaration(declaration);
+    if (name !== undefined) {
+      const origin = this.resolveReferenceOriginAtLocation(name);
+      if (origin.kind === 'project') return origin.declaration;
+    }
+    return getDeclarationIdentity(declaration);
+  }
 
-      if (args.some((arg) => this.containsTypeQuery(arg))) {
-        const rendered = args.map((arg) => this.parenthesizeTypeQueries(arg)).join(', ');
-        return `${typeNode.typeName.getText()}<${rendered}>`;
+  private mapReferenceDeclarationToSource(declaration: ts.Declaration): ts.Declaration | null | undefined {
+    const sourcePath = this.mapDeclarationToSource(this.realpathOrSelf(declaration.getSourceFile().fileName));
+    if (sourcePath === undefined) return undefined;
+    const source = this.program.getSourceFile(sourcePath);
+    const identity = getDeclarationIdentity(declaration);
+    if (source === undefined || identity === undefined) return null;
+    const container =
+      ts.isVariableDeclaration(declaration) && ts.isVariableDeclarationList(declaration.parent)
+        ? declaration.parent.parent.parent
+        : declaration.parent;
+    // The mapping below proves only top-level declarations. A nested namespace
+    // or member with the same spelling must never borrow a top-level identity.
+    if (!ts.isSourceFile(container)) return null;
+    // A source mapping identifies the file, not the declaration. Match only
+    // a unique actual declaration with the same declared name and syntax kind.
+    // Do not transfer positions from the emitted .d.ts into the source file.
+    const candidates: ts.Declaration[] = [];
+    for (const statement of source.statements) {
+      if (ts.isVariableStatement(statement)) {
+        for (const variable of statement.declarationList.declarations) {
+          if (variable.kind === declaration.kind && getDeclarationIdentity(variable)?.name === identity.name) candidates.push(variable);
+        }
+      } else if (
+        ts.isFunctionDeclaration(statement) ||
+        ts.isClassDeclaration(statement) ||
+        ts.isInterfaceDeclaration(statement) ||
+        ts.isTypeAliasDeclaration(statement) ||
+        ts.isEnumDeclaration(statement) ||
+        ts.isModuleDeclaration(statement)
+      ) {
+        if (statement.kind === declaration.kind && getDeclarationIdentity(statement)?.name === identity.name) candidates.push(statement);
       }
     }
-
-    if (ts.isArrayTypeNode(typeNode) && this.containsTypeQuery(typeNode.elementType)) {
-      return `${this.parenthesizeTypeQueries(typeNode.elementType)}[]`;
-    }
-
-    if (ts.isUnionTypeNode(typeNode) && typeNode.types.some((t) => this.containsTypeQuery(t))) {
-      return typeNode.types.map((t) => this.parenthesizeTypeQueries(t)).join(' | ');
-    }
-
-    if (ts.isIntersectionTypeNode(typeNode) && typeNode.types.some((t) => this.containsTypeQuery(t))) {
-      return typeNode.types.map((t) => this.parenthesizeTypeQueries(t)).join(' & ');
-    }
-
-    return typeNode.getText();
-  }
-
-  private containsTypeQuery(typeNode: ts.Node): boolean {
-    if (ts.isTypeQueryNode(typeNode)) {
-      return true;
-    }
-
-    return typeNode.getChildren().some((child) => this.containsTypeQuery(child));
+    // Real overloads and merged declarations share a checker symbol. Equal
+    // spelling alone is insufficient to merge independently declared targets.
+    const symbols = candidates.map((candidate) => {
+      const name = ts.getNameOfDeclaration(candidate);
+      return name === undefined ? undefined : this.checker.getSymbolAtLocation(name);
+    });
+    if (symbols.length === 0 || symbols[0] === undefined || symbols.some((symbol) => symbol !== symbols[0])) return null;
+    const sourceSymbol = symbols[0];
+    const canonical = resolveReferenceOrigin(sourceSymbol, this.program, this.checker);
+    if (canonical.kind !== 'project') return null;
+    return (
+      sourceSymbol.getDeclarations()?.find((candidate) => {
+        const identity = getDeclarationIdentity(candidate);
+        return (
+          identity?.filePath === canonical.declaration.filePath &&
+          identity.start === canonical.declaration.start &&
+          identity.end === canonical.declaration.end &&
+          identity.name === canonical.declaration.name
+        );
+      }) ?? null
+    );
   }
 
   // The single mixin-heritage helper, reconciling PR #152 (slat-harness,
@@ -1920,6 +2073,21 @@ export class TypeScriptAnalyzer {
 
     const base = this.findMixinBaseExpression(expression);
     return base !== undefined ? base.getText() : this.mixinFactoryFallbackName(expression);
+  }
+
+  private resolveFactoryHeritage(call: ts.CallExpression): ReferenceOrigin {
+    if (this.program.getSourceFile(call.getSourceFile().fileName) !== call.getSourceFile()) {
+      return { kind: 'unresolved', reason: 'checker-unavailable' };
+    }
+    const type = this.checker.getTypeAtLocation(call);
+    if (type.isUnionOrIntersection() || type.getConstructSignatures().length === 0) {
+      return { kind: 'unresolved', reason: 'unsupported-heritage-type' };
+    }
+    const classes = type.getSymbol()?.getDeclarations()?.filter(ts.isClassDeclaration) ?? [];
+    if (classes.length !== 1 || classes[0]?.name === undefined) {
+      return { kind: 'unresolved', reason: classes.length > 1 ? 'ambiguous-declaration' : 'unsupported-heritage-type' };
+    }
+    return this.resolveReferenceOriginAtLocation(classes[0].name);
   }
 
   // Finds the base among a mixin call's arguments. Recurses into a nested

@@ -138,6 +138,13 @@ export class QualifiedNameResolver {
         }
       }
       if (owner instanceof ClassFileNode && owner.methods.includes(member)) {
+        if (
+          options.importingFile !== undefined &&
+          options.importingFile !== ownerName &&
+          !ownerName.startsWith(`${options.importingFile}.`)
+        ) {
+          return failure('private-member');
+        }
         return { kind: 'member', owner, member };
       }
       return failure('missing-member');
@@ -146,6 +153,13 @@ export class QualifiedNameResolver {
       return failure('invalid-owner'); // Dotted declarations require a File/ClassFile owner.
     }
     if (owner instanceof ClassNode) {
+      if (
+        options.importingFile !== undefined &&
+        options.importingFile !== ownerName &&
+        !ownerName.startsWith(`${options.importingFile}.`)
+      ) {
+        return failure('private-member');
+      }
       return owner.methods.includes(member) ? { kind: 'member', owner, member } : failure('missing-member');
     }
     if (owner instanceof ConstantsNode) {

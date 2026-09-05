@@ -18,7 +18,7 @@ describe('scenario-44-classfile-mixed-entities', () => {
 
     // The scenario should be invalid due to multiple validation errors
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 8); // More errors than expected
+    assert.equal(result.diagnostics.length, 5); // Q removes three valid ClassFile method-call findings.
 
     // Should find error for BaseController being orphaned
     const baseControllerOrphanedError = result.diagnostics.find(
@@ -34,18 +34,16 @@ describe('scenario-44-classfile-mixed-entities', () => {
     assert.notEqual(baseControllerNotExportedError, undefined);
     assert.equal(baseControllerNotExportedError?.severity, 'error');
 
-    // Should find errors for invalid calls to ClassFile methods
+    // Q resolves these verified ClassFile methods; the unrelated errors remain.
     const userControllerCallError = result.diagnostics.find((diagnostic) =>
       diagnostic.message.includes("Cannot use 'calls' to reference ClassFile 'UserController'"),
     );
-    assert.notEqual(userControllerCallError, undefined);
-    assert.equal(userControllerCallError?.severity, 'error');
+    assert.equal(userControllerCallError, undefined);
 
     const userRepositoryCallError = result.diagnostics.find((diagnostic) =>
       diagnostic.message.includes("Cannot use 'calls' to reference ClassFile 'UserRepository'"),
     );
-    assert.notEqual(userRepositoryCallError, undefined);
-    assert.equal(userRepositoryCallError?.severity, 'error');
+    assert.equal(userRepositoryCallError, undefined);
 
     // Should find error for DataProcessor not being exported
     const dataProcessorError = result.diagnostics.find(

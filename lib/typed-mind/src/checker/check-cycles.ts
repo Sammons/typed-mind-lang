@@ -14,6 +14,7 @@ import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
 import { DtoNode } from '../ast/dto-node.ts';
 import { FileNode } from '../ast/file-node.ts';
+import { resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 import type { CheckContext } from './check-context.ts';
 
@@ -80,7 +81,7 @@ export const checkCircularDeps = (context: CheckContext): void => {
   for (const [name, entity] of context.byName) {
     if (entity instanceof FileNode || entity instanceof ClassFileNode) {
       const fileImports = entity.imports.flatMap((imported) => {
-        const target = context.names.target(imported);
+        const target = resolvedNameTarget(context.names.resolve(imported, { importingFile: name }));
         return target !== undefined && (target.kind === 'File' || target.kind === 'ClassFile') ? [target.name] : [];
       });
       importGraph.set(name, fileImports);

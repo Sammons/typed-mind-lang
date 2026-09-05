@@ -9,7 +9,7 @@
 // collision guard, the second module's reservation would silently
 // clobber the first's, the same symptom RC-B was filed to close. Fixed by
 // tracking every name `reserveFileEntityNames` has already assigned and
-// appending a deterministic `__2`, `__3`, ... suffix on a genuine
+// appending a deterministic `2`, `3`, ... suffix on a genuine
 // post-sanitize collision.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';

@@ -248,7 +248,7 @@
         "column": 1,
         "endLine": 12,
         "endColumn": 40,
-        "message": "Function 'startOrderSystem' lists Dependency 'redis' in its `<- [...]` dependency list; Dependencies cannot be consumed directly — a File must import 'redis' first"
+        "message": "Function 'startOrderSystem' lists Dependency 'redis' in its `<- [...]` dependency list; Dependencies cannot be consumed directly \u2014 a File must import 'redis' first"
       },
       {
         "code": "checker/dependency-not-found",
@@ -311,7 +311,7 @@
         "column": 1,
         "endLine": 23,
         "endColumn": 73,
-        "message": "Function 'processOrderWorkflow' lists Dependency 'emailService' in its `<- [...]` dependency list; Dependencies cannot be consumed directly — a File must import 'emailService' first"
+        "message": "Function 'processOrderWorkflow' lists Dependency 'emailService' in its `<- [...]` dependency list; Dependencies cannot be consumed directly \u2014 a File must import 'emailService' first"
       },
       {
         "code": "checker/import-not-found",
@@ -347,7 +347,7 @@
         "column": 89,
         "endLine": 47,
         "endColumn": 89,
-        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `,` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/function-not-exported",
@@ -392,7 +392,7 @@
         "column": 69,
         "endLine": 71,
         "endColumn": 63,
-        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `,` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -410,7 +410,7 @@
         "column": 86,
         "endLine": 87,
         "endColumn": 29,
-        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `,` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -428,7 +428,7 @@
         "column": 3,
         "endLine": 99,
         "endColumn": 15,
-        "message": "This exports list (`-> [...]`) cannot attach to a Function entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This exports list (`-> [...]`) cannot attach to a Function entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -437,7 +437,7 @@
         "column": 79,
         "endLine": 103,
         "endColumn": 39,
-        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `,` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -473,7 +473,7 @@
         "column": 81,
         "endLine": 118,
         "endColumn": 39,
-        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `,` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -518,7 +518,7 @@
         "column": 78,
         "endLine": 135,
         "endColumn": 62,
-        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `,` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -536,7 +536,7 @@
         "column": 81,
         "endLine": 149,
         "endColumn": 74,
-        "message": "Unparsable text: `,` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `,` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -609,15 +609,6 @@
         "endLine": 171,
         "endColumn": 49,
         "message": "Orphaned entity 'handleReservationError'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 171,
-        "column": 1,
-        "endLine": 171,
-        "endColumn": 49,
-        "message": "Cannot use 'calls' to reference ClassFile 'Logger'"
       },
       {
         "code": "checker/function-not-exported",
@@ -955,7 +946,7 @@
         "column": 3,
         "endLine": 27,
         "endColumn": 23,
-        "message": "Unparsable text: `>> [TypedMindParser]` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `>> [TypedMindParser]` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -964,7 +955,7 @@
         "column": 3,
         "endLine": 30,
         "endColumn": 18,
-        "message": "Unparsable text: `>> [CLIProgram]` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `>> [CLIProgram]` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -973,7 +964,7 @@
         "column": 3,
         "endLine": 31,
         "endColumn": 73,
-        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -982,7 +973,7 @@
         "column": 3,
         "endLine": 34,
         "endColumn": 18,
-        "message": "Unparsable text: `>> [LSPProgram]` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `>> [LSPProgram]` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -991,7 +982,7 @@
         "column": 3,
         "endLine": 35,
         "endColumn": 54,
-        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -1000,7 +991,7 @@
         "column": 3,
         "endLine": 38,
         "endColumn": 23,
-        "message": "Unparsable text: `>> [RendererProgram]` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `>> [RendererProgram]` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1009,7 +1000,7 @@
         "column": 3,
         "endLine": 39,
         "endColumn": 54,
-        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -1018,7 +1009,7 @@
         "column": 3,
         "endLine": 42,
         "endColumn": 21,
-        "message": "Unparsable text: `>> [VSCodeProgram]` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `>> [VSCodeProgram]` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1027,7 +1018,7 @@
         "column": 3,
         "endLine": 43,
         "endColumn": 53,
-        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -1036,7 +1027,7 @@
         "column": 3,
         "endLine": 46,
         "endColumn": 22,
-        "message": "Unparsable text: `>> [WebsiteProgram]` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `>> [WebsiteProgram]` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -1045,7 +1036,7 @@
         "column": 3,
         "endLine": 49,
         "endColumn": 19,
-        "message": "Unparsable text: `>> [TestProgram]` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `>> [TestProgram]` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1054,7 +1045,7 @@
         "column": 3,
         "endLine": 50,
         "endColumn": 54,
-        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This imports list (`<- [...]`) cannot attach to a Asset entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1270,7 +1261,7 @@
         "column": 3,
         "endLine": 332,
         "endColumn": 19,
-        "message": "This exports list (`-> [...]`) cannot attach to a Function entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This exports list (`-> [...]`) cannot attach to a Function entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1288,7 +1279,7 @@
         "column": 3,
         "endLine": 337,
         "endColumn": 19,
-        "message": "This exports list (`-> [...]`) cannot attach to a Function entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This exports list (`-> [...]`) cannot attach to a Function entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1306,7 +1297,7 @@
         "column": 3,
         "endLine": 347,
         "endColumn": 38,
-        "message": "This exports list (`-> [...]`) cannot attach to a Function entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This exports list (`-> [...]`) cannot attach to a Function entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1378,7 +1369,7 @@
         "column": 3,
         "endLine": 383,
         "endColumn": 20,
-        "message": "This exports list (`-> [...]`) cannot attach to a Function entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This exports list (`-> [...]`) cannot attach to a Function entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/extra-input-dto",
@@ -1387,7 +1378,7 @@
         "column": 1,
         "endLine": 392,
         "endColumn": 80,
-        "message": "Function 'saveToHistory' lists extra input DTO 'AssistantMessage' beyond the first ('UserMessage') in its `<- [...]` dependency list; it is ignored — a Function takes one input DTO (`<- Name`)"
+        "message": "Function 'saveToHistory' lists extra input DTO 'AssistantMessage' beyond the first ('UserMessage') in its `<- [...]` dependency list; it is ignored \u2014 a Function takes one input DTO (`<- Name`)"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1446,7 +1437,7 @@
         "column": 3,
         "endLine": 20,
         "endColumn": 69,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1455,7 +1446,7 @@
         "column": 3,
         "endLine": 27,
         "endColumn": 64,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1464,7 +1455,7 @@
         "column": 3,
         "endLine": 34,
         "endColumn": 77,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1473,7 +1464,7 @@
         "column": 3,
         "endLine": 41,
         "endColumn": 57,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1482,7 +1473,7 @@
         "column": 3,
         "endLine": 48,
         "endColumn": 53,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "syntax/error",
@@ -1491,7 +1482,7 @@
         "column": 4,
         "endLine": 49,
         "endColumn": 5,
-        "message": "Unparsable text: `=` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `=` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1500,7 +1491,7 @@
         "column": 3,
         "endLine": 54,
         "endColumn": 59,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1509,7 +1500,7 @@
         "column": 3,
         "endLine": 60,
         "endColumn": 61,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1527,7 +1518,7 @@
         "column": 3,
         "endLine": 66,
         "endColumn": 65,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1545,7 +1536,7 @@
         "column": 3,
         "endLine": 70,
         "endColumn": 49,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1563,7 +1554,7 @@
         "column": 3,
         "endLine": 74,
         "endColumn": 35,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -1581,7 +1572,7 @@
         "column": 3,
         "endLine": 78,
         "endColumn": 31,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1590,7 +1581,7 @@
         "column": 3,
         "endLine": 83,
         "endColumn": 34,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1599,133 +1590,7 @@
         "column": 3,
         "endLine": 89,
         "endColumn": 64,
-        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity — move it under an entity kind that accepts it, or remove it"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 94,
-        "column": 1,
-        "endLine": 94,
-        "endColumn": 60,
-        "message": "Cannot use 'calls' to reference ClassFile '_ValidationService'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 94,
-        "column": 1,
-        "endLine": 94,
-        "endColumn": 60,
-        "message": "Cannot use 'calls' to reference ClassFile 'Logger_Instance'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 94,
-        "column": 1,
-        "endLine": 94,
-        "endColumn": 60,
-        "message": "Cannot use 'calls' to reference ClassFile 'UserService2'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 100,
-        "column": 1,
-        "endLine": 100,
-        "endColumn": 60,
-        "message": "Cannot use 'calls' to reference ClassFile 'Database_v2'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 100,
-        "column": 1,
-        "endLine": 100,
-        "endColumn": 60,
-        "message": "Cannot use 'calls' to reference ClassFile 'UserService2'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 104,
-        "column": 1,
-        "endLine": 104,
-        "endColumn": 83,
-        "message": "Cannot use 'calls' to reference ClassFile '_ValidationService'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 104,
-        "column": 1,
-        "endLine": 104,
-        "endColumn": 83,
-        "message": "Cannot use 'calls' to reference ClassFile 'Database_v2'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 104,
-        "column": 1,
-        "endLine": 104,
-        "endColumn": 83,
-        "message": "Cannot use 'calls' to reference ClassFile 'Database_v2'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 111,
-        "column": 1,
-        "endLine": 111,
-        "endColumn": 45,
-        "message": "Cannot use 'calls' to reference ClassFile 'CryptoService'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 111,
-        "column": 1,
-        "endLine": 111,
-        "endColumn": 45,
-        "message": "Cannot use 'calls' to reference ClassFile 'CryptoService'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 115,
-        "column": 1,
-        "endLine": 115,
-        "endColumn": 52,
-        "message": "Cannot use 'calls' to reference ClassFile 'CryptoService'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 119,
-        "column": 1,
-        "endLine": 119,
-        "endColumn": 35,
-        "message": "Cannot use 'calls' to reference ClassFile 'CryptoService'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 119,
-        "column": 1,
-        "endLine": 119,
-        "endColumn": 35,
-        "message": "Cannot use 'calls' to reference ClassFile 'Database_v2'"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 136,
-        "column": 1,
-        "endLine": 136,
-        "endColumn": 38,
-        "message": "Cannot use 'calls' to reference ClassFile 'Logger_Instance'"
+        "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -2047,33 +1912,6 @@
       {
         "code": "checker/orphaned-entity",
         "severity": "error",
-        "line": 56,
-        "column": 1,
-        "endLine": 56,
-        "endColumn": 13,
-        "message": "Orphaned entity 'TodoModel'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 59,
-        "column": 1,
-        "endLine": 59,
-        "endColumn": 13,
-        "message": "Orphaned entity 'UserModel'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 67,
-        "column": 1,
-        "endLine": 67,
-        "endColumn": 12,
-        "message": "Orphaned entity 'Database'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
         "line": 74,
         "column": 1,
         "endLine": 74,
@@ -2137,15 +1975,6 @@
       {
         "code": "checker/orphaned-entity",
         "severity": "error",
-        "line": 86,
-        "column": 1,
-        "endLine": 86,
-        "endColumn": 7,
-        "message": "Orphaned entity 'app'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
         "line": 130,
         "column": 1,
         "endLine": 130,
@@ -2182,7 +2011,7 @@
         "column": 27,
         "endLine": 10,
         "endColumn": 28,
-        "message": "Unparsable text: `*` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `*` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/undefined-export",
@@ -2248,24 +2077,6 @@
         "message": "Cannot use 'extends' to reference File 'BaseController'"
       },
       {
-        "code": "checker/method-call-on-non-class",
-        "severity": "error",
-        "line": 40,
-        "column": 1,
-        "endLine": 40,
-        "endColumn": 38,
-        "message": "Cannot call method 'create' on File 'TodoModel'. Only Classes and ClassFiles can have methods"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 40,
-        "column": 1,
-        "endLine": 40,
-        "endColumn": 38,
-        "message": "Cannot use 'calls' to reference File 'TodoModel'"
-      },
-      {
         "code": "checker/reference-to-illegal",
         "severity": "error",
         "line": 40,
@@ -2275,13 +2086,13 @@
         "message": "Cannot use 'calls' to reference File 'validateTodo'"
       },
       {
-        "code": "checker/method-call-on-non-class",
+        "code": "checker/qualified-name-unresolved",
         "severity": "error",
         "line": 44,
         "column": 1,
         "endLine": 44,
         "endColumn": 36,
-        "message": "Cannot call method 'find' on File 'TodoModel'. Only Classes and ClassFiles can have methods"
+        "message": "Qualified name 'TodoModel.find' has no declared member 'find' on 'TodoModel'"
       },
       {
         "code": "checker/reference-to-illegal",
@@ -2290,24 +2101,6 @@
         "column": 1,
         "endLine": 44,
         "endColumn": 36,
-        "message": "Cannot use 'calls' to reference File 'TodoModel'"
-      },
-      {
-        "code": "checker/method-call-on-non-class",
-        "severity": "error",
-        "line": 48,
-        "column": 1,
-        "endLine": 48,
-        "endColumn": 38,
-        "message": "Cannot call method 'update' on File 'TodoModel'. Only Classes and ClassFiles can have methods"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 48,
-        "column": 1,
-        "endLine": 48,
-        "endColumn": 38,
         "message": "Cannot use 'calls' to reference File 'TodoModel'"
       },
       {
@@ -2320,49 +2113,13 @@
         "message": "Cannot use 'calls' to reference File 'validateTodo'"
       },
       {
-        "code": "checker/method-call-on-non-class",
-        "severity": "error",
-        "line": 52,
-        "column": 1,
-        "endLine": 52,
-        "endColumn": 38,
-        "message": "Cannot call method 'delete' on File 'TodoModel'. Only Classes and ClassFiles can have methods"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 52,
-        "column": 1,
-        "endLine": 52,
-        "endColumn": 38,
-        "message": "Cannot use 'calls' to reference File 'TodoModel'"
-      },
-      {
-        "code": "checker/method-call-on-non-class",
-        "severity": "error",
-        "line": 56,
-        "column": 1,
-        "endLine": 56,
-        "endColumn": 42,
-        "message": "Cannot call method 'create' on File 'UserModel'. Only Classes and ClassFiles can have methods"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 56,
-        "column": 1,
-        "endLine": 56,
-        "endColumn": 42,
-        "message": "Cannot use 'calls' to reference File 'UserModel'"
-      },
-      {
-        "code": "checker/method-call-on-non-class",
+        "code": "checker/qualified-name-unresolved",
         "severity": "error",
         "line": 60,
         "column": 1,
         "endLine": 60,
         "endColumn": 40,
-        "message": "Cannot call method 'find' on File 'UserModel'. Only Classes and ClassFiles can have methods"
+        "message": "Qualified name 'UserModel.find' has no declared member 'find' on 'UserModel'"
       },
       {
         "code": "checker/reference-to-illegal",
@@ -2371,42 +2128,6 @@
         "column": 1,
         "endLine": 60,
         "endColumn": 40,
-        "message": "Cannot use 'calls' to reference File 'UserModel'"
-      },
-      {
-        "code": "checker/method-call-on-non-class",
-        "severity": "error",
-        "line": 64,
-        "column": 1,
-        "endLine": 64,
-        "endColumn": 42,
-        "message": "Cannot call method 'update' on File 'UserModel'. Only Classes and ClassFiles can have methods"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 64,
-        "column": 1,
-        "endLine": 64,
-        "endColumn": 42,
-        "message": "Cannot use 'calls' to reference File 'UserModel'"
-      },
-      {
-        "code": "checker/method-call-on-non-class",
-        "severity": "error",
-        "line": 68,
-        "column": 1,
-        "endLine": 68,
-        "endColumn": 42,
-        "message": "Cannot call method 'delete' on File 'UserModel'. Only Classes and ClassFiles can have methods"
-      },
-      {
-        "code": "checker/reference-to-illegal",
-        "severity": "error",
-        "line": 68,
-        "column": 1,
-        "endLine": 68,
-        "endColumn": 42,
         "message": "Cannot use 'calls' to reference File 'UserModel'"
       },
       {
@@ -2434,7 +2155,7 @@
         "column": 15,
         "endLine": 73,
         "endColumn": 28,
-        "message": "Unparsable text: `, ./schemas/*` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `, ./schemas/*` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/multi-exported",
@@ -2581,15 +2302,6 @@
         "message": "Export 'isValid' is not defined anywhere in the codebase"
       },
       {
-        "code": "checker/method-call-on-non-class",
-        "severity": "error",
-        "line": 98,
-        "column": 1,
-        "endLine": 98,
-        "endColumn": 35,
-        "message": "Cannot call method 'connect' on File 'Database'. Only Classes and ClassFiles can have methods"
-      },
-      {
         "code": "checker/orphaned-entity",
         "severity": "error",
         "line": 98,
@@ -2597,6 +2309,15 @@
         "endLine": 98,
         "endColumn": 35,
         "message": "Orphaned entity 'startServer'"
+      },
+      {
+        "code": "checker/qualified-name-unresolved",
+        "severity": "error",
+        "line": 98,
+        "column": 1,
+        "endLine": 98,
+        "endColumn": 35,
+        "message": "Qualified name 'Database.connect' has no declared member 'connect' on 'Database'"
       },
       {
         "code": "checker/reference-to-illegal",
@@ -2642,65 +2363,11 @@
       {
         "code": "checker/orphaned-entity",
         "severity": "error",
-        "line": 55,
-        "column": 1,
-        "endLine": 55,
-        "endColumn": 15,
-        "message": "Orphaned entity 'TodoService'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 58,
-        "column": 1,
-        "endLine": 58,
-        "endColumn": 15,
-        "message": "Orphaned entity 'UserService'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 64,
-        "column": 1,
-        "endLine": 64,
-        "endColumn": 12,
-        "message": "Orphaned entity 'Database'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 75,
-        "column": 1,
-        "endLine": 75,
-        "endColumn": 13,
-        "message": "Orphaned entity 'TodoModel'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 78,
-        "column": 1,
-        "endLine": 78,
-        "endColumn": 13,
-        "message": "Orphaned entity 'UserModel'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
         "line": 84,
         "column": 1,
         "endLine": 84,
         "endColumn": 19,
         "message": "Orphaned entity 'Config'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 89,
-        "column": 1,
-        "endLine": 89,
-        "endColumn": 7,
-        "message": "Orphaned entity 'app'"
       },
       {
         "code": "checker/orphaned-entity",
@@ -2999,15 +2666,6 @@
       {
         "code": "checker/orphaned-entity",
         "severity": "error",
-        "line": 5,
-        "column": 1,
-        "endLine": 5,
-        "endColumn": 15,
-        "message": "Orphaned entity 'AuthService'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
         "line": 8,
         "column": 1,
         "endLine": 8,
@@ -3045,15 +2703,6 @@
         "endLine": 2,
         "endColumn": 32,
         "message": "Orphaned file 'DatabaseFile' - none of its exports are imported"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 5,
-        "column": 1,
-        "endLine": 5,
-        "endColumn": 22,
-        "message": "Orphaned entity 'DatabaseConnection'"
       },
       {
         "code": "checker/orphaned-entity",
@@ -3144,7 +2793,7 @@
         "column": 14,
         "endLine": 19,
         "endColumn": 32,
-        "message": "Unparsable text: `<void> | undefined` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `<void> | undefined` \u2014 check this line against the grammar and fix or remove it"
       }
     ]
   },
@@ -3622,7 +3271,7 @@
         "column": 1,
         "endLine": 154,
         "endColumn": 29,
-        "message": "Unparsable text: `名前Service @ src/japanese.ts:` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `\u540d\u524dService @ src/japanese.ts:` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -3631,7 +3280,7 @@
         "column": 3,
         "endLine": 155,
         "endColumn": 14,
-        "message": "Unparsable text: `=> [作成, 更新]` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `=> [\u4f5c\u6210, \u66f4\u65b0]` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/function-not-exported",
@@ -3847,7 +3496,7 @@
         "column": 1,
         "endLine": 181,
         "endColumn": 40,
-        "message": "Unparsable text: `<- [imports]                  # Imports` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `<- [imports]                  # Imports` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -3856,7 +3505,7 @@
         "column": 1,
         "endLine": 190,
         "endColumn": 46,
-        "message": "Unparsable text: `-> [exports]                  # Exports` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `-> [exports]                  # Exports` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",
@@ -3956,7 +3605,7 @@
         "column": 3,
         "endLine": 4,
         "endColumn": 8,
-        "message": "Unparsable text: `-> []` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `-> []` \u2014 check this line against the grammar and fix or remove it"
       }
     ]
   },
@@ -3988,7 +3637,7 @@
         "column": 30,
         "endLine": 45,
         "endColumn": 30,
-        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -3997,7 +3646,7 @@
         "column": 18,
         "endLine": 46,
         "endColumn": 18,
-        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4006,7 +3655,7 @@
         "column": 31,
         "endLine": 47,
         "endColumn": 31,
-        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4015,7 +3664,7 @@
         "column": 26,
         "endLine": 48,
         "endColumn": 26,
-        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4024,7 +3673,7 @@
         "column": 28,
         "endLine": 50,
         "endColumn": 28,
-        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4033,7 +3682,7 @@
         "column": 20,
         "endLine": 51,
         "endColumn": 20,
-        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4042,7 +3691,7 @@
         "column": 18,
         "endLine": 52,
         "endColumn": 18,
-        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4051,7 +3700,7 @@
         "column": 19,
         "endLine": 53,
         "endColumn": 19,
-        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4060,7 +3709,7 @@
         "column": 21,
         "endLine": 54,
         "endColumn": 21,
-        "message": "Unparsable text: `` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4373,7 +4022,7 @@
         "column": 3,
         "endLine": 9,
         "endColumn": 19,
-        "message": "Unparsable text: `:: port?: number` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `:: port?: number` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4382,7 +4031,7 @@
         "column": 3,
         "endLine": 10,
         "endColumn": 19,
-        "message": "Unparsable text: `:: host?: string` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `:: host?: string` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "syntax/error",
@@ -4391,7 +4040,7 @@
         "column": 3,
         "endLine": 11,
         "endColumn": 27,
-        "message": "Unparsable text: `:: openBrowser?: boolean` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `:: openBrowser?: boolean` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4409,7 +4058,7 @@
         "column": 3,
         "endLine": 16,
         "endColumn": 110,
-        "message": "Unparsable text: `-- [programGraph: ProgramGraph | null, validationResult: Val…` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `-- [programGraph: ProgramGraph | null, validationResult: Val\u2026` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4481,7 +4130,7 @@
         "column": 14,
         "endLine": 104,
         "endColumn": 19,
-        "message": "Unparsable text: `@ \"/\"` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `@ \"/\"` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4499,7 +4148,7 @@
         "column": 20,
         "endLine": 106,
         "endColumn": 36,
-        "message": "Unparsable text: `@ \"/renderer.js\"` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `@ \"/renderer.js\"` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4517,7 +4166,7 @@
         "column": 18,
         "endLine": 108,
         "endColumn": 32,
-        "message": "Unparsable text: `@ \"/api/graph\"` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `@ \"/api/graph\"` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/orphaned-entity",
@@ -4572,7 +4221,7 @@
         "column": 51,
         "endLine": 8,
         "endColumn": 53,
-        "message": "Unparsable text: `:*` — check this line against the grammar and fix or remove it"
+        "message": "Unparsable text: `:*` \u2014 check this line against the grammar and fix or remove it"
       },
       {
         "code": "checker/import-not-found",

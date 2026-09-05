@@ -210,39 +210,25 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
-  // 69d records `false`, and the `false` is the POINT of the fixture: a
-  // generic heritage target emits its argument list verbatim into `<:`
-  // (`GenericChild <: Repo<Item>`), which shortform cannot parse. Both the
-  // interface lane and the real-class lane do this identically — the fixture
-  // pins them together — and the residual finding is gap 68's (type
-  // parameters are unmodeled), the same adjudication 66b already carries for
-  // `StringBox <: Container<string>`. Stripping the arguments to make this
-  // green is PR #152's original bug, which
-  // slat-harness-mixin-heritage-controls.test.ts exists to prevent.
+  // G.2 parses structured generic heritage; both source lanes now check.
   {
     fixture: '69d-generic-heritage-both-lanes',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
-  // Reconciliation controls for the single mixin-heritage helper (PR #152
-  // + PR #153 merged into `getExtendsTargetName`). 66b records `false`:
-  // its `StringBox extends Container<string>` carries the generic-base
-  // finding of gap 68, which is the PRICE of property 1 being correct —
-  // preserving the type arguments is what the reconciliation restores.
-  // 66c records `false` for its own known gap (a zero-identifier mixin
-  // falls back to the factory name, which the checker rejects).
+  // G.2 resolves Container<string> without discarding its arguments.
   {
     fixture: '66b-mixin-heritage-controls',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   {
     fixture: '66c-mixin-no-base-argument',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   // NEW — the architecture-notebook ladder rung (a Lit web app plus a
   // node:http server). Three gaps the real target surfaced, each with its

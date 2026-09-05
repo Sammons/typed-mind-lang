@@ -1,4 +1,4 @@
-program Main__App {
+program MainApp {
   type: Program
   entry: MainFile
   version: 1.0.0
@@ -6,14 +6,18 @@ program Main__App {
 }
 
 MainFile @ src/main.ts:
+  <- [MathUtils]
   -> [mainFn]
 
 MathutilsFile @ src/mathutils.ts:
   -> [add, sub]
 
-MathUtils <: NamespaceImport
-  "Namespace import: MathUtils from ./mathutils"
-  => [add, sub]
+class MathUtils {
+  type: Class
+  implements: [NamespaceImport]
+  description: "Namespace import: MathUtils from ./mathutils"
+  methods: [add, sub]
+}
 
 mainFn :: mainFn() => number
 

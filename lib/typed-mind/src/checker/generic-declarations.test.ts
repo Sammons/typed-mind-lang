@@ -130,10 +130,7 @@ it('G.4 qualification and external heritage retain exact base identity without i
   const context = await inspect(
     'Owner @ owner.ts:\n -> [Owner.Base]\nOwner.Base<T> %\nLeaf %\nChild <: Owner.Base<Leaf>\nExternal ^ "library"\n -> [Contract]\nOther <: External.Contract<Leaf, Leaf>\n',
   );
-  assert.deepEqual(
-    genericErrors(context).map((finding) => finding.code),
-    ['checker/orphaned-file'],
-  );
+  assert.deepEqual(genericErrors(context), []);
   assert.deepEqual(
     context.links.referencedBy('Owner.Base').map((reference) => reference.from),
     ['Owner', 'Child'],

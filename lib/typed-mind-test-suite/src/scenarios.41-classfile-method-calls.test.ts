@@ -18,12 +18,12 @@ describe('scenario-41-classfile-method-calls', () => {
 
     // Should be invalid due to issues with method calls and entity resolution (based on actual error output)
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 8);
+    assert.equal(result.diagnostics.length, 6);
 
     const diagnosticMessages = result.diagnostics.map((diagnostic) => diagnostic.message);
 
-    // Should detect that calls cannot reference ClassFile entities
-    assert.equal(diagnosticMessages.filter((msg) => msg.includes("Cannot use 'calls' to reference ClassFile 'UserController'")).length, 3);
+    // Q permits the two verified methods; the unknown method retains its diagnostics.
+    assert.equal(diagnosticMessages.filter((msg) => msg.includes("Cannot use 'calls' to reference ClassFile 'UserController'")).length, 1);
 
     // Should detect orphaned entity
     assert.ok(diagnosticMessages.includes("Orphaned entity 'testInvalidCall'"));

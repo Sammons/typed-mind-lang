@@ -1,0 +1,39 @@
+{
+  "77-same-name-interface-two-files": {
+    "before": {
+      "tmdContent": "program MainApp {\n  type: Program\n  entry: MainFile\n  version: 1.0.0\n  exports: [MainFile.JobRecord, saveJob]\n}\n\nJobStoreFile @ src/job-store.ts:\n  -> [JobRecord, readJob]\n\nMainFile @ src/main.ts:\n  <- [JobRecord, readJob]\n  -> [MainFile.JobRecord, saveJob]\n\nreadJob :: readJob(id: string) => JobRecord\n  -> JobRecord\n\nsaveJob :: saveJob(record: JobRecord) => JobStoreRecord\n  <- JobRecord\n  -> JobStoreRecord\n\nJobRecord %\n  - id: string\n  - procoreTemplateId?: number\n\nMainFile.JobRecord %\n  - id: string\n  - title: string",
+      "diagnostics": [
+        {
+          "code": "checker/output-dto-not-found",
+          "message": "Function output DTO 'JobStoreRecord' not found",
+          "severity": "error"
+        }
+      ]
+    },
+    "after": {
+      "tmdContent": "program MainApp {\n  type: Program\n  entry: MainFile\n  version: 1.0.0\n  exports: [MainFile.JobRecord, saveJob]\n}\n\nJobStoreFile @ src/job-store.ts:\n  -> [JobRecord, readJob]\n\nMainFile @ src/main.ts:\n  <- [JobRecord, readJob]\n  -> [MainFile.JobRecord, saveJob]\n\nreadJob :: readJob(id: string) => JobRecord\n  -> JobRecord\n\nsaveJob :: saveJob(record: MainFile.JobRecord) => JobRecord\n  <- MainFile.JobRecord\n  -> JobRecord\n\nJobRecord %\n  - id: string\n  - procoreTemplateId?: number\n\nMainFile.JobRecord %\n  - id: string\n  - title: string",
+      "diagnostics": []
+    }
+  },
+  "96-same-name-type-alias-two-files": {
+    "before": {
+      "tmdContent": "program IndexApp {\n  type: Program\n  entry: IndexFile\n  version: 1.0.0\n  exports: [advance]\n}\n\nIndexFile @ src/index.ts:\n  <- [nextState]\n  -> [advance]\n\nLifecycleFile @ src/lifecycle.ts:\n  -> [nextState]\n\nadvance :: advance(state: PublishState) => StoredPublishState\n  -> StoredPublishState\n\nnextState :: nextState(current: PublishState) => PublishState\n\nPublishState = 'draft' | 'published'\n\nLifecycleFile.PublishState = (typeof publishStates)[number]",
+      "diagnostics": [
+        {
+          "code": "checker/orphaned-entity",
+          "message": "Orphaned entity 'LifecycleFile.PublishState'",
+          "severity": "error"
+        },
+        {
+          "code": "checker/output-dto-not-found",
+          "message": "Function output DTO 'StoredPublishState' not found",
+          "severity": "error"
+        }
+      ]
+    },
+    "after": {
+      "tmdContent": "program IndexApp {\n  type: Program\n  entry: IndexFile\n  version: 1.0.0\n  exports: [advance]\n}\n\nIndexFile @ src/index.ts:\n  <- [nextState]\n  -> [advance]\n\nLifecycleFile @ src/lifecycle.ts:\n  -> [nextState]\n\nadvance :: advance(state: PublishState) => LifecycleFile.PublishState\n\nnextState :: nextState(current: LifecycleFile.PublishState) => LifecycleFile.PublishState\n\nPublishState = 'draft' | 'published'\n\nLifecycleFile.PublishState = (typeof publishStates)[number]",
+      "diagnostics": []
+    }
+  }
+}

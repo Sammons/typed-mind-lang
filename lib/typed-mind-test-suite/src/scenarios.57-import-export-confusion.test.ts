@@ -65,7 +65,9 @@ describe('Scenario 57: Import and export confusion', () => {
 
     // Mistake 7: Import class method directly
     assert.equal(
-      errors.some((e) => e.includes("Import 'UserService.createUser' not found")),
+      errors.some((e) =>
+        e.includes("Qualified name 'UserService.createUser' is owned by 'UserService' but is not exported for this reference"),
+      ),
       true,
     );
 
