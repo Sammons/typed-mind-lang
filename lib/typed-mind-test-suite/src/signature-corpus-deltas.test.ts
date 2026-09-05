@@ -19,6 +19,7 @@ const cases: readonly [string, readonly string[]][] = [
   ['lib/typed-mind/program.tmd', ['ValidationResult']],
   ['lib/typed-mind-test-suite/scenarios/scenario-22-nested-import.tmd', ['User']],
   ['lib/typed-mind-test-suite/scenarios/scenario-31-mixed-syntax.tmd', ['TodoDTO', 'UserDTO']],
+  ['lib/typed-mind-test-suite/scenarios/scenario-34-cli-tool.tmd', ['TaskInfo']],
 ];
 
 for (const [relativePath, names] of cases) {
