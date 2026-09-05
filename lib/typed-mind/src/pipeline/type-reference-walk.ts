@@ -76,15 +76,18 @@ export const walkTypeReferences = (
             : {
                 ...hooks,
                 reference: (reference, args, role) => hooks.reference({ ...reference, span: sourceSpan(reference.span) }, args, role),
-                parameters:
-                  hooks.parameters === undefined
-                    ? undefined
-                    : (parameters) =>
+                ...(hooks.parameters === undefined
+                  ? {}
+                  : {
+                      parameters: (parameters: readonly TypeParameterNode[]) =>
                         hooks.parameters?.(parameters.map((parameter) => ({ ...parameter, span: sourceSpan(parameter.span) }))),
-                opaque:
-                  hooks.opaque === undefined
-                    ? undefined
-                    : (opaque, role) => hooks.opaque?.({ ...opaque, span: sourceSpan(opaque.span) }, role),
+                    }),
+                ...(hooks.opaque === undefined
+                  ? {}
+                  : {
+                      opaque: (opaque: TypeOpaqueNode, role: TypeReferencePosition) =>
+                        hooks.opaque?.({ ...opaque, span: sourceSpan(opaque.span) }, role),
+                    }),
               },
           position,
         );
