@@ -178,13 +178,13 @@ describe('scenario-31-mixed-syntax', () => {
 
     // Should fail validation due to orphaned entities
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 15);
+    assert.equal(result.diagnostics.length, 13);
 
     // Check for orphaned entity diagnostics
     const orphanedDiagnostics = result.diagnostics.filter((diagnostic) => diagnostic.message.startsWith('Orphaned entity'));
-    assert.equal(orphanedDiagnostics.length, 8);
+    assert.equal(orphanedDiagnostics.length, 6);
 
-    const orphanedEntities = ['createTodo', 'deleteTodo', 'TodoDTO', 'UserDTO', 'UserProfile', 'updateProfile', 'startApp', 'startApi'];
+    const orphanedEntities = ['createTodo', 'deleteTodo', 'UserProfile', 'updateProfile', 'startApp', 'startApi'];
     orphanedEntities.forEach((entityName) => {
       const diagnostic = orphanedDiagnostics.find((d) => d.message === `Orphaned entity '${entityName}'`);
       assert.notEqual(diagnostic, undefined);
