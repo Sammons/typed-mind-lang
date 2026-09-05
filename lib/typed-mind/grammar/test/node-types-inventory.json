@@ -13,6 +13,8 @@
     "E10_runparameter": ["runparameter_declaration", "runparameter_declaration_final", "param_type", "param_marker"],
     "E11_dependency": ["dependency_declaration", "dependency_declaration_final", "dependency_name"],
     "E12_typedef": ["typedef_declaration", "typedef_declaration_final", "typedef_enum_variant", "enum_kw"],
+    "TM13_G2_generic_declaration_heads": ["type_parameters", "type_parameter_name"],
+    "TM13_G2_instantiated_heritage": ["heritage_type"],
     "C1_imports": ["import_list", "import_list_final"],
     "C2_exports": ["export_list", "export_list_final"],
     "C16_reexports": ["reexports_list", "reexports_list_final"],
