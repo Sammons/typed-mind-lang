@@ -176,7 +176,10 @@ export interface ParsedModule {
   // language-optional field) so the checker's orphan rule — which unions
   // Program.exports into its referenced-names set — sees an honest edge
   // instead of a false "orphaned" finding on a function that IS the
-  // program's own entry action.
+  // program's own entry action. Only functions THIS module declares at top
+  // level appear here (Q3 burndown): ambient globals called under the guard
+  // (`String(error)` inside a `.catch` callback) and imported functions are
+  // excluded, so the fold never names an entity the document lacks.
   readonly selfInvokedFunctionNames: readonly string[];
   // RC-F (issue #108) — true when this module has at least one top-level
   // expression-statement call whose argument is a function/arrow-function
