@@ -91,6 +91,61 @@ const renderType = (node: ts.TypeNode): TextPiece[] => {
   return [raw(node)];
 };
 
+// Preserve the public import binding separately from the canonical declaration.
+// A package may export Internal as Public, or expose the same type via subpaths.
+const externalBindingFor = (
+  name: ts.Node,
+  origin: ReferenceOrigin,
+  program: ts.Program,
+  checker: ts.TypeChecker,
+  context: ReferenceOriginContext,
+): TypeReferenceOccurrence['externalBinding'] => {
+  if (origin.kind !== 'external-package') return undefined;
+  const rootOf = (node: ts.Node): ts.Node =>
+    ts.isQualifiedName(node) ? rootOf(node.left) : ts.isPropertyAccessExpression(node) ? rootOf(node.expression) : node;
+  const root = rootOf(name);
+  const bindings: { specifier: ts.StringLiteralLike; exportName: string }[] = [];
+  if (ts.isImportTypeNode(name.parent) && ts.isLiteralTypeNode(name.parent.argument) && ts.isStringLiteral(name.parent.argument.literal)) {
+    bindings.push({ specifier: name.parent.argument.literal, exportName: name.getText() });
+  } else {
+    for (const declaration of checker.getSymbolAtLocation(root)?.declarations ?? []) {
+      const importDeclaration = ts.findAncestor(declaration, ts.isImportDeclaration);
+      if (importDeclaration === undefined || !ts.isStringLiteralLike(importDeclaration.moduleSpecifier)) continue;
+      if (ts.isImportSpecifier(declaration) && name === root) {
+        bindings.push({ specifier: importDeclaration.moduleSpecifier, exportName: (declaration.propertyName ?? declaration.name).text });
+      } else if (ts.isImportClause(declaration) && declaration.name !== undefined && name === root) {
+        bindings.push({ specifier: importDeclaration.moduleSpecifier, exportName: 'default' });
+      } else if (ts.isNamespaceImport(declaration) && root !== name) {
+        const exported =
+          ts.isQualifiedName(name) && name.left === root
+            ? name.right.text
+            : ts.isPropertyAccessExpression(name) && name.expression === root
+              ? name.name.text
+              : undefined;
+        if (exported !== undefined) bindings.push({ specifier: importDeclaration.moduleSpecifier, exportName: exported });
+      }
+    }
+  }
+  const proven = bindings.filter((binding) => {
+    const moduleSymbol = checker.getSymbolAtLocation(binding.specifier);
+    if (moduleSymbol === undefined) return false;
+    const exported = checker.getExportsOfModule(moduleSymbol).find((symbol) => symbol.name === binding.exportName);
+    const resolved = resolveReferenceOrigin(exported, program, checker, context);
+    return (
+      resolved.kind === 'external-package' &&
+      resolved.packageName === origin.packageName &&
+      resolved.declaration.filePath === origin.declaration.filePath &&
+      resolved.declaration.name === origin.declaration.name &&
+      resolved.declaration.start === origin.declaration.start &&
+      resolved.declaration.end === origin.declaration.end
+    );
+  });
+  const unique = new Map(proven.map((binding) => [JSON.stringify([binding.specifier.text, binding.exportName]), binding]));
+  if (unique.size !== 1) return undefined;
+  const binding = [...unique.values()][0];
+  return binding === undefined ? undefined : { specifier: binding.specifier.text, exportName: binding.exportName };
+};
+
 export const parseTypeTextOrigins = (
   node: ts.TypeNode | undefined,
   program: ts.Program,
@@ -112,7 +167,15 @@ export const parseTypeTextOrigins = (
         const origin: ReferenceOrigin = hasChecker
           ? resolveReferenceOrigin(checker.getSymbolAtLocation(name), program, checker, context)
           : { kind: 'unresolved', reason: 'checker-unavailable' };
-        references.push({ writtenName: name.getText(), source, start, end: start + source.end - source.start, origin });
+        const externalBinding = hasChecker ? externalBindingFor(name, origin, program, checker, context) : undefined;
+        references.push({
+          writtenName: name.getText(),
+          source,
+          start,
+          end: start + source.end - source.start,
+          origin,
+          ...(externalBinding === undefined ? {} : { externalBinding }),
+        });
         return;
       }
       renderedOffset += piece.text.length;

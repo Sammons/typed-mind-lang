@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as ts from 'typescript';
+import { getModuleTypeInfos } from './parsed-type-slots.ts';
 import { getDeclarationIdentity, parseTypeTextOrigins, resolveReferenceOrigin, sourceRange } from './type-reference-origins.ts';
 import type {
   AnalyzerDiagnostic,
@@ -526,6 +527,29 @@ export class TypeScriptAnalyzer {
       }
       const module = this.analyzeModule(sourceFile);
       modules.push(module);
+
+      // A2 semantic type dependencies share the queue but are not import edges.
+      const referencedSources = new Set(
+        getModuleTypeInfos(module)
+          .flatMap((info) => info.references)
+          .filter((reference) => reference.origin.kind === 'project')
+          .map((reference) => (reference.origin.kind === 'project' ? reference.origin.declaration.filePath : '')),
+      );
+      for (const referencedPath of referencedSources) {
+        if (visitedModules.has(referencedPath)) continue;
+        const referencedFile = this.program.getSourceFile(referencedPath);
+        if (referencedFile !== undefined && !referencedFile.isDeclarationFile) {
+          if (!traverseQueue.includes(referencedPath)) traverseQueue.push(referencedPath);
+        } else {
+          this.diagnostics.push({
+            severity: 'warning',
+            category: 'unrepresented-type-source',
+            message: `Referenced project declaration has no source module in the TypeScript program: ${referencedPath}`,
+            filePath: currentPath,
+            specifier: undefined,
+          });
+        }
+      }
 
       // X-AN-10 — opt-in recognizer scan. No-op (and no diagnostic
       // surface) when --recognize was not passed for this convention name,

@@ -24,6 +24,7 @@ export type ReferenceOrigin =
     };
 
 export interface TypeReferenceOccurrence {
+  readonly externalBinding?: { readonly specifier: string; readonly exportName: string };
   readonly writtenName: string;
   readonly source: SourceRange;
   readonly start: number;
@@ -266,6 +267,7 @@ export interface AnalyzerDiagnostic {
     | 'unresolvable-import'
     | 'non-literal-dynamic-import'
     | 'skipped-module'
+    | 'unrepresented-type-source'
     | 'zero-entities'
     | 'recognizer-not-found'
     | 'recognizer-module-standalone-parsed';

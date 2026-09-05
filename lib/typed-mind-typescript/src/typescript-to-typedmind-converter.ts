@@ -20,6 +20,8 @@ import {
   type TypeExprNode,
 } from '@sammons/typed-mind';
 import { EmittedNameAllocator } from './emitted-name-allocator.ts';
+import { rewriteParsedTypeSlots } from './rewrite-parsed-type-slots.ts';
+import { rewriteTypeReferences, type TypeReferenceRewriteResult } from './type-reference-rewrite.ts';
 import { mapStructuralSegments, stripComments } from './type-text-segments.ts';
 import type {
   ConversionError,
@@ -33,8 +35,10 @@ import type {
   ParsedImport,
   ParsedInterface,
   ParsedModule,
+  ParsedTypeText,
   SstHandlerReference,
   SuppressionReason,
+  TypeReferenceOccurrence,
   TypeScriptProjectAnalysis,
 } from './types.ts';
 import { createEntityName } from './types.ts';
@@ -299,7 +303,16 @@ interface EntityRegistry {
   files: Map<string, EntityInfo>;
 }
 
+interface OriginConversionContext {
+  readonly entitiesByName: ReadonlyMap<string, EntityNode>;
+  readonly replacementNames: ReadonlyMap<TypeReferenceOccurrence, string>;
+  readonly sourceModules: ReadonlyMap<string, ParsedModule>;
+  readonly bindings: readonly { specifier: string; exportName: string }[];
+}
+
 export class TypeScriptToTypedMindConverter {
+  private originContext: OriginConversionContext | undefined;
+
   // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — the shared SyntaxEmitter replaces the
   // converter's now-deleted private TMD-content emitter.
   private readonly emitter = new SyntaxEmitter();
@@ -662,7 +675,127 @@ export class TypeScriptToTypedMindConverter {
   }
 
   convert(analysis: TypeScriptProjectAnalysis): ConversionResult {
+    const planning = this.convertOnce(analysis);
+    const entitiesByName = new Map<string, EntityNode>();
+    const ambiguousNames = new Set<string>();
+    for (const entity of planning.entities) {
+      if (entitiesByName.has(entity.name)) ambiguousNames.add(entity.name);
+      entitiesByName.set(entity.name, entity);
+    }
+    for (const name of ambiguousNames) entitiesByName.delete(name);
+    const chosen = new Map<string, EntityKind>();
+    const replacementNames = new Map<TypeReferenceOccurrence, string>();
+    const bindings = new Map<string, { specifier: string; exportName: string }>();
+    const warnings: ConversionWarning[] = [];
+    const warn = (message: string, filePath: string | undefined): void => {
+      if (!warnings.some((warning) => warning.message === message && warning.filePath === filePath))
+        warnings.push({ message, filePath, suggestion: undefined });
+    };
+    const entityFor = (identity: DeclarationIdentity | undefined): EntityNode | undefined => {
+      if (identity === undefined) return undefined;
+      const name = this.getAssignedDeclarationName(identity);
+      return name === undefined ? undefined : entitiesByName.get(name);
+    };
+    const replace = (reference: TypeReferenceOccurrence): string | undefined => {
+      if (reference.origin.kind === 'project') {
+        const target = entityFor(reference.origin.declaration);
+        if (target !== undefined) {
+          chosen.set(target.name, target.kind);
+          replacementNames.set(reference, target.name);
+          return target.name;
+        }
+        warn(
+          `Type reference '${reference.writtenName}' has no uniquely emitted declaration; retaining source text`,
+          reference.source.filePath,
+        );
+      } else if (reference.origin.kind === 'external-package') {
+        const binding = reference.externalBinding;
+        if (binding === undefined) {
+          warn(
+            `External type reference '${reference.writtenName}' has no proven public import binding; retaining source text`,
+            reference.source.filePath,
+          );
+          return undefined;
+        }
+        const dependencyName = this.createDependencyName(binding.specifier);
+        const dependency = entitiesByName.get(dependencyName);
+        if (!(dependency instanceof DependencyNode)) {
+          warn(
+            `External type reference '${reference.writtenName}' has no uniquely emitted dependency; retaining source text`,
+            reference.source.filePath,
+          );
+          return undefined;
+        }
+        chosen.set(dependencyName, 'Dependency');
+        bindings.set(JSON.stringify([binding.specifier, binding.exportName]), binding);
+        const name = `${dependencyName}.${binding.exportName}`;
+        replacementNames.set(reference, name);
+        return name;
+      }
+      return undefined;
+    };
+    const state = { changed: false };
+    const modules = rewriteParsedTypeSlots(
+      analysis.modules,
+      (identity) => {
+        const entity = entityFor(identity);
+        if (entity !== undefined) {
+          chosen.set(entity.name, entity.kind);
+          return true;
+        }
+        return false;
+      },
+      (info, fallback) => {
+        if (info === undefined) return fallback;
+        const result = rewriteTypeReferences(info, replace);
+        for (const reference of result.unsupported)
+          warn(
+            `Type reference '${reference.writtenName}' is inside unsupported syntax; retaining that source text`,
+            reference.source.filePath,
+          );
+        if (result.text === info.text) return fallback;
+        state.changed = true;
+        return result.text;
+      },
+    );
+    if (!state.changed) return { ...planning, warnings: [...planning.warnings, ...warnings] };
+    const finalConverter = new TypeScriptToTypedMindConverter(this.options);
+    const result = finalConverter.convertOnce(
+      { ...analysis, modules },
+      {
+        entitiesByName,
+        replacementNames,
+        sourceModules: new Map(analysis.modules.map((module) => [module.filePath, module])),
+        bindings: [...bindings.values()],
+      },
+    );
+    const unstable = [...chosen].some(([name, kind]) => {
+      const emitted = result.entities.filter((entity) => entity.name === name);
+      return emitted.length !== 1 || emitted[0]?.kind !== kind;
+    });
+    if (unstable)
+      return {
+        ...planning,
+        warnings: [
+          ...planning.warnings,
+          ...warnings,
+          {
+            message: 'Type-reference rewriting changed an allocated identity or entity kind; retaining the complete planning result',
+            filePath: undefined,
+            suggestion: undefined,
+          },
+        ],
+      };
+    return { ...result, warnings: [...result.warnings, ...warnings] };
+  }
+
+  private rewriteTypeSlot(info: ParsedTypeText): TypeReferenceRewriteResult {
+    return rewriteTypeReferences(info, (reference) => this.originContext?.replacementNames.get(reference));
+  }
+
+  private convertOnce(analysis: TypeScriptProjectAnalysis, originContext?: OriginConversionContext): ConversionResult {
     this.reset();
+    this.originContext = originContext;
     // X-CONV-3 — every relativization this conversion performs targets the
     // analysis's own project root, not this process's cwd.
     this.projectRoot = analysis.projectRoot;
@@ -1074,7 +1207,7 @@ export class TypeScriptToTypedMindConverter {
 
     // 1.3: Collect all entities information without processing imports
     for (const module of modules) {
-      this.collectModuleEntities(module);
+      this.collectModuleEntities(this.originContext?.sourceModules.get(module.filePath) ?? module);
     }
 
     // 1.4 (gap 69/67): resolve every interface's shape over its heritage
@@ -1085,6 +1218,16 @@ export class TypeScriptToTypedMindConverter {
 
     this.reserveEntityNames(modules);
     for (const module of modules) this.extractDependencies(module);
+    for (const binding of this.originContext?.bindings ?? []) {
+      this.createDependencyEntity(binding.specifier);
+      const dependency = this.dependencies.get(binding.specifier);
+      if (dependency !== undefined && !dependency.exports?.includes(binding.exportName)) {
+        this.dependencies.set(
+          binding.specifier,
+          new DependencyNode({ ...dependency, exports: [...(dependency.exports ?? []), binding.exportName] }),
+        );
+      }
+    }
 
     // PHASE 2: Processing with Complete Knowledge
 
@@ -1698,6 +1841,7 @@ export class TypeScriptToTypedMindConverter {
   // Preserve the existing ambient heritage representation until A2 supplies
   // proven origins; reserve the generated class identity before emission.
   private ensureNamespaceImplementsStub(target: string): string {
+    if (this.originContext?.entitiesByName.has(target)) return target;
     const entityName = this.nameAllocator.reserve(`namespace-heritage:${target}`, [this.sanitizeEntityName(target)]);
 
     if (!this.namespaceImplementsStubNames.has(entityName)) {
@@ -1732,11 +1876,11 @@ export class TypeScriptToTypedMindConverter {
   // rewritten to follow a collision rename (PR 2's job). Warn once per
   // heritage target that names a renamed entity.
   private warnOnCollidedHeritageReferences(cls: ParsedClass, entityName: string, filePath: string): void {
-    for (const target of cls.extends) {
-      this.warnOnCollidedTypeReference(target, `extends target of class '${entityName}'`, filePath);
+    for (const [index, target] of cls.extends.entries()) {
+      this.warnOnCollidedTypeReference(target, `extends target of class '${entityName}'`, filePath, cls.extendsTypeInfo?.[index]);
     }
-    for (const target of cls.implements) {
-      this.warnOnCollidedTypeReference(target, `implements target of class '${entityName}'`, filePath);
+    for (const [index, target] of cls.implements.entries()) {
+      this.warnOnCollidedTypeReference(target, `implements target of class '${entityName}'`, filePath, cls.implementsTypeInfo?.[index]);
     }
   }
 
@@ -2251,7 +2395,13 @@ export class TypeScriptToTypedMindConverter {
   // legitimately point at the first, un-renamed one). Establishing which is
   // precisely PR 2's job. A false positive here costs one warning; a false
   // negative costs an invisible dangling reference.
-  private warnOnCollidedTypeReference(typeText: string | undefined, referenceContext: string, filePath: string): void {
+  private warnOnCollidedTypeReference(
+    typeText: string | undefined,
+    referenceContext: string,
+    filePath: string,
+    info?: ParsedTypeText,
+  ): void {
+    if (this.originContext !== undefined && info !== undefined) return;
     if (typeText === undefined || typeText === '' || this.collidedTypeNames.size === 0) {
       return;
     }
@@ -2296,9 +2446,9 @@ export class TypeScriptToTypedMindConverter {
     // dangling edge is visible here, not only downstream as
     // `checker/input-dto-not-found`.
     for (const parameter of func.parameters) {
-      this.warnOnCollidedTypeReference(parameter.type, `input of function '${entityName}'`, moduleFilePath);
+      this.warnOnCollidedTypeReference(parameter.type, `input of function '${entityName}'`, moduleFilePath, parameter.typeInfo);
     }
-    this.warnOnCollidedTypeReference(func.returnType, `output of function '${entityName}'`, moduleFilePath);
+    this.warnOnCollidedTypeReference(func.returnType, `output of function '${entityName}'`, moduleFilePath, func.returnTypeInfo);
 
     const inputDTO = this.extractInputDTO(func, entityName);
     const outputDTO = this.extractOutputDTO(func, entityName);
@@ -2613,8 +2763,13 @@ export class TypeScriptToTypedMindConverter {
     // decision-same-named-entities PR 1, interim window — an interface's
     // heritage targets are raw source identifiers, not rewritten to follow a
     // collision rename (PR 2's job).
-    for (const target of inheritList) {
-      this.warnOnCollidedTypeReference(target, `extends target of interface-derived class '${entityName}'`, module?.filePath ?? '');
+    for (const [index, target] of inheritList.entries()) {
+      this.warnOnCollidedTypeReference(
+        target,
+        `extends target of interface-derived class '${entityName}'`,
+        module?.filePath ?? '',
+        iface.extendsTypeInfo?.[index],
+      );
     }
 
     const classEntity = new ClassNode({
@@ -2709,7 +2864,7 @@ export class TypeScriptToTypedMindConverter {
       // decision-same-named-entities PR 1, interim window — this field's type
       // is raw source text and is NOT rewritten to follow a collision rename
       // (PR 2's job). Warn if it names a renamed entity.
-      this.warnOnCollidedTypeReference(type, `DTO field '${entityName}.${prop.name}'`, module?.filePath ?? '');
+      this.warnOnCollidedTypeReference(type, `DTO field '${entityName}.${prop.name}'`, module?.filePath ?? '', prop.typeInfo);
       // RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2): the converter builds a
       // synthetic DtoFieldNode from an already-sanitized type string, not a
       // parsed CST subtree — parseTypeExprText (the same hand-rolled parser
@@ -2742,7 +2897,10 @@ export class TypeScriptToTypedMindConverter {
   }
 
   // decision-same-named-entities PR 1 — see `convertInterfaceToClass`.
-  private convertTypeAliasToDTO(typeAliasInput: { name: string; type: string; description?: string }, module?: ParsedModule): void {
+  private convertTypeAliasToDTO(
+    typeAliasInput: { name: string; type: string; description?: string; typeInfo?: ParsedTypeText },
+    module?: ParsedModule,
+  ): void {
     const entityName = this.resolveTypeEntityName(module, typeAliasInput.name);
 
     // Fixture 90 (mail-agent `src/harness/envelope.ts:266` `DispatchResult`,
@@ -2824,7 +2982,12 @@ export class TypeScriptToTypedMindConverter {
 
     // decision-same-named-entities PR 1, interim window — the alias's
     // right-hand side is raw source text, not rewritten to follow a rename.
-    this.warnOnCollidedTypeReference(typeAlias.type, `TypeDef '${entityName}' alias target`, module?.filePath ?? '');
+    this.warnOnCollidedTypeReference(
+      typeAlias.type,
+      `TypeDef '${entityName}' alias target`,
+      module?.filePath ?? '',
+      typeAliasInput.typeInfo,
+    );
 
     const aliasType = parseTypeExprText(typeAlias.type).typeExpr;
     // D-LEG-2 (rfc-tm-10-diamond.md §2, issue #65) — walk the alias's
@@ -2852,7 +3015,10 @@ export class TypeScriptToTypedMindConverter {
   // entirely (the analyzer captured `isEnum`/`enumValues` but the converter
   // never read them — confirmed zero references before this Quantum).
   // decision-same-named-entities PR 1 — see `convertInterfaceToClass`.
-  private convertEnumToTypeDef(enumDef: { name: string; members: readonly string[]; description?: string }, module?: ParsedModule): void {
+  private convertEnumToTypeDef(
+    enumDef: { name: string; members: readonly string[]; description?: string; typeInfo?: ParsedTypeText },
+    module?: ParsedModule,
+  ): void {
     const entityName = this.resolveTypeEntityName(module, enumDef.name);
 
     this.addEntityName(entityName, 'convertEnumToTypeDef');
@@ -2883,7 +3049,10 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
-  private createConstantEntity(constant: { name: string; type: string; value?: string }, module: ParsedModule): void {
+  private createConstantEntity(
+    constant: { name: string; type: string; value?: string; typeInfo?: ParsedTypeText },
+    module: ParsedModule,
+  ): void {
     // decision-same-named-entities PR 1 — this site used to SILENTLY `return`
     // on a name collision, strictly worse than the six sibling `addError`
     // paths: the surviving Constants entity carried the wrong module's `path`
@@ -2908,9 +3077,10 @@ export class TypeScriptToTypedMindConverter {
 
     // decision-same-named-entities PR 1, interim window — the `schema` slot
     // carries the constant's type text, not rewritten to follow a rename.
-    this.warnOnCollidedTypeReference(constant.type, `Constants '${entityName}' schema`, module.filePath);
+    this.warnOnCollidedTypeReference(constant.type, `Constants '${entityName}' schema`, module.filePath, constant.typeInfo);
 
-    const constantSchema = constant.type && constant.type !== 'any' ? this.convertTypeToSchema(constant.type) : undefined;
+    const schemaText = constant.typeInfo === undefined ? constant.type : this.rewriteTypeSlot(constant.typeInfo).text;
+    const constantSchema = schemaText && schemaText !== 'any' ? this.convertTypeToSchema(schemaText) : undefined;
 
     const constantsEntity = new ConstantsNode({
       name: entityName,
@@ -4059,7 +4229,9 @@ export class TypeScriptToTypedMindConverter {
         // stays visible in `entity.signature` regardless (emitted verbatim,
         // `emit-shortform.ts`), so only the machine-checked graph edge is
         // lost, not the DSL reader's visibility into the real type.
-        return isBareEntityName(param.type) ? param.type : undefined;
+        return isBareEntityName(param.type) || this.originContext?.entitiesByName.get(param.type) instanceof DtoNode
+          ? param.type
+          : undefined;
       }
     }
     return undefined;
@@ -4095,7 +4267,7 @@ export class TypeScriptToTypedMindConverter {
       this.walkGenericArgsForExternalStubs(parseTypeExprText(returnType).typeExpr);
       // issue #77 — same bare-`entity_name` guard as extractInputDTO above,
       // applied to the `output_name` grammar slot (grammar.js:815).
-      return isBareEntityName(returnType) ? returnType : undefined;
+      return isBareEntityName(returnType) || this.originContext?.entitiesByName.get(returnType) instanceof DtoNode ? returnType : undefined;
     }
     return undefined;
   }
@@ -4243,6 +4415,8 @@ export class TypeScriptToTypedMindConverter {
   //     elimination — the same fallback the heuristic approximated, now
   //     gated by classification instead of a first-character guess.
   private isDTOLikeType(type: string): boolean {
+    const proven = this.originContext?.entitiesByName.get(type);
+    if (proven !== undefined) return proven instanceof DtoNode;
     const primitives = ['string', 'number', 'boolean', 'void', 'any', 'unknown', 'null', 'undefined'];
     const cleaned = type.replace(/\[\]$/, ''); // Remove array suffix
     if (primitives.includes(cleaned.toLowerCase())) {
@@ -4716,6 +4890,7 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private convertTypeToSchema(type: string): string {
+    if (this.originContext?.entitiesByName.has(type)) return type;
     // Convert TypeScript types to schema names.
     //
     // The Constants type slot is grammatically an `entity_name`
