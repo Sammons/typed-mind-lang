@@ -57,6 +57,7 @@ it('TM13 B1: existing signatures and direct IO retain their reference verdicts',
     'go(value: Wrapped trailing) => void',
     'go(value: Wrapped) =>',
     'go(value: Wrapped => void',
+    'go(value: Wrapped, callback: (input: Store) => Lease trailing) => void',
   ]) {
     assert.deepEqual(orphanNames(signature, ['Wrapped']), ["Orphaned entity 'Wrapped'"], signature);
   }

@@ -182,6 +182,11 @@ class SignatureSource {
     if (callable.kind === 'parsed') {
       return { kind: 'callable', text, span, signature: callable.signature };
     }
+    // A recognized callable with an invalid return cannot hide its leftover
+    // text in TypeExpr's opaque fallback and partially consume other slots.
+    if (callable.reason !== 'unsupported-shape' && text.includes('=>')) {
+      return callable.reason;
+    }
     const scanned = scan(text, 0, undefined, false);
     if (scanned.kind === 'failed') {
       return scanned.reason;

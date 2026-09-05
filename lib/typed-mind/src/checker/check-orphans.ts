@@ -8,6 +8,8 @@
 // are NOT referenced (the legacy comment at :257-259 is the rule). Program and
 // Dependency entities are exempt candidates; Files get the
 // any-export-imported consumption escape.
+// RFC-TM-13 B1 additionally collects structured function-signature type uses;
+// opaque text, local generic binders and builtin wrappers add no false edges.
 
 import { AssetNode } from '../ast/asset-node.ts';
 import { ClassFileNode } from '../ast/class-file-node.ts';
