@@ -3,14 +3,14 @@
 // (`S7ForkRunner.runSummaryFork`).
 //
 // An interface method whose type is a FUNCTION TYPE returning a GENERIC whose
-// argument is a UNION (`(a: X) => Promise<Y | Z>`) leaves an unconsumed `>` in
-// `parseTypeExprText`'s remainder, and the emitted field line is then rejected
+// argument is a UNION (`(a: X) => Promise<Y | Z>`) left an unconsumed `>` in
+// `parseTypeExprText`'s remainder, and the emitted field line was then rejected
 // by the grammar as "Unparsable text: `>`".
 //
-// The `(params) => Return` rescan in `parseAtom` calls `scanOpaqueRun` with the
+// The `(params) => Return` rescan in `parseAtom` called `scanOpaqueRun` with the
 // CALLER's `inGenericArgs` (false at a field's top level), so `scanOpaqueRun`
-// never tracks angle depth for the generic the arrow RETURNS. The `|` inside
-// `Promise<...>` is therefore read as a TOP-LEVEL union operator and ends the
+// never tracked angle depth for the generic the arrow RETURNS. The `|` inside
+// `Promise<...>` was therefore read as a TOP-LEVEL union operator and ended the
 // opaque run early, stranding the generic's own closing `>`.
 //
 // Control: the same shape WITHOUT a union inside the generic

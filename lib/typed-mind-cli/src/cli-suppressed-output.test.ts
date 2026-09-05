@@ -21,7 +21,6 @@ import { fileURLToPath } from 'node:url';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = join(testDir, '..');
-const repoRoot = join(packageDir, '..', '..');
 const cliDistPath = join(packageDir, 'dist', 'cli.js');
 const fixturePath = join(testDir, '__fixtures__', 'suppressed-and-active.tmd');
 
@@ -37,9 +36,6 @@ const runCli = (args: readonly string[]): { stdout: string; stderr: string; stat
 
 describe('typed-mind --check (built dist): suppressed findings render distinctly (issue #92)', () => {
   it('prints a suppressed finding as SUPPRESSED (reason) and reports active/suppressed counts separately', () => {
-    // Ensure dist/ reflects the current sources; tsc --build is incremental.
-    execFileSync(join(repoRoot, 'node_modules', '.bin', 'tsc'), ['--build'], { cwd: packageDir, encoding: 'utf8' });
-
     const { stderr, status } = runCli(['--check', fixturePath]);
 
     assert.equal(status, 1, 'the fixture carries one real unsuppressed error, so --check must still exit non-zero');
@@ -72,8 +68,6 @@ describe('typed-mind --check (built dist): suppressed findings render distinctly
   });
 
   it('a fixture with zero active diagnostics (only suppressed ones) still reports "No errors found"', () => {
-    execFileSync(join(repoRoot, 'node_modules', '.bin', 'tsc'), ['--build'], { cwd: packageDir, encoding: 'utf8' });
-
     const onlySuppressedFixture = [
       'App -> Main v1.0.0',
       'Main @ src/main.ts:',

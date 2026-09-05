@@ -79,7 +79,7 @@
   },
   "scripts": {
     "build": "tsc --build && pnpm run copy-static",
-    "copy-static": "mkdir -p dist && cp -r src/static dist/",
+    "copy-static": "mkdir -p dist && rsync -a --checksum src/static dist/",
     "dev": "tsc --build --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
     "pretest": "pnpm --filter @sammons/typed-mind run build",

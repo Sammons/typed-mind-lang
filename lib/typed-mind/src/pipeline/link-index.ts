@@ -35,7 +35,7 @@ import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
 import { QualifiedNameResolver, resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
-import { isPrimitiveType } from './type-builtins.ts';
+import { isAmbientPlatformType, isPrimitiveType } from './type-builtins.ts';
 import { walkEntityTypeReferences } from './type-reference-walk.ts';
 
 export interface Reference {
@@ -210,7 +210,8 @@ const collectEntityLinks = (collector: LinkCollector, entity: EntityNode): void 
   }
   walkEntityTypeReferences(entity, {
     reference: (node, args) => {
-      if (args.length === 0 || !isPrimitiveType(node.name)) collector.addReference(node.name, entity);
+      if (args.length === 0 || (!isPrimitiveType(node.name) && !isAmbientPlatformType(node.name)))
+        collector.addReference(node.name, entity);
     },
     // RFC-TM-14 §S4 R4b: a `(typeof X)` leaf references the value X names.
     valueReference: (name) => collector.addReference(name, entity),
