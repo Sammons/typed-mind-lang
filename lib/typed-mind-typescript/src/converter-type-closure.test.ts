@@ -239,8 +239,10 @@ it('TM13 EXIT: omitted class properties and private members never seed type rete
     result.entities.some((entity) => ['PropertyOnly', 'PrivateOnly', 'PrivateNested'].includes(entity.name)),
     false,
   );
+  // RFC-TM-14 S7: a retained private method-bearing interface is declared
+  // under its physical file as `Owner.Name`, never as a bare Class.
   assert.equal(
-    result.entities.some((entity) => entity.name === 'Selected'),
+    result.entities.some((entity) => entity.name === 'IndexFile.Selected'),
     true,
   );
   const include = new TypeScriptToTypedMindConverter({ includePrivateMembers: true }).convert(analysis);
