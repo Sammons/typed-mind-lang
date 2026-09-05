@@ -12,7 +12,7 @@ import { checkSingleReference } from './check-reference-legality.ts';
 import { isPrimitiveType } from './type-builtins.ts';
 
 const semanticParameters = (parameters: readonly TypeParameterNode[]): string =>
-  JSON.stringify(parameters, (key, value: unknown) => (key === 'span' || key === 'raw' ? undefined : value));
+  JSON.stringify(parameters, (key, value: unknown) => (key === 'span' || key === 'raw' || key === 'textOffsets' ? undefined : value));
 
 export const checkGenericDeclarations = (context: CheckContext): void => {
   for (const entity of context.byName.values()) {

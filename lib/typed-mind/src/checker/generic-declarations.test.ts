@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { it } from 'node:test';
 import { ClassNode } from '../ast/class-node.ts';
+import { FunctionNode } from '../ast/function-node.ts';
 import { computeLinks } from '../pipeline/link-index.ts';
 import { parseSignatureText } from '../pipeline/parse-signature-text.ts';
 import { TypedMindParser } from '../pipeline/typed-mind-parser.ts';
@@ -175,4 +176,32 @@ it('G.4/B3 typed nongeneric methods and constructors check types and bind local 
     ['Store'],
   );
   assert.deepEqual(orphans(context), ["Orphaned entity 'Store'", "Orphaned entity 'T'", "Orphaned entity 'U'", "Orphaned entity 'run'"]);
+});
+
+it('G.4/B3 generic agreement ignores observational quoted-source offsets', () => {
+  const text = 'choose<T extends (value: string) => string>(value: T) => T';
+  const parsed = parseSignatureText(text);
+  assert.equal(parsed.kind, 'parsed');
+  if (parsed.kind !== 'parsed') return;
+  assert.equal(parsed.signature.typeParameters?.[0]?.constraint?.kind, 'opaque');
+  const entity = new FunctionNode({
+    name: 'choose',
+    raw: '',
+    sourceForm: 'longform',
+    span: { start: { line: 1, column: 1 }, end: { line: 1, column: text.length + 1 } },
+    signature: text,
+    calls: [],
+    pendingDependencies: [],
+    typeParameters: parsed.signature.typeParameters?.map((parameter) => ({
+      ...parameter,
+      constraint:
+        parameter.constraint?.kind === 'opaque'
+          ? { ...parameter.constraint, textOffsets: Array.from({ length: parameter.constraint.text.length + 1 }, (_, index) => index) }
+          : parameter.constraint,
+    })),
+  });
+  const entities = [entity];
+  const context = new CheckContext({ entities, links: computeLinks(entities), parseDiagnostics: [] });
+  checkGenericDeclarations(context);
+  assert.deepEqual(context.findings, []);
 });
