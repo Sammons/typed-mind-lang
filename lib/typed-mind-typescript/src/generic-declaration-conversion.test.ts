@@ -218,3 +218,21 @@ it('G.5 async Promise inline output synthesis retains generic bindings without c
     [{ code: 'checker/orphaned-entity', message: "Orphaned entity 'T'" }],
   );
 });
+
+it('G.5 generic function signatures retain rest parameters and defaulted optionality', async () => {
+  const { result } = convert(`
+export function collect<T>(...values: T[]): T[] { return values; }
+export function take<T>(values: T[], limit: number = 1): T[] { return values.slice(0, limit); }
+`);
+  assert.equal(result.success, true);
+  const signatures = result.entities.filter((entity) => entity instanceof FunctionNode).map((entity) => entity.signature);
+  assert.deepEqual(signatures, ['collect(...values: T[]) => T[]', 'take(values: T[], limit?: number) => T[]']);
+  const emitter = new SyntaxEmitter();
+  const mind = await TypedMind.create();
+  const outcome = { entities: result.entities, imports: [], suppressions: [], diagnostics: [] };
+  for (const text of [emitter.emitShortform(outcome), emitter.emitLongform(outcome)]) {
+    assert.match(text, /\.\.\.values: T\[\]/);
+    assert.match(text, /limit\?: number/);
+    assert.deepEqual(mind.check(text).diagnostics, []);
+  }
+});

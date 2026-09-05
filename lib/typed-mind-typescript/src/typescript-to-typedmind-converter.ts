@@ -2664,7 +2664,7 @@ export class TypeScriptToTypedMindConverter {
         ...func,
         parameters,
         returnType,
-        signature: `${func.isAsync ? 'async ' : ''}${func.name}(${parameters.map((parameter) => `${parameter.name}${parameter.isOptional ? '?' : ''}: ${parameter.type}`).join(', ')}) => ${returnType}`,
+        signature: `${func.isAsync ? 'async ' : ''}${func.name}(${parameters.map((parameter) => `${parameter.isRest ? '...' : ''}${parameter.name}${parameter.isOptional || parameter.hasDefaultValue ? '?' : ''}: ${parameter.type}`).join(', ')}) => ${returnType}`,
       };
     }
 
