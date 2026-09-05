@@ -14,7 +14,8 @@ import { ConstantsNode, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
-const fixtureDir = join(import.meta.dirname, 'repros-analyzer', '119-constants-schema-generic-annotation');
+const fixture119Dir = join(import.meta.dirname, 'repros-analyzer', '119-constants-schema-generic-annotation');
+const fixtureDir = fixture119Dir;
 
 const convert = () => {
   const analysis = new TypeScriptAnalyzer(fixtureDir).analyzeFromEntrypoint(join(fixtureDir, 'src', 'main.ts'));
@@ -122,5 +123,126 @@ describe('TM14 U5a: Constants schema carries a full type expression and credits 
       // R6a adds none — it only stops fabricating a generic finding.
       { generic: [], schemaFindings: [], converterWarnings: [] },
     );
+  });
+});
+
+// RFC-TM-14 U5b (rfc-tm-14-diamond.md §S5, leaf R6b): constants with
+// call/new initializers carrying explicit type arguments and no annotation.
+// The checker-read path resolves the compiler type structurally. Fixture 120.
+const fixture120Dir = join(import.meta.dirname, 'repros-analyzer', '120-constants-call-type-argument');
+
+const convert120 = () => {
+  const analysis = new TypeScriptAnalyzer(fixture120Dir).analyzeFromEntrypoint(join(fixture120Dir, 'src', 'main.ts'));
+  const result = new TypeScriptToTypedMindConverter().convert(analysis);
+  assert.equal(result.success, true, JSON.stringify(result.errors));
+  return result;
+};
+
+describe('TM14 U5b: checker-read schema for call/new initializers with explicit type arguments', () => {
+  it('toasts carries schema Signal<Toast[]> and boxed carries schema Box<Toast> with defaulted param omitted', () => {
+    const { tmdContent } = convert120();
+    assert.deepEqual(
+      {
+        toasts: constantsLine(tmdContent, 'toasts'),
+        boxed: constantsLine(tmdContent, 'boxed'),
+      },
+      {
+        toasts: 'toasts ! src/signals.ts : Signal<Toast[]>',
+        boxed: 'boxed ! src/signals.ts : Box<Toast>',
+      },
+    );
+  });
+
+  it('wrapped and cond have no schema (opaque object and bare literal filtered)', () => {
+    const { tmdContent } = convert120();
+    assert.deepEqual(
+      {
+        wrapped: constantsLine(tmdContent, 'wrapped'),
+        cond: constantsLine(tmdContent, 'cond'),
+      },
+      {
+        wrapped: 'wrapped ! src/signals.ts',
+        cond: 'cond ! src/signals.ts',
+      },
+    );
+  });
+
+  it('the converted entities carry schemaType nodes for toasts and boxed', () => {
+    const { entities } = convert120();
+    const schemaOf = (name: string) => {
+      const entity = entities.find((candidate) => candidate instanceof ConstantsNode && candidate.name === name);
+      assert.ok(entity instanceof ConstantsNode, name);
+      return { kind: entity.schemaType?.kind, schema: entity.schema };
+    };
+    assert.deepEqual(
+      {
+        toasts: schemaOf('toasts'),
+        boxed: schemaOf('boxed'),
+        wrapped: schemaOf('wrapped'),
+        cond: schemaOf('cond'),
+      },
+      {
+        toasts: { kind: 'generic', schema: 'Signal' },
+        boxed: { kind: 'generic', schema: 'Box' },
+        wrapped: { kind: undefined, schema: undefined },
+        cond: { kind: undefined, schema: undefined },
+      },
+    );
+  });
+
+  it('converter warns for wrapped and cond (unsupported inferred types)', () => {
+    const { warnings } = convert120();
+    const unsupported = warnings.filter((w) => w.message.includes('inferred constant type'));
+    assert.deepEqual(
+      unsupported.map((w) => w.message.replace(/Constants '(\w+)'.+/, '$1')),
+      ['wrapped', 'cond'],
+    );
+  });
+
+  it('Toast is not orphaned: schema Signal<Toast[]> credits it in the orphan walk', async () => {
+    const { tmdContent } = convert120();
+    const mind = await TypedMind.create();
+    const findings = mind.check(tmdContent).diagnostics;
+    assert.deepEqual(
+      findings.filter((f) => f.message.includes('Toast')),
+      [],
+    );
+  });
+
+  it('longform round-trips schema: "Signal<Toast[]>"', async () => {
+    const { tmdContent } = convert120();
+    const mind = await TypedMind.create();
+    const longform = mind.emitLongform(tmdContent);
+    assert.equal(longform.includes('schema: "Signal<Toast[]>"'), true, longform);
+    const findings = mind.check(longform).diagnostics;
+    // Legacy is orphaned: its only reference is inside a type argument that
+    // produces an opaque anonymous object, filtered by the checker-read path.
+    // R4a body walk covers value-level references, not type arguments.
+    assert.deepEqual(
+      findings.map((f) => f.message),
+      ["Orphaned entity 'Legacy'"],
+    );
+    const backToShortform = mind.emitShortform(longform);
+    assert.equal(constantsLine(backToShortform, 'toasts'), constantsLine(tmdContent, 'toasts'));
+  });
+
+  it('checker-read reference positions index correctly into the text (rewriteTypeReferences contract)', () => {
+    const analysis = new TypeScriptAnalyzer(fixture120Dir).analyzeFromEntrypoint(join(fixture120Dir, 'src', 'main.ts'));
+    const seen = new Set<string>();
+    for (const mod of analysis.modules) {
+      for (const constant of mod.constants) {
+        if (seen.has(constant.name) || constant.checkerReadSchema === undefined) continue;
+        seen.add(constant.name);
+        const { text, references } = constant.checkerReadSchema;
+        for (const ref of references) {
+          assert.equal(
+            text.slice(ref.start, ref.end),
+            ref.writtenName,
+            `${constant.name}: ${ref.writtenName} at [${ref.start},${ref.end}]`,
+          );
+        }
+      }
+    }
+    assert.ok(seen.size > 0);
   });
 });

@@ -1906,6 +1906,27 @@ export class TypeScriptAnalyzer {
       const value = initializer?.getText();
       const isConst = !!(node.declarationList.flags & ts.NodeFlags.Const);
 
+      // RFC-TM-14 §S5 R6b — when the initializer is a call/new with explicit
+      // type arguments and no annotation, read the checker's resolved type.
+      let checkerReadSchema: ParsedTypeText | undefined;
+      let checkerReadUnsupported = false;
+      const hasExplicitTypeArgs =
+        declaration.type === undefined &&
+        initializer !== undefined &&
+        (ts.isCallExpression(initializer) || ts.isNewExpression(initializer)) &&
+        initializer.typeArguments !== undefined &&
+        initializer.typeArguments.length > 0;
+      if (hasExplicitTypeArgs) {
+        const resolvedType = this.checker.getTypeAtLocation(declaration.name);
+        checkerReadSchema = this.printCheckerType(resolvedType, declaration.name);
+        if (checkerReadSchema === undefined) {
+          checkerReadUnsupported = true;
+        } else if (checkerReadSchema.references.length === 0) {
+          checkerReadSchema = undefined;
+          checkerReadUnsupported = true;
+        }
+      }
+
       constants.push({
         name,
         type,
@@ -1915,6 +1936,8 @@ export class TypeScriptAnalyzer {
         isConst,
         // TM13 F — the initializer is a body for the RFC-TM-14 §S1 walk.
         callReferences: this.collectBodyReferences(initializer),
+        ...(checkerReadSchema === undefined ? {} : { checkerReadSchema }),
+        ...(checkerReadUnsupported ? { checkerReadUnsupported } : {}),
       } as const);
     }
 
@@ -2192,6 +2215,189 @@ export class TypeScriptAnalyzer {
     }
     return resolveReferenceOrigin(this.checker.getSymbolAtLocation(node), this.program, this.checker, {
       mapDeclaration: (declaration) => this.mapReferenceDeclarationToSource(declaration),
+    });
+  }
+
+  // RFC-TM-14 §S5 R6b — read the compiler's resolved type and map it
+  // structurally to a ParsedTypeText with proven external bindings.
+  // Returns undefined for unsupported types (conditional, mapped, any, error).
+  private printCheckerType(type: ts.Type, declarationNode: ts.Node): ParsedTypeText | undefined {
+    const references: import('./types.ts').TypeReferenceOccurrence[] = [];
+    const declarationSource = sourceRange(declarationNode);
+    const text = this.printCheckerTypeRecursive(type, declarationNode, declarationSource, references, 0);
+    if (text === undefined) return undefined;
+    return { text, source: undefined, references };
+  }
+
+  private printCheckerTypeRecursive(
+    type: ts.Type,
+    declarationNode: ts.Node,
+    declarationSource: import('./types.ts').SourceRange,
+    references: import('./types.ts').TypeReferenceOccurrence[],
+    offset: number,
+  ): string | undefined {
+    const intrinsicName = (type as { intrinsicName?: string }).intrinsicName;
+    if (
+      intrinsicName !== undefined &&
+      ['string', 'number', 'boolean', 'void', 'unknown', 'never', 'null', 'undefined'].includes(intrinsicName)
+    ) {
+      return intrinsicName;
+    }
+
+    if (type.flags & ts.TypeFlags.StringLiteral) return `'${(type as ts.StringLiteralType).value}'`;
+    if (type.flags & ts.TypeFlags.NumberLiteral) return `${(type as ts.NumberLiteralType).value}`;
+    if (type.flags & ts.TypeFlags.BooleanLiteral) return intrinsicName ?? 'boolean';
+
+    if (type.aliasSymbol !== undefined) {
+      const name = type.aliasSymbol.name;
+      const origin = this.resolveSymbolOrigin(type.aliasSymbol);
+      const args = type.aliasTypeArguments ?? [];
+      const argsText = this.printCheckerTypeArgs(
+        args,
+        type.aliasSymbol,
+        declarationNode,
+        declarationSource,
+        references,
+        offset + name.length,
+      );
+      if (argsText === undefined) return undefined;
+      references.push({ writtenName: name, source: declarationSource, start: offset, end: offset + name.length, origin });
+      return `${name}${argsText}`;
+    }
+
+    if (this.checker.isArrayType(type)) {
+      const typeArgs = this.checker.getTypeArguments(type as ts.TypeReference);
+      if (typeArgs.length === 1) {
+        const elementText = this.printCheckerTypeRecursive(typeArgs[0]!, declarationNode, declarationSource, references, offset);
+        if (elementText === undefined) return undefined;
+        return `${elementText}[]`;
+      }
+    }
+
+    if (type.isUnion()) {
+      const parts: string[] = [];
+      let cursor = offset;
+      for (const member of type.types) {
+        if (parts.length > 0) cursor += 3;
+        const memberText = this.printCheckerTypeRecursive(member, declarationNode, declarationSource, references, cursor);
+        if (memberText === undefined) return undefined;
+        cursor += memberText.length;
+        parts.push(memberText);
+      }
+      return parts.join(' | ');
+    }
+
+    if (type.isIntersection()) {
+      const parts: string[] = [];
+      let cursor = offset;
+      for (const member of type.types) {
+        if (parts.length > 0) cursor += 3;
+        const memberText = this.printCheckerTypeRecursive(member, declarationNode, declarationSource, references, cursor);
+        if (memberText === undefined) return undefined;
+        cursor += memberText.length;
+        parts.push(memberText);
+      }
+      return parts.join(' & ');
+    }
+
+    const objectFlags = (type as ts.ObjectType).objectFlags;
+    if (objectFlags !== undefined && (objectFlags & ts.ObjectFlags.Reference) !== 0) {
+      const typeRef = type as ts.TypeReference;
+      const target = typeRef.target;
+      const symbol = target.symbol;
+      if (symbol !== undefined) {
+        const name = symbol.name;
+        const origin = this.resolveSymbolOrigin(symbol);
+        const typeArgs = this.checker.getTypeArguments(typeRef);
+        const argsText = this.printCheckerRefTypeArgs(
+          typeArgs,
+          target,
+          declarationNode,
+          declarationSource,
+          references,
+          offset + name.length,
+        );
+        if (argsText === undefined) return undefined;
+        references.push({ writtenName: name, source: declarationSource, start: offset, end: offset + name.length, origin });
+        return `${name}${argsText}`;
+      }
+    }
+
+    if (objectFlags !== undefined && (objectFlags & ts.ObjectFlags.ClassOrInterface) !== 0) {
+      const symbol = type.symbol;
+      if (symbol !== undefined) {
+        const name = symbol.name;
+        const origin = this.resolveSymbolOrigin(symbol);
+        references.push({ writtenName: name, source: declarationSource, start: offset, end: offset + name.length, origin });
+        return name;
+      }
+    }
+
+    if (objectFlags !== undefined && (objectFlags & ts.ObjectFlags.Anonymous) !== 0) {
+      return undefined;
+    }
+
+    return undefined;
+  }
+
+  private printCheckerTypeArgs(
+    args: readonly ts.Type[],
+    aliasSymbol: ts.Symbol,
+    declarationNode: ts.Node,
+    declarationSource: import('./types.ts').SourceRange,
+    references: import('./types.ts').TypeReferenceOccurrence[],
+    argsOffset: number,
+  ): string | undefined {
+    if (args.length === 0) return '';
+    const decl = aliasSymbol.getDeclarations()?.[0];
+    const typeParamDecls = decl !== undefined && ts.isTypeAliasDeclaration(decl) ? decl.typeParameters : undefined;
+    return this.printCheckerTypeArgsList(args, typeParamDecls, declarationNode, declarationSource, references, argsOffset);
+  }
+
+  private printCheckerRefTypeArgs(
+    typeArgs: readonly ts.Type[],
+    target: ts.GenericType,
+    declarationNode: ts.Node,
+    declarationSource: import('./types.ts').SourceRange,
+    references: import('./types.ts').TypeReferenceOccurrence[],
+    argsOffset: number,
+  ): string | undefined {
+    if (typeArgs.length === 0) return '';
+    const decl = target.symbol?.getDeclarations()?.[0];
+    const typeParamDecls =
+      decl !== undefined && (ts.isClassDeclaration(decl) || ts.isInterfaceDeclaration(decl)) ? decl.typeParameters : undefined;
+    return this.printCheckerTypeArgsList(typeArgs, typeParamDecls, declarationNode, declarationSource, references, argsOffset);
+  }
+
+  private printCheckerTypeArgsList(
+    typeArgs: readonly ts.Type[],
+    typeParamDecls: ts.NodeArray<ts.TypeParameterDeclaration> | undefined,
+    declarationNode: ts.Node,
+    declarationSource: import('./types.ts').SourceRange,
+    references: import('./types.ts').TypeReferenceOccurrence[],
+    argsOffset: number,
+  ): string | undefined {
+    const nonDefaultArgs: string[] = [];
+    let cursor = argsOffset + 1;
+    for (let i = 0; i < typeArgs.length; i++) {
+      const paramDecl = typeParamDecls?.[i];
+      if (paramDecl !== undefined && paramDecl.default !== undefined) {
+        const defaultType = this.checker.getTypeAtLocation(paramDecl.default);
+        if (defaultType === typeArgs[i]) break;
+      }
+      if (nonDefaultArgs.length > 0) cursor += 2;
+      const argText = this.printCheckerTypeRecursive(typeArgs[i]!, declarationNode, declarationSource, references, cursor);
+      if (argText === undefined) return undefined;
+      cursor += argText.length;
+      nonDefaultArgs.push(argText);
+    }
+    if (nonDefaultArgs.length === 0) return '';
+    return `<${nonDefaultArgs.join(', ')}>`;
+  }
+
+  private resolveSymbolOrigin(symbol: ts.Symbol): ReferenceOrigin {
+    return resolveReferenceOrigin(symbol, this.program, this.checker, {
+      mapDeclaration: (d) => this.mapReferenceDeclarationToSource(d),
     });
   }
 

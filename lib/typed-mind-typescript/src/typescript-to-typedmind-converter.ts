@@ -3598,7 +3598,14 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private createConstantEntity(
-    constant: { name: string; type: string; value?: string; typeInfo?: ParsedTypeText },
+    constant: {
+      name: string;
+      type: string;
+      value?: string;
+      typeInfo?: ParsedTypeText;
+      checkerReadSchema?: ParsedTypeText;
+      checkerReadUnsupported?: boolean;
+    },
     module: ParsedModule,
   ): void {
     // decision-same-named-entities PR 1 — this site used to SILENTLY `return`
@@ -3627,12 +3634,33 @@ export class TypeScriptToTypedMindConverter {
     // carries the constant's type text, not rewritten to follow a rename.
     this.warnOnCollidedTypeReference(constant.type, `Constants '${entityName}' schema`, module.filePath, constant.typeInfo);
 
-    const schemaText = constant.typeInfo === undefined ? constant.type : this.rewriteTypeSlot(constant.typeInfo).text;
-    const constantSchema = schemaText && schemaText !== 'any' ? this.convertTypeToSchema(schemaText) : undefined;
-    // RFC-TM-14 R6a: the schema slot is a full type expression (the TypeDef
-    // alias lane above is the precedent); `convertTypeToSchema` returns ''
-    // for an annotation with no rendering, which omits the slot entirely.
-    const schemaType = constantSchema === undefined || constantSchema === '' ? undefined : parseTypeExprText(constantSchema).typeExpr;
+    let schemaType: import('@sammons/typed-mind').TypeExprNode | undefined;
+
+    if (constant.checkerReadSchema !== undefined) {
+      // RFC-TM-14 R6b: checker-read path — the analyzer read the compiler's
+      // resolved type for a call/new initializer with explicit type args.
+      const rewritten = this.rewriteTypeSlot(constant.checkerReadSchema);
+      const parsed = parseTypeExprText(rewritten.text);
+      schemaType = parsed.typeExpr;
+    } else if (constant.typeInfo !== undefined && constant.typeInfo.source !== undefined) {
+      // Explicit annotation path (R6a): rewrite and convert.
+      const schemaText = this.rewriteTypeSlot(constant.typeInfo).text;
+      const constantSchema = schemaText && schemaText !== 'any' ? this.convertTypeToSchema(schemaText) : undefined;
+      schemaType = constantSchema === undefined || constantSchema === '' ? undefined : parseTypeExprText(constantSchema).typeExpr;
+    } else {
+      // Fallback: inferred type string through the legacy reduction.
+      const constantSchema = constant.type && constant.type !== 'any' ? this.convertTypeToSchema(constant.type) : undefined;
+      schemaType = constantSchema === undefined || constantSchema === '' ? undefined : parseTypeExprText(constantSchema).typeExpr;
+    }
+
+    if (constant.checkerReadUnsupported) {
+      this.addWarning(
+        `Constants '${constant.name}' has an inferred constant type that cannot be represented as a schema`,
+        module.filePath,
+        'Add an explicit type annotation',
+      );
+    }
+
     if (schemaType !== undefined) {
       // D-LEG-2: a package type inside the annotation needs its
       // Dependency-exports stub, exactly as an alias's generic argument does.
