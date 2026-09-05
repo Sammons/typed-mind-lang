@@ -4758,58 +4758,10 @@ export class TypeScriptToTypedMindConverter {
     return undefined;
   }
 
-  // issue #114 — a naive `.includes('{')` check treats a UNION of object
-  // literals (`{ tagged: false } | { tagged: true; label: string }`, a
-  // TypeScript discriminated-union idiom) as "one object literal," routing
-  // it to `parseInlineObjectLiteralToFields`. That parser's own
-  // `startsWith('{') && endsWith('}')` slice then strips only the
-  // OUTERMOST leading `{` and trailing `}` of the whole multi-member text,
-  // leaving an unbalanced middle (`tagged: false } | { tagged: true; label:
-  // string`) that `splitObjectLiteralProperties` cannot recover — the
-  // corrupted `- tagged: false } | { tagged: true` field line issue #114
-  // reports. Detected here, BEFORE the DTO/TypeDef branch decision, so a
-  // union-shaped type routes to the TypeDef/alias path instead: that path's
-  // `parseTypeExprText` already parses a top-level `|` outside any bracket
-  // depth as a real `union` TypeExprNode (confirmed empirically — each
-  // `{...}` member individually balances and falls to the grammar's own
-  // `type_opaque` leaf, per type-expr-from-text.ts's opaque-run scanner),
-  // which is a real, parseable grammar production — the "degrade honestly,
-  // anything that parses" option the issue itself names, with no new
-  // grammar surface and no field-list modeling attempted for the union.
-  // Adversarial review finding, round 1 (PR #115) — the ORIGINAL depth
-  // tracker below counted `{()[]}` only, so a union nested inside a
-  // generic (`Record<string, { a: string } | { b: string }>`) misread its
-  // `|` as top-level the instant the first `{...}` member closed, routing
-  // an alias that should stay a DTO into the TypeDef/alias path and
-  // corrupting a PREVIOUSLY-correct emission.
-  //
-  // Adversarial review finding, round 2 (PR #115) — adding `<`/`>` to the
-  // depth tracker fixed that case but was still too permissive: a union
-  // whose top-level members are THEMSELVES generics each containing their
-  // own nested union of object literals (`Record<string, {a}|{b}> |
-  // Map<string, {c}|{d}>`) still has a genuinely top-level `|` between
-  // the two generics — so the OLD "any top-level `|` plus any `{`
-  // anywhere" test still fired, routing the whole thing into
-  // `parseTypeExprText`, which has its OWN pre-existing, PR-independent
-  // bug in `scanOpaqueRun` (lib/typed-mind/src/pipeline/
-  // type-expr-from-text.ts): its bracket-depth tracker ALSO omits `<`/`>`,
-  // so it mis-nests a top-level union of generics and corrupts the
-  // output — confirmed present on `main` too (`parseTypeExprText` on this
-  // exact text already mis-parses on `main`, unrelated to this PR).
-  // Fixing that shared core parser is design work (a broader bracket-depth
-  // fix touching every `parseTypeExprText` caller) outside this
-  // increment's mechanical-fix mandate — filed as issue #118 instead of
-  // silently routing more inputs into a parser known to mishandle them.
-  //
-  // The fix: narrow the check from "any top-level `|` plus any `{`" to
-  // "every top-level-split member is ITSELF a bare object literal"
-  // (`startsWith('{') && endsWith('}')`, the exact same test
-  // `isInlineObjectLiteralType` already uses) — this is precisely the
-  // shape `parseTypeExprText`'s opaque-run scanner can safely absorb (each
-  // member independently brace-balances with no unaccounted `<`/`>`
-  // inside it), and it correctly excludes a member that is a generic
-  // (`Record<...>`, `Map<...>`) since that member does not itself start
-  // with `{`.
+  // Issue #114 first preserved top-level object unions as aliases. RFC-TM-13
+  // EXIT extends preservation to every non-object-body alias, including
+  // generic wrappers and intersections. The final whole-body classifier below
+  // rejects those shapes even when they are not unions of object literals.
   private isUnionOfObjectLiterals(type: string): boolean {
     const trimmed = type.trim();
     if (!trimmed.includes('{') || !trimmed.includes('|')) {
