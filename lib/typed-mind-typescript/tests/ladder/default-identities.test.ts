@@ -7,7 +7,7 @@ import { ClassFileNode, ClassNode, ConstantsNode, FileNode, FunctionNode, TypedM
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
-const fixture = (context: TestContext, source: string) => {
+const fixture = (context: TestContext, source: string, overrides: Record<string, string> = {}) => {
   const project = mkdtempSync(join(tmpdir(), 'tm13-default-identities-'));
   context.after(() => rmSync(project, { recursive: true, force: true }));
   writeFileSync(join(project, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true, module: 'NodeNext' } }));
@@ -17,6 +17,7 @@ const fixture = (context: TestContext, source: string) => {
     join(project, 'main.ts'),
     'import alias, { value as named } from "./value.js"; import { other } from "./other.js"; export function main() { return [alias, named, other]; }',
   );
+  for (const [name, content] of Object.entries(overrides)) writeFileSync(join(project, name), content);
   const analysis = new TypeScriptAnalyzer(project).analyzeFromEntrypoint(join(project, 'main.ts'));
   return { analysis, converted: new TypeScriptToTypedMindConverter().convert(analysis) };
 };
@@ -68,4 +69,39 @@ it('TM13 D: gap 88 closes file and initializer-call orphans through real referen
   assert.deepEqual(mind.check(converted.tmdContent).diagnostics, []);
   const removed = converted.tmdContent.replace('  ~> [buildHealthStatus]', '');
   assert.ok(mind.check(removed).diagnostics.some((finding) => finding.message === "Orphaned entity 'buildHealthStatus'"));
+  const noImport = converted.tmdContent.replace('[HealthFile.default, namedHelper]', '[namedHelper]');
+  assert.notEqual(noImport, converted.tmdContent);
+  assert.deepEqual(
+    mind
+      .check(noImport)
+      .diagnostics.map((finding) => finding.message)
+      .sort(),
+    ["Orphaned entity 'HealthFile.default'", "Orphaned file 'HealthFile' - none of its exports are imported"],
+  );
+});
+
+it('TM13 D: same-named defaults in separate files remain distinct and traversal stable', async (context) => {
+  const { analysis, converted } = fixture(context, 'const app = { value: 1 }; export default app;', {
+    'other.ts': 'const app = { value: 2 }; export default app;',
+    'main.ts': 'import left from "./value.js"; import right from "./other.js"; export function main() { return [left, right]; }',
+  });
+  assert.deepEqual(
+    converted.entities
+      .filter((entity) => entity.name.endsWith('.default'))
+      .map((entity) => entity.name)
+      .sort(),
+    ['OtherFile.default', 'ValueFile.default'],
+  );
+  const reversed = new TypeScriptToTypedMindConverter().convert({ ...analysis, modules: [...analysis.modules].reverse() });
+  assert.equal(reversed.tmdContent, converted.tmdContent);
+  assert.deepEqual((await TypedMind.create()).check(converted.tmdContent).diagnostics, []);
+});
+
+it('TM13 D: source declarations reserve their name before a default owner is generated', (context) => {
+  const { converted } = fixture(context, 'export const value = { value: 1 }; export const ValueFile = 1; export default value;');
+  assert.ok(converted.entities.some((entity) => entity instanceof ConstantsNode && entity.name === 'ValueFile'));
+  const owner = converted.entities.find((entity) => entity instanceof FileNode && entity.path === 'value.ts');
+  assert.ok(owner instanceof FileNode);
+  assert.notEqual(owner.name, 'ValueFile');
+  assert.ok(converted.entities.some((entity) => entity.name === `${owner.name}.default`));
 });

@@ -224,35 +224,21 @@ describe('87 — a multi-line DTO field type leaks its source newlines', () => {
   });
 });
 
-describe('88 — `export default <identifier>` drops the import edge (knownGap)', () => {
-  // Two halves in two layers: the analyzer has no `ts.isExportAssignment`
-  // branch (every export branch is gated on `hasExportModifier`, which an
-  // ExportAssignment does not carry), and `resolveImportToEntity` compares the
-  // EXPORTED name against the LOCAL BINDING at the import site. Fixing half 1
-  // alone closes no orphan and regresses `checker/multi-exported` on the eight
-  // route modules that all name their router `app`. See README.md.
-  it('knownGap: the default export is absent from the analyzer output', () => {
+describe('88 — default identifiers retain canonical ownership and initializer references', () => {
+  it('the analyzer resolves the default export to the real local declaration', () => {
     const analysis = analyzeFixture('88-export-assignment-default');
     const healthModule = analysis.modules.find((module) => module.filePath.endsWith('health.ts'));
-    assert.notEqual(healthModule, undefined, 'the module itself IS reached — only its default export is dropped');
-    assert.deepEqual(
-      healthModule?.exports.map((exportItem) => exportItem.name).sort(),
-      ['HealthStatus', 'buildHealthStatus'],
-      "`export default app` contributes nothing: 'app' is missing from this list",
-    );
+    const app = healthModule?.constants.find((constant) => constant.name === 'app');
+    assert.ok(app);
+    assert.deepEqual(healthModule?.exports.find((exp) => exp.isDefault)?.declaration, app.declaration);
   });
 
-  it('knownGap: the importer records no edge for the default-imported router', () => {
+  it('the importer references the canonical default identity', () => {
     const result = convertFixture('88-export-assignment-default');
     assert.equal(result.success, true);
-    const indexFile = result.entities.find((entity) => entity.kind === 'File' && entity.path.endsWith('src/index.ts')) as
-      | { imports: readonly string[] }
-      | undefined;
-    assert.deepEqual(
-      [...(indexFile?.imports ?? [])],
-      ['namedHelper'],
-      'only the NAMED import resolves; the default import of `health` is silently dropped',
-    );
+    const indexFile = result.entities.find((entity) => entity.kind === 'File' && entity.path.endsWith('src/index.ts'));
+    assert.ok(indexFile?.kind === 'File');
+    assert.deepEqual(indexFile.imports, ['HealthFile.default', 'namedHelper']);
   });
 
   it('control: the named import in the same module graph resolves correctly', () => {
@@ -263,7 +249,7 @@ describe('88 — `export default <identifier>` drops the import edge (knownGap)'
     assert.deepEqual([...(helperFile?.exports ?? [])], ['namedHelper']);
   });
 
-  it('module-graph golden: BOTH edges resolve internal — the gap is downstream of resolution', () => {
+  it('module-graph golden: both internal source edges remain unchanged', () => {
     // This is what makes the gap a converter/analyzer modeling defect rather
     // than a traversal limit: the analyzer already resolves and follows the
     // route module. Only the export/import NAME binding is lost.
