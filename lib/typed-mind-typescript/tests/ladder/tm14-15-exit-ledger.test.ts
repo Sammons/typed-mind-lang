@@ -17,10 +17,12 @@ const analyzeAndCheck = async (projectDir: string, configPath: string, entrypoin
   assert.equal(converted.success, true, JSON.stringify(converted.errors));
   const tm = await TypedMind.create();
   const checked = tm.check(converted.tmdContent);
+  const active = checked.diagnostics.filter((d) => d.suppression === undefined);
   return {
     entityCount: converted.entities.length,
-    diagnostics: checked.diagnostics,
-    orphans: checked.diagnostics.filter((d) => d.message.startsWith("Orphaned entity '")),
+    diagnostics: active,
+    orphans: active.filter((d) => d.message.startsWith("Orphaned entity '")),
+    suppressedCount: checked.suppressedCount,
   };
 };
 
