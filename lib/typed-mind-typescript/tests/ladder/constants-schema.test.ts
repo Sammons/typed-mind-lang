@@ -153,7 +153,7 @@ describe('TM14 U5b: checker-read schema for call/new initializers with explicit 
     );
   });
 
-  it('wrapped and cond have no schema (opaque object and bare literal filtered)', () => {
+  it('wrapped carries opaque object schema and cond carries resolved literal schema', () => {
     const { tmdContent } = convert120();
     assert.deepEqual(
       {
@@ -161,8 +161,8 @@ describe('TM14 U5b: checker-read schema for call/new initializers with explicit 
         cond: constantsLine(tmdContent, 'cond'),
       },
       {
-        wrapped: 'wrapped ! src/signals.ts',
-        cond: 'cond ! src/signals.ts',
+        wrapped: 'wrapped ! src/signals.ts : { a: Legacy; }',
+        cond: 'cond ! src/signals.ts : 2',
       },
     );
   });
@@ -184,19 +184,16 @@ describe('TM14 U5b: checker-read schema for call/new initializers with explicit 
       {
         toasts: { kind: 'generic', schema: 'Signal' },
         boxed: { kind: 'generic', schema: 'Box' },
-        wrapped: { kind: undefined, schema: undefined },
-        cond: { kind: undefined, schema: undefined },
+        wrapped: { kind: 'opaque', schema: undefined },
+        cond: { kind: 'literal', schema: undefined },
       },
     );
   });
 
-  it('converter warns for wrapped and cond (unsupported inferred types)', () => {
+  it('no unsupported-type warnings for wrapped or cond (anonymous object and literal are resolved)', () => {
     const { warnings } = convert120();
     const unsupported = warnings.filter((w) => w.message.includes('inferred constant type'));
-    assert.deepEqual(
-      unsupported.map((w) => w.message.replace(/Constants '(\w+)'.+/, '$1')),
-      ['wrapped', 'cond'],
-    );
+    assert.deepEqual(unsupported, []);
   });
 
   it('Toast is not orphaned: schema Signal<Toast[]> credits it in the orphan walk', async () => {
@@ -215,13 +212,7 @@ describe('TM14 U5b: checker-read schema for call/new initializers with explicit 
     const longform = mind.emitLongform(tmdContent);
     assert.equal(longform.includes('schema: "Signal<Toast[]>"'), true, longform);
     const findings = mind.check(longform).diagnostics;
-    // Legacy is orphaned: its only reference is inside a type argument that
-    // produces an opaque anonymous object, filtered by the checker-read path.
-    // R4a body walk covers value-level references, not type arguments.
-    assert.deepEqual(
-      findings.map((f) => f.message),
-      ["Orphaned entity 'Legacy'"],
-    );
+    assert.deepEqual(findings, []);
     const backToShortform = mind.emitShortform(longform);
     assert.equal(constantsLine(backToShortform, 'toasts'), constantsLine(tmdContent, 'toasts'));
   });
