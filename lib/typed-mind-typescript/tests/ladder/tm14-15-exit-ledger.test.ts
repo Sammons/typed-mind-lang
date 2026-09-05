@@ -27,16 +27,16 @@ const analyzeAndCheck = async (projectDir: string, configPath: string, entrypoin
 };
 
 describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
-  it('self has 13 active diagnostics (down from 23 at Q2)', async () => {
+  it('self has 13 orphan diagnostics (down from 23 at Q2)', async () => {
     const result = await analyzeAndCheck(
       join(repoRoot, 'lib/typed-mind-typescript'),
       join(repoRoot, 'lib/typed-mind-typescript/tsconfig.json'),
       join(repoRoot, 'lib/typed-mind-typescript/src/cli.ts'),
     );
     assert.equal(
-      result.diagnostics.length,
+      result.orphans.length,
       13,
-      `expected 13 diagnostics, got ${result.diagnostics.length}: ${result.diagnostics.map((d) => d.message).join(', ')}`,
+      `expected 13 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
     );
   });
 
@@ -66,16 +66,16 @@ describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
 });
 
 describe('TM14/15 EXIT: core (typed-mind)', () => {
-  it('core has 7 active diagnostics (down from 19 at Q2)', async () => {
+  it('core has 7 orphan diagnostics (down from 19 at Q2)', async () => {
     const result = await analyzeAndCheck(
       join(repoRoot, 'lib/typed-mind'),
       join(repoRoot, 'lib/typed-mind/tsconfig.json'),
       join(repoRoot, 'lib/typed-mind/src/typed-mind.ts'),
     );
     assert.equal(
-      result.diagnostics.length,
+      result.orphans.length,
       7,
-      `expected 7 diagnostics, got ${result.diagnostics.length}: ${result.diagnostics.map((d) => d.message).join(', ')}`,
+      `expected 7 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
     );
   });
 
