@@ -19,8 +19,8 @@ describe('scenario-01-duplicate-export', () => {
     // Validate that the file is invalid due to errors
     assert.equal(result.valid, false);
 
-    // Should have exactly 5 errors
-    assert.equal(result.diagnostics.length, 5);
+    // G counts the BaseService heritage reference; four unrelated errors remain.
+    assert.equal(result.diagnostics.length, 4);
 
     // Check for the main duplicate export error
     const duplicateExportDiagnostic = result.diagnostics.find((diagnostic) =>
@@ -47,12 +47,9 @@ describe('scenario-01-duplicate-export', () => {
     assert.equal(orphanedUserServiceDiagnostic?.span.start.column, 1);
     assert.equal(orphanedUserServiceDiagnostic?.severity, 'error');
 
-    // Check for orphaned BaseService error
+    // G counts the declared base as used.
     const orphanedBaseServiceDiagnostic = result.diagnostics.find((diagnostic) => diagnostic.message === "Orphaned entity 'BaseService'");
-    assert.notEqual(orphanedBaseServiceDiagnostic, undefined);
-    assert.equal(orphanedBaseServiceDiagnostic?.span.start.line, 13);
-    assert.equal(orphanedBaseServiceDiagnostic?.span.start.column, 1);
-    assert.equal(orphanedBaseServiceDiagnostic?.severity, 'error');
+    assert.equal(orphanedBaseServiceDiagnostic, undefined);
 
     // Check for BaseService not exported error
     const baseServiceNotExportedDiagnostic = result.diagnostics.find(

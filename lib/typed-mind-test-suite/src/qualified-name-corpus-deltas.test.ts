@@ -58,9 +58,14 @@ for (const [scenario, owners] of cases) {
     const control = new CheckContext({ entities: withoutCalls, links: computeLinks(withoutCalls), parseDiagnostics: [] });
     checkOrphans(actual);
     checkOrphans(control);
+    // AIController remains consumed by EnemyAI/CompanionAI heritage after calls are removed.
+    // generic-heritage-corpus-deltas.test.ts independently removes those bases.
     assert.deepEqual(
       control.findings.map((finding) => finding.message).sort(),
-      [...actual.findings.map((finding) => finding.message), ...owners.map((owner) => `Orphaned entity '${owner}'`)].sort(),
+      [
+        ...actual.findings.map((finding) => finding.message),
+        ...owners.filter((owner) => owner !== 'AIController').map((owner) => `Orphaned entity '${owner}'`),
+      ].sort(),
     );
   });
 }

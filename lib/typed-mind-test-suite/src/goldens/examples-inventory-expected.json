@@ -539,24 +539,6 @@
         "message": "Unparsable text: `,` \u2014 check this line against the grammar and fix or remove it"
       },
       {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 154,
-        "column": 1,
-        "endLine": 154,
-        "endColumn": 36,
-        "message": "Orphaned entity 'BaseService'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 158,
-        "column": 1,
-        "endLine": 158,
-        "endColumn": 55,
-        "message": "Orphaned entity 'BaseProcessor'"
-      },
-      {
         "code": "checker/function-not-exported",
         "severity": "error",
         "line": 162,
@@ -1149,15 +1131,6 @@
       {
         "code": "checker/orphaned-entity",
         "severity": "error",
-        "line": 258,
-        "column": 1,
-        "endLine": 258,
-        "endColumn": 18,
-        "message": "Orphaned entity 'BaseAPIAdapter'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
         "line": 261,
         "column": 1,
         "endLine": 261,
@@ -1503,15 +1476,6 @@
         "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 65,
-        "column": 1,
-        "endLine": 65,
-        "endColumn": 44,
-        "message": "Orphaned entity 'BaseUserService'"
-      },
-      {
         "code": "semantics/illegal-continuation",
         "severity": "warning",
         "line": 66,
@@ -1519,15 +1483,6 @@
         "endLine": 66,
         "endColumn": 65,
         "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 69,
-        "column": 1,
-        "endLine": 69,
-        "endColumn": 36,
-        "message": "Orphaned entity '_BaseManager'"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1539,15 +1494,6 @@
         "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
       },
       {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 73,
-        "column": 1,
-        "endLine": 73,
-        "endColumn": 43,
-        "message": "Orphaned entity 'DatabaseConnection'"
-      },
-      {
         "code": "semantics/illegal-continuation",
         "severity": "warning",
         "line": 74,
@@ -1555,15 +1501,6 @@
         "endLine": 74,
         "endColumn": 35,
         "message": "This description line (`\"...\"`) cannot attach to a ClassFile entity \u2014 move it under an entity kind that accepts it, or remove it"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 77,
-        "column": 1,
-        "endLine": 77,
-        "endColumn": 33,
-        "message": "Orphaned entity 'BaseLogger'"
       },
       {
         "code": "semantics/illegal-continuation",
@@ -1899,15 +1836,6 @@
         "endLine": 40,
         "endColumn": 33,
         "message": "Orphaned entity 'UserController'"
-      },
-      {
-        "code": "checker/orphaned-entity",
-        "severity": "error",
-        "line": 43,
-        "column": 1,
-        "endLine": 43,
-        "endColumn": 18,
-        "message": "Orphaned entity 'BaseController'"
       },
       {
         "code": "checker/orphaned-entity",
