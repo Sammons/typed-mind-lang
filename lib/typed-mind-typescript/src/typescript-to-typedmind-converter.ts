@@ -1125,6 +1125,57 @@ export class TypeScriptToTypedMindConverter {
 
     // 2.3: Add dependencies to entities
     this.entities.push(...this.dependencies.values());
+    this.foldConstantInitializerCalls(modules);
+  }
+
+  private foldConstantInitializerCalls(modules: readonly ParsedModule[]): void {
+    const byName = new Map(this.entities.map((entity) => [entity.name, entity]));
+    const targets = new Map<string, string>();
+    const key = (identity: DeclarationIdentity): string => JSON.stringify([identity.filePath, identity.name, identity.start, identity.end]);
+    const entityCounts = new Map<string, number>();
+    for (const entity of this.entities) entityCounts.set(entity.name, (entityCounts.get(entity.name) ?? 0) + 1);
+    const isUnique = (name: string): boolean => entityCounts.get(name) === 1;
+    for (const module of modules) {
+      for (const fn of module.functions) {
+        const name = fn.declaration === undefined ? undefined : this.getAssignedDeclarationName(fn.declaration);
+        if (fn.declaration !== undefined && name !== undefined && isUnique(name) && byName.get(name) instanceof FunctionNode) {
+          targets.set(key(fn.declaration), name);
+        }
+      }
+      for (const cls of module.classes) {
+        const name = cls.declaration === undefined ? undefined : this.getAssignedDeclarationName(cls.declaration);
+        if (
+          cls.declaration !== undefined &&
+          name !== undefined &&
+          isUnique(name) &&
+          module.exports.some((exp) => exp.name === cls.name) &&
+          byName.get(name) instanceof ClassNode
+        ) {
+          targets.set(key(cls.declaration), name);
+        }
+      }
+    }
+    for (const module of modules) {
+      for (const constant of module.constants) {
+        const name = constant.declaration === undefined ? undefined : this.getAssignedDeclarationName(constant.declaration);
+        if (name === undefined) continue;
+        const entity = byName.get(name);
+        if (!(entity instanceof ConstantsNode) || !isUnique(name)) continue;
+        const calls = new Set(entity.calls);
+        for (const reference of constant.callReferences ?? []) {
+          if (reference.origin.kind !== 'project') continue;
+          // Full declaration identity prevents a parameter/local binding from
+          // borrowing the name of an exported function in the same file.
+          const target = targets.get(key(reference.origin.declaration));
+          if (target !== undefined) calls.add(target);
+        }
+        if (calls.size === entity.calls.length) continue;
+        const replacement = new ConstantsNode({ ...entity, calls: [...calls].sort() });
+        const index = this.entities.indexOf(entity);
+        this.entities[index] = replacement;
+        byName.set(name, replacement);
+      }
+    }
   }
 
   private extractDependencies(module: ParsedModule): void {

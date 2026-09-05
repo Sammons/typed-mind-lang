@@ -8,7 +8,17 @@ import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ClassFileNode, DependencyNode, type Diagnostic, FileNode, FunctionNode, type ParseOutput, ProgramNode } from '@sammons/typed-mind';
+import {
+  ClassFileNode,
+  ConstantsNode,
+  DependencyNode,
+  type Diagnostic,
+  FileNode,
+  FunctionNode,
+  type ParseOutput,
+  ProgramNode,
+  QualifiedNameResolver,
+} from '@sammons/typed-mind';
 
 export interface InteractiveRendererOptions {
   port?: number;
@@ -237,6 +247,7 @@ ${classMethods}
 
     const entities = this.graph.entities;
     const byName = new Map(entities.map((entity) => [entity.name, entity]));
+    const names = new QualifiedNameResolver(byName);
     const links: Array<{ source: string; target: string; type: 'import' | 'export' | 'call' | 'entry' }> = [];
 
     // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — class dispatch over EntityNode
@@ -265,10 +276,11 @@ ${classMethods}
         }
       }
 
-      if (entity instanceof FunctionNode) {
+      if (entity instanceof FunctionNode || entity instanceof ConstantsNode) {
         for (const call of entity.calls) {
-          if (byName.has(call)) {
-            links.push({ source: entity.name, target: call, type: 'call' });
+          const target = entity instanceof ConstantsNode ? names.target(call)?.name : byName.get(call)?.name;
+          if (target !== undefined) {
+            links.push({ source: entity.name, target, type: 'call' });
           }
         }
       }

@@ -6,6 +6,7 @@ import type {
   AnalyzerDiagnostic,
   DeclarationIdentity,
   ModuleGraphEdge,
+  ParsedCallReference,
   ParsedClass,
   ParsedConstant,
   ParsedEnum,
@@ -1659,10 +1660,32 @@ export class TypeScriptAnalyzer {
         declaration: this.getRetainedDeclarationIdentity(declaration),
         value: value || undefined,
         isConst,
+        callReferences: this.collectInitializerCallReferences(initializer),
       } as const);
     }
 
     return { functions, constants };
+  }
+
+  private collectInitializerCallReferences(initializer: ts.Expression | undefined): readonly ParsedCallReference[] {
+    if (initializer === undefined) return [];
+    const references: ParsedCallReference[] = [];
+    const visit = (node: ts.Node): void => {
+      // Named declarations have their own bodies. Function expressions,
+      // including named callbacks, remain part of the initializer.
+      if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isClassExpression(node)) return;
+      if ((ts.isCallExpression(node) || ts.isNewExpression(node)) && ts.isIdentifier(node.expression)) {
+        references.push({
+          kind: ts.isNewExpression(node) ? 'construct' : 'call',
+          writtenName: node.expression.text,
+          source: { filePath: path.resolve(node.getSourceFile().fileName), start: node.getStart(), end: node.getEnd() },
+          origin: this.resolveReferenceOriginAtLocation(node.expression),
+        });
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(initializer);
+    return references;
   }
 
   private inferTypeFromInitializer(initializer?: ts.Expression): string {

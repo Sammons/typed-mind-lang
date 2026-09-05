@@ -234,6 +234,9 @@ const constantsToShortform = (entity: ConstantsNode): string[] => {
     line += ` : ${entity.schema}`;
   }
   const lines = [line];
+  if (entity.calls.length > 0) {
+    lines.push(`  ~> [${entity.calls.join(', ')}]`);
+  }
   if (entity.purpose !== undefined) {
     lines.push(`  ${quoteStringLiteral(entity.purpose)}`);
   }

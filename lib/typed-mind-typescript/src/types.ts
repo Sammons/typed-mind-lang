@@ -211,6 +211,14 @@ export interface ParsedConstant {
   readonly type: string;
   readonly value: string | undefined;
   readonly isConst?: boolean;
+  readonly callReferences?: readonly ParsedCallReference[];
+}
+
+export interface ParsedCallReference {
+  readonly kind: 'call' | 'construct';
+  readonly writtenName: string;
+  readonly source: SourceRange;
+  readonly origin: ReferenceOrigin;
 }
 
 // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-AN-7) — a real TS `enum` declaration

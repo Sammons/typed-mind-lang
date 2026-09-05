@@ -334,6 +334,7 @@ export class AssertionEngine {
     }
 
     this.compareStringProperty(actual.name, 'schema', actual.schema, expected.schema, deviations);
+    this.compareArrayProperty(actual.name, 'calls', actual.calls, expected.calls, deviations);
   }
 
   private compareStringProperty(

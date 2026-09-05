@@ -134,6 +134,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'Constants',
+            calls: [],
             sourceForm: 'shortform',
             name: 'AppConfig',
             comment: undefined,

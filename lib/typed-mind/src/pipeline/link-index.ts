@@ -200,6 +200,7 @@ const collectEntityLinks = (collector: LinkCollector, entity: EntityNode): void 
       collector.addReference(entity.containsProgram, entity);
     }
   } else if (entity instanceof ConstantsNode) {
+    collector.addAll(entity.calls, entity);
     if (entity.schema !== undefined) {
       collector.addReference(entity.schema, entity);
     }

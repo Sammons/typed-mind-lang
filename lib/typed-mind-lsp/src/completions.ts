@@ -27,7 +27,7 @@ const OPERATOR_ITEMS: readonly CompletionItem[] = [
   { label: '<-', detail: 'Import operator' },
   { label: '@', detail: 'Location operator' },
   { label: '::', detail: 'Function signature operator' },
-  { label: '~>', detail: 'Function calls operator' },
+  { label: '~>', detail: 'Function or Constants calls operator' },
   { label: '<:', detail: 'Extends operator' },
   { label: '!', detail: 'Constants operator' },
   { label: '=>', detail: 'Methods operator' },
