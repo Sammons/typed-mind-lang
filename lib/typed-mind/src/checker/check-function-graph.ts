@@ -14,6 +14,8 @@
 //     consumes existence/kind, verbatim. (The reverse consumedBy arm lives in
 //     check-run-parameters.ts.)
 
+import { ClassFileNode } from '../ast/class-file-node.ts';
+import { ClassNode } from '../ast/class-node.ts';
 import { DependencyNode } from '../ast/dependency-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import { resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
@@ -102,9 +104,15 @@ export const checkFunctionDependencies = (context: CheckContext): void => {
 
 const VALID_CONSUME_KINDS = ['RunParameter', 'Asset', 'Dependency', 'Constants'];
 
+// RFC-TM-14 §S3 (rfc-tm-14-diamond.md): the two consumes arms extend to Class
+// and ClassFile consumers; `${entity.kind}` parameterizes both the message and
+// the suggestion (U-4, U2-8). Function wording is unchanged ("Functions can
+// only consume"); the plural of the three consumer kinds is spelled here.
+const CONSUMER_KIND_PLURALS = { Function: 'Functions', Class: 'Classes', ClassFile: 'ClassFiles' } as const;
+
 export const checkFunctionConsumption = (context: CheckContext): void => {
   for (const entity of context.byName.values()) {
-    if (!(entity instanceof FunctionNode)) {
+    if (!(entity instanceof FunctionNode || entity instanceof ClassNode || entity instanceof ClassFileNode)) {
       continue;
     }
     for (const consumeName of entity.consumes ?? []) {
@@ -114,7 +122,7 @@ export const checkFunctionConsumption = (context: CheckContext): void => {
           code: 'checker/consumes-unknown',
           severity: 'error',
           span: entity.span,
-          message: `Function '${entity.name}' consumes unknown entity '${consumeName}'`,
+          message: `${entity.kind} '${entity.name}' consumes unknown entity '${consumeName}'`,
           suggestion: `Define '${consumeName}' as one of: ${VALID_CONSUME_KINDS.join(', ')}`,
         });
       } else if (!VALID_CONSUME_KINDS.includes(target.kind)) {
@@ -122,8 +130,8 @@ export const checkFunctionConsumption = (context: CheckContext): void => {
           code: 'checker/consumes-invalid-kind',
           severity: 'error',
           span: entity.span,
-          message: `Function '${entity.name}' cannot consume '${consumeName}' (it's a ${target.kind})`,
-          suggestion: `Functions can only consume: ${VALID_CONSUME_KINDS.join(', ')}`,
+          message: `${entity.kind} '${entity.name}' cannot consume '${consumeName}' (it's a ${target.kind})`,
+          suggestion: `${CONSUMER_KIND_PLURALS[entity.kind]} can only consume: ${VALID_CONSUME_KINDS.join(', ')}`,
         });
       }
     }

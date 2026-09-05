@@ -13,6 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import {
   ClassFileNode,
+  ClassNode,
   ConstantsNode,
   DependencyNode,
   type Diagnostic,
@@ -1313,6 +1314,18 @@ ${this.generateRendererJS()}
           // entity the resolver rejects (a non-File owner, `invalid-owner`);
           // the checker reports that document, the graph still draws it.
           const target = names.target(call)?.name ?? byName.get(call)?.name;
+          if (target !== undefined) {
+            links.push({ source: entity.name, target, type: 'call' });
+          }
+        }
+      }
+
+      // RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class/ClassFile member-body
+      // call edges draw as 'call' links; resolved through the qualified-name
+      // resolver so a `Owner.member` target lands on its owner (S2 shape).
+      if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
+        for (const call of entity.calls) {
+          const target = names.target(call)?.name;
           if (target !== undefined) {
             links.push({ source: entity.name, target, type: 'call' });
           }

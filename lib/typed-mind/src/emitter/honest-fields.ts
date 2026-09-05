@@ -51,6 +51,8 @@ export const honestTypeExprOf = (typeExpr: TypeExprNode): unknown => {
 
 // Honest-field projection: every own enumerable field except span/raw, which
 // are expected to move across a round-trip (new source text, new positions).
+// Class/ClassFile `calls`/`consumes` (RFC-TM-14 §S3) are plain string lists
+// and project through the spread like FunctionNode's.
 // DtoNode's fields carry their own per-field span (DtoFieldNode) and typeExpr
 // span tree, stripped the same way one level down. TypeDefNode's aliasType
 // carries the identical span tree one level down (X-TYPE-7's alias variant).

@@ -122,18 +122,24 @@ const isLegacyClass = (entity: EntityNode): boolean => {
   return entity instanceof ClassNode || (entity instanceof ClassFileNode && !entity.raw.includes('#:'));
 };
 
-const checkFunctionReferences = (context: CheckContext, fn: FunctionNode): void => {
-  for (const call of fn.calls) {
-    checkSingleReference(context, fn, 'calls', call);
+// RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class and ClassFile share the
+// Function calls/consumes walk.
+const checkCallsAndConsumes = (context: CheckContext, from: FunctionNode | ClassNode | ClassFileNode): void => {
+  for (const call of from.calls) {
+    checkSingleReference(context, from, 'calls', call);
   }
+  for (const consumed of from.consumes ?? []) {
+    checkSingleReference(context, from, 'consumes', consumed);
+  }
+};
+
+const checkFunctionReferences = (context: CheckContext, fn: FunctionNode): void => {
+  checkCallsAndConsumes(context, fn);
   if (fn.input !== undefined) {
     checkSingleReference(context, fn, 'input', fn.input);
   }
   if (fn.output !== undefined) {
     checkSingleReference(context, fn, 'output', fn.output);
-  }
-  for (const consumed of fn.consumes ?? []) {
-    checkSingleReference(context, fn, 'consumes', consumed);
   }
   for (const affected of fn.affects ?? []) {
     checkSingleReference(context, fn, 'affects', affected);
@@ -159,6 +165,7 @@ const checkEntityReferences = (context: CheckContext, entity: EntityNode): void 
         checkSingleReference(context, entity, 'implements', implemented);
       }
     }
+    checkCallsAndConsumes(context, entity);
   } else if (entity instanceof ClassNode) {
     if (entity.extends !== undefined) {
       checkSingleReference(context, entity, 'extends', entity.extends);
@@ -166,6 +173,7 @@ const checkEntityReferences = (context: CheckContext, entity: EntityNode): void 
     for (const implemented of entity.implements) {
       checkSingleReference(context, entity, 'implements', implemented);
     }
+    checkCallsAndConsumes(context, entity);
   } else if (entity instanceof ProgramNode) {
     checkSingleReference(context, entity, 'entry', entity.entry);
     for (const exported of entity.exports ?? []) {

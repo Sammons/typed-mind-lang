@@ -40,7 +40,8 @@ export const VALID_REFERENCES: Record<ReferenceKind, ReferenceLegality> = {
     to: ['Function', 'Class', 'ClassFile', 'Constants', 'DTO', 'Asset', 'UIComponent', 'File'],
   },
   calls: {
-    from: ['Function', 'Constants'],
+    // RFC-TM-14 §S3: Class and ClassFile callers (member-body edges).
+    from: ['Function', 'Constants', 'Class', 'ClassFile'],
     to: ['Function', 'Class'], // Class is allowed because of method calls
   },
   // Gap 67 (ladder rung sammons/slat-harness, fixture
@@ -107,7 +108,8 @@ export const VALID_REFERENCES: Record<ReferenceKind, ReferenceLegality> = {
     to: ['Function'],
   },
   consumes: {
-    from: ['Function'],
+    // RFC-TM-14 §S3: Class and ClassFile consumers (member-body value reads).
+    from: ['Function', 'Class', 'ClassFile'],
     to: ['RunParameter', 'Asset', 'Dependency', 'Constants'],
   },
   consumedBy: {

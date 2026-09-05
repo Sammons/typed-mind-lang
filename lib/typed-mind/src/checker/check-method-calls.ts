@@ -1,6 +1,9 @@
 // Existing method diagnostics retain their wording. Qualified calls now use
 // checked ownership and the longest declared entity prefix, including an
 // explicitly declared File.handler identity before method-member fallback.
+// RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class and ClassFile callers are
+// checked with Function parity — a bare unknown target is inert (the
+// Constants-only `unknown-call-target` arm is unchanged, U2-12).
 
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
@@ -10,7 +13,14 @@ import type { CheckContext } from './check-context.ts';
 
 export const checkMethodCalls = (context: CheckContext): void => {
   for (const entity of context.byName.values()) {
-    if (!(entity instanceof FunctionNode || entity instanceof ConstantsNode)) {
+    if (
+      !(
+        entity instanceof FunctionNode ||
+        entity instanceof ConstantsNode ||
+        entity instanceof ClassNode ||
+        entity instanceof ClassFileNode
+      )
+    ) {
       continue;
     }
     for (const call of entity.calls) {

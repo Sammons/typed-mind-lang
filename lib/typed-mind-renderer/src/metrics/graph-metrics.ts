@@ -502,6 +502,13 @@ export class GraphMetricsAnalyzer {
     } else if (entity instanceof UiComponentNode) {
       entity.declaredContainedBy?.forEach(addDependency);
     }
+    // RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class and ClassFile member-body
+    // edges are dependencies like a Function's calls/consumes. Outside the
+    // chain above because ClassFile already took the File arm for imports.
+    if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
+      entity.calls.forEach(addDependency);
+      entity.consumes?.forEach(addDependency);
+    }
   }
 
   private getEntityTypeDistribution(): Record<EntityKind, number> {

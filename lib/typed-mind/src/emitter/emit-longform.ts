@@ -192,7 +192,22 @@ const classToLongform = (entity: ClassNode): string[] => {
   }
   for (const constructorMember of entity.members?.constructors ?? [])
     body.push(`constructor: ${quoteStringLiteral(printSignature(constructorMember.signature))}`);
+  body.push(...classEdgeLines(entity));
   return [`class ${entity.name} {`, ...indent(body), '}'];
+};
+
+// RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class and ClassFile carry the
+// Function-shaped `calls:` / `consumes:` keys after the member lines. Same
+// guards as functionToLongform (empty lists are not emitted).
+const classEdgeLines = (entity: ClassNode | ClassFileNode): string[] => {
+  const lines: string[] = [];
+  if (entity.calls.length > 0) {
+    lines.push(`calls: [${entity.calls.join(', ')}]`);
+  }
+  if (entity.consumes !== undefined && entity.consumes.length > 0) {
+    lines.push(`consumes: [${entity.consumes.join(', ')}]`);
+  }
+  return lines;
 };
 
 const classFileToLongform = (entity: ClassFileNode): string[] => {
@@ -210,6 +225,7 @@ const classFileToLongform = (entity: ClassFileNode): string[] => {
   }
   for (const constructorMember of entity.members?.constructors ?? [])
     body.push(`constructor: ${quoteStringLiteral(printSignature(constructorMember.signature))}`);
+  body.push(...classEdgeLines(entity));
   // The auto-self-export (ClassFileNode constructor) reconstructs itself on
   // re-parse even if omitted; emit the full declared list including it (the
   // constructor's `.includes` guard makes this idempotent, never a duplicate).

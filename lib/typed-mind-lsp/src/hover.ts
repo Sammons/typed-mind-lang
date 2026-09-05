@@ -124,6 +124,9 @@ const renderClass = (entity: ClassNode): string[] => {
       'Constructors',
       entity.members?.constructors.map((member) => printSignature(member.signature)),
     ),
+    // RFC-TM-14 §S3: member-body edges, same sections as renderFunction.
+    listSection('Calls', entity.calls),
+    listSection('Consumes', entity.consumes),
   ].filter((line): line is string => line !== undefined);
 };
 
@@ -146,6 +149,9 @@ const renderClassFile = (entity: ClassFileNode): string[] => {
       'Constructors',
       entity.members?.constructors.map((member) => printSignature(member.signature)),
     ),
+    // RFC-TM-14 §S3: member-body edges, same sections as renderFunction.
+    listSection('Calls', entity.calls),
+    listSection('Consumes', entity.consumes),
     listSection('Imports', entity.imports),
     listSection('Exports', entity.exports),
   ].filter((line): line is string => line !== undefined);
