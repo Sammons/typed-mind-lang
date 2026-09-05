@@ -203,3 +203,26 @@ it('TM13 A2: alias rewriting preserves literal bytes unchanged sibling slots and
   assert.equal(use.signature, 'use(\n  value: Model | "two  spaces",\n  sibling: "keep  spaces"\n) => Model');
   assert.equal(supplied.modules.flatMap((module) => module.functions).find((func) => func.name === 'use')?.signature, signature);
 });
+
+it('TM13 A2: a shadowed generic Array base follows its local and imported declaration origins', (context) => {
+  // G owns parameter declaration emission; this control isolates the exact base rewrite.
+  const analysis = project(context, {
+    'a.ts': 'export interface Array<T> { first: T }',
+    'z.ts': 'export interface Array<T> { second: T } export interface Uses { local: Array<string> }',
+    'index.ts':
+      'import { Array as FirstArray } from "./a.js"; import { Array as OtherArray, Uses } from "./z.js"; export interface Input { first: FirstArray<string>; second: OtherArray<string>; uses: Uses }',
+  });
+  const converted = new TypeScriptToTypedMindConverter().convert(analysis);
+  const uses = converted.entities.find((entity) => entity.name === 'Uses');
+  const input = converted.entities.find((entity) => entity.name === 'Input');
+  assert.ok(uses instanceof DtoNode);
+  assert.ok(input instanceof DtoNode);
+  assert.equal(uses.fields.find((field) => field.name === 'local')?.type, 'ZFile.Array<string>');
+  assert.equal(input.fields.find((field) => field.name === 'second')?.type, 'ZFile.Array<string>');
+  const original = analysis.modules.flatMap((module) => module.interfaces).find((iface) => iface.name === 'Uses');
+  assert.equal(
+    original?.properties[0]?.typeInfo?.references.find((reference) => reference.writtenName === 'Array')?.origin.kind,
+    'project',
+  );
+  assert.equal(original?.properties[0]?.type, 'Array<string>');
+});
