@@ -3,6 +3,7 @@
 // exports. Language-optional: extends, purpose. Auto-self-export replicated
 // from parser.ts:287: construction always includes `name` in `exports`.
 
+import type { ClassMemberArgs, ClassMembers } from './class-members.ts';
 import { EntityNode, type EntityNodeArgs } from './entity-node.ts';
 import { type ClassHeritage, type ClassHeritageArgs, classHeritageFromArgs } from './heritage-reference.ts';
 import type { TypeParameterNode } from './type-parameter-node.ts';
@@ -12,6 +13,7 @@ export class ClassFileNode extends EntityNode {
   readonly path: string;
   readonly implements: readonly string[];
   readonly methods: readonly string[];
+  readonly members: ClassMembers | undefined;
   readonly imports: readonly string[];
   readonly exports: readonly string[];
   readonly extends: string | undefined;
@@ -21,9 +23,9 @@ export class ClassFileNode extends EntityNode {
 
   constructor(
     args: EntityNodeArgs &
-      ClassHeritageArgs & {
+      ClassHeritageArgs &
+      ClassMemberArgs & {
         path: string;
-        methods: readonly string[];
         imports: readonly string[];
         exports: readonly string[];
         purpose?: string;
@@ -34,7 +36,11 @@ export class ClassFileNode extends EntityNode {
     this.path = args.path;
     this.heritage = classHeritageFromArgs(args, args.span);
     this.implements = this.heritage.implements.flatMap((reference) => (reference.kind === 'named' ? [reference.base.name] : []));
-    this.methods = args.methods;
+    this.members = args.members;
+    this.methods =
+      args.members === undefined
+        ? args.methods
+        : args.members.methods.flatMap((method) => (method.name === undefined ? [] : [method.name]));
     this.imports = args.imports;
     // Fusion auto-self-export (parser.ts:287): the class name is always
     // exported by its own file. Pure expression, assign-only constructor.
