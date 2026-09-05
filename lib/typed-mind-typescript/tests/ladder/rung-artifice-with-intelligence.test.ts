@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { FunctionNode, TypedMind } from '@sammons/typed-mind';
+import { ConstantsNode, FunctionNode, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -39,12 +39,22 @@ const diagnose = async (tmdContent: string) => {
   return tm.check(tmdContent).diagnostics;
 };
 
-// Constants line for a given entity, e.g. `embedWhitelist ! src/index.ts : ReadonlySet`.
+// Constants line for a given entity, e.g. `embedWhitelist ! src/index.ts : ReadonlySet<string>`.
 const constantsLine = (tmdContent: string, name: string): string | undefined => {
   return tmdContent.split('\n').find((line) => line.startsWith(`${name} ! `));
 };
 
-describe('artifice rung, FIXTURE 94: a Constants generic type annotation must degrade to a grammatical entity_name', () => {
+// RFC-TM-14 U5a, leaf R6a (rfc-tm-14-diamond.md §S5, S-11): the Constants
+// schema slot is a `type_expr` (grammar/grammar.js constants_declaration, the
+// typedef_declaration twin), so fixture 94's four pinned REDUCTIONS —
+// `ReadonlySet<string>` -> `ReadonlySet`, `Record<string, string>` ->
+// `Record`, `Map<string, number>` -> `Map`, `string[]` -> `Array` — migrate
+// to the whole annotation. The fixture's original defect (an ungrammatical
+// `<string>` in the slot) stays pinned by the zero-diagnostics check: every
+// slot now parses because the grammar holds the full type expression. Cause:
+// `convertTypeToSchema` no longer degrades to a base name (fixture 119,
+// `constants-schema.test.ts`, is the R6a fixture).
+describe('artifice rung, FIXTURE 94: a Constants generic type annotation is emitted whole into the type_expr schema slot', () => {
   it('the emitted .tmd has zero diagnostics (was: syntax/error on `<string>`)', async () => {
     const result = convert('94-constants-generic-type-annotation');
     assert.equal(result.success, true);
@@ -52,26 +62,38 @@ describe('artifice rung, FIXTURE 94: a Constants generic type annotation must de
     assert.deepEqual(diagnostics, [], `must have zero diagnostics: ${JSON.stringify(diagnostics.map((d) => d.message))}`);
   });
 
-  it('ReadonlySet<string> reduces to its base name, matching how Record<K,V> already reduces', () => {
+  it('ReadonlySet<string> is emitted whole (R6a migration of the pinned base-name reduction)', () => {
     const result = convert('94-constants-generic-type-annotation');
-    assert.equal(constantsLine(result.tmdContent, 'embedWhitelist'), 'embedWhitelist ! src/index.ts : ReadonlySet');
+    assert.equal(constantsLine(result.tmdContent, 'embedWhitelist'), 'embedWhitelist ! src/index.ts : ReadonlySet<string>');
   });
 
-  it('CONTROLS: the pre-existing allowlist reductions are unchanged', () => {
+  it('CONTROLS: the former allowlist reductions now emit the annotation text (R6a migration)', () => {
     const result = convert('94-constants-generic-type-annotation');
-    assert.equal(constantsLine(result.tmdContent, 'headerDefaults'), 'headerDefaults ! src/index.ts : Record');
-    assert.equal(constantsLine(result.tmdContent, 'slotIndex'), 'slotIndex ! src/index.ts : Map');
-    assert.equal(constantsLine(result.tmdContent, 'knownRels'), 'knownRels ! src/index.ts : Array');
-    assert.equal(constantsLine(result.tmdContent, 'skillDoc'), 'skillDoc ! src/index.ts : string');
+    assert.deepEqual(
+      {
+        headerDefaults: constantsLine(result.tmdContent, 'headerDefaults'),
+        slotIndex: constantsLine(result.tmdContent, 'slotIndex'),
+        knownRels: constantsLine(result.tmdContent, 'knownRels'),
+        skillDoc: constantsLine(result.tmdContent, 'skillDoc'),
+      },
+      {
+        headerDefaults: 'headerDefaults ! src/index.ts : Record<string, string>',
+        slotIndex: 'slotIndex ! src/index.ts : Map<string, number>',
+        knownRels: 'knownRels ! src/index.ts : string[]',
+        skillDoc: 'skillDoc ! src/index.ts : string',
+      },
+    );
   });
 
-  it('every emitted Constants type slot is a bare entity_name (grammar/grammar.js:761)', () => {
+  it('every emitted Constants type slot parses as a type_expr (grammar.md "Constants" row)', async () => {
     const result = convert('94-constants-generic-type-annotation');
     const annotated = result.tmdContent.split('\n').filter((line) => / ! .* : /.test(line));
     assert.equal(annotated.length, 5, 'all five constants must keep their type slot');
+    const tm = await TypedMind.create();
     for (const line of annotated) {
-      const schema = line.split(' : ')[1] ?? '';
-      assert.match(schema, /^[A-Za-z_]\w*$/, `ungrammatical Constants type slot: ${line}`);
+      const outcome = tm.parse(`${line}\n`);
+      assert.deepEqual(outcome.diagnostics, [], `unparsable Constants type slot: ${line}`);
+      assert.equal(outcome.entities[0] instanceof ConstantsNode && outcome.entities[0].schemaType !== undefined, true, line);
     }
   });
 });
