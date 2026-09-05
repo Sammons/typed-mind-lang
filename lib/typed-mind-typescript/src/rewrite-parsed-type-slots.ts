@@ -11,7 +11,7 @@ const offsetAt = (text: string, position: Span['start']): number =>
   position.column -
   1;
 
-import type { DeclarationIdentity, ParsedModule, ParsedTypeParameter, ParsedTypeText } from './types.ts';
+import type { DeclarationIdentity, ParsedConstructor, ParsedModule, ParsedTypeParameter, ParsedTypeText } from './types.ts';
 
 type FunctionLike = ParsedModule['functions'][number] | ParsedModule['classes'][number]['methods'][number];
 export const rewriteParsedTypeSlots = (
@@ -27,13 +27,15 @@ export const rewriteParsedTypeSlots = (
     // G consumes rewriteTypeSlot on these original companions before parsing.
     return items;
   };
-  const functionLike = <T extends FunctionLike>(func: T): T => {
+  const functionLike = <T extends FunctionLike | ParsedConstructor>(func: T): T => {
     const args = func.parameters.map((parameter) => ({ ...parameter, type: rewrite(parameter.typeInfo, parameter.type) }));
-    const returnType = rewrite(func.returnTypeInfo, func.returnType);
-    const changed = args.some((parameter, index) => parameter.type !== func.parameters[index]?.type) || returnType !== func.returnType;
+    const returnType = 'returnType' in func ? rewrite(func.returnTypeInfo, func.returnType) : undefined;
+    const changed =
+      args.some((parameter, index) => parameter.type !== func.parameters[index]?.type) ||
+      ('returnType' in func && returnType !== func.returnType);
     // Parse only the existing signature's slot boundaries. Retain its header,
     // labels and separators rather than rebuilding from name conventions.
-    const parsed = parseSignatureText(func.signature);
+    const parsed = parseSignatureText(func.signature, { allowMissingReturnType: !('returnType' in func) });
     const edits: { start: number; end: number; text: string }[] = [];
     if (changed && parsed.kind === 'parsed' && parsed.signature.parameters.length === args.length) {
       for (const [index, parameter] of parsed.signature.parameters.entries()) {
@@ -44,7 +46,7 @@ export const rewriteParsedTypeSlots = (
             text: collapseTypeWhitespace(args[index].type),
           });
       }
-      if (parsed.signature.returnType !== undefined && returnType !== func.returnType)
+      if (parsed.signature.returnType !== undefined && returnType !== undefined && 'returnType' in func && returnType !== func.returnType)
         edits.push({
           start: offsetAt(func.signature, parsed.signature.returnType.span.start),
           end: offsetAt(func.signature, parsed.signature.returnType.span.end),
@@ -54,7 +56,9 @@ export const rewriteParsedTypeSlots = (
     const signature = edits
       .sort((left, right) => right.start - left.start)
       .reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), func.signature);
-    return { ...func, parameters: args, returnType, signature, typeParameters: parameters(func.typeParameters) };
+    return 'returnType' in func
+      ? { ...func, parameters: args, returnType, signature, typeParameters: parameters(func.typeParameters) }
+      : { ...func, parameters: args, signature };
   };
   for (const module of modules)
     for (const cls of module.classes) {
@@ -70,6 +74,7 @@ export const rewriteParsedTypeSlots = (
             ...cls,
             properties: cls.properties.map((property) => ({ ...property, type: rewrite(property.typeInfo, property.type) })),
             methods: cls.methods.map(functionLike),
+            ...(cls.constructors === undefined ? {} : { constructors: cls.constructors.map(functionLike) }),
             extends: cls.extends.map((type, index) => rewrite(cls.extendsTypeInfo?.[index], type)),
             implements: cls.implements.map((type, index) => rewrite(cls.implementsTypeInfo?.[index], type)),
             typeParameters: parameters(cls.typeParameters),

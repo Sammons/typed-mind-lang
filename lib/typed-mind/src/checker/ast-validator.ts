@@ -16,6 +16,7 @@
 import type { LinkIndex } from '../pipeline/link-index.ts';
 import type { ParseOutcome } from '../pipeline/parse-outcome.ts';
 import { checkAssetProgramRelationships } from './check-assets.ts';
+import { checkClassMembers } from './check-class-members.ts';
 import { CheckContext } from './check-context.ts';
 import { checkCircularDeps, checkCircularUiContainment, checkInheritanceChains } from './check-cycles.ts';
 import { checkDtoFieldTypes } from './check-dto-fields.ts';
@@ -80,6 +81,7 @@ export class AstValidator {
     checkFunctionDependencies(context);
     checkDtoFieldTypes(context);
     checkGenericDeclarations(context);
+    checkClassMembers(context);
     checkUiComponentRelationships(context);
     checkFunctionUiComponentAffects(context);
     checkAssetProgramRelationships(context);

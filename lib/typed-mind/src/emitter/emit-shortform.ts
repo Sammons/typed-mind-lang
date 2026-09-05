@@ -13,8 +13,8 @@
 // as `(optional)`, per field.
 //
 import type { AssetNode } from '../ast/asset-node.ts';
-import type { ClassFileNode } from '../ast/class-file-node.ts';
-import type { ClassNode } from '../ast/class-node.ts';
+import { ClassFileNode } from '../ast/class-file-node.ts';
+import { ClassNode } from '../ast/class-node.ts';
 import type { ConstantsNode } from '../ast/constants-node.ts';
 import type { DependencyNode } from '../ast/dependency-node.ts';
 import type { Diagnostic } from '../ast/diagnostic.ts';
@@ -360,6 +360,7 @@ const typeDefToShortform = (entity: TypeDefNode): string[] => {
 // just this one entity to longform when it carries the field.
 export const shortformCannotExpress = (entity: EntityNode): boolean => {
   if (genericNeedsLongform(entity)) return true;
+  if ((entity instanceof ClassNode || entity instanceof ClassFileNode) && entity.members !== undefined) return true;
   switch (entity.kind) {
     case 'Program': {
       const program = entity as ProgramNode;

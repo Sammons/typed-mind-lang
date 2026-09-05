@@ -28,6 +28,7 @@ export const getModuleTypeInfos = (module: ParsedModule): readonly ParsedTypeTex
   for (const cls of module.classes) {
     cls.implementsTypeInfo?.forEach(add);
     for (const selected of cls.mixinHeritage ?? []) add(selected.base);
+    for (const member of cls.constructors ?? []) for (const parameter of member.parameters) add(parameter.typeInfo);
   }
   for (const alias of module.types) {
     add(alias.typeInfo);

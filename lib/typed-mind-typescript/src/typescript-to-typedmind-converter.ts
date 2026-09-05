@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   ClassFileNode,
+  type ClassMemberArgs,
   ClassNode,
   ConstantsNode,
   canonicalizeTypeText,
@@ -13,6 +14,7 @@ import {
   FileNode,
   FunctionNode,
   ProgramNode,
+  parseSignatureText,
   parseTypeExprText,
   type Span,
   SuppressionNode,
@@ -33,11 +35,14 @@ import type {
   ConversionWarning,
   DeclarationIdentity,
   ParsedClass,
+  ParsedConstructor,
   ParsedExport,
   ParsedFunction,
   ParsedImport,
   ParsedInterface,
+  ParsedMethod,
   ParsedModule,
+  ParsedParameter,
   ParsedTypeParameter,
   ParsedTypeText,
   SstHandlerReference,
@@ -2035,7 +2040,7 @@ export class TypeScriptToTypedMindConverter {
       path: this.getRelativePath(module.filePath),
       heritage: this.convertClassHeritage(primaryClass, module.filePath),
       typeParameters: convertSourceTypeParameters(primaryClass.typeParameters, this.genericMetadataContext(module.filePath)),
-      methods: this.convertMethods(primaryClass),
+      ...this.convertMembers(primaryClass, module.filePath),
       imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
       exports: [...this.convertExports(module, entityName).exportNames, ...this.claimStubExportNames(stubNames)],
       purpose: primaryClass.description ? collapseDescription(primaryClass.description) : undefined,
@@ -2284,7 +2289,7 @@ export class TypeScriptToTypedMindConverter {
       sourceForm: 'shortform',
       heritage: this.convertClassHeritage(cls, module?.filePath),
       typeParameters: convertSourceTypeParameters(cls.typeParameters, this.genericMetadataContext(module?.filePath)),
-      methods: this.convertMethods(cls),
+      ...this.convertMembers(cls, module?.filePath),
       purpose: cls.description ? collapseDescription(cls.description) : undefined,
     });
 
@@ -2945,7 +2950,7 @@ export class TypeScriptToTypedMindConverter {
       // construction. This is why the method list is taken directly rather
       // than through `convertMethods` (which filters `isPrivate` on a
       // ParsedClass).
-      methods: iface.methods.map((method) => method.name),
+      ...this.convertMembers(iface, module?.filePath),
       purpose: iface.description ? collapseDescription(iface.description) : undefined,
     });
 
@@ -4111,15 +4116,52 @@ export class TypeScriptToTypedMindConverter {
     return claimed;
   }
 
-  private convertMethods(cls: ParsedClass): string[] {
-    const methods = cls.methods.filter((method) => {
-      if (!this.options.includePrivateMembers && method.isPrivate) {
-        return false;
-      }
-      return true;
-    });
-
-    return methods.map((method) => method.name);
+  private convertMembers(
+    owner: { methods: readonly ParsedMethod[]; constructors?: readonly ParsedConstructor[] },
+    filePath?: string,
+  ): ClassMemberArgs {
+    const typeText = (text: string): string => {
+      const canonical = canonicalizeTypeText(text);
+      if (typeof canonical !== 'string') return canonical.text;
+      this.addError(`Unsupported member type: ${canonical}; original type retained`, filePath);
+      return text;
+    };
+    const parametersText = (parameters: readonly ParsedParameter[]): string =>
+      parameters
+        .map(
+          (parameter) =>
+            `${parameter.isRest ? '...' : ''}${parameter.name}${parameter.isOptional || parameter.hasDefaultValue ? '?' : ''}: ${typeText(parameter.type)}`,
+        )
+        .join(', ');
+    const methods = owner.methods
+      .filter((method) => this.options.includePrivateMembers || !method.isPrivate)
+      .map((method) => {
+        const text = `${method.isAsync ? 'async ' : ''}${method.name}(${parametersText(method.parameters)}) => ${typeText(method.returnType)}`;
+        const parsed = parseSignatureText(text);
+        const typeParameters = convertSourceTypeParameters(method.typeParameters, {
+          rewrite: (info) => this.rewriteTypeSlot(info).text,
+          error: (message) => this.addError(message, filePath),
+        });
+        const signature =
+          parsed.kind !== 'parsed' || typeParameters === undefined
+            ? parsed
+            : {
+                kind: 'parsed' as const,
+                signature: { ...parsed.signature, typeParameters, typeParameterNames: typeParameters.map((parameter) => parameter.name) },
+              };
+        return {
+          name: signature.kind === 'parsed' && /^[A-Za-z_]\w*$/.test(method.name) ? method.name : undefined,
+          signature,
+          span: SYNTHETIC_SPAN,
+        };
+      });
+    const constructors = (owner.constructors ?? [])
+      .filter((member) => this.options.includePrivateMembers || !member.isPrivate)
+      .map((member) => ({
+        signature: parseSignatureText(`(${parametersText(member.parameters)})`, { allowMissingReturnType: true }),
+        span: SYNTHETIC_SPAN,
+      }));
+    return methods.length === 0 && constructors.length === 0 ? { methods: [] } : { members: { methods, constructors } };
   }
 
   // RC-A (issue #99) — `importerFilePath` is the ABSOLUTE path of the module

@@ -178,3 +178,7 @@ Emission-only diagnostic `emitter/unsupported-multiline-type-parameter` (generic
 | `checker/unsupported-generic-type` | check-generic-declarations.ts | Generic constraint is retained as opaque type text. | CheckerFinding | PASS | States the reference-checking limitation. |
 | `checker/unsupported-heritage` | check-generic-declarations.ts | Heritage is retained as opaque type text. | CheckerFinding | PASS | Requests a named base for reference checking. |
 | `checker/type-parameter-heritage-base` | check-generic-declarations.ts | Declaration cannot extend local type parameter T. | CheckerFinding | PASS | Requests a declared base with parameters as arguments. |
+
+| `checker/invalid-member-signature` | check-class-members.ts | `Member signature in 'MyEntity' has an invalid method name or constructor shape` | CheckerFinding | PASS | — |
+| `checker/unsupported-member-signature` | check-class-members.ts | `Member signature in 'MyEntity' is retained but its references cannot be checked` | CheckerFinding | PASS | — |
+| `semantics/invalid-member-property` | longform-builder.ts | `Invalid member property in 'MyEntity'; use a quoted method or constructor property on a Class or ClassFile.` | Diagnostic | PASS | — |

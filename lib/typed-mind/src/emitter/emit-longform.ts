@@ -1,3 +1,5 @@
+import { legacyMethodNames } from '../ast/class-members.ts';
+import { printSignature } from './print-signature.ts';
 // RFC-TM-4 §2 (rfc-tm-4-diamond.md) — longform emission, ported from the
 // legacy per-kind longform converters (syntax-generator.ts:733-1011) with the
 // ClassFile keyword-header form as the canonical longform (the RFC: "the
@@ -161,9 +163,13 @@ const classToLongform = (entity: ClassNode): string[] => {
   body.push(...parameterLines(entity));
   body.push(...heritageLines(entity));
   body.push(...descriptionAndPurposeLines(entity.comment, entity.purpose));
-  if (entity.methods.length > 0) {
-    body.push(`methods: [${entity.methods.join(', ')}]`);
+  const legacy = legacyMethodNames(entity);
+  if (legacy.length > 0) body.push(`methods: [${legacy.join(', ')}]`);
+  for (const method of entity.members?.methods ?? []) {
+    if (method.signature !== undefined) body.push(`method: ${quoteStringLiteral(printSignature(method.signature))}`);
   }
+  for (const constructorMember of entity.members?.constructors ?? [])
+    body.push(`constructor: ${quoteStringLiteral(printSignature(constructorMember.signature))}`);
   return [`class ${entity.name} {`, ...indent(body), '}'];
 };
 
@@ -175,9 +181,13 @@ const classFileToLongform = (entity: ClassFileNode): string[] => {
   if (entity.imports.length > 0) {
     body.push(`imports: [${entity.imports.join(', ')}]`);
   }
-  if (entity.methods.length > 0) {
-    body.push(`methods: [${entity.methods.join(', ')}]`);
+  const legacy = legacyMethodNames(entity);
+  if (legacy.length > 0) body.push(`methods: [${legacy.join(', ')}]`);
+  for (const method of entity.members?.methods ?? []) {
+    if (method.signature !== undefined) body.push(`method: ${quoteStringLiteral(printSignature(method.signature))}`);
   }
+  for (const constructorMember of entity.members?.constructors ?? [])
+    body.push(`constructor: ${quoteStringLiteral(printSignature(constructorMember.signature))}`);
   // The auto-self-export (ClassFileNode constructor) reconstructs itself on
   // re-parse even if omitted; emit the full declared list including it (the
   // constructor's `.includes` guard makes this idempotent, never a duplicate).

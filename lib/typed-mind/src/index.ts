@@ -13,7 +13,13 @@
 // tested by RFC-TM-3/4.
 export { AssetNode } from './ast/asset-node.ts';
 export { ClassFileNode } from './ast/class-file-node.ts';
-export { type ClassMembers, type ConstructorDeclarationNode, legacyMethodNames, type MethodDeclarationNode } from './ast/class-members.ts';
+export {
+  type ClassMemberArgs,
+  type ClassMembers,
+  type ConstructorDeclarationNode,
+  legacyMethodNames,
+  type MethodDeclarationNode,
+} from './ast/class-members.ts';
 export { ClassNode } from './ast/class-node.ts';
 export { ConstantsNode } from './ast/constants-node.ts';
 export { DependencyNode } from './ast/dependency-node.ts';
