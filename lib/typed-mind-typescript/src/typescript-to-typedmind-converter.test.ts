@@ -1,9 +1,31 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { ClassFileNode, DtoNode } from '@sammons/typed-mind';
-import type { ParsedClass, ParsedModule, TypeScriptProjectAnalysis } from './types.ts';
+import { ClassFileNode, DtoNode, type EntityNode } from '@sammons/typed-mind';
+import type { ParsedModule, TypeScriptProjectAnalysis } from './types.ts';
 import { createFilePath } from './types.ts';
 import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
+
+// Deep-mutable view of a fixture type: readonly arrays become mutable arrays
+// and readonly properties become writable, recursively.
+type Mutable<T> = T extends string | number | boolean | undefined | null
+  ? T
+  : T extends readonly (infer Item)[]
+    ? Mutable<Item>[]
+    : { -readonly [Key in keyof T]: Mutable<T[Key]> };
+
+// Tests that build on the shared mock by pushing into its arrays get their own
+// deep copy typed without `readonly`, so the mutation is neither a cast nor a
+// leak into sibling tests.
+const mutableFixture = <T>(fixture: T): Mutable<T> =>
+  // Mutable<T> only removes readonly modifiers, which have no runtime shape, so the clone already has the right value.
+  structuredClone(fixture) as Mutable<T>;
+
+const isDtoNode = (entity: EntityNode | undefined): entity is DtoNode => entity instanceof DtoNode;
+
+// Reaches the converter's private matchesPattern (typescript-to-typedmind-converter.ts:1228) without widening to `any`.
+const privateMatchesPattern = (converter: TypeScriptToTypedMindConverter) =>
+  // Reflect.get returns unknown; the cast restates the private method's declared signature.
+  (Reflect.get(converter, 'matchesPattern') as (filePath: string, pattern: string) => boolean).bind(converter);
 
 const createMockAnalysis = (): TypeScriptProjectAnalysis => ({
   modules: [
@@ -286,9 +308,9 @@ describe('TypeScriptToTypedMindConverter', () => {
 
   it('retains the complete structured qualified property type (TM13 Q)', () => {
     const converter = new TypeScriptToTypedMindConverter();
-    const analysis = createMockAnalysis();
-    // biome-ignore lint/suspicious/noExplicitAny: matches this file's existing convention for mutating a readonly test fixture (see "should skip private members by default")
-    const userInterface = (analysis.modules as any[]).flatMap((module) => module.interfaces).find((iface: any) => iface.name === 'UserDTO');
+    const analysis = mutableFixture(createMockAnalysis());
+    const userInterface = analysis.modules.flatMap((module) => module.interfaces).find((iface) => iface.name === 'UserDTO');
+    assert.ok(userInterface);
     userInterface.properties.push({
       name: 'projectConfig',
       type: 'ts.CompilerOptions',
@@ -301,16 +323,14 @@ describe('TypeScriptToTypedMindConverter', () => {
 
     const result = converter.convert(analysis);
     const userDTO = result.entities.find((e) => e.name === 'UserDTO');
-    // biome-ignore lint/suspicious/noExplicitAny: DtoNode's fields are not part of the narrow EntityNode result type this test suite already casts through elsewhere
-    const dto = userDTO as any;
-    // biome-ignore lint/suspicious/noExplicitAny: matches the file's existing find-callback typing convention
-    const projectConfigField = dto.fields.find((field: any) => field.name === 'projectConfig');
-    assert.notEqual(projectConfigField, undefined);
+    assert.ok(isDtoNode(userDTO));
+    const projectConfigField = userDTO.fields.find((field) => field.name === 'projectConfig');
+    assert.ok(projectConfigField);
     // The raw `type` string is preserved verbatim regardless of structure.
     assert.equal(projectConfigField.type, 'ts.CompilerOptions');
     // The qualified name is structured and remains complete; checking its
     // declared namespace owner is a separate validation step.
-    assert.equal(projectConfigField.typeExpr.kind, 'named');
+    assert.ok(projectConfigField.typeExpr.kind === 'named');
     assert.equal(projectConfigField.typeExpr.name, 'ts.CompilerOptions');
   });
 
@@ -326,12 +346,11 @@ describe('TypeScriptToTypedMindConverter', () => {
   });
 
   it('should skip private members by default', () => {
-    const analysis = createMockAnalysis();
+    const analysis = mutableFixture(createMockAnalysis());
 
-    // Add a private method to the class. The mock fixture types its arrays
-    // `readonly`, but this test intentionally mutates them in place, so
-    // `methods` is cast through a mutable-array shape rather than `any`.
-    const userServiceClass = analysis.modules[1].classes[0] as ParsedClass & { methods: ParsedClass['methods'][number][] };
+    // Add a private method to the class.
+    const userServiceClass = analysis.modules[1]?.classes[0];
+    assert.ok(userServiceClass);
     userServiceClass.methods.push({
       name: 'privateHelper',
       signature: 'privateHelper() => void',
@@ -353,12 +372,11 @@ describe('TypeScriptToTypedMindConverter', () => {
   });
 
   it('should include private members when requested', () => {
-    const analysis = createMockAnalysis();
+    const analysis = mutableFixture(createMockAnalysis());
 
-    // Add a private method to the class. The mock fixture types its arrays
-    // `readonly`, but this test intentionally mutates them in place, so
-    // `methods` is cast through a mutable-array shape rather than `any`.
-    const userServiceClass = analysis.modules[1].classes[0] as ParsedClass & { methods: ParsedClass['methods'][number][] };
+    // Add a private method to the class.
+    const userServiceClass = analysis.modules[1]?.classes[0];
+    assert.ok(userServiceClass);
     userServiceClass.methods.push({
       name: 'privateHelper',
       signature: 'privateHelper() => void',
@@ -672,8 +690,7 @@ describe('TypeScriptToTypedMindConverter', () => {
     for (const { label, pattern, filePath, expected } of cases) {
       it(label, () => {
         const converter = new TypeScriptToTypedMindConverter();
-        // biome-ignore lint/suspicious/noExplicitAny: matches this file's existing convention for reaching a private method under test
-        const matches = (converter as any).matchesPattern(filePath, pattern);
+        const matches = privateMatchesPattern(converter)(filePath, pattern);
         assert.equal(matches, expected);
       });
     }
