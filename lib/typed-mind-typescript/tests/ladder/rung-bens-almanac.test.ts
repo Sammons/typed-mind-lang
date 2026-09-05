@@ -19,8 +19,10 @@
 //   packages/almanac-ctl/src/index.ts       1
 //
 // Fixtures 87 and 89 are fix-bound: each fails on main and passes here.
-// Fixture 86 is fix-bound on its PIPELINE half and pins a grammar knownGap.
-// Fixture 88 is a documented knownGap. See each fixture's README.md.
+// Fixture 86 is FIXED on both halves — pipeline (parseTypeExprText) and
+// grammar (86-grammar, unit C, see the 'TM13 C' test below). Fixture 88 is
+// FIXED (default-export identity, unit D/F). See each fixture's README.md
+// and https://git.tail4ea214.ts.net/sammons/typed-mind-lang/pulls/181.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

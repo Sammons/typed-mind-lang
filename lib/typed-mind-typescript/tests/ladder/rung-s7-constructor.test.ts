@@ -14,10 +14,10 @@
 //   lib/policy            src/evaluate.ts   6 entities   0 (clean control)
 //   tools/worktree-mediator src/server.ts  11 entities   2 diagnostics
 //
-// Four fixtures (82-85). Fixture 82 is HALF fix-bound: its analyzer-side half
-// is fixed here and asserted green; its grammar-side half is pinned as a
-// knownGap in the same describe block. RFC-TM-13 closes fixtures 83 and 84.
-// Fixture 85 remains pinned until typed methods and constructors land.
+// Four fixtures (82-85). Fixture 82's analyzer-side half (parseTypeExprText)
+// and grammar-side half (82b, unit C) are both FIXED — see the '82' describe
+// block below. RFC-TM-13 also closes fixtures 83 (unit B2), 84 (unit B1), and
+// 85 (unit B3). See https://git.tail4ea214.ts.net/sammons/typed-mind-lang/pulls/181.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -60,8 +60,9 @@ describe('82 — a function type returning a generic whose argument is a union',
   //   (a) `parseTypeExprText`'s `scanOpaqueRun` (the TS-side text parser).
   //       FIXED here — see the first two tests.
   //   (b) the tree-sitter grammar's `_opaque_piece` token, whose regex
-  //       `[^ \t\n"(){}\[\]]+` splits on whitespace, so ` | ` ends the run
-  //       inside the grammar too. NOT fixed here — see the knownGap test.
+  //       `[^ \t\n"(){}\[\]]+` split on whitespace, so ` | ` ended the run
+  //       inside the grammar too. FIXED (gap 82b, unit C) — see the
+  //       'TM13 C' test below, which asserts the grammar now accepts it.
 
   it('parses `(a: X) => Promise<Y | Z>` as one complete opaque leaf, with no stranded remainder', () => {
     const result = parseTypeExprText('(a: X) => Promise<Y | Z>');

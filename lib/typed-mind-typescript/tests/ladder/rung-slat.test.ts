@@ -21,13 +21,18 @@
 // backup's 0 -> 9 is an UNMASKING, not a regression — the same pattern PRs
 // #152 and #154 documented. Its `RestoreFailure %` previously emitted as an
 // empty DTO, silently discarding all 7 variants the source declares, so the
-// target reported a FALSE clean. The 9 findings are issue #130's known
-// alias-quoting limit, now reached because the structure is finally present.
+// target reported a FALSE clean. At the time this baseline was measured, the
+// 9 findings were issue #130's alias-quoting limit, reached because the
+// structure was finally present.
 //
-// The residual on every target is dominated by two tracked, out-of-scope
-// gaps: issue #130 (inner quotes in a shortform `type:` value) and the
-// fixture-84/85 family (the checker does not descend into generic arguments
-// or method signatures, so a type reachable only there reads as an orphan).
+// At the time this baseline was measured, the residual on every target was
+// dominated by two tracked gaps, both since FIXED by RFC-TM-13: issue #130
+// (inner quotes in a shortform `type:` value, unit CP,
+// https://git.tail4ea214.ts.net/sammons/typed-mind-lang/pulls/181) and the
+// fixture-84/85 family (the checker did not descend into generic arguments
+// or method signatures, so a type reachable only there read as an orphan;
+// units B1 and B3). This baseline is historical measurement, not a live
+// re-check against the current checker.
 //
 // Fixtures 98/99/100/101 are all fix-bound: each fails before its fix and
 // passes here. See each fixture's README.md for the root cause.
