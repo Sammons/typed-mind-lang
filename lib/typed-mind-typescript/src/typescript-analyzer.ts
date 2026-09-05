@@ -1924,6 +1924,18 @@ export class TypeScriptAnalyzer {
         }
       }
 
+      // RFC-TM-14 §S6 — a const whose call/new initializer produces a callable type
+      // is a Function, not data.
+      if (initializer !== undefined && (ts.isCallExpression(initializer) || ts.isNewExpression(initializer))) {
+        const resolvedType = this.checker.getTypeAtLocation(declaration.name);
+        const callSignatures = resolvedType.getCallSignatures();
+        // A union is callable only when every constituent is callable
+        if (callSignatures.length > 0 && !this.isPartiallyCallableUnion(resolvedType)) {
+          functions.push(this.parseCallableInitializer(name, declaration, initializer, callSignatures[0]!));
+          continue;
+        }
+      }
+
       constants.push({
         name,
         type,
@@ -1939,6 +1951,74 @@ export class TypeScriptAnalyzer {
     }
 
     return { functions, constants };
+  }
+
+  // RFC-TM-14 §S6 — a union type is callable only when every constituent
+  // has a call signature; a partially-callable union (e.g. `(() => void) |
+  // number`) stays a Constants entity because it isn't unconditionally
+  // invocable.
+  private isPartiallyCallableUnion(type: ts.Type): boolean {
+    if (!type.isUnion()) return false;
+    return type.types.some((constituent) => constituent.getCallSignatures().length === 0);
+  }
+
+  // RFC-TM-14 §S6 (Quantum U6, R5) — build a ParsedFunction from a const's
+  // call/new initializer whose resolved type has call signatures, reading
+  // parameters and return type from the checker rather than the syntax.
+  private parseCallableInitializer(
+    name: string,
+    declaration: ts.VariableDeclaration,
+    initializer: ts.CallExpression | ts.NewExpression,
+    signature: ts.Signature,
+  ): ParsedFunction {
+    const params = signature.getParameters();
+    const parameters: ParsedParameter[] = params.map((param) => {
+      const paramType = this.checker.getTypeOfSymbolAtLocation(param, declaration);
+      const typeText = this.printCheckerType(paramType, declaration.name);
+      const paramDecl = param.getDeclarations()?.[0];
+      const isOptional = paramDecl !== undefined && ts.isParameter(paramDecl) && paramDecl.questionToken !== undefined;
+      const hasDefault = paramDecl !== undefined && ts.isParameter(paramDecl) && paramDecl.initializer !== undefined;
+      return {
+        name: param.name,
+        type: typeText?.text ?? this.checker.typeToString(paramType, undefined, ts.TypeFormatFlags.NoTruncation),
+        typeInfo: typeText,
+        isOptional: isOptional || hasDefault,
+        hasDefaultValue: hasDefault,
+      };
+    });
+
+    const returnType = signature.getReturnType();
+    const returnTypeText = this.printCheckerType(returnType, declaration.name);
+    const returnTypeStr = returnTypeText?.text ?? this.checker.typeToString(returnType, undefined, ts.TypeFormatFlags.NoTruncation);
+
+    const isAsync = returnTypeStr.startsWith('Promise<') || returnTypeStr === 'Promise<void>';
+    // keep the Promise<> wrapper — buildFunctionSignature adds the `async` prefix
+    // but does not itself wrap the return type.
+    const effectiveReturnType = returnTypeStr;
+
+    const fnSignature = this.buildFunctionSignature(name, parameters, effectiveReturnType, isAsync);
+    const description = this.extractJSDocDescription(declaration.name);
+
+    return {
+      name,
+      declaration: this.getRetainedDeclarationIdentity(declaration),
+      typeParameters: [], // checker-read callable consts expand type params
+      signature: fnSignature,
+      parameters,
+      returnType: effectiveReturnType,
+      returnTypeInfo: returnTypeText ?? undefined,
+      isAsync,
+      description: description || undefined,
+      decorators: [],
+      // Walk the call/new expression's arguments, not the initializer node
+      // itself — the initializer's own callee (the factory, e.g.
+      // `createMiddleware`) is not a call this const's body makes; the
+      // const IS the factory's return value, so only what the argument
+      // callbacks reference is this function's body (fixture 121:
+      // `both ~> [auth, audit]`, no `createMiddleware`).
+      bodyReferences: (initializer.arguments ?? []).flatMap((argument) => this.collectBodyReferences(argument)),
+      origin: 'callable-initializer',
+    } as const;
   }
 
   private inferTypeFromInitializer(initializer?: ts.Expression): string {
