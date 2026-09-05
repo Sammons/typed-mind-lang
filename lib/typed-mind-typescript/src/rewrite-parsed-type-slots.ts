@@ -47,6 +47,10 @@ export const rewriteParsedTypeSlots = (
       .reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), func.signature);
     return { ...func, parameters: args, returnType, signature, typeParameters: parameters(func.typeParameters) };
   };
+  for (const module of modules)
+    for (const cls of module.classes) {
+      if (canRewriteOwner(cls.declaration)) for (const selected of cls.mixinHeritage ?? []) rewrite(selected.base, selected.base.text);
+    }
   return modules.map((module) => ({
     ...module,
     functions: module.functions.map((func) => (canRewriteOwner(func.declaration) ? functionLike(func) : func)),

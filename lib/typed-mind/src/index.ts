@@ -93,6 +93,7 @@ export {
 } from './pipeline/parse-signature-text.ts';
 export { parseTypeParameterListText, parseTypeParameterText } from './pipeline/parse-type-parameters.ts';
 export { type ParseTypeExprTextOptions, type ParseTypeExprTextResult, parseTypeExprText } from './pipeline/type-expr-from-text.ts';
+export { canonicalizeTypeText } from './pipeline/type-text-lexical.ts';
 // RFC-TM-4 §3 (rfc-tm-4-diamond.md) — the new primary surface (the flip's
 // original new export). This is the only checker/parser entry point left —
 // the legacy bridge and its DSLCheckerOptions (skipOrphanCheck/

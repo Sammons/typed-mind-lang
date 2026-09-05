@@ -86,7 +86,13 @@ export interface ParsedFactoryHeritage {
   readonly origin: ReferenceOrigin;
 }
 
+export interface ParsedMixinHeritage {
+  readonly index: number;
+  readonly base: ParsedTypeText;
+}
+
 export interface ParsedClass {
+  readonly mixinHeritage?: readonly ParsedMixinHeritage[];
   readonly factoryHeritage?: readonly ParsedFactoryHeritage[];
   readonly implementsTypeInfo?: readonly ParsedTypeText[];
   readonly extendsTypeInfo?: readonly ParsedTypeText[];

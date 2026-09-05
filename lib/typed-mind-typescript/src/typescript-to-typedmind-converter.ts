@@ -19,6 +19,7 @@ import {
   TypeDefNode,
   type TypeExprNode,
 } from '@sammons/typed-mind';
+import { convertSourceHeritage, convertSourceTypeParameters, type GenericMetadataContext } from './convert-generic-metadata.ts';
 import { EmittedNameAllocator } from './emitted-name-allocator.ts';
 import { rewriteParsedTypeSlots } from './rewrite-parsed-type-slots.ts';
 import { rewriteTypeReferences, type TypeReferenceRewriteResult } from './type-reference-rewrite.ts';
@@ -35,6 +36,7 @@ import type {
   ParsedImport,
   ParsedInterface,
   ParsedModule,
+  ParsedTypeParameter,
   ParsedTypeText,
   SstHandlerReference,
   SuppressionReason,
@@ -793,6 +795,34 @@ export class TypeScriptToTypedMindConverter {
 
   private rewriteTypeSlot(info: ParsedTypeText): TypeReferenceRewriteResult {
     return rewriteTypeReferences(info, (reference) => this.originContext?.replacementNames.get(reference));
+  }
+
+  private genericMetadataContext(filePath?: string): GenericMetadataContext {
+    return { rewrite: (info) => this.rewriteTypeSlot(info).text, error: (message) => this.addError(message, filePath) };
+  }
+
+  private convertClassHeritage(cls: ParsedClass, filePath?: string) {
+    const context = this.genericMetadataContext(filePath);
+    const extendsReferences = cls.extends.map((target, index) => {
+      const selected = cls.mixinHeritage?.find((entry) => entry.index === index)?.base;
+      const reference = convertSourceHeritage(target, selected ?? cls.extendsTypeInfo?.[index], context);
+      if (reference.kind !== 'named') return reference;
+      const stub = this.ensureBuiltinExtendsStub(reference.base.name);
+      return stub === undefined ? reference : { ...reference, base: { ...reference.base, name: stub } };
+    });
+    const implementsReferences = cls.implements.map((target, index) => {
+      const reference = convertSourceHeritage(target, cls.implementsTypeInfo?.[index], context);
+      if (reference.kind !== 'named' || !reference.base.name.includes('.') || this.originContext?.resolvedNames.has(reference.base.name))
+        return reference;
+      return { ...reference, base: { ...reference.base, name: this.ensureNamespaceImplementsStub(reference.base.name) } };
+    });
+    return { extends: extendsReferences[0], implements: [...extendsReferences.slice(1), ...implementsReferences] };
+  }
+
+  private sourceHeritageBase(target: string | undefined): string | undefined {
+    if (target === undefined) return undefined;
+    const reference = convertSourceHeritage(target, undefined, this.genericMetadataContext());
+    return reference.kind === 'named' ? reference.base.name : undefined;
   }
 
   private convertOnce(analysis: TypeScriptProjectAnalysis, originContext?: OriginConversionContext): ConversionResult {
@@ -1887,12 +1917,6 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
-  private convertImplementsList(secondaryExtends: readonly string[], implementsTargets: readonly string[]): string[] {
-    return [...secondaryExtends, ...implementsTargets].map((target) =>
-      target.includes('.') ? this.ensureNamespaceImplementsStub(target) : target,
-    );
-  }
-
   // Collects the namespace-implements stub names newly needed by a module's
   // own classes, so the caller (mirroring `collectBuiltinExtendsStubImports`)
   // can fold them into that module's File/ClassFile `imports` list — a stub
@@ -1903,8 +1927,9 @@ export class TypeScriptToTypedMindConverter {
     const stubNames: string[] = [];
     for (const cls of classes) {
       for (const target of cls.implements) {
-        if (target.includes('.') && !this.originContext?.resolvedNames.has(target)) {
-          stubNames.push(this.ensureNamespaceImplementsStub(target));
+        const base = this.sourceHeritageBase(target);
+        if (base?.includes('.') && !this.originContext?.resolvedNames.has(base)) {
+          stubNames.push(this.ensureNamespaceImplementsStub(base));
         }
       }
     }
@@ -1923,7 +1948,7 @@ export class TypeScriptToTypedMindConverter {
   private collectBuiltinExtendsStubImports(classes: readonly ParsedClass[]): string[] {
     const stubNames: string[] = [];
     for (const cls of classes) {
-      const stubName = this.ensureBuiltinExtendsStub(cls.extends[0]);
+      const stubName = this.ensureBuiltinExtendsStub(this.sourceHeritageBase(cls.extends[0]));
       if (stubName !== undefined) {
         stubNames.push(stubName);
       }
@@ -1967,7 +1992,7 @@ export class TypeScriptToTypedMindConverter {
     // reference edge (extends is never counted as one). This ClassFile is
     // the only entity in this module with an honest claim to the ambient
     // global its source references, so it both imports and exports it.
-    const primaryStubName = this.ensureBuiltinExtendsStub(primaryClass.extends[0]);
+    const primaryStubName = this.ensureBuiltinExtendsStub(this.sourceHeritageBase(primaryClass.extends[0]));
     const otherStubNames = this.collectBuiltinExtendsStubImports(module.classes.filter((cls) => cls !== primaryClass));
     // D-LEG-3 — namespace-qualified `implements` targets (`ts.Foo`) get the
     // same stub-import-folding treatment as builtin-extends targets: a stub
@@ -2006,8 +2031,8 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} #: ${this.getRelativePath(module.filePath)}`,
       sourceForm: 'shortform',
       path: this.getRelativePath(module.filePath),
-      extends: primaryStubName ?? (primaryClass.extends[0] || undefined), // TypedMind supports single inheritance
-      implements: this.convertImplementsList(primaryClass.extends.slice(1), primaryClass.implements),
+      heritage: this.convertClassHeritage(primaryClass, module.filePath),
+      typeParameters: convertSourceTypeParameters(primaryClass.typeParameters, this.genericMetadataContext(module.filePath)),
       methods: this.convertMethods(primaryClass),
       imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
       exports: [...this.convertExports(module, entityName).exportNames, ...this.claimStubExportNames(stubNames)],
@@ -2239,8 +2264,8 @@ export class TypeScriptToTypedMindConverter {
       span: SYNTHETIC_SPAN,
       raw: `${entityName} <: ${cls.extends.join(', ')}`,
       sourceForm: 'shortform',
-      extends: this.ensureBuiltinExtendsStub(cls.extends[0]) ?? (cls.extends[0] || undefined), // TypedMind supports single inheritance
-      implements: this.convertImplementsList(cls.extends.slice(1), cls.implements),
+      heritage: this.convertClassHeritage(cls, module?.filePath),
+      typeParameters: convertSourceTypeParameters(cls.typeParameters, this.genericMetadataContext(module?.filePath)),
       methods: this.convertMethods(cls),
       purpose: cls.description ? collapseDescription(cls.description) : undefined,
     });
@@ -2532,6 +2557,7 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} :: ${func.signature}`,
       sourceForm: 'shortform',
       signature: func.signature,
+      typeParameters: convertSourceTypeParameters(func.typeParameters, this.genericMetadataContext(module.filePath)),
       calls: this.resolveSameFileCallEdges(func, module),
       pendingDependencies: [],
       description: func.description ? collapseDescription(func.description) : undefined,
@@ -2853,8 +2879,18 @@ export class TypeScriptToTypedMindConverter {
       // TypedMind supports single inheritance in the `extends` slot; every
       // further parent lands in `implements`, the same split `convertClass`
       // performs on a class's own heritage.
-      extends: inheritList[0] || undefined,
-      implements: this.convertImplementsList(inheritList.slice(1), []),
+      heritage: {
+        extends:
+          inheritList[0] === undefined
+            ? undefined
+            : convertSourceHeritage(inheritList[0], iface.extendsTypeInfo?.[0], this.genericMetadataContext(module?.filePath)),
+        implements: inheritList
+          .slice(1)
+          .map((target, index) =>
+            convertSourceHeritage(target, iface.extendsTypeInfo?.[index + 1], this.genericMetadataContext(module?.filePath)),
+          ),
+      },
+      typeParameters: convertSourceTypeParameters(iface.typeParameters, this.genericMetadataContext(module?.filePath)),
       // Private/protected modifiers do not exist on a `MethodSignature`, so
       // there is no `includePrivateMembers` filter to apply here — every
       // method an interface declares is part of its public contract by
@@ -2964,6 +3000,13 @@ export class TypeScriptToTypedMindConverter {
       sourceForm: 'shortform',
       fields,
       purpose: iface.description ? collapseDescription(iface.description) : undefined,
+      typeParameters: convertSourceTypeParameters(iface.typeParameters, this.genericMetadataContext(module?.filePath)),
+      extendsReferences:
+        iface.extends.length === 0
+          ? undefined
+          : iface.extends.map((target, index) =>
+              convertSourceHeritage(target, iface.extendsTypeInfo?.[index], this.genericMetadataContext(module?.filePath)),
+            ),
     });
 
     this.entities.push(dtoEntity);
@@ -2971,7 +3014,13 @@ export class TypeScriptToTypedMindConverter {
 
   // decision-same-named-entities PR 1 — see `convertInterfaceToClass`.
   private convertTypeAliasToDTO(
-    typeAliasInput: { name: string; type: string; description?: string; typeInfo?: ParsedTypeText },
+    typeAliasInput: {
+      name: string;
+      type: string;
+      description?: string;
+      typeInfo?: ParsedTypeText;
+      typeParameters?: readonly ParsedTypeParameter[];
+    },
     module?: ParsedModule,
   ): void {
     const entityName = this.resolveTypeEntityName(module, typeAliasInput.name);
@@ -3033,6 +3082,7 @@ export class TypeScriptToTypedMindConverter {
         sourceForm: 'shortform',
         fields: this.parseInlineObjectLiteralToFields(typeAlias.type, entityName),
         purpose: typeAlias.description ? collapseDescription(typeAlias.description) : undefined,
+        typeParameters: convertSourceTypeParameters(typeAlias.typeParameters, this.genericMetadataContext(module?.filePath)),
       });
 
       this.entities.push(dtoEntity);
@@ -3076,6 +3126,7 @@ export class TypeScriptToTypedMindConverter {
       variant: 'alias',
       aliasType,
       purpose: typeAlias.description ? collapseDescription(typeAlias.description) : undefined,
+      typeParameters: convertSourceTypeParameters(typeAlias.typeParameters, this.genericMetadataContext(module?.filePath)),
     });
 
     this.entities.push(typeDefEntity);
@@ -3384,11 +3435,11 @@ export class TypeScriptToTypedMindConverter {
             comment: sourceEntity.comment,
             sourceForm: sourceEntity.sourceForm,
             path: sourceEntity.path,
-            implements: sourceEntity.implements,
+            heritage: sourceEntity.heritage,
+            typeParameters: sourceEntity.typeParameters,
             methods: sourceEntity.methods,
             imports: [...sourceEntity.imports, ...newNames],
             exports: sourceEntity.exports,
-            extends: sourceEntity.extends,
             purpose: sourceEntity.purpose,
           });
   }
@@ -3499,11 +3550,11 @@ export class TypeScriptToTypedMindConverter {
                 comment: sourceEntity.comment,
                 sourceForm: sourceEntity.sourceForm,
                 path: sourceEntity.path,
-                implements: sourceEntity.implements,
+                heritage: sourceEntity.heritage,
+                typeParameters: sourceEntity.typeParameters,
                 methods: sourceEntity.methods,
                 imports: [...sourceEntity.imports, ...newNames],
                 exports: sourceEntity.exports,
-                extends: sourceEntity.extends,
                 purpose: sourceEntity.purpose,
               });
       }
@@ -4273,6 +4324,7 @@ export class TypeScriptToTypedMindConverter {
     // Look for single parameter that looks like a DTO
     if (func.parameters.length === 1) {
       const param = func.parameters[0];
+      if (param !== undefined && func.typeParameters?.some((parameter) => parameter.name === param.type.trim())) return undefined;
       if (param && isInlineObjectLiteralType(param.type)) {
         // issue #72 — synthesize a named DTO instead of D-LEG-1's
         // `isDTOLikeType` `{`-prefix exclusion (checked BEFORE that
@@ -4321,6 +4373,7 @@ export class TypeScriptToTypedMindConverter {
     // one shape but leave the wrapper itself unstrippable whenever the
     // newline sits inside the `Promise<>` brackets.
     const returnType = collapseTypeWhitespace(collapseTypeWhitespace(func.returnType).replace(/^Promise<(.+)>$/, '$1'));
+    if (func.typeParameters?.some((parameter) => parameter.name === returnType)) return undefined;
     if (isInlineObjectLiteralType(returnType)) {
       // issue #72 — same synthesis path as `extractInputDTO`, applied to
       // the return-type position. `Output` is the codomain-disambiguation
