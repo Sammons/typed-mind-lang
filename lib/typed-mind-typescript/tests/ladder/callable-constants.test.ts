@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import { FunctionNode, ConstantsNode, TypedMind } from '@sammons/typed-mind';
+import { ConstantsNode, FunctionNode, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -43,11 +43,7 @@ describe('TM14 U6: callable constants are reclassified as Functions (R5)', () =>
     const { result } = convert();
     for (const entity of result.entities) {
       if (entity instanceof FunctionNode) {
-        assert.equal(
-          entity.signature.includes('import('),
-          false,
-          `${entity.name} signature contains import(): ${entity.signature}`,
-        );
+        assert.equal(entity.signature.includes('import('), false, `${entity.name} signature contains import(): ${entity.signature}`);
       }
     }
   });
