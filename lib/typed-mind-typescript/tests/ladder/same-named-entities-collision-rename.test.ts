@@ -225,7 +225,7 @@ describe('decision-same-named-entities PR 1: the rename is order-independent (re
   // keeps the bare name" rule makes the emitted names a function of import
   // line order and of which entrypoint was used. Two runs over byte-identical
   // source could then disagree on which declaration is `Shared` and which is
-  // `<Dir>__Shared`. The canonical rule — within a colliding group, the
+  // `<File>.Shared`. The canonical rule — within a colliding group, the
   // declaration whose project-relative path sorts first in byte order wins —
   // takes traversal order out of the answer entirely.
   //
@@ -242,7 +242,7 @@ describe('decision-same-named-entities PR 1: the rename is order-independent (re
 
     // `src/alpha.ts` sorts before `src/zulu.ts`, so alpha keeps the bare name
     // under BOTH traversal orders. Before the fix the reversed entrypoint
-    // produced `Alpha__Shared` instead — same source, different answer.
+    // produced `AlphaFile.Shared` instead — same source, different answer.
     assert.deepEqual(sharedNames(forward), ['Shared', 'ZuluFile.Shared'], 'alpha sorts first, so it keeps the bare name');
     assert.deepEqual(sharedNames(reversed), sharedNames(forward), 'reversing the import order must not change the assignment');
   });
@@ -253,7 +253,7 @@ describe('decision-same-named-entities PR 1: the rename is order-independent (re
 
     // Compare every collision-relevant name, not just the pair above. The two
     // entrypoints legitimately differ in their OWN entities — the File and
-    // Program (`MainFile`/`Main__App` vs `ReversedFile`/`Reversed__App`) and
+    // Program (`MainFile`/`MainApp` vs `ReversedFile`/`ReversedApp`) and
     // each one's own exported function (`runMain` vs `runReversed`) — so those
     // are excluded; everything reachable from BOTH must match exactly.
     const common = (result: { entities: readonly unknown[] }): string[] =>

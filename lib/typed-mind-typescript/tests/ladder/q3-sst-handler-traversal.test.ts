@@ -106,7 +106,7 @@ describe('RFC-TM-10 Q3 check — D-LEG-6: traversal-enqueue makes the handler mo
     //
     //   - `checker/orphaned-entity` on `handler` — RESOLVED (tm10-inc3a).
     //     The converter now folds `handler`'s final entity name into
-    //     `Api__App`'s own `exports` (X-AN-11's mechanism, extended
+    //     `ApiApp`'s own `exports` (X-AN-11's mechanism, extended
     //     cross-module: `resolveSstHandlerExportNames`), so the checker's
     //     orphan walk sees a real reference edge instead of a false
     //     "orphaned" finding on code that IS the deployed program's own
@@ -121,7 +121,7 @@ describe('RFC-TM-10 Q3 check — D-LEG-6: traversal-enqueue makes the handler mo
     //   - `checker/multi-exported` — did NOT fire before this amendment and
     //     was correctly absent from the prior pin, but WOULD have appeared
     //     as an unavoidable side effect of the exports-push above (`handler`
-    //     exported by both `Api__App` and `IndexFile`) without the paired
+    //     exported by both `ApiApp` and `IndexFile`) without the paired
     //     checker widening: `check-exports.ts`'s D-LEG-7 exclusion widened
     //     from a same-entity Program/entry comparison to a Program-scoped
     //     entry-reachability rule (`isProgramScopedExposure`,
@@ -247,7 +247,7 @@ describe('RFC-TM-10 Q3 check — lead-authorized amendment: Function-entity coll
     // traversed FIRST (api.ts is the entrypoint, its own handler string is
     // scanned before the import to auth.ts is followed), so it keeps the
     // bare name; auth.ts's handler target collides and is disambiguated.
-    assert.deepEqual(functionNames, ['ProvisionTenant__handler', 'handler']);
+    assert.deepEqual(functionNames, ['ProvisionTenantFile.handler', 'handler']);
 
     // The disambiguated name must be the one actually referenced by its
     // owning File's exports list — not the stale bare name, which would be
@@ -256,7 +256,7 @@ describe('RFC-TM-10 Q3 check — lead-authorized amendment: Function-entity coll
       (e) => e.kind === 'File' && 'path' in e && (e as { path: string }).path.includes('provision-tenant'),
     ) as { exports: readonly string[] } | undefined;
     assert.notEqual(provisionFile, undefined);
-    assert.ok(provisionFile?.exports.includes('ProvisionTenant__handler'));
+    assert.ok(provisionFile?.exports.includes('ProvisionTenantFile.handler'));
     assert.ok(!provisionFile?.exports.includes('handler'), 'the stale bare name must not appear in the export list');
 
     const { result: checkResult } = await checkViaLongform(result.entities);
