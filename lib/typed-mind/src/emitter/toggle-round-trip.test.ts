@@ -22,7 +22,6 @@ import { before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { TypedMindParser } from '../pipeline/typed-mind-parser.ts';
 import { detectFormat } from './detect-format.ts';
-import { UNREPRESENTABLE_ALIAS_CODE } from './emitter-diagnostics.ts';
 import { honestFieldsAcrossToggleOf, honestSuppressionOf } from './honest-fields.ts';
 import { SyntaxEmitter } from './syntax-emitter.ts';
 
@@ -284,40 +283,18 @@ const TYPE_EXPR_KIND_FIXTURES: readonly ToggleFixture[] = [
   // chunk is a bare identifier, so P7 takes the whole line. Pins that only
   // the leading position is affected.
   { name: 'typedef alias: tuple nested in a union', source: 'TupUnion = Widget | [string, number]\n' },
-  // Both genuinely fixed by this PR: quoting these double-wrapped into an
-  // unparsable value, and unquoted is safe because the first chunk is a bare
-  // identifier.
+  // Escaped outer quoting preserves literals in every type position.
   { name: 'typedef alias: generic with a string-literal argument', source: 'PickSend = Pick<S3Client, "send">\n' },
   { name: 'typedef alias: union mixing named and string literal', source: 'Mixed = Widget | "active" | Gadget\n' },
   {
-    // Issue #130 — one of the two classes longform cannot spell at all. The
-    // printed type OPENS with a string literal, so BOTH representations are
-    // wrong: quoted double-wraps (`type: ""active" | "inactive""`) into an
-    // unparsable value, and unquoted is claimed by P1 `property_string`,
-    // whose `unquote` silently degrades the literal members. P7
-    // `freetext_value` deliberately requires a leading non-string chunk so P1
-    // keeps sole ownership of a bare-quoted value — without that,
-    // `description: "text"` is a genuine LR conflict (grammar.js
-    // `freetext_value`). `aliasTypeValue` picks the QUOTED route so the
-    // failure is loud, and `emitter/unrepresentable-alias` reports it at emit
-    // time too. A fix belongs in the grammar.
+    // RFC-TM-13 C-prime closes the former unrepresentable-alias case.
     name: 'typedef alias: union of string literals',
     source: 'Status = "active" | "inactive"\n',
-    knownGap:
-      'issue #130: an alias type whose printed text OPENS with a string literal has no correct longform spelling — quoted double-wraps (loud), unquoted degrades the literal to a named leaf (silent). The emitter picks loud, and also reports emitter/unrepresentable-alias.',
   },
   {
-    // Issue #130's narrower sibling, and this PR's second regression guard. A
-    // LONE string literal. Unquoted, P1 claims it and `unquote` strips the
-    // quotes, reparsing `literal`/literalKind:'string' to `named 'active'`
-    // with zero diagnostics — a semantic change, because the checker
-    // distinguishes those kinds (`check-dto-fields.ts:181` gates
-    // `checker/enum-literal-outside-members` on `literalKind === 'string'`).
-    // Quoted keeps it loud, which is the lesser evil.
+    // A quoted wrapper must preserve literal kind, not reinterpret a name.
     name: 'typedef alias: single string literal',
     source: 'Only = "active"\n',
-    knownGap:
-      'issue #130 (narrower sibling): a lone string-literal alias has no correct longform spelling — quoted double-wraps (loud), unquoted silently degrades literal -> named. The emitter picks loud, and also reports emitter/unrepresentable-alias.',
   },
 ];
 
@@ -555,9 +532,9 @@ const ALIAS_SHAPE_CLASSES: readonly AliasShapeClass[] = [
   { name: 'tuple nested in a union', source: 'TupUnion = Widget | [string, number]\n', expectation: 'round-trips' },
   { name: 'generic with a string-literal argument', source: 'PickSend = Pick<S3Client, "send">\n', expectation: 'round-trips' },
   { name: 'union mixing named and string literal', source: 'Mixed = Widget | "active" | Gadget\n', expectation: 'round-trips' },
-  // The only two classes where no representation is correct (issue #130).
-  { name: 'union of string literals', source: 'Status = "active" | "inactive"\n', expectation: 'loud-failure' },
-  { name: 'single string literal', source: 'Only = "active"\n', expectation: 'loud-failure' },
+  // RFC-TM-13 C-prime: the escaped outer wrapper preserves literal types.
+  { name: 'union of string literals', source: 'Status = "active" | "inactive"\n', expectation: 'round-trips' },
+  { name: 'single string literal', source: 'Only = "active"\n', expectation: 'round-trips' },
 ];
 
 // Spans move when a shape is re-emitted into a different form, so identity is
@@ -604,24 +581,6 @@ describe('TypeDef alias shape classes: a longform toggle round-trips exactly or 
       const longform = emitter.toggleFormat(outcome, 'shortform');
       const reparsed = parser.parse(longform);
       const syntaxDiagnostics = reparsed.diagnostics.filter((diagnostic) => diagnostic.code.startsWith('syntax/'));
-
-      if (shapeClass.expectation === 'loud-failure') {
-        assert.equal(
-          syntaxDiagnostics.length > 0,
-          true,
-          `"${shapeClass.name}" must fail LOUDLY when longform cannot represent it — a silent reparse would hide an AST change. Emitted:\n${longform}`,
-        );
-        // Loud at parse time is necessary but not sufficient: a caller
-        // holding the emitted text should not have to reparse to learn the
-        // emission is lossy. The emitter must say so itself.
-        const emitDiagnostics = emitter.emitLongformWithDiagnostics(outcome).diagnostics;
-        assert.equal(
-          emitDiagnostics.some((diagnostic) => diagnostic.code === UNREPRESENTABLE_ALIAS_CODE),
-          true,
-          `"${shapeClass.name}" must also warn at EMIT time via ${UNREPRESENTABLE_ALIAS_CODE}, got: ${JSON.stringify(emitDiagnostics.map((diagnostic) => diagnostic.code))}`,
-        );
-        return;
-      }
 
       assert.deepEqual(
         syntaxDiagnostics,

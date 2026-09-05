@@ -56,6 +56,7 @@ import {
   CstReexportsList,
 } from '../ast/gen/cst-nodes.ts';
 import type { Span } from '../ast/span.ts';
+import { decodeQuotedString } from '../quoted-string.ts';
 import type { EntityAccumulator } from './entity-accumulator.ts';
 import { typeExprFromCst } from './type-expr-from-cst.ts';
 
@@ -72,10 +73,6 @@ const namesOf = (wrapped: { nameListChildren(): { listEntryChildren(): { text: s
     return [];
   }
   return nameList.listEntryChildren().map((entry) => entry.text);
-};
-
-const unquote = (text: string): string => {
-  return text.replace(/^"/, '').replace(/"$/, '');
 };
 
 // §1: the `?` optionality sigil is a bare anonymous token, invisible to the
@@ -117,7 +114,7 @@ export const dtoFieldFromCst = (wrapped: CstDtoField, span: Span): DtoFieldNode 
     type: (wrapped.fieldTypeChildren().at(0)?.text ?? '').trim(),
     typeExpr: typeExprOf(wrapped, span),
     optionalityMarker,
-    ...(description !== undefined ? { description: unquote(description) } : {}),
+    ...(description !== undefined ? { description: decodeQuotedString(description) } : {}),
     span,
   });
 };
@@ -230,7 +227,7 @@ export const attachmentRules: Record<string, AttachmentRule> = {
     accepts: (target) => target.kind === 'RunParameter',
     apply: (target, syntaxNode) => {
       const value = new CstDefaultValue(syntaxNode).stringChildren().at(0)?.text;
-      target.slots.defaultValue = value === undefined ? '' : unquote(value);
+      target.slots.defaultValue = value === undefined ? '' : decodeQuotedString(value);
     },
   },
   consumes_list: {
@@ -258,7 +255,7 @@ export const attachmentRules: Record<string, AttachmentRule> = {
     },
     apply: (target, syntaxNode) => {
       const text = new CstDescriptionLine(syntaxNode).stringChildren().at(0)?.text;
-      const value = text === undefined ? '' : unquote(text);
+      const value = text === undefined ? '' : decodeQuotedString(text);
       if (target.kind === 'Function') {
         target.slots.description = value;
         return;

@@ -20,6 +20,7 @@ consumed by another entity to avoid dead code. The TypedMind checker will valida
 5. [Suppression](#suppression)
 6. [Quick Reference Example](#quick-reference-example)
 7. [Longform Example](#longform-example)
+8. [Quoted Strings](#quoted-strings)
 
 ## Shortform Declarations
 
@@ -241,4 +242,10 @@ dto UserDTO {
   }
 }
 ```
+
+## Quoted Strings
+
+Quoted values escape a double quote as `\"` and a backslash as `\\`. Other escape pairs, including `\n` and `\q`, retain their literal backslash. Physical newlines are not allowed inside quoted tokens. The same rule covers descriptions, reasons, literal types, import paths, and quoted dependency names.
+
+Longform type values use an escaped outer string; parsing that wrapper restores the original type expression before its literal values are decoded. Older documents treated backslashes as ordinary characters. Existing doubled backslashes now decode to one backslash; an odd trailing run escapes the closing quote. Use an even trailing run to represent a value ending in a backslash.
 

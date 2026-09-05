@@ -26,7 +26,6 @@ import type { ProgramNode } from '../ast/program-node.ts';
 import type { RunParameterNode } from '../ast/run-parameter-node.ts';
 import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
-import { quoteSwapDiagnosticsFor } from './emitter-diagnostics.ts';
 import { printTypeExpr } from './print-type-expr.ts';
 import { quoteStringLiteral } from './quote-string-literal.ts';
 
@@ -362,6 +361,9 @@ export const shortformCannotExpress = (entity: EntityNode): boolean => {
     }
     case 'ClassFile':
       return (entity as ClassFileNode).purpose !== undefined;
+    case 'Dependency':
+      // A quoted longform name can contain text outside dependency_name.
+      return !/^[@\w\-/]+$/.test(entity.name);
     case 'UIComponent': {
       const uiComponent = entity as UiComponentNode;
       return uiComponent.declaredAffectedBy !== undefined && uiComponent.declaredAffectedBy.length > 0;
@@ -404,12 +406,7 @@ export const emitShortform = (entity: EntityNode): string[] => {
   return withInlineComment(body, commentToEmit);
 };
 
-// Issue #130, disposition (b) — sibling of `emitShortform` that additionally
-// reports every quote-swap `quoteStringLiteral` performed while producing
-// these lines, as structured `Diagnostic`s (emitter-diagnostics.ts). Added
-// rather than changing `emitShortform`'s own return shape so every existing
-// caller (emit-longform.ts's sibling functions do not call this one, but
-// syntax-emitter.ts and every downstream facade do) keeps working unchanged.
+// The diagnostic API remains available; escaped output requires no mutation warning.
 export const emitShortformWithDiagnostics = (entity: EntityNode): { lines: string[]; diagnostics: Diagnostic[] } => {
-  return { lines: emitShortform(entity), diagnostics: quoteSwapDiagnosticsFor(entity, 'shortform') };
+  return { lines: emitShortform(entity), diagnostics: [] };
 };
