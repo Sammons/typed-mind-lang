@@ -4002,7 +4002,12 @@ export class TypeScriptToTypedMindConverter {
       if (modules.length > 0) {
         const firstModule = modules[0];
         if (firstModule) {
-          this.createProgramEntity('DefaultApp', firstModule.filePath, this.emittedSelfInvokedFunctionNames(firstModule), sstHandlerReferences);
+          this.createProgramEntity(
+            'DefaultApp',
+            firstModule.filePath,
+            this.emittedSelfInvokedFunctionNames(firstModule),
+            sstHandlerReferences,
+          );
         }
       }
       return;
@@ -4032,8 +4037,11 @@ export class TypeScriptToTypedMindConverter {
   // ⊆ {entities this document contains}. Names are the raw source names;
   // `createProgramEntity` unions them with the already-remapped public
   // export list, which contains every exported function of the entrypoint.
+  // The `?? []` mirrors the previous call-site tolerance (and
+  // `hasTopLevelCallbackRegistration ?? false`): hand-built ParsedModule
+  // mocks and legacy analysis JSON omit the field.
   private emittedSelfInvokedFunctionNames(module: ParsedModule): string[] {
-    return module.selfInvokedFunctionNames.filter((name) =>
+    return (module.selfInvokedFunctionNames ?? []).filter((name) =>
       module.functions.some((func) => func.name === name && this.isFunctionExported(func, module)),
     );
   }
