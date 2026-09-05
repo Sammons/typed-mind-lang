@@ -73,4 +73,8 @@ it('TM13 B1: signature parser preserves parameter and return type structure', ()
   }
   // biome-ignore lint/suspicious/noTemplateCurlyInString: This is literal parser input.
   assert.equal(parseSignatureText('go(value = `a${nested}`) => Boxed').kind, 'opaque');
+  const genericCallDefault = 'go(value: Wrapped = factory<Boxed, Store>()) => Lease';
+  const unsupportedDefault = parseSignatureText(genericCallDefault);
+  assert.equal(unsupportedDefault.kind, 'opaque');
+  assert.equal(unsupportedDefault.kind === 'opaque' && unsupportedDefault.text, genericCallDefault);
 });
