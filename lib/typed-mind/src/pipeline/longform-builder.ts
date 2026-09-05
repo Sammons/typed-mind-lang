@@ -21,7 +21,6 @@
 import type { Diagnostic } from '../ast/diagnostic.ts';
 import { DtoFieldNode } from '../ast/dto-field-node.ts';
 import type { EntityKind } from '../ast/entity-kind.ts';
-import { CstHeaderQuotedName } from '../ast/gen/cst-nodes.ts';
 import type {
   CstBlockProperty,
   CstClassfileBlockSigil,
@@ -29,6 +28,7 @@ import type {
   CstDtoFieldsBlock,
   CstLongformBlock,
 } from '../ast/gen/cst-nodes.ts';
+import { CstHeaderQuotedName } from '../ast/gen/cst-nodes.ts';
 import type { Span } from '../ast/span.ts';
 import { decodeQuotedString } from '../quoted-string.ts';
 import { illegalContinuationDiagnostic } from './attachment-rules.ts';
@@ -514,8 +514,6 @@ export const buildFromLongformBlock = (block: CstLongformBlock): LongformBuildRe
 
 export const buildFromClassfileBlockSigil = (block: CstClassfileBlockSigil): LongformBuildResult => {
   const collected = collectProperties(block.blockPropertyChildren());
-  const nameField = header.nameField();
-  const name = nameField instanceof CstHeaderQuotedName ? decodeQuotedString(`"${nameField.text}`) : header.headerName();
   const accumulator = new EntityAccumulator({
     kind: 'ClassFile',
     name: block.entityNameChildren().at(0)?.text ?? '',
