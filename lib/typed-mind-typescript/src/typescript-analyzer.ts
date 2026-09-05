@@ -1921,7 +1921,16 @@ export class TypeScriptAnalyzer {
         if (statement.kind === declaration.kind && getDeclarationIdentity(statement)?.name === identity.name) candidates.push(statement);
       }
     }
-    return candidates.length === 1 ? candidates[0] : null;
+    if (candidates.length === 1) return candidates[0];
+    // Real overloads and merged declarations share a checker symbol. Equal
+    // spelling alone is insufficient to merge independently declared targets.
+    const symbols = candidates.map((candidate) => {
+      const name = ts.getNameOfDeclaration(candidate);
+      return name === undefined ? undefined : this.checker.getSymbolAtLocation(name);
+    });
+    if (symbols.length === 0 || symbols[0] === undefined || symbols.some((symbol) => symbol !== symbols[0])) return null;
+    candidates.sort((left, right) => left.getStart() - right.getStart());
+    return candidates[0] ?? null;
   }
 
   // The single mixin-heritage helper, reconciling PR #152 (slat-harness,

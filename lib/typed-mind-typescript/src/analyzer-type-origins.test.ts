@@ -109,6 +109,21 @@ it('TM13 A1: referenced package declarations map to real source positions', () =
     const cli = join(root, 'packages/cli');
     mkdirSync(join(cli, 'node_modules/@fixture'), { recursive: true });
     symlinkSync(join(root, 'packages/core'), join(cli, 'node_modules/@fixture/core'), 'dir');
+    const coreSourcePath = join(root, 'packages/core/src/index.ts');
+    const coreSource = `${readFileSync(coreSourcePath, 'utf8')}\nexport function lookup(value: string): string;
+export function lookup(value: number): number;
+export function lookup(value: string | number): string | number { return value; }\n`;
+    writeFileSync(coreSourcePath, coreSource);
+    const declarationPath = join(root, 'packages/core/dist/index.d.ts');
+    writeFileSync(
+      declarationPath,
+      `${readFileSync(declarationPath, 'utf8')}\nexport declare function lookup(value: string): string;\nexport declare function lookup(value: number): number;\n`,
+    );
+    const entryPath = join(cli, 'src/index.ts');
+    writeFileSync(
+      entryPath,
+      `${readFileSync(entryPath, 'utf8')}\nimport { lookup } from '@fixture/core';\nexport type LookupType = typeof lookup;\n`,
+    );
     const analysis = new TypeScriptAnalyzer(cli).analyzeFromEntrypoint(join(cli, 'src/index.ts'));
     const module = required(analysis.modules.find((candidate) => candidate.filePath === join(cli, 'src/index.ts')));
     const origin = module.interfaces.find((candidate) => candidate.name === 'CliOptions')?.properties[0]?.typeInfo?.references[0]?.origin;
@@ -119,6 +134,16 @@ it('TM13 A1: referenced package declarations map to real source positions', () =
       assert.equal(
         readFileSync(origin.declaration.filePath, 'utf8').slice(origin.declaration.start, origin.declaration.end),
         "export type OutputFormat = 'json' | 'yaml' | 'text';",
+      );
+    }
+    const overload = module.types.find((candidate) => candidate.name === 'LookupType')?.typeInfo?.references[0]?.origin;
+    assert.equal(overload?.kind, 'project', JSON.stringify(overload));
+    if (overload?.kind === 'project') {
+      assert.equal(overload.declaration.filePath, coreSourcePath);
+      assert.equal(overload.declaration.start, coreSource.indexOf('export function lookup'));
+      assert.equal(
+        coreSource.slice(overload.declaration.start, overload.declaration.end),
+        'export function lookup(value: string): string;',
       );
     }
   } finally {
