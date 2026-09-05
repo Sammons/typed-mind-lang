@@ -34,7 +34,7 @@ export const checkEntryPoint = (context: CheckContext): void => {
   }
 
   for (const program of programs) {
-    const entryFile = context.byName.get(program.entry);
+    const entryFile = context.names.target(program.entry);
     if (entryFile === undefined) {
       context.addFinding({
         code: 'checker/entry-not-found',

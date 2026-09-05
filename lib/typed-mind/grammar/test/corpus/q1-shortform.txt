@@ -1338,7 +1338,7 @@ UserDTO %
                   (entity_name))))))))))
 
 ============================================================
-X-TYPE-1: qualified/dotted type reference falls to opaque (regression fix — lib/typed-mind-typescript/architecture.tmd:107 `ts.CompilerOptions`)
+X-TYPE-1: qualified/dotted type reference is structured (RFC-TM-13 Q) (regression fix — lib/typed-mind-typescript/architecture.tmd:107 `ts.CompilerOptions`)
 ============================================================
 
 UserDTO %
@@ -1357,7 +1357,7 @@ UserDTO %
           (type_intersection
             (type_postfix
               (type_atom
-                (type_opaque)))))))))
+                (type_named)))))))))
 
 ============================================================
 X-TYPE-1: readonly array of an inline object literal (regression fix — lib/typed-mind-typescript/architecture.tmd:102)

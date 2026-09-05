@@ -16,6 +16,7 @@
 
 import { DependencyNode } from '../ast/dependency-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
+import { resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import type { CheckContext } from './check-context.ts';
 
 const isDtoExportedByDependency = (context: CheckContext, dtoName: string): boolean => {
@@ -28,7 +29,9 @@ const isDtoExportedByDependency = (context: CheckContext, dtoName: string): bool
 };
 
 const checkDtoSlot = (context: CheckContext, fn: FunctionNode, slot: 'input' | 'output', dtoName: string): void => {
-  const target = context.byName.get(dtoName);
+  const resolution = context.resolveName(dtoName, fn.span);
+  if (dtoName.includes('.') && (resolution.kind === 'unresolved' || resolution.kind === 'external')) return;
+  const target = resolvedNameTarget(resolution);
   if (target === undefined) {
     if (!isDtoExportedByDependency(context, dtoName)) {
       context.addFinding({
@@ -70,7 +73,9 @@ export const checkFunctionDependencies = (context: CheckContext): void => {
       continue;
     }
     for (const dependencyName of entity.pendingDependencies) {
-      const target = context.byName.get(dependencyName);
+      const resolution = context.resolveName(dependencyName, entity.span);
+      if (resolution.kind === 'external') continue;
+      const target = resolvedNameTarget(resolution);
       if (target === undefined) {
         context.addFinding({
           code: 'checker/dependency-not-found',
@@ -103,7 +108,7 @@ export const checkFunctionConsumption = (context: CheckContext): void => {
       continue;
     }
     for (const consumeName of entity.consumes ?? []) {
-      const target = context.byName.get(consumeName);
+      const target = context.names.target(consumeName);
       if (target === undefined) {
         context.addFinding({
           code: 'checker/consumes-unknown',

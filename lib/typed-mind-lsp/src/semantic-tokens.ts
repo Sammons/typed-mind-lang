@@ -7,7 +7,7 @@
 // occurrence IS the declaration.
 
 import { SemanticTokenModifiers, SemanticTokensBuilder } from 'vscode-languageserver/node';
-import type { DocumentState } from './document-state.ts';
+import { type DocumentState, targetOfOccurrence } from './document-state.ts';
 import { getSemanticTokenType, SEMANTIC_TOKEN_LEGEND } from './entity-kind-maps.ts';
 
 export const SEMANTIC_TOKEN_MODIFIERS: readonly string[] = [
@@ -22,7 +22,7 @@ const DECLARATION_MODIFIER_BIT = 1 << SEMANTIC_TOKEN_MODIFIERS.indexOf(SemanticT
 export const provideSemanticTokensForDocument = (state: DocumentState) => {
   const builder = new SemanticTokensBuilder();
   for (const occurrence of state.nameIndex.all()) {
-    const entity = state.byName.get(occurrence.name);
+    const entity = targetOfOccurrence(occurrence, state.names);
     if (entity === undefined) {
       continue;
     }
@@ -31,13 +31,30 @@ export const provideSemanticTokensForDocument = (state: DocumentState) => {
     // LSP semantic tokens are single-line, 0-based; Span is 1-based. Every
     // NameOccurrenceIndex entry is a leaf token (entity_name/list_entry) so it
     // never spans multiple lines.
-    builder.push(
-      occurrence.startLine - 1,
-      occurrence.startColumn - 1,
-      occurrence.endColumn - occurrence.startColumn,
-      tokenType,
-      tokenModifiers,
-    );
+    let prefixLength = occurrence.name.lastIndexOf('.');
+    while (prefixLength > 0 && state.names.target(occurrence.name.slice(0, prefixLength)) === undefined) {
+      prefixLength = occurrence.name.lastIndexOf('.', prefixLength - 1);
+    }
+    if (prefixLength > 0) {
+      const owner = state.names.target(occurrence.name.slice(0, prefixLength));
+      if (owner !== undefined)
+        builder.push(occurrence.startLine - 1, occurrence.startColumn - 1, prefixLength, getSemanticTokenType(owner.kind), 0);
+      builder.push(
+        occurrence.startLine - 1,
+        occurrence.startColumn + prefixLength,
+        occurrence.name.length - prefixLength - 1,
+        tokenType,
+        tokenModifiers,
+      );
+    } else {
+      builder.push(
+        occurrence.startLine - 1,
+        occurrence.startColumn - 1,
+        occurrence.endColumn - occurrence.startColumn,
+        tokenType,
+        tokenModifiers,
+      );
+    }
   }
   return builder.build();
 };

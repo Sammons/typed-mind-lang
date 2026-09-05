@@ -6,8 +6,8 @@
 // iteration `Map.set` — LAST declaration wins, the frozen duplicate semantics
 // (rfc-tm-3-diamond.md §3.6; link-index.ts:17, legacy parser.ts:122).
 
-import type { CstSourceFile, EntityNode, ParseOutput } from '@sammons/typed-mind';
-import { NameOccurrenceIndex } from './name-occurrence-index.ts';
+import { type CstSourceFile, type EntityNode, type ParseOutput, QualifiedNameResolver, resolvedNameTarget } from '@sammons/typed-mind';
+import { type NameOccurrence, NameOccurrenceIndex } from './name-occurrence-index.ts';
 
 // The return type of TypedMind.parseWithCst(): ParseOutput (entities, imports,
 // diagnostics, links) plus the shared CST (doc §1, one parse per document
@@ -18,6 +18,7 @@ export interface DocumentState {
   readonly output: ParseWithCstOutput;
   readonly nameIndex: NameOccurrenceIndex;
   readonly byName: ReadonlyMap<string, EntityNode>;
+  readonly names: QualifiedNameResolver;
 }
 
 // Last-wins over the duplicate-preserving entity list: a later declaration of
@@ -33,9 +34,19 @@ export const buildEntityByNameIndex = (output: ParseWithCstOutput): ReadonlyMap<
 };
 
 export const buildDocumentState = (output: ParseWithCstOutput): DocumentState => {
+  const byName = buildEntityByNameIndex(output);
   return {
     output,
-    nameIndex: new NameOccurrenceIndex(output.cst),
-    byName: buildEntityByNameIndex(output),
+    nameIndex: new NameOccurrenceIndex(output.cst, output.entities),
+    byName,
+    names: new QualifiedNameResolver(byName),
   };
+};
+
+export const targetOfOccurrence = (occurrence: NameOccurrence, names: QualifiedNameResolver): EntityNode | undefined => {
+  return occurrence.exportingOwner === undefined
+    ? resolvedNameTarget(
+        names.resolve(occurrence.name, occurrence.importingOwner === undefined ? {} : { importingFile: occurrence.importingOwner }),
+      )
+    : resolvedNameTarget(names.resolveExport(occurrence.exportingOwner, occurrence.name));
 };

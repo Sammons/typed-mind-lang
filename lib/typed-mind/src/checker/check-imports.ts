@@ -38,6 +38,8 @@ export const checkImports = (context: CheckContext): void => {
             suggestion: `Check the pattern's glob syntax or the target module's actual export names`,
           });
         }
+      } else if (imported.includes('.')) {
+        context.resolveName(imported, entity.span, entity.name);
       } else if (!context.byName.has(imported)) {
         const isDependency = [...context.byName.values()].some(
           (candidate) => candidate.kind === 'Dependency' && candidate.name === imported,

@@ -13,6 +13,7 @@
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
 import { FileNode } from '../ast/file-node.ts';
+import { resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 import type { CheckContext } from './check-context.ts';
 
@@ -78,9 +79,9 @@ export const checkCircularDeps = (context: CheckContext): void => {
   const importGraph = new Map<string, string[]>();
   for (const [name, entity] of context.byName) {
     if (entity instanceof FileNode || entity instanceof ClassFileNode) {
-      const fileImports = entity.imports.filter((imported) => {
-        const target = context.byName.get(imported);
-        return target !== undefined && (target.kind === 'File' || target.kind === 'ClassFile');
+      const fileImports = entity.imports.flatMap((imported) => {
+        const target = resolvedNameTarget(context.names.resolve(imported, { importingFile: name }));
+        return target !== undefined && (target.kind === 'File' || target.kind === 'ClassFile') ? [target.name] : [];
       });
       importGraph.set(name, fileImports);
     }
@@ -108,7 +109,10 @@ export const checkCircularUiContainment = (context: CheckContext): void => {
   const containmentGraph = new Map<string, readonly string[]>();
   for (const [name, entity] of context.byName) {
     if (entity instanceof UiComponentNode && entity.contains !== undefined) {
-      containmentGraph.set(name, entity.contains);
+      containmentGraph.set(
+        name,
+        entity.contains.map((child) => context.names.target(child)?.name ?? child),
+      );
     }
   }
 
@@ -150,9 +154,9 @@ export const checkInheritanceChains = (context: CheckContext): void => {
       continue;
     }
     if (entity.extends !== undefined) {
-      inheritanceGraph.set(name, entity.extends);
+      inheritanceGraph.set(name, context.names.target(entity.extends)?.name ?? entity.extends);
 
-      if (entity.extends === name) {
+      if (entity.extends !== undefined && (context.names.target(entity.extends)?.name ?? entity.extends) === name) {
         context.addFinding({
           code: 'checker/self-inheritance',
           severity: 'error',
@@ -160,7 +164,7 @@ export const checkInheritanceChains = (context: CheckContext): void => {
           message: `Class '${name}' inherits from itself`,
           suggestion: 'Remove the self-inheritance or choose a different base class',
         });
-      } else if (!context.byName.has(entity.extends)) {
+      } else if (context.names.target(entity.extends) === undefined) {
         // Legacy `continue`s after self-inheritance, so the existence check
         // only runs for non-self extends (validator.ts:566-584).
         context.addFinding({
@@ -175,11 +179,11 @@ export const checkInheritanceChains = (context: CheckContext): void => {
 
     // Legacy checks implements even when extends is absent — but skips the
     // whole entity after a SELF-extends `continue` (validator.ts:573).
-    if (entity.extends === name) {
+    if (entity.extends !== undefined && (context.names.target(entity.extends)?.name ?? entity.extends) === name) {
       continue;
     }
     for (const implemented of entity.implements) {
-      if (!context.byName.has(implemented)) {
+      if (context.names.target(implemented) === undefined) {
         context.addFinding({
           code: 'checker/unknown-interface',
           severity: 'error',

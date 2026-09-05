@@ -23,6 +23,7 @@
 
 import { DependencyNode } from '../ast/dependency-node.ts';
 import { DtoNode } from '../ast/dto-node.ts';
+import { resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import type { Span } from '../ast/span.ts';
 import { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
@@ -44,10 +45,12 @@ const checkNamedPart = (context: CheckContext, entity: DtoNode, fieldName: strin
   // ordinary (unresolvable-by-convention) type text, not a reference —
   // mirrors the legacy `isCustomTypeName`'s uppercase-first requirement: only
   // a Capitalized name is a candidate entity-table reference.
-  if (!/^[A-Z]/.test(name)) {
+  if (!name.includes('.') && !/^[A-Z]/.test(name)) {
     return;
   }
-  const referenced = context.byName.get(name);
+  const resolution = context.resolveName(name, span);
+  if (name.includes('.') && (resolution.kind === 'unresolved' || resolution.kind === 'external')) return;
+  const referenced = resolvedNameTarget(resolution);
   if (referenced === undefined) {
     // RFC-TM-13 B2: external type exports resolve only absent local names.
     // A local declaration still owns its name and must pass the kind check.
@@ -126,7 +129,7 @@ const checkEnumClosedSet = (context: CheckContext, entity: DtoNode, fieldName: s
   const literalMembers: Array<{ value: string; span: Span }> = [];
   for (const member of node.members) {
     if (member.kind === 'named') {
-      const referenced = context.byName.get(member.name);
+      const referenced = context.names.target(member.name);
       if (referenced instanceof TypeDefNode && referenced.variant === 'enum') {
         // Doc's minimal reading: exactly one enum reference triggers the
         // rule; a union naming two DIFFERENT enums has no single closed set
