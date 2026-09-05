@@ -22,5 +22,12 @@ inspect :: inspect(a: ChildOfMethodIface, b: ChildWithOwnProps, c: ChildOfProper
 PropertyOnlyParent %
   - size: number
 
-ChildOfPropertyOnly %
-  - color: string
+dto ChildOfPropertyOnly {
+  type: DTO
+  extends: "PropertyOnlyParent"
+  fields: {
+    color: {
+      type: "string"
+    }
+  }
+}

@@ -87,14 +87,18 @@ export interface ParsedFactoryHeritage {
   readonly origin: ReferenceOrigin;
 }
 
+export interface ParsedMixinHeritage {
+  readonly index: number;
+  readonly base: ParsedTypeText;
+}
 export interface ParsedConstructor {
   readonly signature: string;
   readonly parameters: readonly ParsedParameter[];
   readonly isPrivate: boolean;
   readonly isProtected: boolean;
 }
-
 export interface ParsedClass {
+  readonly mixinHeritage?: readonly ParsedMixinHeritage[];
   readonly constructors?: readonly ParsedConstructor[];
   readonly factoryHeritage?: readonly ParsedFactoryHeritage[];
   readonly implementsTypeInfo?: readonly ParsedTypeText[];

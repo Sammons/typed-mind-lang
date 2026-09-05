@@ -15,12 +15,13 @@ class BaseWidget {
 
 class Container {
   type: Class
+  typeParameter: "T"
   constructor: "(value: T)"
 }
 
 class StringBox {
   type: Class
-  extends: Container<string>
+  extends: "Container<string>"
   method: "unwrap() => string"
 }
 

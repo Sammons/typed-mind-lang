@@ -10,17 +10,19 @@ IndexFile @ src/index.ts:
 
 class GenericBase {
   type: Class
+  typeParameter: "T"
   method: "hold(value: T) => void"
 }
 
 class GenericDerived {
   type: Class
-  extends: GenericBase<string>
+  extends: "GenericBase<string>"
   method: "run() => void"
 }
 
 class Repo {
   type: Class
+  typeParameter: "T"
   method: "find(id: string) => T"
 }
 

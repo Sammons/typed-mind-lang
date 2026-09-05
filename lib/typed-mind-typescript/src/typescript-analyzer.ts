@@ -18,6 +18,7 @@ import type {
   ParsedImport,
   ParsedInterface,
   ParsedMethod,
+  ParsedMixinHeritage,
   ParsedModule,
   ParsedParameter,
   ParsedProperty,
@@ -1428,6 +1429,7 @@ export class TypeScriptAnalyzer {
     const isAbstract = this.hasAbstractModifier(node);
     const extendsClasses: string[] = [];
     const factoryHeritage: ParsedFactoryHeritage[] = [];
+    const mixinHeritage: ParsedMixinHeritage[] = [];
     const implementsInterfaces: string[] = [];
     const methods: ParsedMethod[] = [];
     const constructors: ParsedConstructor[] = [];
@@ -1439,7 +1441,22 @@ export class TypeScriptAnalyzer {
       for (const clause of node.heritageClauses) {
         if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
           for (const type of clause.types) {
-            if (ts.isCallExpression(type.expression) && this.findMixinBaseExpression(type.expression) === undefined) {
+            const selected = ts.isCallExpression(type.expression) ? this.findMixinBaseExpression(type.expression) : undefined;
+            if (selected !== undefined) {
+              const text = selected.getText();
+              const source = sourceRange(selected);
+              mixinHeritage.push({
+                index: extendsClasses.length,
+                base: {
+                  text,
+                  source,
+                  references: [
+                    { writtenName: text, start: 0, end: text.length, source, origin: this.resolveReferenceOriginAtLocation(selected) },
+                  ],
+                },
+              });
+            }
+            if (ts.isCallExpression(type.expression) && selected === undefined) {
               const origin = this.resolveFactoryHeritage(type.expression);
               factoryHeritage.push({ index: extendsClasses.length, source: sourceRange(type.expression), origin });
               if (origin.kind !== 'project') {
@@ -1554,6 +1571,7 @@ export class TypeScriptAnalyzer {
       isAbstract,
       extends: extendsClasses,
       ...(factoryHeritage.length > 0 ? { factoryHeritage } : {}),
+      ...(mixinHeritage.length > 0 ? { mixinHeritage } : {}),
       implements: implementsInterfaces,
       implementsTypeInfo:
         node.heritageClauses
