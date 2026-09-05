@@ -183,8 +183,7 @@ const checkEntityReferences = (context: CheckContext, entity: EntityNode): void 
     }
   } else if (entity instanceof ConstantsNode) {
     for (const call of entity.calls) {
-      const callTarget = call.includes('.') ? (call.split('.').at(0) ?? call) : call;
-      checkSingleReference(context, entity, 'calls', callTarget);
+      checkSingleReference(context, entity, 'calls', call);
     }
     if (entity.schema !== undefined) {
       checkSingleReference(context, entity, 'schema', entity.schema);

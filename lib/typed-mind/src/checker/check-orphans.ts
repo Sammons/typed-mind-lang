@@ -119,7 +119,7 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
     }
     if (entity instanceof ConstantsNode) {
       for (const call of entity.calls) {
-        referenced.add(call);
+        addReference(call, referenced, context.names);
       }
     }
     if (entity instanceof ProgramNode) {

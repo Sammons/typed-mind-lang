@@ -1131,40 +1131,21 @@ export class TypeScriptToTypedMindConverter {
     const byName = new Map(this.entities.map((entity) => [entity.name, entity]));
     const targets = new Map<string, string>();
     const key = (identity: DeclarationIdentity): string => JSON.stringify([identity.filePath, identity.name, identity.start, identity.end]);
-    const declarationsByName = new Map<string, Set<string>>();
     const entityCounts = new Map<string, number>();
     for (const entity of this.entities) entityCounts.set(entity.name, (entityCounts.get(entity.name) ?? 0) + 1);
-    for (const module of modules) {
-      const declarations = [
-        ...module.functions.map((declaration) => ({
-          declaration,
-          name: this.functionNameRemap.get(`${module.filePath}::${declaration.name}`),
-        })),
-        ...[...module.classes, ...module.constants].map((declaration) => ({
-          declaration,
-          name: this.resolveTypeEntityName(module, declaration.name),
-        })),
-      ];
-      for (const { declaration, name } of declarations) {
-        if (declaration.declaration === undefined) continue;
-        if (name === undefined) continue;
-        const identities = declarationsByName.get(name) ?? new Set<string>();
-        identities.add(key(declaration.declaration));
-        declarationsByName.set(name, identities);
-      }
-    }
-    const isUnique = (name: string): boolean => declarationsByName.get(name)?.size === 1 && entityCounts.get(name) === 1;
+    const isUnique = (name: string): boolean => entityCounts.get(name) === 1;
     for (const module of modules) {
       for (const fn of module.functions) {
-        const name = this.functionNameRemap.get(`${module.filePath}::${fn.name}`);
+        const name = fn.declaration === undefined ? undefined : this.getAssignedDeclarationName(fn.declaration);
         if (fn.declaration !== undefined && name !== undefined && isUnique(name) && byName.get(name) instanceof FunctionNode) {
           targets.set(key(fn.declaration), name);
         }
       }
       for (const cls of module.classes) {
-        const name = this.resolveTypeEntityName(module, cls.name);
+        const name = cls.declaration === undefined ? undefined : this.getAssignedDeclarationName(cls.declaration);
         if (
           cls.declaration !== undefined &&
+          name !== undefined &&
           isUnique(name) &&
           module.exports.some((exp) => exp.name === cls.name) &&
           byName.get(name) instanceof ClassNode
@@ -1175,7 +1156,8 @@ export class TypeScriptToTypedMindConverter {
     }
     for (const module of modules) {
       for (const constant of module.constants) {
-        const name = this.resolveTypeEntityName(module, constant.name);
+        const name = constant.declaration === undefined ? undefined : this.getAssignedDeclarationName(constant.declaration);
+        if (name === undefined) continue;
         const entity = byName.get(name);
         if (!(entity instanceof ConstantsNode) || !isUnique(name)) continue;
         const calls = new Set(entity.calls);

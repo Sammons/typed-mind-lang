@@ -17,6 +17,7 @@ import {
   FunctionNode,
   type ParseOutput,
   ProgramNode,
+  QualifiedNameResolver,
 } from '@sammons/typed-mind';
 
 export interface InteractiveRendererOptions {
@@ -246,6 +247,7 @@ ${classMethods}
 
     const entities = this.graph.entities;
     const byName = new Map(entities.map((entity) => [entity.name, entity]));
+    const names = new QualifiedNameResolver(byName);
     const links: Array<{ source: string; target: string; type: 'import' | 'export' | 'call' | 'entry' }> = [];
 
     // RFC-TM-6 §2 (rfc-tm-6-diamond.md) — class dispatch over EntityNode
@@ -276,8 +278,9 @@ ${classMethods}
 
       if (entity instanceof FunctionNode || entity instanceof ConstantsNode) {
         for (const call of entity.calls) {
-          if (byName.has(call)) {
-            links.push({ source: entity.name, target: call, type: 'call' });
+          const target = entity instanceof ConstantsNode ? names.target(call)?.name : byName.get(call)?.name;
+          if (target !== undefined) {
+            links.push({ source: entity.name, target, type: 'call' });
           }
         }
       }
