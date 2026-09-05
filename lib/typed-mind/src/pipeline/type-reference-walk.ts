@@ -1,6 +1,7 @@
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { constructorSignature, methodSignature } from '../ast/class-members.ts';
 import { ClassNode } from '../ast/class-node.ts';
+import { ConstantsNode } from '../ast/constants-node.ts';
 import { parametersOf } from '../ast/declared-type-parameters.ts';
 import { DtoNode } from '../ast/dto-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
@@ -175,6 +176,13 @@ export const walkEntityTypeReferences = (entity: EntityNode, hooks: TypeReferenc
     for (const field of entity.fields) walkTypeReferences(field.typeExpr, binders, hooks, 'field');
   } else if (entity instanceof TypeDefNode && entity.aliasType !== undefined) {
     walkTypeReferences(entity.aliasType, binders, hooks, 'alias');
+  } else if (entity instanceof ConstantsNode && entity.schemaType !== undefined) {
+    // RFC-TM-14 R6a: a Constants schema is walked exactly like a TypeDef
+    // alias. Position 'alias' with no declared parameters keeps
+    // check-generic-declarations.ts's early return (no generic-unknown-type
+    // for `Config : NonExistentSchema`, the scenario-60 pin), while the
+    // orphan walk and the link index credit every named leaf.
+    walkTypeReferences(entity.schemaType, binders, hooks, 'alias');
   } else if (entity instanceof FunctionNode) {
     const parsed = parseSignatureText(entity.signature, { baseLine: entity.span.start.line, baseColumn: entity.span.start.column });
     if (parsed.kind === 'parsed') walkSignatureTypes(parsed.signature, binders, hooks, 'signature', parameters === undefined);

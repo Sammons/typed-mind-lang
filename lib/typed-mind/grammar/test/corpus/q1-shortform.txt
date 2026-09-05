@@ -119,7 +119,13 @@ Config ! src/config.ts : ConfigSchema
   (constants_declaration
     (entity_name)
     (path)
-    (entity_name)))
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_named
+                (entity_name)))))))))
 
 ============================================================
 E6: Constants without schema

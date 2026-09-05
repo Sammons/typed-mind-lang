@@ -17,13 +17,23 @@ describe('Scenario 48: Constants Edge Cases', () => {
     const result = typedMind.check(content);
 
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 3); // More errors than expected
-
-    // Should find error for orphaned ConfigSchema
-    const orphanedSchemaError = result.diagnostics.find(
-      (diagnostic) => diagnostic.message.includes('ConfigSchema') && diagnostic.message.includes('Orphaned entity'),
+    assert.deepEqual(
+      result.diagnostics.map((diagnostic) => `${diagnostic.span.start.line}:${diagnostic.message}`),
+      ["20:Orphaned entity 'InvalidSchemaConfig'", "30:Orphaned entity 'processConfig'"],
     );
-    assert.notEqual(orphanedSchemaError, undefined);
+
+    // RFC-TM-14 U5a, leaf R6a (rfc-tm-14-diamond.md §S5, U-2): ConfigSchema is
+    // USED — `ValidConfig ! src/config/valid.ts : ConfigSchema` names it as
+    // the value's type — so the schema reference credits the orphan walk.
+    // The former pin (`Orphaned entity 'ConfigSchema'` at line 24) recorded
+    // the legacy port's exclusion of schema from the referenced set, not a
+    // rule; removing the schema slot restores exactly that orphan
+    // (constants-schema-corpus-deltas.test.ts is the corpus-wide control).
+    const withoutSchema = content.replace('ValidConfig ! src/config/valid.ts : ConfigSchema', 'ValidConfig ! src/config/valid.ts');
+    assert.notEqual(withoutSchema, content);
+    const orphanedSchemaError = typedMind
+      .check(withoutSchema)
+      .diagnostics.find((diagnostic) => diagnostic.message.includes('ConfigSchema') && diagnostic.message.includes('Orphaned entity'));
     assert.equal(orphanedSchemaError?.severity, 'error');
     assert.equal(orphanedSchemaError?.span.start.line, 24); // Line where ConfigSchema is defined
 

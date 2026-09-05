@@ -155,6 +155,9 @@ describe('CST→AST walk/attach layer', () => {
             name: 'AppConfig',
             comment: undefined,
             path: 'src/config.ts',
+            // RFC-TM-14 R6a: the schema slot is a type_expr; `schema` is the
+            // derived base name of the named node.
+            schemaType: { kind: 'named', name: 'ConfigSchema', span: { start: { line: 19, column: 29 }, end: { line: 19, column: 41 } } },
             schema: 'ConfigSchema',
             purpose: undefined,
           },

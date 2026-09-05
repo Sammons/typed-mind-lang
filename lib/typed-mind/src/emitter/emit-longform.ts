@@ -240,8 +240,11 @@ const constantsToLongform = (entity: ConstantsNode): string[] => {
   if (entity.calls.length > 0) {
     body.push(`calls: [${entity.calls.join(', ')}]`);
   }
-  if (entity.schema !== undefined) {
-    body.push(`schema: ${entity.schema}`);
+  if (entity.schemaType !== undefined) {
+    // RFC-TM-14 R6a: the schema is a full type expression, printed through
+    // the canonical printer and quoted like the DTO field / TypeDef alias
+    // `type:` slots (C-prime, longformTypeValue below).
+    body.push(`schema: ${longformTypeValue(printTypeExpr(entity.schemaType))}`);
   }
   body.push(...descriptionAndPurposeLines(entity.comment, entity.purpose));
   return [`constants ${entity.name} {`, ...indent(body), '}'];

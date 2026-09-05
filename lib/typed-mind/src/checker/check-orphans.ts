@@ -4,7 +4,9 @@
 // field walks — imports (non-wildcard), calls (RAW call string, dotted names
 // included as written), methods, Program entry + exports, consumes, Function
 // input/output, UIComponent contains, Asset containsProgram — and from nothing
-// else (affects/extends/implements/schema never counted legacy-side).
+// else (affects/extends/implements never counted legacy-side; schema was
+// excluded by port fidelity, not by rule — RFC-TM-14 R6a credits it below
+// because a schema names the type of the value, which is a use).
 // RFC-TM-14 §S3 adds Class/ClassFile calls and consumes to the same walk. Exports
 // are NOT referenced (the legacy comment at :257-259 is the rule). Program and
 // Dependency entities are exempt candidates; Files get the

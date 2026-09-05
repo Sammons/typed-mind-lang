@@ -50,7 +50,8 @@ export interface AccumulatorSlots {
   implementsList?: string[] | undefined;
   methods?: string[] | undefined;
   classMembers?: ClassMembers | undefined;
-  schema?: string | undefined;
+  // RFC-TM-14 R6a: the Constants schema slot is a full TypeExprNode.
+  schemaType?: TypeExprNode | undefined;
   fields?: DtoFieldNode[] | undefined;
   containsProgram?: string | undefined;
   root?: boolean | undefined;
@@ -205,7 +206,7 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
       ...accumulator.baseArgs(),
       path: slots.path ?? '',
       calls: slots.calls ?? [],
-      ...(slots.schema !== undefined ? { schema: slots.schema } : {}),
+      ...(slots.schemaType !== undefined ? { schemaType: slots.schemaType } : {}),
       ...(slots.purpose !== undefined ? { purpose: slots.purpose } : {}),
     });
   },

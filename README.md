@@ -137,7 +137,7 @@ Config ! src/config.ts : EnvSchema
 - **File**: `FileName @ path/to/file.ts:`
 - **Function**: `funcName :: (args) => ReturnType`
 - **Class**: `ClassName <: BaseClass, Interface`
-- **Constants**: `ConfigName ! path/to/config.ts : Schema`
+- **Constants**: `ConfigName ! path/to/config.ts : Schema` — the schema slot holds a full type expression (`Record<string, Rule>`, `Rule[]`, `"read" | "write"`), and every named type in it counts as a use
 
 ### Operators
 

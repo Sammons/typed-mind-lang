@@ -203,9 +203,8 @@ const collectEntityLinks = (collector: LinkCollector, entity: EntityNode): void 
     }
   } else if (entity instanceof ConstantsNode) {
     for (const call of entity.calls) collector.addReference(call, entity);
-    if (entity.schema !== undefined) {
-      collector.addReference(entity.schema, entity);
-    }
+    // RFC-TM-14 R6a: schema references come from walkEntityTypeReferences
+    // below (every named leaf of schemaType, the TypeDef alias precedent).
   } else if (entity instanceof DependencyNode) {
     collector.addExports(entity, entity.exports);
   }

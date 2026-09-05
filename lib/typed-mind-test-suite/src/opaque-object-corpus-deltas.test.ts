@@ -17,7 +17,7 @@ const root = join(import.meta.dirname, '../../..');
 const cases = [
   [
     'complex-dto-example.tmd',
-    ['ColumnDefDTO', 'ExecutionStepDTO', 'DatabaseConfigDTO', 'RedisConfigDTO', 'MemoryConfigDTO', 'AuthProviderDTO', 'PermissionDTO'],
+    ['ColumnDefDTO', 'ExecutionStepDTO', 'RedisConfigDTO', 'MemoryConfigDTO', 'AuthProviderDTO', 'PermissionDTO'],
   ],
 ] as const;
 

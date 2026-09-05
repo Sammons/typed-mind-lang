@@ -24,6 +24,7 @@ import {
   ProgramNode,
   printHeritage,
   printSignature,
+  printTypeExpr,
   printTypeParameter,
   RunParameterNode,
   TypeDefNode,
@@ -160,7 +161,8 @@ const renderClassFile = (entity: ClassFileNode): string[] => {
 const renderConstants = (entity: ConstantsNode): string[] => {
   return [
     section('Path', entity.path),
-    section('Schema', entity.schema),
+    // RFC-TM-14 R6a: the schema is a full type expression; print all of it.
+    section('Schema', entity.schemaType === undefined ? undefined : printTypeExpr(entity.schemaType)),
     section('Purpose', entity.purpose),
     listSection('Calls', entity.calls),
   ].filter((line): line is string => line !== undefined);

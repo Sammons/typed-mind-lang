@@ -33,7 +33,7 @@ One entity per line. `<symbol>` names a grammar production; `[...]` marks an opt
 | Function | `<entity_name> [<type_parameters>] :: <signature>` |
 | Class | `<entity_name> [<type_parameters>] <: [<inherit_list>]` |
 | ClassFile | `<entity_name> [<type_parameters>] #: <path> [<: <inherit_list>]` |
-| Constants | `<entity_name> ! <path> [: <entity_name>]` |
+| Constants | `<entity_name> ! <path> [: <type_expr>]` |
 | DTO | `<entity_name> [<type_parameters>] % [<string>]` |
 | Asset | `<entity_name> ~ <string>` |
 | UIComponent | `<entity_name> &!|& <string>` |

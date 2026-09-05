@@ -2659,7 +2659,7 @@
                 },
                 {
                   "type": "SYMBOL",
-                  "name": "entity_name"
+                  "name": "type_expr"
                 }
               ]
             },
@@ -2713,7 +2713,7 @@
                 },
                 {
                   "type": "SYMBOL",
-                  "name": "entity_name"
+                  "name": "type_expr"
                 }
               ]
             },

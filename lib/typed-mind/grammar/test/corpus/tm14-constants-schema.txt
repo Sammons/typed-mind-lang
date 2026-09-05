@@ -1,0 +1,210 @@
+==================
+TM14 R6a: bare schema name in the Constants slot parses as a type_expr (the 11 existing bare-schema documents keep their shape)
+==================
+Config ! src/config.ts : ConfigSchema
+
+---
+
+(source_file
+  (constants_declaration
+    (entity_name)
+    (path)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_named
+                (entity_name)))))))))
+
+==================
+TM14 R6a: generic schema with an inline comment
+==================
+RULES ! src/rules.ts : Record<string, Rule> # keyed by rule id
+
+---
+
+(source_file
+  (constants_declaration
+    (entity_name)
+    (path)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_generic
+                (type_named
+                  (entity_name))
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name)))))))
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name)))))))))))))
+    (inline_comment)))
+
+==================
+TM14 R6a: opaque brace schema with an inline comment
+==================
+BOX ! src/box.ts : { Variables: AuthVars; } # inline object
+
+---
+
+(source_file
+  (constants_declaration
+    (entity_name)
+    (path)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_opaque))))))
+    (inline_comment)))
+
+==================
+TM14 R6a: schema at EOF without a trailing newline (constants_declaration_final)
+==================
+NAMES ! src/names.ts : ReadonlyMap<string, Rule>
+---
+
+(source_file
+  (constants_declaration_final
+    (entity_name)
+    (path)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_generic
+                (type_named
+                  (entity_name))
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name)))))))
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name)))))))))))))))
+
+==================
+TM14 R6a: string-literal union schema
+==================
+MODE ! src/mode.ts : "read" | "write"
+
+---
+
+(source_file
+  (constants_declaration
+    (entity_name)
+    (path)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_literal_string
+                (string)))))
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_literal_string
+                (string)))))))))
+
+==================
+TM14 R6a: qualified generic base in the Constants slot (Dep.Signal<Toast[]>, Dep.Box<{ Variables: AuthVars; }>) with TypeDef and DTO-field pins
+==================
+Toasts ! src/toast.ts : Dep.Signal<Toast[]>
+App ! src/app.ts : Dep.Box<{ Variables: AuthVars; }>
+X = Dep.Signal<Toast[]>
+Data %
+  - a: Dep.Hono<AuthVars>
+
+---
+
+(source_file
+  (constants_declaration
+    (entity_name)
+    (path)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_generic
+                (type_named)
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name))))))))))))))
+  (constants_declaration
+    (entity_name)
+    (path)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_generic
+                (type_named)
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_opaque)))))))))))))
+  (typedef_declaration
+    (entity_name)
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_generic
+                (type_named)
+                (type_expr
+                  (type_union
+                    (type_intersection
+                      (type_postfix
+                        (type_atom
+                          (type_named
+                            (entity_name))))))))))))))
+  (dto_declaration
+    (entity_name))
+  (dto_field
+    (field_name)
+    (field_type
+      (type_expr
+        (type_union
+          (type_intersection
+            (type_postfix
+              (type_atom
+                (type_generic
+                  (type_named)
+                  (type_expr
+                    (type_union
+                      (type_intersection
+                        (type_postfix
+                          (type_atom
+                            (type_named
+                              (entity_name))))))))))))))))
