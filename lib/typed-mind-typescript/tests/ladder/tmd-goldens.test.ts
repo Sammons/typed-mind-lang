@@ -283,17 +283,13 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
-  // 79 records `false`: every `syntax/error` is fixed (the function-type
-  // alias round-trips), but `TreeVisitor`/`NodePredicate` are referenced
-  // only from a function SIGNATURE, which lands on the deferred
-  // call-graph-vs-import-graph orphan class
-  // (ladder-diagnostic-disposition-r3-2026-08-29.md rank 5, TRUE under the
-  // frozen RFC-TM-4 rule). The rung test asserts the syntax half directly.
+  // RFC-TM-13 B1 also closes 79's deferred signature-only TypeDef orphans.
+  // The byte-identical golden still preserves both function-type aliases.
   {
     fixture: '79-function-type-alias-remainder',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   // 80 records `false` for the same deferred reason: `checker/multi-exported`
   // on the shared `Error` stub IS fixed (asserted in the rung test), and the
@@ -311,6 +307,13 @@ const cases: readonly FixtureCase[] = [
   // goldens live in rung-code-outline-cli.test.ts and in each fixture's own
   // module-graph.json and README.md.
   //
+  // RFC-TM-13 B1: signature references close fixture 84 without changing its bytes.
+  {
+    fixture: '84-function-io-generic-orphan',
+    entrySegments: ['src', 'index.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
   // 86 records `false`: the PIPELINE half is fixed (the emitted field text
   // round-trips, asserted directly in rung-bens-almanac.test.ts), but the
   // tree-sitter grammar is a separate parser with the same blind spot and
