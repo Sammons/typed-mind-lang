@@ -114,3 +114,18 @@ it('TM13 D: local clauses preserve existing named default declaration flags in e
     }
   }
 });
+
+it('TM13 D/R: unsupported imported default clauses do not erase supported reexports', (context) => {
+  const { analysis, module } = analyze(context, 'import { remote } from "./remote.js"; export { remote as default, remote as named };');
+  assert.equal(analysis.diagnostics.filter((diagnostic) => diagnostic.category === 'unsupported-default-export').length, 1);
+  assert.deepEqual(
+    module.exports.map((exp) => [exp.name, exp.source]),
+    [['named', './remote.js']],
+  );
+  const explicit = analyze(context, 'export { remote as default } from "./remote.js";');
+  assert.deepEqual(explicit.analysis.diagnostics, []);
+  assert.deepEqual(
+    explicit.module.exports.map((exp) => [exp.name, exp.source]),
+    [['default', './remote.js']],
+  );
+});
