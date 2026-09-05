@@ -120,7 +120,15 @@ it('TM13 EXIT: TypeDef, external and ordinary reexports retain their existing la
     false,
   );
   assert.deepEqual(owner.exports, []);
-  assert.deepEqual(owner.reExports, ['Phase', 'encodeQuotedString', 'Remote']);
+  // RFC-TM-15 §S2 (leaf X1) — the external lane now carries provenance: a
+  // re-export whose source is external and whose binding resolved to no
+  // project declaration is `Owner.member`, with the Dependency created and
+  // exporting the name. The TypeDef and ordinary lanes are unchanged.
+  assert.deepEqual(owner.reExports, ['Phase', 'encodeQuotedString', 'MissingPackage.Remote']);
+  const remoteDependency = result.entities.find((entity) => entity.kind === 'Dependency' && entity.name === 'MissingPackage') as
+    | { exports?: readonly string[] }
+    | undefined;
+  assert.deepEqual(remoteDependency?.exports, ['Remote']);
   const barrel = analysis.modules.find((module) => module.filePath.endsWith('/barrel.ts'));
   assert.equal(barrel?.exports.find((exp) => exp.name === 'Remote')?.declaration, undefined);
   const tm = await TypedMind.create();
