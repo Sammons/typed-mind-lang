@@ -32,6 +32,14 @@ limitation diagnostics where structural checking is required. Physical newlines
 inside literal values produce conversion errors while retaining the source
 facts in the result; callers must inspect conversion success and diagnostics.
 
+## Typed methods and constructors
+
+Class and ClassFile extraction retains typed method overloads and constructor
+parameters. These emit as repeated quoted longform properties, including when
+shortform was requested. Signature references use exact declaration identities
+and lexical generic bindings. See [typed class members](../typed-mind/docs/typed-members.md)
+for syntax, ownership, visibility and unsupported-shape behavior.
+
 ## Installation
 
 ```bash
@@ -171,9 +179,12 @@ export class UserService extends BaseService {
 
 ```tmd
 # TypedMind ClassFile (combines class + file)
-UserService #: src/services/user-service.ts <: BaseService
-  <- [CreateUserDTO, UserDTO]
-  => [createUser]
+classfile UserService {
+  path: src/services/user-service.ts
+  extends: BaseService
+  imports: [CreateUserDTO, UserDTO]
+  method: "async createUser(data: CreateUserDTO) => Promise<UserDTO>"
+}
 ```
 
 Instead of separate File and Class entities, you get one ClassFile with both capabilities.

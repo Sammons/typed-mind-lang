@@ -42,6 +42,10 @@ export const honestTypeExprOf = (typeExpr: TypeExprNode): unknown => {
     const { span: _baseSpan, ...baseRest } = rest.base;
     return { ...rest, base: baseRest, args: rest.args.map(honestTypeExprOf) };
   }
+  if (rest.kind === 'opaque') {
+    const { textOffsets: _textOffsets, ...opaque } = rest;
+    return opaque;
+  }
   return rest;
 };
 

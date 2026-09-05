@@ -119,7 +119,7 @@ describe('mixin heritage reconciliation, property 3: named factory-return identi
   it('emits the actual Widget base and the original fixture checks clean', async () => {
     const result = convert('66c-mixin-no-base-argument');
     assert.equal(result.success, true);
-    assert.match(result.tmdContent, /SelfMadeWidget <: Widget/);
+    assert.match(result.tmdContent, /class SelfMadeWidget \{\n {2}type: Class\n {2}extends: Widget\n {2}method: "label\(\) => string"/);
     assert.deepEqual(await diagnose(result.entities), []);
   });
 });

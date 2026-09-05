@@ -119,3 +119,21 @@ it('TM13 B3a: quoted signature references retain exact source columns after esca
   });
   assert.deepEqual(references, ['Bound', 'Request', 'Input', 'Output', 'Result']);
 });
+
+it('TM13 B3a: nested generic callbacks preserve escaped literal source offsets', async () => {
+  const parser = await TypedMindParser.create({ wasmPath });
+  const payload = 'run(value: Box<(label: "say hi", item: Input) => Output>) => Result';
+  const source = `class Store {\n  method: ${quoteStringLiteral(payload)}\n}`;
+  const parsed = parser.parse(source);
+  assert.deepEqual(parsed.diagnostics, []);
+  const entity = parsed.entities[0];
+  assert.ok(entity);
+  const references: string[] = [];
+  walkEntityTypeReferences(entity, {
+    reference: (node) => {
+      references.push(node.name);
+      assert.equal(source.split('\n')[node.span.start.line - 1]?.slice(node.span.start.column - 1, node.span.end.column - 1), node.name);
+    },
+  });
+  assert.deepEqual(references, ['Box', 'Input', 'Output', 'Result']);
+});

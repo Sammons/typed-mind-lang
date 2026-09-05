@@ -8,6 +8,7 @@ import { parseSignatureText } from './parse-signature-text.ts';
 // their actual token columns, including the outer quote and escaped quotes or
 // backslashes; unknown escape pairs remain two decoded characters in the codec.
 export const parseQuotedSignature = (raw: string, tokenSpan: Span, isConstructor: boolean): SignatureParseResult => {
+  const decoded = decodeQuotedString(raw);
   const offsets = [1];
   for (let index = 1; index < raw.length - 1; ) {
     index += raw[index] === '\\' && (raw[index + 1] === '"' || raw[index + 1] === '\\') ? 2 : 1;
@@ -26,6 +27,16 @@ export const parseQuotedSignature = (raw: string, tokenSpan: Span, isConstructor
       case 'union':
       case 'intersection':
         return { ...node, span: span(node.span), members: node.members.map(type) };
+      case 'opaque': {
+        const start = node.span.start.column - 1;
+        const end = node.span.end.column - 1;
+        const base = offsets[start] ?? 1;
+        return {
+          ...node,
+          span: span(node.span),
+          textOffsets: offsets.slice(start, end + 1).map((offset) => offset - base),
+        };
+      }
       default:
         return { ...node, span: span(node.span) };
     }
@@ -54,6 +65,6 @@ export const parseQuotedSignature = (raw: string, tokenSpan: Span, isConstructor
     })),
     returnType: value.returnType === undefined ? undefined : position(value.returnType),
   });
-  const parsed = parseSignatureText(decodeQuotedString(raw), { allowMissingReturnType: isConstructor });
+  const parsed = parseSignatureText(decoded, { allowMissingReturnType: isConstructor });
   return parsed.kind === 'opaque' ? { ...parsed, span: span(parsed.span) } : { kind: 'parsed', signature: signature(parsed.signature) };
 };
