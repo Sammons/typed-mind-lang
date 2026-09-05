@@ -16,13 +16,13 @@
 
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
+import { parametersOf } from '../ast/declared-type-parameters.ts';
 import { DtoNode } from '../ast/dto-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import type { HeritageReference } from '../ast/heritage-reference.ts';
 import type { SuppressionNode } from '../ast/suppression-node.ts';
 import { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
-import { parametersOf } from './generic-declaration-emission.ts';
 
 // typeExpr carries its own recursive span tree (one per structured
 // sub-node); a round-trip regenerates new text so every span in that tree
@@ -54,18 +54,18 @@ export const honestFieldsOf = (entity: EntityNode): Record<string, unknown> => {
   const fields: Record<string, unknown> = { ...baseFields };
   const parameters = parametersOf(entity);
   if (parameters !== undefined)
-    fields.typeParameters = parameters.map(({ span: _parameterSpan, raw: _parameterRaw, constraint, defaultType, ...parameter }) => ({
+    fields['typeParameters'] = parameters.map(({ span: _parameterSpan, raw: _parameterRaw, constraint, defaultType, ...parameter }) => ({
       ...parameter,
       constraint: constraint === undefined ? undefined : honestTypeExprOf(constraint),
       defaultType: defaultType === undefined ? undefined : honestTypeExprOf(defaultType),
     }));
   if (entity instanceof ClassNode || entity instanceof ClassFileNode)
-    fields.heritage = {
+    fields['heritage'] = {
       extends: entity.heritage.extends === undefined ? undefined : honestHeritageOf(entity.heritage.extends),
       implements: entity.heritage.implements.map(honestHeritageOf),
     };
   if (entity instanceof DtoNode && entity.extendsReferences !== undefined)
-    fields.extendsReferences = entity.extendsReferences.map(honestHeritageOf);
+    fields['extendsReferences'] = entity.extendsReferences.map(honestHeritageOf);
   if (entity instanceof DtoNode) {
     return {
       ...fields,

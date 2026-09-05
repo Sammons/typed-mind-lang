@@ -27,7 +27,8 @@ it('TM13 B1: signature-only references consume DTO leaves', () => {
   assert.deepEqual(orphanNames('go(callback: Map<string, (input: Store) => Lease | Failure>) => void', ['Store', 'Lease', 'Failure']), []);
 });
 
-it('TM13 B1: builtin wrappers and opaque text create no false uses', () => {
+it('TM13 B1/G: builtin wrappers and opaque text create no false uses; constraints are real references', () => {
+  assert.deepEqual(orphanNames('go<T>(value: T) => void', ['Constraint']), ["Orphaned entity 'Constraint'"]);
   assert.deepEqual(
     orphanNames('go<T extends Constraint>(callback: <U>(input: T, other: U) => Wrapped, value: Boxed = DefaultValue) => Promise<Wrapped>', [
       'T',
@@ -39,7 +40,7 @@ it('TM13 B1: builtin wrappers and opaque text create no false uses', () => {
       'DefaultValue',
       'callback',
     ]),
-    ['Constraint', 'DefaultValue', 'Promise', 'T', 'U', 'callback'].map((name) => `Orphaned entity '${name}'`).toSorted(),
+    ['DefaultValue', 'Promise', 'T', 'U', 'callback'].map((name) => `Orphaned entity '${name}'`).toSorted(),
   );
   assert.deepEqual(
     orphanNames('go(value: "Literal", object: { secret: Opaque }) => Map<string, Wrapped>', ['Literal', 'Opaque', 'Map', 'Wrapped']),

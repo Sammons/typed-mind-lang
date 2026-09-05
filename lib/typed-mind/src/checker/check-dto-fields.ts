@@ -27,6 +27,7 @@ import { resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import type { Span } from '../ast/span.ts';
 import { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
+import { walkTypeReferences } from '../pipeline/type-reference-walk.ts';
 import type { CheckContext } from './check-context.ts';
 import { isPrimitiveType } from './type-builtins.ts';
 
@@ -82,38 +83,6 @@ const checkNamedPart = (context: CheckContext, entity: DtoNode, fieldName: strin
 // X-TYPE-4's per-part walk: each TypeExprNode kind recurses per doc §4's
 // per-kind table. `opaque` carries no findings (the unvalidated leaf,
 // identical trust level to today's non-matching chunks, doc §4/§10).
-const walkTypeExpr = (context: CheckContext, entity: DtoNode, fieldName: string, node: TypeExprNode): void => {
-  switch (node.kind) {
-    case 'named':
-      checkNamedPart(context, entity, fieldName, node.name, node.span);
-      return;
-    case 'generic':
-      // The base resolves as a named part (builtin generic or entity); each
-      // argument validates recursively (doc §4: "Pick<S3Client, "send">
-      // resolves Pick from the allowlist, S3Client against the entity
-      // table, and passes "send" as a literal — three parts, three
-      // verdicts").
-      checkNamedPart(context, entity, fieldName, node.base.name, node.base.span);
-      for (const arg of node.args) {
-        walkTypeExpr(context, entity, fieldName, arg);
-      }
-      return;
-    case 'union':
-    case 'intersection':
-      for (const member of node.members) {
-        walkTypeExpr(context, entity, fieldName, member);
-      }
-      return;
-    case 'array':
-      walkTypeExpr(context, entity, fieldName, node.element);
-      return;
-    case 'literal':
-      return; // passes (doc §4)
-    case 'opaque':
-      return; // no findings — the unvalidated leaf (doc §4/§10)
-  }
-};
-
 // X-TYPE-7 enum closed-set rule (doc §5, FAQ "What exactly triggers the enum
 // closed-set check?"): a `union` field type containing exactly the shape
 // "one named reference to an enum-variant TypeDef entity plus one or more
@@ -128,7 +97,7 @@ const checkEnumClosedSet = (context: CheckContext, entity: DtoNode, fieldName: s
   let enumDef: TypeDefNode | undefined;
   const literalMembers: Array<{ value: string; span: Span }> = [];
   for (const member of node.members) {
-    if (member.kind === 'named') {
+    if (member.kind === 'named' && !entity.typeParameters?.some((parameter) => parameter.name === member.name)) {
       const referenced = context.names.target(member.name);
       if (referenced instanceof TypeDefNode && referenced.variant === 'enum') {
         // Doc's minimal reading: exactly one enum reference triggers the
@@ -172,7 +141,8 @@ export const checkDtoFieldTypes = (context: CheckContext): void => {
         continue; // legacy skipped absent types (validator.ts:1481)
       }
 
-      if (field.type === 'Function' || /\bFunction\b/.test(field.type)) {
+      const binders = new Set(entity.typeParameters?.map((parameter) => parameter.name));
+      if (!binders.has('Function') && (field.type === 'Function' || /\bFunction\b/.test(field.type))) {
         context.addFinding({
           code: 'checker/dto-field-function-type',
           severity: 'error',
@@ -183,7 +153,12 @@ export const checkDtoFieldTypes = (context: CheckContext): void => {
         continue;
       }
 
-      walkTypeExpr(context, entity, field.name, field.typeExpr);
+      walkTypeReferences(
+        field.typeExpr,
+        binders,
+        { reference: (node) => checkNamedPart(context, entity, field.name, node.name, node.span) },
+        'field',
+      );
       checkEnumClosedSet(context, entity, field.name, field.typeExpr);
     }
   }

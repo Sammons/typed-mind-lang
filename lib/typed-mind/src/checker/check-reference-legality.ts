@@ -27,6 +27,7 @@ import { AssetNode } from '../ast/asset-node.ts';
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
 import { ConstantsNode } from '../ast/constants-node.ts';
+import { parametersOf } from '../ast/declared-type-parameters.ts';
 import { DependencyNode } from '../ast/dependency-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
@@ -43,6 +44,11 @@ import { type ReferenceKind, VALID_REFERENCES } from './valid-references.ts';
 // AST walk (every walked field lives on a kind its from-list allows), so the
 // fixtures exercise this arm directly.
 export const checkSingleReference = (context: CheckContext, from: EntityNode, referenceKind: ReferenceKind, targetName: string): void => {
+  if (
+    (referenceKind === 'extends' || referenceKind === 'implements') &&
+    parametersOf(from)?.some((parameter) => parameter.name === targetName)
+  )
+    return;
   const result =
     referenceKind === 'calls'
       ? context.names.resolve(targetName)
