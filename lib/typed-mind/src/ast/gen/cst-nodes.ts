@@ -6,7 +6,6 @@
 // CI diff-gates this file via scripts/check-generated.mjs step 2b.
 
 import type { Node as SyntaxNode } from 'web-tree-sitter';
-import { decodeQuotedString } from '../../quoted-string.ts';
 import type { Span } from '../span.ts';
 
 export const CST_NAMED_NODE_TYPE_COUNT = 123;
@@ -130,7 +129,7 @@ export class CstBlockHeader extends CstNode {
   headerName(): string {
     const nameField = this.nameField();
     if (nameField instanceof CstHeaderQuotedName) {
-      return decodeQuotedString(`"${nameField.text}`);
+      return nameField.text.slice(0, -1);
     }
     const keywordText = this.blockKwChildren().at(0)?.text ?? '';
     const lastKeywordCharacter = keywordText.slice(-1);

@@ -51,7 +51,7 @@ const emitEntity = (entity: EntityNode, options: EmitOptions): string[] => {
 };
 
 // Issue #130, disposition (b) — same per-entity form resolution as
-// `emitEntity`, additionally collecting any diagnostics each entity emission produces.
+// `emitEntity`, additionally collecting diagnostics each entity emission produces.
 const emitEntityWithDiagnostics = (entity: EntityNode, options: EmitOptions): { lines: string[]; diagnostics: Diagnostic[] } => {
   const form = resolvedFormFor(entity, options);
   return form === 'longform' ? emitLongformWithDiagnostics(entity) : emitShortformWithDiagnostics(entity);

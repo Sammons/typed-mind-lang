@@ -48,7 +48,7 @@ it('TM13 CP: both grammar string tokens accept escapes and reject unclosed strin
   assert.equal(fn.signature, `setMode ${quoted}`);
   assert.equal(outcome.entities[2]?.name, value);
   const header = parser.parseCst(`dependency ${quoted} {\n}\n`).longformBlockChildren()[0].blockHeaderChildren()[0];
-  assert.equal(header.headerName(), value);
+  assert.equal(header.headerName(), quoted.slice(1, -1));
   assert.equal(outcome.imports[0]?.path, value);
 
   for (const raw of ['"unclosed', '"odd\\"', '"physical\nnewline"', '"physical\rcarriage"', '"escaped\\\nnewline"']) {

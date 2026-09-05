@@ -21,6 +21,7 @@
 import type { Diagnostic } from '../ast/diagnostic.ts';
 import { DtoFieldNode } from '../ast/dto-field-node.ts';
 import type { EntityKind } from '../ast/entity-kind.ts';
+import { CstHeaderQuotedName } from '../ast/gen/cst-nodes.ts';
 import type {
   CstBlockProperty,
   CstClassfileBlockSigil,
@@ -496,9 +497,11 @@ export const buildFromLongformBlock = (block: CstLongformBlock): LongformBuildRe
     return undefined;
   }
   const collected = collectProperties(block.blockPropertyChildren());
+  const nameField = header.nameField();
+  const name = nameField instanceof CstHeaderQuotedName ? decodeQuotedString(`"${nameField.text}`) : header.headerName();
   const accumulator = new EntityAccumulator({
     kind,
-    name: header.headerName(),
+    name,
     span: tokenSpanOf(block.syntaxNode),
     raw: block.syntaxNode.text.trimEnd(),
     // Legacy longform comment = the description property (longform-parser.ts:183).
@@ -511,6 +514,8 @@ export const buildFromLongformBlock = (block: CstLongformBlock): LongformBuildRe
 
 export const buildFromClassfileBlockSigil = (block: CstClassfileBlockSigil): LongformBuildResult => {
   const collected = collectProperties(block.blockPropertyChildren());
+  const nameField = header.nameField();
+  const name = nameField instanceof CstHeaderQuotedName ? decodeQuotedString(`"${nameField.text}`) : header.headerName();
   const accumulator = new EntityAccumulator({
     kind: 'ClassFile',
     name: block.entityNameChildren().at(0)?.text ?? '',
