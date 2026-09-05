@@ -157,8 +157,9 @@ export const honestSuppressionOf = (suppression: SuppressionNode): Record<string
 //
 // A DISTINCT pair (`Foo ~ "description" # comment`, both set and different)
 // is never collapsed: both fields stay in the comparison. Longform carries
-// such a pair on every kind — `purpose:` beside `description:` for the six
-// kinds with a purpose key, and, since RFC-TM-15 leaf C1
+// such a pair on every kind — `purpose:` beside `description:` for the seven
+// kinds whose longform block reads a `purpose:` key (Program, File, Class,
+// ClassFile, Constants, DTO, Dependency), and, since RFC-TM-15 leaf C1
 // (rfc-tm-15-diamond.md §S1), `comment:` beside `description:` for
 // Function, Asset, UIComponent and RunParameter (emit-longform.ts's
 // commentLine; longform-builder.ts reads it with precedence over
