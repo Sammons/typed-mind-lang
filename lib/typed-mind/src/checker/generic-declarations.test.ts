@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { it } from 'node:test';
+import { ClassNode } from '../ast/class-node.ts';
 import { computeLinks } from '../pipeline/link-index.ts';
+import { parseSignatureText } from '../pipeline/parse-signature-text.ts';
 import { TypedMindParser } from '../pipeline/typed-mind-parser.ts';
 import { CheckContext } from './check-context.ts';
 import { checkInheritanceChains } from './check-cycles.ts';
@@ -134,4 +136,43 @@ it('G.4 qualification and external heritage retain exact base identity without i
     ['Owner', 'Child'],
   );
   assert.equal(context.links.referencedBy('Leaf').length, 2);
+});
+
+it('G.4/B3 typed nongeneric methods and constructors check types and bind local generics', async () => {
+  const base = await inspect('T %\nU %\nInput %\nOutput %\nrun :: run() => void\nwork :: work() => void\n');
+  const span = { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } };
+  const typed = new ClassNode({
+    name: 'Store',
+    span,
+    raw: '',
+    sourceForm: 'longform',
+    implements: [],
+    members: {
+      methods: [
+        { name: 'run', signature: parseSignatureText('run<T>(input: T, callback: <U>(value: U) => Output) => Input'), span },
+        { name: 'bad', signature: parseSignatureText('bad(value: Missing) => work'), span },
+        { name: 'wrong', signature: parseSignatureText('Other.method(value: T) => U'), span },
+      ],
+      constructors: [{ signature: parseSignatureText('(input: Input)', { allowMissingReturnType: true }), span }],
+    },
+  });
+  const entities = [...base.entities, typed];
+  const context = new CheckContext({ entities, links: computeLinks(entities), parseDiagnostics: [] });
+  checkGenericDeclarations(context);
+  checkOrphans(context);
+  assert.deepEqual(
+    genericErrors(context).map((finding) => finding.code),
+    ['checker/generic-unknown-type', 'checker/generic-non-data-type'],
+  );
+  assert.deepEqual(context.links.referencedBy('T'), []);
+  assert.deepEqual(context.links.referencedBy('U'), []);
+  assert.deepEqual(
+    context.links.referencedBy('Input').map((reference) => reference.from),
+    ['Store'],
+  );
+  assert.deepEqual(
+    context.links.referencedBy('Output').map((reference) => reference.from),
+    ['Store'],
+  );
+  assert.deepEqual(orphans(context), ["Orphaned entity 'Store'", "Orphaned entity 'T'", "Orphaned entity 'U'", "Orphaned entity 'run'"]);
 });
