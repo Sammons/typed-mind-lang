@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import type { EntityKind } from '../ast/entity-kind.ts';
 import { computeLinks } from '../pipeline/link-index.ts';
 import { TypedMindParser } from '../pipeline/typed-mind-parser.ts';
 import { type AstValidationResult, AstValidator } from './ast-validator.ts';
@@ -106,7 +107,8 @@ describe('RFC-TM-13 Q1: ClassFile is a legal Constants schema target', () => {
     for (const kind of DATA_TYPE_KINDS) {
       assert.equal(isDataTypeKind(kind), true, kind);
     }
-    for (const kind of ['Function', 'Asset', 'UIComponent', 'Constants', 'File', 'Program', 'RunParameter', 'Dependency']) {
+    const rejected: EntityKind[] = ['Function', 'Asset', 'UIComponent', 'Constants', 'File', 'Program', 'RunParameter', 'Dependency'];
+    for (const kind of rejected) {
       assert.equal(isDataTypeKind(kind), false, kind);
     }
   });
