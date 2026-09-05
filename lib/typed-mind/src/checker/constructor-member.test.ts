@@ -36,9 +36,15 @@ const findingsFor = (source: string) => {
   return new AstValidator().validate(outcome, computeLinks(outcome.entities)).findings;
 };
 
-const classSource = ['App -> Main', 'Main @ main.ts:', '  -> [walk, Walker]', 'Walker <:', '  => [walk]', 'walk :: () => number', '  ~> [Walker.constructor]'].join(
-  '\n',
-);
+const classSource = [
+  'App -> Main',
+  'Main @ main.ts:',
+  '  -> [walk, Walker]',
+  'Walker <:',
+  '  => [walk]',
+  'walk :: () => number',
+  '  ~> [Walker.constructor]',
+].join('\n');
 
 const classFileSource = [
   'App -> Main',
@@ -83,8 +89,16 @@ it('TM14 U2: Owner.constructor resolves as a member for Class and ClassFile', ()
     withoutEdge.map((finding) => [finding.code, finding.message]),
     [['checker/orphaned-entity', "Orphaned entity 'Cursor'"]],
   );
-  assert.ok(computeLinks(parse(classSource).entities).referencedBy('Walker').some((link) => link.from === 'walk'));
-  assert.ok(computeLinks(parse(classFileSource).entities).referencedBy('Cursor').some((link) => link.from === 'scan'));
+  assert.ok(
+    computeLinks(parse(classSource).entities)
+      .referencedBy('Walker')
+      .some((link) => link.from === 'walk'),
+  );
+  assert.ok(
+    computeLinks(parse(classFileSource).entities)
+      .referencedBy('Cursor')
+      .some((link) => link.from === 'scan'),
+  );
 });
 
 it('TM14 U2: constructor is the only implicit member and a File owner has none', () => {

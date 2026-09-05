@@ -183,7 +183,9 @@ export class QualifiedNameResolver {
       ) {
         return failure('private-member');
       }
-      return member === CONSTRUCTOR_MEMBER || owner.methods.includes(member) ? { kind: 'member', owner, member } : failure('missing-member');
+      return member === CONSTRUCTOR_MEMBER || owner.methods.includes(member)
+        ? { kind: 'member', owner, member }
+        : failure('missing-member');
     }
     if (owner instanceof ConstantsNode) {
       const schema = owner.schema === undefined ? undefined : resolvedNameTarget(this.resolveWithState(owner.schema, {}, active));
