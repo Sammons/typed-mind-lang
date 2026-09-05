@@ -24,6 +24,7 @@ export { EntityNode, type SourceForm } from './ast/entity-node.ts';
 export { FileNode } from './ast/file-node.ts';
 export { FunctionNode } from './ast/function-node.ts';
 export { CstNode, CstSourceFile } from './ast/gen/cst-nodes.ts';
+export type { ClassHeritage, HeritageReference } from './ast/heritage-reference.ts';
 export { ImportStatementNode } from './ast/import-statement-node.ts';
 export { ProgramNode } from './ast/program-node.ts';
 export { type QualifiedNameResolution, QualifiedNameResolver, resolvedNameTarget } from './ast/qualified-name-resolver.ts';
@@ -61,6 +62,7 @@ export { TypeDefNode } from './ast/type-def-node.ts';
 // no-barrel house rule's targeted-export precedent (index.ts is the only path
 // into lib/typed-mind/src for sibling workspace packages).
 export type { TypeExprNode } from './ast/type-expr-node.ts';
+export type { TypeParameterNode } from './ast/type-parameter-node.ts';
 export { UiComponentNode } from './ast/ui-component-node.ts';
 // Historical diagnostic identifiers remain exported for compatibility.
 // RFC-TM-13 C-prime preserves quotes and nested aliases, so neither fires.
@@ -78,6 +80,7 @@ export { type EmitOptions, SyntaxEmitter } from './emitter/syntax-emitter.ts';
 // longer needs the rename to avoid a collision, but the exported name stays
 // `LinkReference` for call-site stability.
 export { LinkIndex, type Reference as LinkReference } from './pipeline/link-index.ts';
+export { parseHeritageText } from './pipeline/parse-heritage-text.ts';
 export type { ParseOutcome } from './pipeline/parse-outcome.ts';
 export {
   type ParsedSignature,
@@ -87,6 +90,7 @@ export {
   type SignatureParseResult,
   type SignatureTypePosition,
 } from './pipeline/parse-signature-text.ts';
+export { parseTypeParameterListText, parseTypeParameterText } from './pipeline/parse-type-parameters.ts';
 export { type ParseTypeExprTextOptions, type ParseTypeExprTextResult, parseTypeExprText } from './pipeline/type-expr-from-text.ts';
 // RFC-TM-4 §3 (rfc-tm-4-diamond.md) — the new primary surface (the flip's
 // original new export). This is the only checker/parser entry point left —

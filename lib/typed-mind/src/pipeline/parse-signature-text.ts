@@ -1,5 +1,7 @@
 import type { Position, Span } from '../ast/span.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
+import type { TypeParameterNode } from '../ast/type-parameter-node.ts';
+import { parseTypeParameterListText } from './parse-type-parameters.ts';
 import { parseTypeExprText } from './type-expr-from-text.ts';
 
 export type SignatureTypePosition =
@@ -22,6 +24,7 @@ export interface ParsedSignature {
   readonly async: boolean;
   readonly typeParameterText: string | undefined;
   readonly typeParameterNames: readonly string[];
+  readonly typeParameters?: readonly TypeParameterNode[];
   readonly parameters: readonly SignatureParameter[];
   readonly returnType: SignatureTypePosition | undefined;
 }
@@ -79,6 +82,18 @@ const scan = (text: string, start: number, stop: string | undefined, parameters:
       continue;
     }
     if (char === '/') {
+      if (!parameters && text[index + 1] === '*') {
+        const end = text.indexOf('*/', index + 2);
+        if (end === -1) return { kind: 'failed', reason: 'incomplete-signature' };
+        index = end + 1;
+        continue;
+      }
+      if (!parameters && text[index + 1] === '/') {
+        const end = text.indexOf('\n', index + 2);
+        if (end === -1) return { kind: 'failed', reason: 'incomplete-signature' };
+        index = end;
+        continue;
+      }
       return { kind: 'failed', reason: 'unsupported-shape' };
     }
     const arrowOrComparison = (char === '>' && text[index - 1] === '=') || ((char === '<' || char === '>') && text[index + 1] === '=');
@@ -238,27 +253,20 @@ export const parseSignatureText = (text: string, options: ParseSignatureTextOpti
   const displayName = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*/.exec(text.slice(state.index))?.[0];
   state.index = source.skipWhitespace(state.index + (displayName?.length ?? 0));
   const binderStart = state.index;
-  const typeParameterNames: string[] = [];
+  let typeParameters: readonly TypeParameterNode[] = [];
   if (text[state.index] === '<') {
     const binders = scan(text, state.index + 1, '>', false);
     if (binders.kind === 'failed') {
       return source.failure(binders.reason);
     }
-    const stops = [...binders.delimiters.filter((delimiter) => delimiter.char === ',').map((delimiter) => delimiter.index), binders.end];
-    const cursor = { index: state.index + 1 };
-    for (const stop of stops) {
-      const binder = text.slice(cursor.index, stop).trim();
-      if (binder === '' && stop === binders.end && typeParameterNames.length > 0) {
-        break; // A trailing comma is valid in a generic arrow header.
-      }
-      const match = /^(?:const\s+)?(?:(?:in|out)\s+)*([A-Za-z_$][\w$]*)(?=\s+extends\b|\s*=|\s*$)/.exec(binder);
-      if (match?.[1] === undefined) {
-        return source.failure('unsupported-shape');
-      }
-      typeParameterNames.push(match[1]);
-      cursor.index = stop + 1;
-    }
     state.index = binders.end + 1;
+    const position = source.positionAt(binderStart);
+    const parsed = parseTypeParameterListText(text.slice(binderStart, state.index), {
+      baseLine: position.line,
+      baseColumn: position.column,
+    });
+    if (parsed.kind === 'invalid') return source.failure('unsupported-shape');
+    typeParameters = parsed.parameters;
   }
   const typeParameterText = state.index > binderStart ? text.slice(binderStart, state.index) : undefined;
   state.index = source.skipWhitespace(state.index);
@@ -303,7 +311,8 @@ export const parseSignatureText = (text: string, options: ParseSignatureTextOpti
       displayName,
       async: asyncPrefix !== null,
       typeParameterText,
-      typeParameterNames,
+      typeParameterNames: typeParameters.map((parameter) => parameter.name),
+      typeParameters,
       parameters,
       returnType,
     },

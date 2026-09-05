@@ -28,6 +28,8 @@ const span = (startLine: number, startColumn: number, endLine: number, endColumn
   end: { line: endLine, column: endColumn },
 });
 
+const heritageBase = (name: string, where: Span) => ({ kind: 'named', base: { kind: 'named', name, span: where }, args: [], span: where });
+
 describe('ProgramNode', () => {
   it('constructs from a shortform declaration shape', () => {
     const raw = 'TodoApp -> AppEntry "Task management app" v1.0.0';
@@ -172,6 +174,7 @@ describe('FunctionNode', () => {
       { ...node },
       {
         kind: 'Function',
+        typeParameters: undefined,
         name: 'createUser',
         span: span(12, 1, 12, 41),
         raw,
@@ -205,6 +208,7 @@ describe('FunctionNode', () => {
       { ...node },
       {
         kind: 'Function',
+        typeParameters: undefined,
         name: 'createUser',
         span: span(4, 1, 6, 2),
         raw,
@@ -240,6 +244,11 @@ describe('ClassNode', () => {
       { ...node },
       {
         kind: 'Class',
+        typeParameters: undefined,
+        heritage: {
+          extends: heritageBase('BaseController', span(20, 1, 20, 46)),
+          implements: [heritageBase('IController', span(20, 1, 20, 46))],
+        },
         name: 'UserController',
         span: span(20, 1, 20, 46),
         raw,
@@ -270,6 +279,8 @@ describe('ClassNode', () => {
       { ...node },
       {
         kind: 'Class',
+        typeParameters: undefined,
+        heritage: { extends: undefined, implements: [] },
         name: 'TodoModel',
         span: span(1, 1, 3, 2),
         raw,
@@ -304,6 +315,8 @@ describe('ClassFileNode', () => {
       { ...node },
       {
         kind: 'ClassFile',
+        typeParameters: undefined,
+        heritage: { extends: heritageBase('BaseController', span(30, 1, 30, 61)), implements: [] },
         name: 'UserController',
         span: span(30, 1, 30, 61),
         raw,
@@ -338,6 +351,8 @@ describe('ClassFileNode', () => {
       { ...node },
       {
         kind: 'ClassFile',
+        typeParameters: undefined,
+        heritage: { extends: undefined, implements: [heritageBase('IController', span(1, 1, 3, 2))] },
         name: 'UserController',
         span: span(1, 1, 3, 2),
         raw,
@@ -432,6 +447,8 @@ describe('DtoNode', () => {
       { ...node },
       {
         kind: 'DTO',
+        typeParameters: undefined,
+        extendsReferences: undefined,
         name: 'UserDTO',
         span: span(50, 1, 50, 10),
         raw,
@@ -456,6 +473,8 @@ describe('DtoNode', () => {
       { ...node },
       {
         kind: 'DTO',
+        typeParameters: undefined,
+        extendsReferences: undefined,
         name: 'UserDTO',
         span: span(1, 1, 5, 2),
         raw,
