@@ -5,7 +5,7 @@
 // original versions; these checks stop either behavior regressing out.
 //
 // Fixture 66b covers properties 1 and 2 (all clean). Fixture 66c covers
-// property 3, which is a KNOWN GAP pinned with its root cause.
+// property 3, whose named constructor return is resolved by RFC-TM-13 H.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -123,22 +123,20 @@ describe('mixin heritage reconciliation, property 2: the base is searched for am
   });
 });
 
-describe('mixin heritage reconciliation, KNOWN GAP property 3: a zero-identifier mixin falls back to the factory name', () => {
-  it('KNOWN GAP — `extends makeWidget()` records the callee name `makeWidget`, not a base class', () => {
-    // The fallback keeps the line parsable (`makeWidget` is a bare
-    // identifier) but states an edge to the FACTORY rather than a base.
-    assert.equal(extendsTargetOf('66c-mixin-no-base-argument', 'SelfMadeWidget'), 'makeWidget');
+describe('mixin heritage reconciliation, property 3: named factory-return identity', () => {
+  it('retains the written factory fallback beside a proven returned class identity', () => {
+    const analysis = analyze('66c-mixin-no-base-argument');
+    const classes = analysis.modules.flatMap((module) => module.classes);
+    const derived = classes.find((cls) => cls.name === 'SelfMadeWidget');
+    const base = classes.find((cls) => cls.name === 'Widget');
+    assert.equal(derived?.extends[0], 'makeWidget');
+    assert.deepEqual(derived?.factoryHeritage?.[0]?.origin, { kind: 'project', declaration: base?.declaration });
   });
 
-  it('KNOWN GAP — and the checker rejects it, because the factory is a Function, not a Class', async () => {
+  it('emits the actual Widget base and the original fixture checks clean', async () => {
     const result = convert('66c-mixin-no-base-argument');
     assert.equal(result.success, true);
-    const diagnostics = await diagnose(result.entities);
-    const finding = diagnostics.find((d) => /Cannot use 'extends' to reference Function 'makeWidget'/.test(d.message));
-    assert.notEqual(
-      finding,
-      undefined,
-      `the zero-identifier-mixin gap must still be present and annotated; got: ${JSON.stringify(diagnostics.map((d) => d.message))}`,
-    );
+    assert.match(result.tmdContent, /SelfMadeWidget <: Widget/);
+    assert.deepEqual(await diagnose(result.entities), []);
   });
 });

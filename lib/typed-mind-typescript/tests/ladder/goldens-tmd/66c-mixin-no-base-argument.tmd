@@ -11,7 +11,7 @@ IndexFile @ src/index.ts:
 Widget <:
   => [render]
 
-SelfMadeWidget <: makeWidget
+SelfMadeWidget <: Widget
   => [label]
 
 makeWidget :: makeWidget() => (typeof Widget)
