@@ -301,12 +301,6 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
-  // 86 records `false`: the PIPELINE half is fixed (the emitted field text
-  // round-trips, asserted directly in rung-bens-almanac.test.ts), but the
-  // tree-sitter grammar is a separate parser with the same blind spot and
-  // still reports one `syntax/error` on the spaced `|` inside `<...>`. That
-  // residual is the committed grammar knownGap — see
-  // repros-analyzer/86-fn-type-union-in-generic-return/README.md.
   // B3 retains constructor and method references; both original false orphans close.
   {
     fixture: '85-classfile-method-signature-types',
@@ -314,32 +308,25 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
+  // TM13 C closes the shared grammar gap: both fixtures now check clean.
   {
     fixture: '86-fn-type-union-in-generic-return',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
-  // 87 records `false`: the multi-line field now collapses to one line (the
-  // fix, asserted in the rung test), and the residual findings are the SAME
-  // grammar knownGap as 86 — both surviving fields return a generic over a
-  // union, which the grammar rejects for the reason 86's README records.
   {
     fixture: '87-multiline-dto-field-type',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
-  // 88 records `false`: it is a knownGap fixture. `export default <identifier>`
-  // never reaches the export registry, so the route file's exports go unimported
-  // and the checker reports the orphan. Root cause and the reason it is not
-  // fixed here (two layers plus a missing constant-name reservation pass) are in
-  // repros-analyzer/88-export-assignment-default/README.md.
+  // RFC-TM-13 D/F: canonical default identity and actual initializer call close fixture88.
   {
     fixture: '88-export-assignment-default',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   // 89 records `true`: the barrel no longer double-claims its re-exported
   // names, so the fixture checks clean end to end.

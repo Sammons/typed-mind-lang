@@ -10,7 +10,7 @@ A noncolliding primary class can still fuse with its file. A primary class requi
 
 Source metadata is checked by all four `DeclarationIdentity` fields: file path, name, start, and end. `getAssignedDeclarationName` refuses missing or ambiguous identity metadata. Distinct lexical declarations sharing a file/name allocation key produce an explicit conversion error; this change does not invent lexical scope syntax. Canonical overload identities remain one identity. Consumers requiring an emitted entity must additionally verify one final entity instance of the intended kind.
 
-Raw source type-text rewriting remains A2's responsibility. E preserves collision-reference warnings and does not claim to close gaps 77 or 96. Default identity allocation remains D's responsibility; this change does not reserve unused `.default` names.
+Raw source type-text rewriting remains A2's responsibility. E preserves collision-reference warnings and does not claim to close gaps 77 or 96. Default identities follow the D rules below; `.default` is reserved only for an actual supported default exposure.
 
 ## Validation and golden conservation
 
@@ -21,3 +21,11 @@ The 39 ladder checker verdicts remain unchanged. All 41 changed tracked snapshot
 - Ten ladder documents change only entity order: 01, 07, 07b, 10, 16, 17, 47, 71, 78, and 84. Only the existing regular/pure-types emission phases are sorted; registration, classification, and default entry selection retain their prior semantics.
 - Fixtures 09 and 09b additionally import the actual `MathUtils` namespace stub, matching the shared reservation rather than retrying its raw name as an ordinary export.
 - Every other semantic field in these snapshots is identical. Immutable legacy baselines remain unchanged. The converter golden gate now checks the exact Program header name during longform promotion.
+
+## Default exports
+
+A retained local function, arrow function, class or constant with default exposure is emitted once as `ActualFile.default`. Named declarations, `export default local`, and `export { local as default }` preserve the same source declaration identity. Additional local public aliases, such as `export { local as renamed }`, resolve to that same entity through named and default imports and through File/Program exports; repeated exposure does not duplicate the entity or reference.
+
+An export alias carries its exact local declaration identity. Its public spelling cannot expose an unrelated private declaration with the same name. A default class uses a separate File owner and Class instead of ClassFile fusion.
+
+Anonymous default function/class declarations, arbitrary default expressions, imported identifier default assignments and imported bindings in local default clauses currently produce `unsupported-default-export`. They do not synthesize a local body, `<anonymous>` entity or foreign-owner default identity. Enum defaults are likewise outside this retained declaration lane. These warnings disclose unsupported extraction; they do not establish a complete export model for those forms.

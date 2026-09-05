@@ -18,7 +18,7 @@ describe('scenario-43-classfile-auto-export', () => {
 
     // The scenario should be invalid due to the regular class without export
     assert.equal(result.valid, false);
-    assert.equal(result.diagnostics.length, 4); // More errors than expected
+    assert.equal(result.diagnostics.length, 3); // G counts the BaseController heritage reference.
 
     // Should find error for RegularClass being orphaned
     const orphanedError = result.diagnostics.find(
@@ -43,6 +43,6 @@ describe('scenario-43-classfile-auto-export', () => {
         diagnostic.message.includes('ProductController') ||
         diagnostic.message.includes('BaseController'),
     );
-    assert.ok(classFileErrors.length > 0);
+    assert.deepEqual(classFileErrors, []);
   });
 });

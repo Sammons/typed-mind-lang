@@ -126,6 +126,10 @@ export const attemptClassFileWrites = (node: ClassFileNode) => {
 };
 
 export const attemptConstantsWrites = (node: ConstantsNode) => {
+  // @ts-expect-error readonly field
+  node.calls = [];
+  // @ts-expect-error readonly array
+  node.calls.push('target');
   // @ts-expect-error readonly kind discriminant
   node.kind = 'Constants';
   // @ts-expect-error readonly field

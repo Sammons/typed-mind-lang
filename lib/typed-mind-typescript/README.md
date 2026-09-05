@@ -11,6 +11,27 @@ TypeScript analysis and bridge to TypedMind DSL - extract architecture from Type
 - **Comprehensive Analysis**: Functions, classes, interfaces, types, imports, exports
 - **Matt Pocok-style TypeScript**: Branded types, type predicates, const assertions
 
+## Generic declarations and heritage
+
+Extraction preserves declared parameters on functions, classes, interfaces and
+aliases, including constraints, defaults and `const`/`in`/`out` modifiers.
+Instantiated `extends` and `implements` references retain their arguments.
+References inside these types use the analyzer's declaration identities, while
+local parameters remain scoped bindings instead of global entities.
+
+Names-only parameters can emit in shortform. Full parameter metadata uses
+repeated quoted `typeParameter` properties in longform; the formatter promotes
+an entity when shortform cannot preserve its facts. Inline DTOs synthesized
+inside a generic declaration retain the enclosing bindings. Method-local
+parameters shadow class parameters and share the same representation.
+
+The checker validates referenced names, declaration kinds and declared generic
+arity. It does not evaluate TypeScript constraint assignability or instantiate
+generic types. Unsupported type expressions remain opaque and receive explicit
+limitation diagnostics where structural checking is required. Physical newlines
+inside literal values produce conversion errors while retaining the source
+facts in the result; callers must inspect conversion success and diagnostics.
+
 ## Installation
 
 ```bash

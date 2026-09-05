@@ -26,7 +26,7 @@ import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
+import { FileNode, SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -65,8 +65,8 @@ describe('RC-E: a dynamic import() nested inside a call/arrow argument (lazy(() 
     const result = convert();
     assert.equal(result.success, true);
 
-    const home = result.entities.find((e) => e.kind === 'Function' && e.name === 'Home');
-    assert.notEqual(home, undefined, 'Home (the default export) must be extracted as a real entity');
+    const home = result.entities.find((e) => e.kind === 'Function' && e.name === 'HomeFile.default');
+    assert.notEqual(home, undefined, 'HomeFile.default (the default export) must be extracted as a real entity');
   });
 
   it("the importing module's File entity ALSO names the target's default-exported entity, not only its File", () => {
@@ -82,8 +82,8 @@ describe('RC-E: a dynamic import() nested inside a call/arrow argument (lazy(() 
       | { imports: readonly string[] }
       | undefined;
     assert.ok(
-      appEntity?.imports.includes('Home'),
-      `expected 'Home' (the default export of ./pages/home.ts) in App's imports list, got: ${JSON.stringify(appEntity?.imports)}`,
+      appEntity?.imports.includes('HomeFile.default'),
+      `expected 'HomeFile.default' (the default export of ./pages/home.ts) in App's imports list, got: ${JSON.stringify(appEntity?.imports)}`,
     );
   });
 
@@ -106,6 +106,23 @@ describe('RC-E: a dynamic import() nested inside a call/arrow argument (lazy(() 
       [],
       `pages/home.ts and its default export must not orphan now that its lazy()-wrapped dynamic import resolves: ${JSON.stringify(orphanFindings)}`,
     );
+  });
+
+  it('TM13 D: removing the canonical lazy default restores only its orphan', async () => {
+    const result = convert();
+    const tm = await TypedMind.create();
+    const emitter = new SyntaxEmitter();
+    const findings = (entities: typeof result.entities) =>
+      tm
+        .check(emitter.emitLongform({ entities, imports: [], suppressions: [], diagnostics: [] }))
+        .diagnostics.map(({ code, message }) => ({ code, message }));
+    const original = findings(result.entities);
+    const removed = result.entities.map((entity) =>
+      entity instanceof FileNode && entity.path.endsWith('App.ts')
+        ? new FileNode({ ...entity, imports: entity.imports.filter((name) => name !== 'HomeFile.default') })
+        : entity,
+    );
+    assert.deepEqual(findings(removed), [{ code: 'checker/orphaned-entity', message: "Orphaned entity 'HomeFile.default'" }, ...original]);
   });
 
   it('a non-literal (computed) dynamic-import specifier still surfaces the existing diagnostic, not silence', () => {

@@ -282,6 +282,7 @@ interface ExportRegistry {
   [moduleSpecifier: string]: {
     defaultExport?: string;
     namedExports: Set<string>;
+    localDeclarations: Map<string, DeclarationIdentity>;
     // The subset of `namedExports` that this module RE-exports from a sibling
     // (`export { a } from './other.ts'`) rather than declaring itself. Kept as
     // a parallel set because `namedExports` holds bare strings with no
@@ -1307,6 +1308,57 @@ export class TypeScriptToTypedMindConverter {
 
     // 2.3: Add dependencies to entities
     this.entities.push(...this.dependencies.values());
+    this.foldConstantInitializerCalls(modules);
+  }
+
+  private foldConstantInitializerCalls(modules: readonly ParsedModule[]): void {
+    const byName = new Map(this.entities.map((entity) => [entity.name, entity]));
+    const targets = new Map<string, string>();
+    const key = (identity: DeclarationIdentity): string => JSON.stringify([identity.filePath, identity.name, identity.start, identity.end]);
+    const entityCounts = new Map<string, number>();
+    for (const entity of this.entities) entityCounts.set(entity.name, (entityCounts.get(entity.name) ?? 0) + 1);
+    const isUnique = (name: string): boolean => entityCounts.get(name) === 1;
+    for (const module of modules) {
+      for (const fn of module.functions) {
+        const name = fn.declaration === undefined ? undefined : this.getAssignedDeclarationName(fn.declaration);
+        if (fn.declaration !== undefined && name !== undefined && isUnique(name) && byName.get(name) instanceof FunctionNode) {
+          targets.set(key(fn.declaration), name);
+        }
+      }
+      for (const cls of module.classes) {
+        const name = cls.declaration === undefined ? undefined : this.getAssignedDeclarationName(cls.declaration);
+        if (
+          cls.declaration !== undefined &&
+          name !== undefined &&
+          isUnique(name) &&
+          module.exports.some((exp) => this.exportMatchesDeclaration(exp, cls)) &&
+          byName.get(name) instanceof ClassNode
+        ) {
+          targets.set(key(cls.declaration), name);
+        }
+      }
+    }
+    for (const module of modules) {
+      for (const constant of module.constants) {
+        const name = constant.declaration === undefined ? undefined : this.getAssignedDeclarationName(constant.declaration);
+        if (name === undefined) continue;
+        const entity = byName.get(name);
+        if (!(entity instanceof ConstantsNode) || !isUnique(name)) continue;
+        const calls = new Set(entity.calls);
+        for (const reference of constant.callReferences ?? []) {
+          if (reference.origin.kind !== 'project') continue;
+          // Full declaration identity prevents a parameter/local binding from
+          // borrowing the name of an exported function in the same file.
+          const target = targets.get(key(reference.origin.declaration));
+          if (target !== undefined) calls.add(target);
+        }
+        if (calls.size === entity.calls.length) continue;
+        const replacement = new ConstantsNode({ ...entity, calls: [...calls].sort() });
+        const index = this.entities.indexOf(entity);
+        this.entities[index] = replacement;
+        byName.set(name, replacement);
+      }
+    }
   }
 
   private extractDependencies(module: ParsedModule): void {
@@ -1355,12 +1407,16 @@ export class TypeScriptToTypedMindConverter {
   private registerModuleExports(module: ParsedModule): void {
     const moduleExports = {
       namedExports: new Set<string>(),
+      localDeclarations: new Map<string, DeclarationIdentity>(),
       reExportedNames: new Set<string>(),
       filePath: module.filePath,
     } as ExportRegistry[string];
 
     // Register all exports from this module
     for (const exp of module.exports) {
+      if (exp.source === undefined && exp.declaration !== undefined) {
+        moduleExports.localDeclarations.set(exp.name, exp.declaration);
+      }
       if (exp.isDefault) {
         moduleExports.defaultExport = exp.name;
       } else {
@@ -1530,7 +1586,7 @@ export class TypeScriptToTypedMindConverter {
         name: cls.name,
         type: 'class',
         sourceFile,
-        exported: module.exports.some((exp) => exp.name === cls.name),
+        exported: module.exports.some((exp) => this.exportMatchesDeclaration(exp, cls)),
       };
       this.entityRegistry.classes.set(TypeScriptToTypedMindConverter.registryKey(sourceFile, cls.name), entityInfo);
       this.registryBareNames.classes.add(cls.name);
@@ -2351,19 +2407,36 @@ export class TypeScriptToTypedMindConverter {
       (entry.function ? this.functionNameRemap : this.typeNameRemap).set(key, name);
     };
     const losers: Declaration[] = [];
+    const defaults: Declaration[] = [];
     for (const name of [...groups.keys()].sort()) {
       const group = groups.get(name) ?? [];
       group.sort((a, b) => this.compareModulePaths(a.module.filePath, b.module.filePath));
-      const first = group[0];
+      const ordinary = group.filter((entry) => {
+        const key = `${entry.module.filePath}::${entry.name}`;
+        const identities = this.sourceDeclarationIdentities.get(key);
+        const identity = identities?.length === 1 ? identities[0] : undefined;
+        const isDefault = entry.module.exports.some(
+          (exp) =>
+            exp.isDefault &&
+            exp.source === undefined &&
+            exp.declaration !== undefined &&
+            identity !== undefined &&
+            !this.sourceDeclarationsWithoutIdentity.has(key) &&
+            this.sameDeclarationIdentity(exp.declaration, identity),
+        );
+        if (isDefault) defaults.push(entry);
+        return !isDefault;
+      });
+      const first = ordinary[0];
       if (first === undefined) continue;
       store(first, this.nameAllocator.reserve(sourceKey(first), [name]));
       this.typeNameFirstDeclarer.set(name, this.getRelativePath(first.module.filePath));
-      losers.push(...group.slice(1));
+      losers.push(...ordinary.slice(1));
     }
 
     // A primary class that retained its bare identity can share it with the
     // physical file. A qualified primary class needs a separate real owner.
-    const needsOwner = new Set(losers.map((entry) => entry.module.filePath));
+    const needsOwner = new Set([...losers, ...defaults].map((entry) => entry.module.filePath));
     const fileModules: ParsedModule[] = [];
     for (const module of orderedModules) {
       const primary = this.primaryClassOf(module);
@@ -2393,6 +2466,14 @@ export class TypeScriptToTypedMindConverter {
       const name = this.nameAllocator.reserve(`file:${module.filePath}`, candidates);
       this.reservedFileEntityNameByModulePath.set(module.filePath, name);
       this.fileEntityNameByModulePath.set(module.filePath, name);
+    }
+    for (const entry of defaults) {
+      const owner = this.fileEntityNameByModulePath.get(entry.module.filePath);
+      if (owner === undefined) {
+        this.addError('Missing reserved File owner for a default declaration', entry.module.filePath);
+        continue;
+      }
+      store(entry, this.nameAllocator.reserve(sourceKey(entry), [`${owner}.default`]));
     }
     for (const entry of losers) {
       const owner = this.fileEntityNameByModulePath.get(entry.module.filePath);
@@ -2899,22 +2980,11 @@ export class TypeScriptToTypedMindConverter {
       );
     }
 
-    // The inherit targets are recorded VERBATIM, type arguments included, so
-    // `extends Repo<Item>` emits `<: Repo<Item>`. That is intentional and
-    // matches `convertClass` (the real-class lane) exactly: dropping the
-    // arguments is PR #152's original bug, and
-    // slat-harness-mixin-heritage-controls.test.ts pins the verbatim form as
-    // property 1 of the #152/#153 reconciliation, warning that silencing the
-    // resulting diagnostic "would pressure a future author to reintroduce the
-    // bug". The unresolvable generic base is gap 68's territory (type
-    // parameters are unmodeled language-wide), NOT a defect of this lane —
-    // fixture 69d pins both lanes together so neither can be changed alone.
-    // `stripGenericArguments` is applied only to the heritage LOOKUP
-    // (`resolveInterfaceIsMethodBearing`), never to the emitted text.
+    // G retains full instantiated heritage and declaration parameters in both
+    // class lanes. A2 rewrites exact reference origins before the canonical
+    // base/argument parse below; raw analyzer text remains observational.
+    // Legacy strings here serve only collision reporting and raw source text.
     const inheritList = [...iface.extends];
-    // decision-same-named-entities PR 1, interim window — an interface's
-    // heritage targets are raw source identifiers, not rewritten to follow a
-    // collision rename (PR 2's job).
     for (const [index, target] of inheritList.entries()) {
       this.warnOnCollidedTypeReference(
         target,
@@ -3877,7 +3947,13 @@ export class TypeScriptToTypedMindConverter {
     // is not a collision-renamed declaration resolves to `undefined`, which is
     // exactly when the raw name is already correct.
     const remapExportName = (name: string): string => {
-      return this.functionNameRemap.get(`${entryFilePath}::${name}`) ?? this.typeNameRemap.get(`${entryFilePath}::${name}`) ?? name;
+      const identity = moduleExports?.localDeclarations.get(name);
+      return (
+        (identity !== undefined ? this.getAssignedDeclarationName(identity) : undefined) ??
+        this.functionNameRemap.get(`${entryFilePath}::${name}`) ??
+        this.typeNameRemap.get(`${entryFilePath}::${name}`) ??
+        name
+      );
     };
 
     // Look up exports from this entry file in our export registry
@@ -3962,7 +4038,7 @@ export class TypeScriptToTypedMindConverter {
       publicExports.push(remapExportName(moduleExports.namespaceExport));
     }
 
-    return publicExports;
+    return [...new Set(publicExports)];
   }
 
   // X-AN-3 residual — a bare `export * from '<source>'` produces NO
@@ -4186,7 +4262,7 @@ export class TypeScriptToTypedMindConverter {
         // Now using the complete export registry for proper resolution
 
         if (imp.defaultImport) {
-          const entityName = this.resolveImportToEntity(importerFilePath, imp.defaultImport, imp.specifier);
+          const entityName = this.resolveImportToEntity(importerFilePath, imp.defaultImport, imp.specifier, true);
           if (entityName) {
             importNames.push(entityName);
           }
@@ -4220,10 +4296,15 @@ export class TypeScriptToTypedMindConverter {
       }
     }
 
-    return importNames;
+    return [...new Set(importNames)];
   }
 
-  private resolveImportToEntity(importerFilePath: string, importName: string, specifier: string): string | undefined {
+  private resolveImportToEntity(
+    importerFilePath: string,
+    requestedName: string,
+    specifier: string,
+    defaultImport = false,
+  ): string | undefined {
     // Handle external packages
     if (this.isExternalPackage(specifier)) {
       const dependencyName = this.createDependencyName(specifier);
@@ -4260,11 +4341,15 @@ export class TypeScriptToTypedMindConverter {
       return undefined;
     }
 
+    const exportedName = defaultImport ? moduleExports.defaultExport : requestedName;
+    const importName = exportedName === undefined ? undefined : (moduleExports.localDeclarations.get(exportedName)?.name ?? exportedName);
+    if (importName === undefined) return undefined;
+
     // Check if this import name is actually exported by the target module
     const isExported =
-      moduleExports.defaultExport === importName ||
-      moduleExports.namedExports.has(importName) ||
-      moduleExports.namespaceExport === importName;
+      moduleExports.defaultExport === exportedName ||
+      (exportedName !== undefined && moduleExports.namedExports.has(exportedName)) ||
+      moduleExports.namespaceExport === exportedName;
 
     if (!isExported) {
       return undefined;
@@ -4281,13 +4366,15 @@ export class TypeScriptToTypedMindConverter {
     // reservation pass wrote. Falls through to the bare name when the target
     // module is unknown (empty `moduleGraph`, unit-test mock) or the name
     // never collided — both the pre-change behaviour.
-    const declaringModulePath =
-      resolvedTarget !== undefined ? this.modulePathByRelativePath.get(this.stripKnownSourceExtension(resolvedTarget)) : undefined;
+    const declaringModulePath = moduleExports.filePath;
+    const identity = exportedName === undefined ? undefined : moduleExports.localDeclarations.get(exportedName);
     const entityName =
+      (identity !== undefined ? this.getAssignedDeclarationName(identity) : undefined) ??
       (declaringModulePath !== undefined
         ? (this.functionNameRemap.get(`${declaringModulePath}::${importName}`) ??
           this.typeNameRemap.get(`${declaringModulePath}::${importName}`))
-        : undefined) ?? createEntityName(importName);
+        : undefined) ??
+      createEntityName(importName);
 
     // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — a `types`-registry name
     // predicted to become a TypeDef is EXCLUDED from import/export
@@ -4400,14 +4487,16 @@ export class TypeScriptToTypedMindConverter {
           // every export that is not a collision-renamed declaration, which is
           // exactly when the raw `exp.name` is already correct.
           const remapped =
-            this.functionNameRemap.get(`${module.filePath}::${exp.name}`) ?? this.typeNameRemap.get(`${module.filePath}::${exp.name}`);
-          exportNames.push(remapped ?? exp.name);
+            (exp.declaration !== undefined ? this.getAssignedDeclarationName(exp.declaration) : undefined) ??
+            this.functionNameRemap.get(`${module.filePath}::${exp.name}`) ??
+            this.typeNameRemap.get(`${module.filePath}::${exp.name}`);
+          if ((remapped ?? exp.name) !== excludeName) exportNames.push(remapped ?? exp.name);
         }
         seenNames.add(exp.name);
       }
     }
 
-    return { exportNames, reExportNames };
+    return { exportNames: [...new Set(exportNames)], reExportNames };
   }
 
   private isReExport(exportItem: ParsedExport): boolean {
@@ -4415,8 +4504,15 @@ export class TypeScriptToTypedMindConverter {
     return exportItem.source !== undefined;
   }
 
-  private isConstantExported(constant: { name: string }, module: ParsedModule): boolean {
-    return module.exports.some((exp) => exp.name === constant.name && exp.type === 'constant');
+  private exportMatchesDeclaration(exp: ParsedExport, declaration: { name: string; declaration?: DeclarationIdentity }): boolean {
+    if (exp.source === undefined && exp.declaration !== undefined) {
+      return declaration.declaration !== undefined && this.sameDeclarationIdentity(exp.declaration, declaration.declaration);
+    }
+    return exp.name === declaration.name;
+  }
+
+  private isConstantExported(constant: { name: string; declaration?: DeclarationIdentity }, module: ParsedModule): boolean {
+    return module.exports.some((exp) => this.exportMatchesDeclaration(exp, constant) && exp.type === 'constant');
   }
 
   private extractInputDTO(func: ParsedFunction, functionEntityName: string): string | undefined {
@@ -5219,7 +5315,7 @@ export class TypeScriptToTypedMindConverter {
 
   private isFunctionExported(func: ParsedFunction, module: ParsedModule): boolean {
     // Check if function is in module exports
-    return module.exports.some((exp) => exp.name === func.name);
+    return module.exports.some((exp) => this.exportMatchesDeclaration(exp, func));
   }
 
   private isExternalPackage(specifier: string): boolean {

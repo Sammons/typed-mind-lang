@@ -135,9 +135,12 @@ const renderClassFile = (entity: ClassFileNode): string[] => {
 };
 
 const renderConstants = (entity: ConstantsNode): string[] => {
-  return [section('Path', entity.path), section('Schema', entity.schema), section('Purpose', entity.purpose)].filter(
-    (line): line is string => line !== undefined,
-  );
+  return [
+    section('Path', entity.path),
+    section('Schema', entity.schema),
+    section('Purpose', entity.purpose),
+    listSection('Calls', entity.calls),
+  ].filter((line): line is string => line !== undefined);
 };
 
 const renderDto = (entity: DtoNode): string[] => {

@@ -387,6 +387,7 @@ const applyProperties = (accumulator: EntityAccumulator, collected: CollectedPro
     }
     case 'Constants': {
       slots.path = scalar('path') ?? '';
+      slots.calls = list('calls') ?? [];
       const schema = scalar('schema');
       if (schema !== undefined) {
         slots.schema = schema;
