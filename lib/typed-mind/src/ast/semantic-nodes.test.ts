@@ -244,6 +244,7 @@ describe('ClassNode', () => {
       { ...node },
       {
         kind: 'Class',
+        members: undefined,
         typeParameters: undefined,
         heritage: {
           extends: heritageBase('BaseController', span(20, 1, 20, 46)),
@@ -279,6 +280,7 @@ describe('ClassNode', () => {
       { ...node },
       {
         kind: 'Class',
+        members: undefined,
         typeParameters: undefined,
         heritage: { extends: undefined, implements: [] },
         name: 'TodoModel',
@@ -315,6 +317,7 @@ describe('ClassFileNode', () => {
       { ...node },
       {
         kind: 'ClassFile',
+        members: undefined,
         typeParameters: undefined,
         heritage: { extends: heritageBase('BaseController', span(30, 1, 30, 61)), implements: [] },
         name: 'UserController',
@@ -351,6 +354,7 @@ describe('ClassFileNode', () => {
       { ...node },
       {
         kind: 'ClassFile',
+        members: undefined,
         typeParameters: undefined,
         heritage: { extends: undefined, implements: [heritageBase('IController', span(1, 1, 3, 2))] },
         name: 'UserController',

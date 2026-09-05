@@ -117,6 +117,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'Class',
+            members: undefined,
             typeParameters: undefined,
             heritage: { extends: expectedHeritage('Base', 13, 19, 23), implements: [expectedHeritage('IController', 13, 25, 36)] },
             sourceForm: 'shortform',
@@ -129,6 +130,7 @@ describe('CST→AST walk/attach layer', () => {
           },
           {
             kind: 'ClassFile',
+            members: undefined,
             typeParameters: undefined,
             heritage: { extends: expectedHeritage('BaseController', 15, 46, 60), implements: [] },
             sourceForm: 'shortform',

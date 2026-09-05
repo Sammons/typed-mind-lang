@@ -3,12 +3,14 @@ import path from 'node:path';
 import * as ts from 'typescript';
 import { getModuleTypeInfos } from './parsed-type-slots.ts';
 import { getDeclarationIdentity, parseTypeTextOrigins, resolveReferenceOrigin, sourceRange } from './type-reference-origins.ts';
+import { mapStructuralSegments, stripComments } from './type-text-segments.ts';
 import type {
   AnalyzerDiagnostic,
   DeclarationIdentity,
   ModuleGraphEdge,
   ParsedClass,
   ParsedConstant,
+  ParsedConstructor,
   ParsedEnum,
   ParsedExport,
   ParsedFactoryHeritage,
@@ -1428,6 +1430,7 @@ export class TypeScriptAnalyzer {
     const factoryHeritage: ParsedFactoryHeritage[] = [];
     const implementsInterfaces: string[] = [];
     const methods: ParsedMethod[] = [];
+    const constructors: ParsedConstructor[] = [];
     const properties: ParsedProperty[] = [];
     const decorators = this.parseDecorators(node);
     const description = node.name ? this.extractJSDocDescription(node.name) : this.extractJSDocDescriptionFallback(node);
@@ -1476,7 +1479,15 @@ export class TypeScriptAnalyzer {
     const accessorsByKey = new Map<string, AccessorFold>();
 
     for (const member of node.members) {
-      if (ts.isMethodDeclaration(member)) {
+      if (ts.isConstructorDeclaration(member)) {
+        const parameters = this.parseParameters(member.parameters);
+        constructors.push({
+          signature: `(${parameters.map((parameter) => `${parameter.isRest ? '...' : ''}${parameter.name}${parameter.isOptional || parameter.hasDefaultValue ? '?' : ''}: ${mapStructuralSegments(stripComments(parameter.type), (segment) => segment.replace(/\s+/g, ' ')).trim()}`).join(', ')})`,
+          parameters,
+          isPrivate: this.hasPrivateModifier(member),
+          isProtected: this.hasProtectedModifier(member),
+        });
+      } else if (ts.isMethodDeclaration(member)) {
         methods.push(this.parseMethod(member));
       } else if (ts.isPropertyDeclaration(member)) {
         const { property, arrowMethod } = this.parseProperty(member);
@@ -1549,6 +1560,7 @@ export class TypeScriptAnalyzer {
           ?.filter((clause) => clause.token === ts.SyntaxKind.ImplementsKeyword)
           .flatMap((clause) => clause.types.map((type) => this.getTypeInfo(type))) ?? [],
       methods,
+      ...(constructors.length > 0 ? { constructors } : {}),
       properties,
       decorators,
       description: description || undefined,
@@ -1862,6 +1874,7 @@ export class TypeScriptAnalyzer {
       typeInfo: this.getTypeInfo(param.type),
       isOptional: !!param.questionToken,
       hasDefaultValue: !!param.initializer,
+      ...(param.dotDotDotToken === undefined ? {} : { isRest: true }),
     }));
   }
 

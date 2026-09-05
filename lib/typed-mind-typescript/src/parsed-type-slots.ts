@@ -25,7 +25,10 @@ export const getModuleTypeInfos = (module: ParsedModule): readonly ParsedTypeTex
     owner.extendsTypeInfo?.forEach(add);
     generics(owner.typeParameters);
   }
-  for (const cls of module.classes) cls.implementsTypeInfo?.forEach(add);
+  for (const cls of module.classes) {
+    cls.implementsTypeInfo?.forEach(add);
+    for (const member of cls.constructors ?? []) for (const parameter of member.parameters) add(parameter.typeInfo);
+  }
   for (const alias of module.types) {
     add(alias.typeInfo);
     generics(alias.typeParameters);

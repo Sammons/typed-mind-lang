@@ -13,7 +13,13 @@
 // tested by RFC-TM-3/4.
 export { AssetNode } from './ast/asset-node.ts';
 export { ClassFileNode } from './ast/class-file-node.ts';
-export { type ClassMembers, type ConstructorDeclarationNode, legacyMethodNames, type MethodDeclarationNode } from './ast/class-members.ts';
+export {
+  type ClassMemberArgs,
+  type ClassMembers,
+  type ConstructorDeclarationNode,
+  legacyMethodNames,
+  type MethodDeclarationNode,
+} from './ast/class-members.ts';
 export { ClassNode } from './ast/class-node.ts';
 export { ConstantsNode } from './ast/constants-node.ts';
 export { DependencyNode } from './ast/dependency-node.ts';
@@ -94,6 +100,7 @@ export {
 } from './pipeline/parse-signature-text.ts';
 export { parseTypeParameterListText, parseTypeParameterText } from './pipeline/parse-type-parameters.ts';
 export { type ParseTypeExprTextOptions, type ParseTypeExprTextResult, parseTypeExprText } from './pipeline/type-expr-from-text.ts';
+export { canonicalizeTypeText } from './pipeline/type-text-lexical.ts';
 // RFC-TM-4 §3 (rfc-tm-4-diamond.md) — the new primary surface (the flip's
 // original new export). This is the only checker/parser entry point left —
 // the legacy bridge and its DSLCheckerOptions (skipOrphanCheck/

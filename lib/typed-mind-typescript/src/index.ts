@@ -11,6 +11,7 @@ export type {
   ModuleGraphEdge,
   ParsedClass,
   ParsedConstant,
+  ParsedConstructor,
   ParsedEnum,
   ParsedExport,
   ParsedFactoryHeritage,

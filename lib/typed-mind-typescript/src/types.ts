@@ -73,6 +73,7 @@ export interface ParsedFunction {
 }
 
 export interface ParsedParameter {
+  readonly isRest?: boolean;
   readonly typeInfo?: ParsedTypeText;
   readonly name: string;
   readonly type: string;
@@ -86,7 +87,15 @@ export interface ParsedFactoryHeritage {
   readonly origin: ReferenceOrigin;
 }
 
+export interface ParsedConstructor {
+  readonly signature: string;
+  readonly parameters: readonly ParsedParameter[];
+  readonly isPrivate: boolean;
+  readonly isProtected: boolean;
+}
+
 export interface ParsedClass {
+  readonly constructors?: readonly ParsedConstructor[];
   readonly factoryHeritage?: readonly ParsedFactoryHeritage[];
   readonly implementsTypeInfo?: readonly ParsedTypeText[];
   readonly extendsTypeInfo?: readonly ParsedTypeText[];
