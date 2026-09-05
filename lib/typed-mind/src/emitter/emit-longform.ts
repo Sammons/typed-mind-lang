@@ -18,9 +18,12 @@ import { printSignature } from './print-signature.ts';
 // mirrors this: one `description:` line carries `comment` (and doubles as
 // `purpose` when they're equal); a `purpose:` line is added only when
 // `purpose` differs from `comment` (including comment undefined). Function,
-// Asset, RunParameter, and UIComponent have no separate purpose key at all —
-// their purpose/description-shaped field and `comment` are always identical
-// on a longform round-trip, so one `description:` line always covers both.
+// Asset, RunParameter, and UIComponent have no separate purpose key: one
+// `description:` line sets their description-shaped field and `comment`
+// together on reparse. RFC-TM-15 leaf C1 (rfc-tm-15-diamond.md §S1) adds a
+// `comment:` property for those four kinds, emitted only when `comment`
+// differs from the description-shaped field (see commentLine below), so a
+// shortform `Name ~ "description" # comment` pair survives a longform toggle.
 
 import type { AssetNode } from '../ast/asset-node.ts';
 import type { ClassFileNode } from '../ast/class-file-node.ts';
@@ -98,6 +101,24 @@ const descriptionAndPurposeLines = (comment: string | undefined, purpose: string
   return lines;
 };
 
+// RFC-TM-15 leaf C1 (rfc-tm-15-diamond.md §S1; follow-up scope named in
+// issue #121): the `comment:` property for the four kinds with no separate
+// purpose key. Shortform parses the declaration line's trailing
+// `# comment` (declaration-openers.ts) and the quoted description as two
+// disjoint values, so they can legitimately differ (scenario-55's
+// `API_KEY $secret "API key"  # Wrong type!`). A `description:` line alone
+// reparses into BOTH fields (longform-builder.ts's buildFromLongformBlock),
+// so `comment:` is emitted only when it would carry different text —
+// including the comment-only shape (`run :: () => void  # distinct`), whose
+// description-shaped field is undefined. An identical pair emits nothing
+// extra, so a longform-authored document never gains the line.
+const commentLine = (comment: string | undefined, description: string | undefined): string[] => {
+  if (comment === undefined || comment === description) {
+    return [];
+  }
+  return [`comment: ${quoteStringLiteral(comment)}`];
+};
+
 const programToLongform = (entity: ProgramNode): string[] => {
   const body: string[] = [`type: Program`, `entry: ${entity.entry}`];
   if (entity.version !== undefined) {
@@ -132,6 +153,7 @@ const functionToLongform = (entity: FunctionNode): string[] => {
   if (entity.description !== undefined) {
     body.push(`description: ${quoteStringLiteral(entity.description)}`);
   }
+  body.push(...commentLine(entity.comment, entity.description));
   if (entity.input !== undefined) {
     body.push(`input: ${entity.input}`);
   }
@@ -245,6 +267,7 @@ const dtoToLongform = (entity: DtoNode): string[] => {
 
 const assetToLongform = (entity: AssetNode): string[] => {
   const body: string[] = [`type: Asset`, `description: ${quoteStringLiteral(entity.description)}`];
+  body.push(...commentLine(entity.comment, entity.description));
   if (entity.containsProgram !== undefined) {
     body.push(`containsProgram: ${entity.containsProgram}`);
   }
@@ -253,6 +276,7 @@ const assetToLongform = (entity: AssetNode): string[] => {
 
 const uiComponentToLongform = (entity: UiComponentNode): string[] => {
   const body: string[] = [`type: UIComponent`, `description: ${quoteStringLiteral(entity.purpose)}`];
+  body.push(...commentLine(entity.comment, entity.purpose));
   if (entity.root) {
     body.push(`root: true`);
   }
@@ -277,6 +301,7 @@ const runParameterToLongform = (entity: RunParameterNode): string[] => {
   // alongside its own now-dead `paramType:` key) would collide with and
   // overwrite the real paramType on reparse.
   const body: string[] = [`type: ${entity.paramType}`, `description: ${quoteStringLiteral(entity.description)}`];
+  body.push(...commentLine(entity.comment, entity.description));
   if (entity.defaultValue !== undefined) {
     body.push(`default: ${quoteStringLiteral(entity.defaultValue)}`);
   }

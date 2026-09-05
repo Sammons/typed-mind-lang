@@ -115,28 +115,19 @@ const enumerateCorpus = (): string[] => {
 //   regression test using the issue's own repro. Promoted out of this
 //   exception set.
 //
-// - scenario-55-common-validation-mistakes.tmd: a REAL bucket-b design gap,
-//   same shape as the (now-fixed) pendingDependencies gap above.
-//   `RunParameter` (and the other three kinds with no separate purpose key —
-//   Function, Asset, UIComponent, per emit-longform.ts's own header comment)
-//   has exactly ONE longform free-text slot (`description:`), which the
-//   parser sets BOTH `comment` and `description` from identically. A
-//   shortform-authored entity of one of these four kinds CAN legally carry
-//   a comment GENUINELY DISTINCT from its description/purpose (`API_KEY
-//   $secret "API key" # Wrong type comment` — two separate string values on
-//   parse, see honest-fields.ts's honestFieldsAcrossToggleOf doc comment) —
-//   but forcing it through longform has no property key to carry the
-//   distinct comment alongside the description, so it is silently dropped.
-//   Same missing-schema-slot mechanism pendingDependencies had; noted in
-//   issue #121's own comments as follow-up scope (reserve a
-//   `comment:`-equivalent longform property for these four kinds) rather
-//   than fixed in the same change, since it is a distinct field on a
-//   distinct set of entity kinds.
+// - scenario-55-common-validation-mistakes.tmd: FIXED (RFC-TM-15 leaf C1,
+//   rfc-tm-15-diamond.md §S1; follow-up scope named in issue #121). The four
+//   kinds with no separate purpose key (Function, Asset, UIComponent,
+//   RunParameter) now carry a shortform `# comment` that differs from the
+//   description in a dedicated `comment:` longform property
+//   (emit-longform.ts's four per-kind emitters write it, longform-builder.ts's
+//   buildFromLongformBlock reads it with precedence over `description:`).
+//   See COMMENT_SLOT_FIXTURES below for the targeted regression test.
+//   Promoted out of this exception set.
 const KNOWN_CORPUS_TOGGLE_EXCEPTIONS: ReadonlySet<string> = new Set([
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-61-multiple-dtos-function-deps.tmd'),
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-49-dto-complex-structures.tmd'),
   join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-31-mixed-syntax.tmd'),
-  join('lib', 'typed-mind-test-suite', 'scenarios', 'scenario-55-common-validation-mistakes.tmd'),
 ]);
 
 describe('toggle round-trip: corpus-wide parse -> toggleFormat -> toggle back -> AST equal', () => {
@@ -408,6 +399,39 @@ const PENDING_DEPENDENCIES_FIXTURES: readonly ToggleFixture[] = [
   },
 ];
 
+// RFC-TM-15 leaf C1 (rfc-tm-15-diamond.md §S1): the four kinds with no
+// separate purpose key have a dedicated `comment:` longform property, so a
+// shortform `# comment` that differs from the quoted description survives a
+// longform toggle. One shortform entity per kind, comment distinct from
+// description; honest-fields.ts keeps BOTH fields in the comparison when
+// they differ, so a dropped comment is a hard diff here.
+const COMMENT_SLOT_FIXTURES: readonly ToggleFixture[] = [
+  {
+    name: 'TM15 V1: shortform comments distinct from descriptions survive a longform toggle on all four kinds',
+    source: [
+      'run :: () => void # entry-point wrapper',
+      '  "runs the thing"',
+      'Logo ~ "the logo" # brand mark, not the favicon',
+      'App & "root shell" # mounted by index.html',
+      'API_KEY $env "API key" # rotated monthly',
+      '',
+    ].join('\n'),
+  },
+  {
+    // The comment-only shape: no quoted description at all, so before C1 the
+    // longform block had no line to carry the comment and it was dropped
+    // (scenario-56's `log` is the corpus instance).
+    name: 'TM15 V1 control: a comment-only Function round-trips through longform',
+    source: 'run :: () => void # distinct\n',
+  },
+  {
+    // An empty description is still a description; the comment differs from
+    // it (scenario-52's `NoDescAsset` is the corpus instance).
+    name: 'TM15 V1 control: a comment beside an empty description round-trips through longform',
+    source: 'NoDescAsset ~ "" # empty description\n',
+  },
+];
+
 // Ladder gap 93 (PR #158): a string-literal discriminant inside a union of
 // object literals — the house-style `kind`-tagged failure union that
 // `failures_are_local_tagged_unions` mandates. `_opaque_piece`'s chunk token
@@ -446,6 +470,7 @@ const ALL_TARGETED_FIXTURES: readonly ToggleFixture[] = [
   ...RC_C_PROMOTION_FIXTURES,
   ...QUOTED_DESCRIPTION_FIXTURES,
   ...PENDING_DEPENDENCIES_FIXTURES,
+  ...COMMENT_SLOT_FIXTURES,
   ...LITERAL_DISCRIMINANT_FIXTURES,
 ];
 
@@ -625,5 +650,57 @@ describe('TypeDef alias shape classes: a longform toggle round-trips exactly or 
 
   it('covers every shape class the review enumerated, so the table cannot silently shrink', () => {
     assert.equal(ALIAS_SHAPE_CLASSES.length, 21);
+  });
+});
+
+// RFC-TM-15 leaf C1 (rfc-tm-15-diamond.md §S1) — the emission rule itself:
+// `comment:` appears only when `comment` differs from the description slot.
+// An identical pair keeps one `description:` line (which the reader assigns
+// to both fields), so no corpus document that authored a single free-text
+// value gains a line.
+describe('TM15 V1: the longform comment: property', () => {
+  let parser: TypedMindParser;
+  const emitter = new SyntaxEmitter();
+
+  before(async () => {
+    parser = await TypedMindParser.create({ wasmPath });
+  });
+
+  it('is emitted for each of the four kinds when the comment differs from the description', () => {
+    const outcome = parser.parse(COMMENT_SLOT_FIXTURES[0]?.source ?? '');
+    const longform = emitter.toggleFormat(outcome, 'shortform');
+    const commentLines = longform.split('\n').filter((line) => line.trim().startsWith('comment: '));
+    assert.deepEqual(commentLines, [
+      '  comment: "entry-point wrapper"',
+      '  comment: "brand mark, not the favicon"',
+      '  comment: "mounted by index.html"',
+      '  comment: "rotated monthly"',
+    ]);
+  });
+
+  it('control: an identical comment emits no comment: line and still round-trips', () => {
+    const source = ['run :: () => void # runs the thing', '  "runs the thing"', 'Logo ~ "the logo" # the logo', ''].join('\n');
+    const outcome = parser.parse(source);
+    const longform = emitter.toggleFormat(outcome, 'shortform');
+    assert.deepEqual(
+      longform.split('\n').filter((line) => line.trim().startsWith('comment: ')),
+      [],
+    );
+    const reparsed1 = parser.parse(longform);
+    const reparsed2 = parser.parse(emitter.toggleFormat(reparsed1, 'longform'));
+    assert.deepEqual(reparsed2.entities.map(honestFieldsAcrossToggleOf), outcome.entities.map(honestFieldsAcrossToggleOf));
+  });
+
+  it('control: comment: wins over description: for the comment field, and description: alone still sets both', () => {
+    const outcome = parser.parse(
+      'function run {\n  signature: () => void\n  description: "runs the thing"\n  comment: "entry-point wrapper"\n}\n\nasset Logo {\n  description: "the logo"\n}\n',
+    );
+    assert.deepEqual(
+      outcome.entities.map((entity) => ({ name: entity.name, comment: entity.comment })),
+      [
+        { name: 'run', comment: 'entry-point wrapper' },
+        { name: 'Logo', comment: 'the logo' },
+      ],
+    );
   });
 });

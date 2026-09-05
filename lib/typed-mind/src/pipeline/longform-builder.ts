@@ -1,7 +1,12 @@
 // RFC-TM-3 §3.1 (rfc-tm-3-diamond.md) — longform blocks map their typed
 // property_*/dto_fields_block children onto the semantic classes. The per-kind
 // key mapping replicates longform-parser.ts:181-343, including its quirks:
-//   - comment = the `description` property, for every kind (longform-parser.ts:183);
+//   - comment = the `description` property, for every kind (longform-parser.ts:183),
+//     except that Function/Asset/UIComponent/RunParameter read a `comment`
+//     property first (RFC-TM-15 leaf C1, rfc-tm-15-diamond.md §S1: the
+//     four kinds with no separate purpose key carry a shortform `# comment`
+//     that differs from the description in `comment:`; `description:` alone
+//     keeps setting both fields);
 //   - purpose = `purpose` ?? `description` where both are read (program/file/
 //     class/constants/dto; dependency adds the '' default);
 //   - component purpose = `description` only (longform-parser.ts:279);
@@ -568,6 +573,12 @@ const buildResult = (accumulator: EntityAccumulator, collected: CollectedPropert
   return { accumulator, diagnostics, attachments };
 };
 
+// RFC-TM-15 leaf C1 (rfc-tm-15-diamond.md §S1): the kinds whose longform
+// block reads a `comment:` property. Every other kind has a `purpose:` key
+// (or, for TypeDef, no free-text slot), so `comment:` stays an ignored
+// unknown key there.
+const COMMENT_PROPERTY_KINDS: ReadonlySet<EntityKind> = new Set<EntityKind>(['Function', 'Asset', 'UIComponent', 'RunParameter']);
+
 export const buildFromLongformBlock = (block: CstLongformBlock): LongformBuildResult | undefined => {
   const header = block.blockHeaderChildren().at(0);
   if (header === undefined) {
@@ -587,7 +598,10 @@ export const buildFromLongformBlock = (block: CstLongformBlock): LongformBuildRe
     span: tokenSpanOf(block.syntaxNode),
     raw: block.syntaxNode.text.trimEnd(),
     // Legacy longform comment = the description property (longform-parser.ts:183).
-    comment: collected.scalars.get('description'),
+    // RFC-TM-15 leaf C1: the four kinds with no separate purpose key read a
+    // `comment:` property first, so a distinct shortform `# comment` that
+    // emit-longform.ts's commentLine carried survives the toggle back.
+    comment: (COMMENT_PROPERTY_KINDS.has(kind) ? collected.scalars.get('comment') : undefined) ?? collected.scalars.get('description'),
     // RFC-TM-4 §2 (rfc-tm-4-diamond.md): a brace-block header is 'longform'.
     sourceForm: 'longform',
   });

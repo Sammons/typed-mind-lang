@@ -225,6 +225,8 @@ class BaseService {
 
 function createUser {
   signature: (data: UserDTO) => UserDTO
+  description: "Creates a user record"
+  comment: "Validates before insert"
   input: UserDTO
   output: UserDTO
   calls: [init]
