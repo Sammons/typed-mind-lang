@@ -136,6 +136,8 @@ Longform wraps the same entity kinds in a brace-delimited block: `keyword Name {
 | typedef | `typedef Name {` |
 | dependency | `dependency Name {` or `dependency "quoted-name" {` |
 
+Class and ClassFile blocks carry typed members as quoted properties: `method: "name(params) => Return"`, `constructor: "(params)"` and `property: "[readonly] name[?]: Type"` (RFC-TM-14 R3a; the property payload is the DTO field shape). The checker resolves the type names inside them. Shortform has no member slot, so an entity with typed members always emits in longform.
+
 ## DTO Field Syntax
 
 Shortform DTO fields: `- name[?]: type ["description"] [(optional)]`.
@@ -227,6 +229,7 @@ file main {
 UserService #: src/services/user.ts {
   extends: BaseService
   methods: [createUser, findUser]
+  property: "readonly cache: UserDTO[]"
 }
 
 file base {

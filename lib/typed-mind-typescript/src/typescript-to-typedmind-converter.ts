@@ -46,6 +46,7 @@ import type {
   ParsedMethod,
   ParsedModule,
   ParsedParameter,
+  ParsedProperty,
   ParsedTypeParameter,
   ParsedTypeText,
   SstHandlerReference,
@@ -1307,7 +1308,8 @@ export class TypeScriptToTypedMindConverter {
         ...module,
         classes: module.classes.map((cls) => ({
           ...cls,
-          properties: [],
+          // RFC-TM-14 §S4 R3a: emitted properties are reference surfaces too.
+          properties: cls.properties.filter(visible),
           methods: cls.methods.filter(visible),
           constructors: cls.constructors?.filter(visible),
         })),
@@ -3312,7 +3314,10 @@ export class TypeScriptToTypedMindConverter {
       // construction. This is why the method list is taken directly rather
       // than through `convertMethods` (which filters `isPrivate` on a
       // ParsedClass).
-      ...this.convertMembers(iface, module?.filePath),
+      // RFC-TM-14 §S4 R3a carries CLASS properties only; the Class-lane
+      // interface keeps its property-loss warning (`properties` omitted here
+      // on purpose — a follow-up may route them through the same slot).
+      ...this.convertMembers({ methods: iface.methods }, module?.filePath),
       purpose: iface.description ? collapseDescription(iface.description) : undefined,
     });
 
@@ -4582,8 +4587,11 @@ export class TypeScriptToTypedMindConverter {
     return claimed;
   }
 
+  // RFC-TM-14 §S4 R3a (rfc-tm-14-diamond.md): `properties` is passed by the
+  // class lanes only (a ParsedClass); the interface lane keeps its
+  // property-loss warning, so callers omit the field there.
   private convertMembers(
-    owner: { methods: readonly ParsedMethod[]; constructors?: readonly ParsedConstructor[] },
+    owner: { methods: readonly ParsedMethod[]; constructors?: readonly ParsedConstructor[]; properties?: readonly ParsedProperty[] },
     filePath?: string,
   ): ClassMemberArgs {
     const typeText = (text: string): string => {
@@ -4627,7 +4635,34 @@ export class TypeScriptToTypedMindConverter {
         signature: parseSignatureText(`(${parametersText(member.parameters)})`, { allowMissingReturnType: true }),
         span: SYNTHETIC_SPAN,
       }));
-    return methods.length === 0 && constructors.length === 0 ? { methods: [] } : { members: { methods, constructors } };
+    // R3a: properties pass through under the same visibility filter as
+    // methods (S-17); a property that is not emitted contributes no reference.
+    // The payload is the DTO field shape; a type the text parser cannot
+    // structure stays an opaque leaf, never a dropped member. A property with
+    // no declared type (`name = 'noop'`) has no type surface to carry — the
+    // analyzer reports `any` for it, which is not what the source says — so it
+    // is omitted rather than printed as `name: any`.
+    const properties = (owner.properties ?? [])
+      .filter((member) => (this.options.includePrivateMembers || !member.isPrivate) && member.typeInfo?.source !== undefined)
+      .flatMap((member) => {
+        const parsed = parseTypeExprText(typeText(member.type));
+        if (parsed.remainder.trim() !== '') {
+          this.addError(`Unsupported property type on '${member.name}': ${member.type}; property omitted`, filePath);
+          return [];
+        }
+        return [
+          {
+            name: member.name,
+            optionality: member.isOptional ? ('question' as const) : ('none' as const),
+            readonly: member.isReadonly,
+            typeExpr: parsed.typeExpr,
+            span: SYNTHETIC_SPAN,
+          },
+        ];
+      });
+    return methods.length === 0 && constructors.length === 0 && properties.length === 0
+      ? { methods: [] }
+      : { members: { methods, constructors, properties } };
   }
 
   // RC-A (issue #99) — `importerFilePath` is the ABSOLUTE path of the module

@@ -1,5 +1,6 @@
 import type { SignatureParseResult } from './callable-signature.ts';
 import type { Span } from './span.ts';
+import type { TypeExprNode } from './type-expr-node.ts';
 
 export interface MethodDeclarationNode {
   readonly name: string | undefined;
@@ -10,9 +11,20 @@ export interface ConstructorDeclarationNode {
   readonly signature: SignatureParseResult;
   readonly span: Span;
 }
+// RFC-TM-14 §S4 R3a (rfc-tm-14-diamond.md): a typed property member, spelled
+// `property: "[readonly] name[?]: Type"` in longform. The DTO `(optional)`
+// spelling is not carried (G2-7), so optionality is `none` or `question`.
+export interface PropertyDeclarationNode {
+  readonly name: string;
+  readonly optionality: 'none' | 'question';
+  readonly readonly: boolean;
+  readonly typeExpr: TypeExprNode;
+  readonly span: Span;
+}
 export interface ClassMembers {
   readonly methods: readonly MethodDeclarationNode[];
   readonly constructors: readonly ConstructorDeclarationNode[];
+  readonly properties: readonly PropertyDeclarationNode[];
 }
 export type ClassMemberArgs =
   | { readonly methods: readonly string[]; readonly members?: never }
