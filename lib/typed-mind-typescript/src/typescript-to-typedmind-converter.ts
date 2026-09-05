@@ -2649,7 +2649,9 @@ export class TypeScriptToTypedMindConverter {
         this.nameAllocator.reserve(`program:${entry}`, [this.deriveProgramName(path.basename(entry, path.extname(entry)))]);
     }
     const dependencySpecifiers = new Set([
-      ...orderedModules.flatMap((module) => module.imports.filter((imp) => this.isExternalPackage(imp.specifier)).map((imp) => imp.specifier)),
+      ...orderedModules.flatMap((module) =>
+        module.imports.filter((imp) => this.isExternalPackage(imp.specifier)).map((imp) => imp.specifier),
+      ),
       // RFC-TM-15 §S2 — an external re-export source becomes a Dependency
       // in `convertExports` (`reExportEntryWithProvenance`); reserve its
       // name in the same deterministic order as the import-derived ones.

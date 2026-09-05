@@ -108,7 +108,10 @@ describe('Q7 item 2 — RFC-TM-11 Deferral RX-A: reExports vs an independent exp
     assert.deepEqual(vendorSurface?.imports, []);
     assert.deepEqual(dependency?.exports, ['normalizeVehicleString']);
     assert.ok(main?.imports.includes(vendorSurface?.name ?? ''), `RX-6 fold must survive qualification: ${main?.imports.join(', ')}`);
-    assert.match(result.tmdContent, /VendorSurfaceFile @ src\/vendor-surface\.ts:\n  <-> \[VehicleVendorSdk\.normalizeVehicleString\]\n/);
+    assert.ok(
+      result.tmdContent.includes('VendorSurfaceFile @ src/vendor-surface.ts:\n  <-> [VehicleVendorSdk.normalizeVehicleString]\n'),
+      result.tmdContent,
+    );
     const checked = await checkDocument(result.tmdContent);
     assert.deepEqual(checked.diagnostics, [], result.tmdContent);
     assert.equal(checked.valid, true);
