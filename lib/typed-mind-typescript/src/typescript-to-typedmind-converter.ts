@@ -2198,9 +2198,25 @@ export class TypeScriptToTypedMindConverter {
         const index = this.entities.findIndex((entity) => entity.name === name);
         const entity = this.entities[index];
         if (entity instanceof ClassFileNode) {
-          this.entities[index] = new ClassFileNode({ ...entity, extends: target });
+          this.entities[index] = new ClassFileNode({
+            ...entity,
+            extends: undefined,
+            implements: undefined,
+            heritage: {
+              ...entity.heritage,
+              extends: { kind: 'named', base: { kind: 'named', name: target, span: entity.span }, args: [], span: entity.span },
+            },
+          });
         } else if (entity instanceof ClassNode) {
-          this.entities[index] = new ClassNode({ ...entity, extends: target });
+          this.entities[index] = new ClassNode({
+            ...entity,
+            extends: undefined,
+            implements: undefined,
+            heritage: {
+              ...entity.heritage,
+              extends: { kind: 'named', base: { kind: 'named', name: target, span: entity.span }, args: [], span: entity.span },
+            },
+          });
         }
       }
     }
