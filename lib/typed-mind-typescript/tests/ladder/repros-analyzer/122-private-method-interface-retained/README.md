@@ -74,4 +74,7 @@ interfaces and TypeDefs keep their standalone names (non-goal N-9u).
 inline object literal and marks each `[readonly] key?: type` member's type
 slot structural (same depth/quote/separator rules as the converter's
 `splitObjectLiteralProperties`). Method and index-signature members stay
-unsupported.
+unsupported. One divergence from the converter's field parser: the rewrite
+also accepts string-literal keys (`'quoted': T`), which
+`parseObjectLiteralProperty` (`^(\w+)`) drops — the rewrite renames a slot
+the converter never emits, harmless on output.
