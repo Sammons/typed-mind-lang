@@ -1278,17 +1278,37 @@ export class TypeScriptAnalyzer {
 
     // Handle export { name1, name2 } from 'module'
     if (node.exportClause && ts.isNamedExports(node.exportClause)) {
-      const source = node.moduleSpecifier ? (node.moduleSpecifier as ts.StringLiteral).text : undefined;
+      const explicitSource = node.moduleSpecifier ? (node.moduleSpecifier as ts.StringLiteral).text : undefined;
 
-      return node.exportClause.elements.map((element) => ({
-        name: element.name.text,
-        isDefault: false,
-        type: this.inferExportType(element.name.text, source),
-        source: source || undefined,
-      }));
+      return node.exportClause.elements.map((element) => {
+        const source = explicitSource ?? this.namedImportSourceForExport(element);
+        return {
+          name: element.name.text,
+          isDefault: false,
+          type: this.inferExportType(element.name.text, source),
+          source: source || undefined,
+        };
+      });
     }
 
     return exports;
+  }
+
+  // A separate import followed by a bare export has the same provenance as
+  // `export { name } from 'source'`. Resolve its local binding, not its text:
+  // import aliases and exports before imports must identify the same owner.
+  private namedImportSourceForExport(element: ts.ExportSpecifier): string | undefined {
+    const symbol = this.checker.getExportSpecifierLocalTargetSymbol(element);
+    for (const declaration of symbol?.declarations ?? []) {
+      if (!ts.isImportSpecifier(declaration) || declaration.getSourceFile() !== element.getSourceFile()) {
+        continue;
+      }
+      const importDeclaration = declaration.parent.parent.parent;
+      if (ts.isImportDeclaration(importDeclaration) && ts.isStringLiteral(importDeclaration.moduleSpecifier)) {
+        return importDeclaration.moduleSpecifier.text;
+      }
+    }
+    return undefined;
   }
 
   private inferExportType(name: string, _source?: string): 'function' | 'class' | 'interface' | 'type' | 'constant' | 'variable' {
