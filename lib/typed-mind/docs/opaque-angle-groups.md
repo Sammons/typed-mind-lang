@@ -35,17 +35,17 @@ mode inside this token. Physical multiline literal types remain unsupported.
 - [WASM tests](../src/pipeline/opaque-angle-scanner.test.ts) compare valid,
   malformed and fresh/incremental parses, including final lines without a
   trailing newline.
-- [Original82 callback fixture](../../typed-mind-typescript/tests/ladder/rung-s7-constructor.test.ts)
-  and [original86/87 fixtures](../../typed-mind-typescript/tests/ladder/rung-bens-almanac.test.ts)
+- [Original 82 callback fixture](../../typed-mind-typescript/tests/ladder/rung-s7-constructor.test.ts)
+  and [original 86/87 fixtures](../../typed-mind-typescript/tests/ladder/rung-bens-almanac.test.ts)
   retain their complete emitted types and check clean. Removing the closing
-  angle from86 restores a syntax error.
+  angle from 86 restores a syntax error.
 
-Before/after native comparison at the C implementation checkpoint covered234
+Before/after native comparison at the C implementation checkpoint covered 234
 tracked `.tmd` files, using separate native caches and identical input bytes.
-Only three trees changed:86 and87 lost their syntax errors; scenario56 retained
+Only three trees changed: 86 and 87 lost their syntax errors; scenario 56 retained
 the same error ranges, with three incidental identifier children removed inside
-already-invalid multiline signature fragments. The other231 trees were
-identical. All154 grammar corpus cases passed in both native and WASM builds.
+already-invalid multiline signature fragments. The other 231 trees were
+identical. All 154 grammar corpus cases passed in both native and WASM builds.
 Native and WASM fresh/incremental trees agreed for valid→invalid→valid edits.
 
 The existing build freshness scan includes every file under `grammar/src/`,
