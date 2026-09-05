@@ -230,6 +230,21 @@ describe('79 — a function-type alias loses its parameter list and return type'
   });
 });
 
+it('TM13 B1.5: fixture 79 changes only its two signature-only orphan findings', async () => {
+  const result = convertSimple('79-function-type-alias-remainder');
+  const golden = readFileSync(join(testDir, 'goldens-tmd', '79-function-type-alias-remainder.tmd'), 'utf8').replace(/\n$/, '');
+  assert.equal(result.tmdContent, golden);
+  assert.deepEqual((await checkTmd(result.tmdContent)).diagnostics, []);
+  const withoutUses = result.tmdContent.replace(
+    'visitor: TreeVisitor<void>, predicate: NodePredicate',
+    'visitor: unknown, predicate: unknown',
+  );
+  assert.deepEqual((await checkTmd(withoutUses)).diagnostics.map((diagnostic) => diagnostic.message).toSorted(), [
+    "Orphaned entity 'NodePredicate'",
+    "Orphaned entity 'TreeVisitor'",
+  ]);
+});
+
 describe('80 — two files extending the same builtin both claim to export the stub', () => {
   // Corpus: packages/cli's `CLIArgumentError extends Error`
   // (cli-argument-parser.ts:45) and `FileProcessorError extends Error`
