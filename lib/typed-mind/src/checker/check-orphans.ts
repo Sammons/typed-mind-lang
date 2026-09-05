@@ -85,7 +85,9 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
     if (entity instanceof FunctionNode) {
       const signature = parseSignatureText(entity.signature);
       if (signature.kind === 'parsed') {
-        collectSignatureReferences(signature.signature, referenced);
+        const signatureNames = new Set<string>();
+        collectSignatureReferences(signature.signature, signatureNames);
+        for (const name of signatureNames) addReference(name, referenced, context.names);
       }
       for (const call of entity.calls) {
         addReference(call, referenced, context.names); // the RAW call string, dotted included (validator.ts:262)

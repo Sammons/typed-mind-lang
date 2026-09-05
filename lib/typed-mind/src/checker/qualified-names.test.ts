@@ -282,3 +282,17 @@ it('TM13 Q: a barrel cannot launder private exposure through a qualified export 
   const publicNames = namesFor(source.replace('Left @ left.ts:\n', 'Left @ left.ts:\n  -> [Left.Private]\n')).names;
   assert.equal(publicNames.resolve('Barrel.Left.Private').kind, 'entity');
 });
+
+it('TM13 Q+B1: signature-only qualified aliases use canonical declarations without leaking binders', () => {
+  const { outcome } = namesFor('File @ file.ts:\n  -> [Payload]\nPayload %\nT %\nCaller :: <T>(input: File.Payload, value: T) => void\n');
+  const context = new CheckContext({ entities: outcome.entities, links: computeLinks(outcome.entities), parseDiagnostics: [] });
+  checkOrphans(context);
+  assert.equal(
+    context.findings.some((finding) => finding.message === "Orphaned entity 'Payload'"),
+    false,
+  );
+  assert.equal(
+    context.findings.some((finding) => finding.message === "Orphaned entity 'T'"),
+    true,
+  );
+});
