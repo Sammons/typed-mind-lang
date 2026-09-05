@@ -207,9 +207,7 @@ UserController #: src/controllers/user.ts <: BaseController {
     (entity_name)
     (path)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name))))))
+      (heritage_type (type_named (entity_name))))))
 
 ============================================================
 H1-H11 single-character name (header_name_rest absent — the name-split's
@@ -531,6 +529,11 @@ User:
 
 ---
 
+; X-TYPE-1 collateral (rfc-tm-8-diamond.md §1): the ERROR-recovery internal
+; shape moved (was `(ERROR (entity_name) (UNEXPECTED 'y') (UNEXPECTED 'D'))`)
+; for the same reason as q1-shortform.txt's two collateral notes — the new
+; type-expression token shapes are grammar-global and change what GLR error
+; recovery can match at this recovery point. Still, and only, an ERROR.
 (source_file
   (ERROR
     (entity_name)))

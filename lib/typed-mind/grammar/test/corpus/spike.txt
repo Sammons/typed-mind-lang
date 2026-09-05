@@ -50,6 +50,17 @@ S-GRAMMAR-1a: DTO field with function type and (optional) marker
 
 ---
 
+; X-TYPE-1 KNOWN GAP CLOSED (issue #50, tm10-inc2-grammar): a dedicated
+; longest-match token (_paramlist_opaque_open, grammar.js's type_atom
+; production) recognizes the disambiguating '(' + identifier + ':' prefix
+; as ONE atomic token — mirroring _qualified_name_opaque_token's own
+; longest-match mechanism — before type_named's bare-identifier match can
+; win the lexer race. The rest of the balanced run (including the trailing
+; '=> void') rides the existing _opaque_piece continuation machinery
+; (already proven for nested object literals), landing the WHOLE
+; '(x: number) => void' text in one type_opaque leaf with zero ERROR nodes.
+; No external scanner needed — this is a pure grammar.js change, confirmed
+; wasm-buildable.
 (source_file
   (dto_field
     (field_name)
@@ -70,6 +81,7 @@ S-GRAMMAR-1a: DTO field with function type, description, and marker as distinct 
 
 ---
 
+; Same fix as the fixture above — see its comment.
 (source_file
   (dto_field
     (field_name)
@@ -90,6 +102,22 @@ S-GRAMMAR-1a adversarial: genuine trailing paren group is type, not marker
   - cb: fn (custom)
 
 ---
+
+; X-TYPE-1 KNOWN GAP — NOT closed by tm10-inc2-grammar's issue #50 fix
+; (recorded here so this residual is not mistaken for a leftover from the
+; already-fixed sibling above). `fn (custom)` carries NO colon and NO
+; `typeof` keyword — the two lexical disambiguators tm10-inc2-grammar's
+; _paramlist_opaque_open and _typeof_opaque_open tokens key on. A bare
+; identifier immediately inside parens still reduces as a complete
+; type_atom before the parser can tell the second `fn` name is not part of
+; that group, and no token can be objectively longer than that reduction
+; without a lexical signal to anchor on. This shape is a synthetic
+; adversarial fixture (S-GRAMMAR-1a: distinguishing a genuine trailing
+; paren-group type from the `(optional)` marker), not a real TypeScript
+; function-type shape (which always carries `name: type` per parameter or
+; is empty `()`) — genuinely irreducible without an external scanner or a
+; quoting convention, same disposition as the pre-fix state, still
+; regressed from the pre-X-TYPE-1 flat chunk token.
 
 (source_file
   (dto_field
@@ -242,9 +270,7 @@ program ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -303,9 +329,7 @@ file ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -364,9 +388,7 @@ function ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -425,9 +447,7 @@ class ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -486,9 +506,7 @@ dto ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -547,9 +565,7 @@ component ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -608,9 +624,7 @@ asset ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -669,9 +683,7 @@ constants ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -730,9 +742,7 @@ parameter ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -791,9 +801,7 @@ dependency ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -852,9 +860,7 @@ classfile ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -913,9 +919,7 @@ import ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -985,6 +989,15 @@ tm10-inc2-grammar (issue #50, live-evidence correction): multi-param function ty
 
 ---
 
+; Real corpus instance (RFC-TM-10 Q10 ladder re-run, 2026-08-29):
+; webhookstorage's outbound-delivery/src/index.ts, WorkerDeps DTO field
+; `sleep?: (ms: number, signal?: AbortSignal) => Promise<void>` — this is
+; the shape that superseded D-LEG-D1's "zero corpus instances" premise
+; (issue #50 comment). _paramlist_opaque_open's longest-match token fires
+; on the FIRST parameter's `(ms:` prefix; the rest of the run — the second
+; parameter, its own optional marker, and the `=> Promise<void>` return —
+; all ride the existing _opaque_piece continuation, landing the entire
+; text in one type_opaque leaf.
 (source_file
   (dto_field
     (field_name)
@@ -1004,6 +1017,18 @@ CheckCode = (typeof CHECK_CODES)[number]
 
 ---
 
+; Real corpus instance: lib/typed-mind/src/checker/check-codes.ts:122's
+; `export type CheckCode = (typeof CHECK_CODES)[number];`. `typeof` has no
+; structured production (the doc's six kinds have no type-query shape) and
+; must fall to type_opaque; `[number]` is indexed access with content, not
+; type_postfix's empty `[]` array suffix, so it cannot compose as a
+; separate postfix node either — the whole parenthesized-plus-index run
+; lands in ONE type_opaque leaf via _typeof_opaque_open's longest-match
+; token ('(' + optional-ws + 'typeof' + required-ws, objectively longer
+; than type_named's bare-'(' _type_paren_group attempt at the same
+; position) plus the existing _opaque_piece continuation (which already
+; balances '[...]' groups for nested object literals, reused here for the
+; indexed-access suffix).
 (source_file
   (typedef_declaration
     (entity_name)
@@ -1022,6 +1047,9 @@ tm10-inc2-grammar (issue #83 sibling): typeof indexed access as one union member
 
 ---
 
+; Proves the typeof-opaque run composes correctly with type_union — the
+; opaque leaf terminates cleanly at the union's '|' boundary rather than
+; swallowing the sibling member.
 (source_file
   (dto_field
     (field_name)

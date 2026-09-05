@@ -64,12 +64,8 @@ UserController <: BaseController, IController
   (class_declaration
     (entity_name)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name)))
-      (heritage_type
-        (type_named
-          (entity_name))))))
+      (heritage_type (type_named (entity_name)))
+      (heritage_type (type_named (entity_name))))))
 
 ============================================================
 E4 CORRECTED: bare Class with EMPTY inheritance list (scenario-34-cli-tool.tmd:127 `cli <:`)
@@ -96,9 +92,7 @@ UserController #: src/controllers/user.ts <: BaseController
     (entity_name)
     (path)
     (inherit_list
-      (heritage_type
-        (type_named
-          (entity_name))))))
+      (heritage_type (type_named (entity_name))))))
 
 ============================================================
 E5: ClassFile without inheritance
@@ -779,6 +773,12 @@ S-GRAMMAR-4b arm 2 (NARROWS): leading-digit entity name yields ERROR (scenario-5
 
 ---
 
+; X-TYPE-1 collateral (rfc-tm-8-diamond.md §1): the ERROR-recovery internal
+; shape moved (was `(ERROR (dependency_name) (UNEXPECTED 's'))`) because the
+; type-expression sub-grammar adds new token shapes to the grammar's global
+; token table, which GLR error recovery draws from at every recovery point —
+; not because this line's OWN meaning changed. The document-level verdict is
+; unchanged: this is still, and only, an ERROR.
 (source_file
   (ERROR
     (dependency_name)))
@@ -811,6 +811,13 @@ range-version ^ "Range version" ^4.0.0
 
 ---
 
+; X-TYPE-1 collateral (rfc-tm-8-diamond.md §1): the ERROR-recovery internal
+; shape moved (was `(ERROR (UNEXPECTED '4'))`) — GLR error recovery now finds
+; `4.0.0` matches the new type_literal_number token (`-?\d+(\.\d+)?`) at this
+; recovery point (that token is grammar-global, not scoped to dto_field), so
+; recovery consumes it as a real leaf instead of an opaque UNEXPECTED
+; placeholder. The line's own meaning is unchanged: `^4.0.0` is still, and
+; only, an ERROR for a dependency version (this fixture's whole point).
 (source_file
   (dependency_declaration
     (dependency_name)
