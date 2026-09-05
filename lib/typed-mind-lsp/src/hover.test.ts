@@ -132,3 +132,18 @@ AppEntry @ src/index.ts:
     assert.match(contents, /\*\*Exports\*\*: handleRequest, UserController/);
   });
 });
+
+it('G.3 hover shows full declaration parameters and instantiated inheritance', async () => {
+  const typedMind = await TypedMind.create();
+  const parsed = typedMind.parseWithCst(
+    'class Child {\n typeParameter: "T extends Constraint = Default"\n extends: "Base<T>"\n implements: "Contract<T>"\n}\ndto Pair {\n typeParameter: "out T"\n extends: "Base<T>"\n}\n',
+  );
+  const byName = buildEntityByNameIndex(parsed);
+  const child = hoverFor(byName, parsed.links, 'Child');
+  assert.ok(child.includes('**Type parameters**: T extends Constraint = Default'));
+  assert.ok(child.includes('**Extends**: Base<T>'));
+  assert.ok(child.includes('**Implements**: Contract<T>'));
+  const pair = hoverFor(byName, parsed.links, 'Pair');
+  assert.ok(pair.includes('**Type parameters**: out T'));
+  assert.ok(pair.includes('**Extends**: Base<T>'));
+});

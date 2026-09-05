@@ -115,6 +115,11 @@ export const CHECK_CODES = [
   // pipeline/attachment-rules.ts
   'semantics/illegal-continuation',
   'semantics/orphan-continuation',
+  // Generic declaration header/property validation.
+  'semantics/conflicting-type-parameters',
+  'semantics/invalid-type-parameter',
+  'semantics/multiple-class-bases',
+  'semantics/unsupported-generic-declaration',
   // pipeline/syntax-diagnostics.ts
   'syntax/error',
   'syntax/missing',

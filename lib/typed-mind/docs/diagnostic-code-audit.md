@@ -166,3 +166,5 @@ surrounding prose must match.
 | `semantics/invalid-type-parameter` | generic-declaration-syntax.ts / longform-builder.ts | `Invalid type parameter in 'Pair': close every bracket and quote.` | Diagnostic | PASS | Names the declaration and gives a specific correction, including explicit single-line literal limits. |
 | `semantics/multiple-class-bases` | longform-builder.ts | `A class may extend one base; use implements for additional contracts.` | Diagnostic | PASS | Span locates the declaration; message distinguishes base and contract roles and suggests correction. |
 | `semantics/unsupported-generic-declaration` | generic-declaration-syntax.ts / cst-to-ast.ts | `Enum 'Choice' does not accept type parameters; remove them or use an alias declaration.` | Diagnostic | PASS | Names the unsupported declaration and gives an applicable alternative. |
+
+Emission-only diagnostic `emitter/unsupported-multiline-type-parameter` (generic-declaration-emission.ts) is outside the suppressible checker registry. Grade: PASS. It names the parameter and declaration, identifies the unsupported multiline value, and asks for a single-line literal before emission.

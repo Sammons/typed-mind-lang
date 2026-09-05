@@ -26,6 +26,7 @@ import type { ProgramNode } from '../ast/program-node.ts';
 import type { RunParameterNode } from '../ast/run-parameter-node.ts';
 import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
+import { genericEmissionDiagnostics, genericNeedsLongform, parameterHeader, printHeritage } from './generic-declaration-emission.ts';
 import { printTypeExpr } from './print-type-expr.ts';
 import { quoteStringLiteral } from './quote-string-literal.ts';
 
@@ -149,7 +150,7 @@ const fileToShortform = (entity: FileNode): string[] => {
 };
 
 const functionToShortform = (entity: FunctionNode): string[] => {
-  const lines = [`${entity.name} :: ${entity.signature}`];
+  const lines = [`${entity.name}${parameterHeader(entity)} :: ${entity.signature}`];
   if (entity.description !== undefined) {
     lines.push(`  ${quoteStringLiteral(entity.description)}`);
   }
@@ -191,7 +192,9 @@ const inheritanceSuffix = (extendsName: string | undefined, implementsList: read
 };
 
 const classToShortform = (entity: ClassNode): string[] => {
-  const lines = [`${entity.name} <:${inheritanceSuffix(entity.extends, entity.implements)}`];
+  const lines = [
+    `${entity.name}${parameterHeader(entity)} <:${inheritanceSuffix(entity.heritage.extends === undefined ? undefined : printHeritage(entity.heritage.extends), entity.heritage.implements.map(printHeritage))}`,
+  ];
   if (entity.purpose !== undefined) {
     lines.push(`  ${quoteStringLiteral(entity.purpose)}`);
   }
@@ -203,8 +206,10 @@ const classToShortform = (entity: ClassNode): string[] => {
 
 const classFileToShortform = (entity: ClassFileNode): string[] => {
   const inheritance =
-    entity.extends === undefined && entity.implements.length === 0 ? '' : ` <:${inheritanceSuffix(entity.extends, entity.implements)}`;
-  const lines = [`${entity.name} #: ${entity.path}${inheritance}`];
+    entity.extends === undefined && entity.implements.length === 0
+      ? ''
+      : ` <:${inheritanceSuffix(entity.heritage.extends === undefined ? undefined : printHeritage(entity.heritage.extends), entity.heritage.implements.map(printHeritage))}`;
+  const lines = [`${entity.name}${parameterHeader(entity)} #: ${entity.path}${inheritance}`];
   if (entity.purpose !== undefined) {
     lines.push(`  ${quoteStringLiteral(entity.purpose)}`);
   }
@@ -259,7 +264,7 @@ const dtoFieldLine = (field: DtoNode['fields'][number]): string => {
 };
 
 const dtoToShortform = (entity: DtoNode): string[] => {
-  let line = `${entity.name} %`;
+  let line = `${entity.name}${parameterHeader(entity)} %`;
   if (entity.purpose !== undefined) {
     line += ` ${quoteStringLiteral(entity.purpose)}`;
   }
@@ -323,9 +328,9 @@ const dependencyToShortform = (entity: DependencyNode): string[] => {
 // printer consumer, not a raw-carriage byte-preservation case.
 const typeDefToShortform = (entity: TypeDefNode): string[] => {
   if (entity.variant === 'enum') {
-    return [`${entity.name} = enum [${(entity.members ?? []).join(', ')}]`];
+    return [`${entity.name}${parameterHeader(entity)} = enum [${(entity.members ?? []).join(', ')}]`];
   }
-  return [`${entity.name} = ${entity.aliasType === undefined ? '' : printTypeExpr(entity.aliasType)}`];
+  return [`${entity.name}${parameterHeader(entity)} = ${entity.aliasType === undefined ? '' : printTypeExpr(entity.aliasType)}`];
 };
 
 // RC-C (issue #102): shortform's grammar/attachment-rules.ts legality table
@@ -357,6 +362,7 @@ const typeDefToShortform = (entity: TypeDefNode): string[] => {
 // shortform. Same fix shape as Program.exports/ClassFile.purpose: promote
 // just this one entity to longform when it carries the field.
 export const shortformCannotExpress = (entity: EntityNode): boolean => {
+  if (genericNeedsLongform(entity)) return true;
   switch (entity.kind) {
     case 'Program': {
       const program = entity as ProgramNode;
@@ -411,5 +417,5 @@ export const emitShortform = (entity: EntityNode): string[] => {
 
 // The diagnostic API remains available; escaped output requires no mutation warning.
 export const emitShortformWithDiagnostics = (entity: EntityNode): { lines: string[]; diagnostics: Diagnostic[] } => {
-  return { lines: emitShortform(entity), diagnostics: [] };
+  return { lines: emitShortform(entity), diagnostics: genericEmissionDiagnostics(entity) };
 };
