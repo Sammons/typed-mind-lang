@@ -9,7 +9,8 @@
 //         regression test below.
 //   110 — RFC-TM-11 Deferral RX-A (rfc-tm-11-diamond.md:373-406): the real
 //         re-export is CLEAN; the same-name-from-external-package shape is
-//         pinned at current behaviour (silent) — needs a new mechanism.
+//         FIXED by RFC-TM-15 §S2 (rfc-tm-15-diamond.md, leaf X1): the entry
+//         is owner-qualified and its Dependency carries the export.
 //   111 — RFC-TM-11 Deferral RX-B (same section): the self-credit shape is
 //         FIXED in check-orphans.ts (core test in ast-validator.test.ts);
 //         the unrelated-importer shape is pinned — needs the same mechanism.
@@ -85,21 +86,32 @@ describe('Q7 item 2 — RFC-TM-11 Deferral RX-A: reExports vs an independent exp
     assert.equal(checked.valid, true);
   });
 
-  // PINNED, not fixed. `vendor-surface.ts` re-exports `normalizeVehicleString`
-  // from an external package; the emitted `<-> [normalizeVehicleString]`
-  // names normalize.ts's entity by coincidence of spelling. The document has
-  // no slot to say WHICH binding a `reexports:` entry forwards, so the
-  // checker cannot tell this from shape A and stays silent. RX-A's own fix
-  // is that provenance slot (fixture 110's README); a `reExports`-only
-  // patch in `checkDuplicateExports` would flag shape A too.
-  it('shape B (same name re-exported from an external package) is pinned: silent, and the converter keeps the name', async () => {
+  // FIXED (RFC-TM-15 §S2, leaf X1). `vendor-surface.ts` re-exports
+  // `normalizeVehicleString` from an external package; the entry used to be
+  // the bare name, which named normalize.ts's entity by coincidence of
+  // spelling. The converter now creates the Dependency for the external
+  // source, appends the re-exported name to its `exports`, and emits the
+  // entry owner-qualified (`VehicleVendorSdk.normalizeVehicleString`); the
+  // resolver follows the qualified entry to `external`, so the local entity
+  // is never bound. RX-6's fold matches on the member part, so `MainFile`
+  // keeps `VendorSurfaceFile` in its imports and no `orphaned-file` fires.
+  it('TM15 V2: an external re-export is emitted owner-qualified with its Dependency and the fold survives', async () => {
     const result = convertFixture('110-reexport-name-vs-independent-export');
+    assert.equal(result.success, true);
     const vendorSurface = fileByPath(result.entities, 'vendor-surface.ts');
+    const main = fileByPath(result.entities, 'main.ts');
+    const dependency = result.entities.find((entity) => entity.kind === 'Dependency' && entity.name === 'VehicleVendorSdk') as
+      | { exports?: readonly string[] }
+      | undefined;
     assert.deepEqual(vendorSurface?.exports, []);
-    assert.deepEqual(vendorSurface?.reExports, ['normalizeVehicleString']);
+    assert.deepEqual(vendorSurface?.reExports, ['VehicleVendorSdk.normalizeVehicleString']);
     assert.deepEqual(vendorSurface?.imports, []);
+    assert.deepEqual(dependency?.exports, ['normalizeVehicleString']);
+    assert.ok(main?.imports.includes(vendorSurface?.name ?? ''), `RX-6 fold must survive qualification: ${main?.imports.join(', ')}`);
+    assert.match(result.tmdContent, /VendorSurfaceFile @ src\/vendor-surface\.ts:\n  <-> \[VehicleVendorSdk\.normalizeVehicleString\]\n/);
     const checked = await checkDocument(result.tmdContent);
     assert.deepEqual(checked.diagnostics, [], result.tmdContent);
+    assert.equal(checked.valid, true);
   });
 });
 

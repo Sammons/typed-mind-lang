@@ -2648,9 +2648,13 @@ export class TypeScriptToTypedMindConverter {
       for (const entry of entries)
         this.nameAllocator.reserve(`program:${entry}`, [this.deriveProgramName(path.basename(entry, path.extname(entry)))]);
     }
-    const dependencySpecifiers = new Set(
-      orderedModules.flatMap((module) => module.imports.filter((imp) => this.isExternalPackage(imp.specifier)).map((imp) => imp.specifier)),
-    );
+    const dependencySpecifiers = new Set([
+      ...orderedModules.flatMap((module) => module.imports.filter((imp) => this.isExternalPackage(imp.specifier)).map((imp) => imp.specifier)),
+      // RFC-TM-15 §S2 — an external re-export source becomes a Dependency
+      // in `convertExports` (`reExportEntryWithProvenance`); reserve its
+      // name in the same deterministic order as the import-derived ones.
+      ...orderedModules.flatMap((module) => module.exports.flatMap((exp) => this.externalReExportSource(exp) ?? [])),
+    ]);
     for (const specifier of [...dependencySpecifiers].sort()) this.createDependencyName(specifier);
     const builtinTargets = new Set(
       orderedModules.flatMap((module) => module.classes.map((cls) => cls.extends[0]).filter((name): name is string => name !== undefined)),
@@ -3961,7 +3965,13 @@ export class TypeScriptToTypedMindConverter {
     if (!(targetEntity instanceof FileNode)) {
       return undefined;
     }
-    const reExportsTheImportedName = importedNames.some((name) => targetEntity.reExports.includes(name));
+    // RFC-TM-15 §S2 — an external re-export entry is `Owner.member`, so the
+    // match is on the member part; the importer's source names the bare
+    // binding, and the fold must survive qualification (fixture 110's
+    // `MainFile: <- [..., VendorSurfaceFile]`).
+    const reExportsTheImportedName = importedNames.some((name) =>
+      targetEntity.reExports.some((entry) => entry.slice(entry.lastIndexOf('.') + 1) === name),
+    );
     return reExportsTheImportedName ? targetFileEntityName : undefined;
   }
 
@@ -4669,7 +4679,7 @@ export class TypeScriptToTypedMindConverter {
       }
       if (exp.name !== excludeName && this.isValidEntityName(exp.name) && !seenNames.has(exp.name)) {
         if (this.isReExport(exp)) {
-          reExportNames.push(exp.name);
+          reExportNames.push(this.reExportEntryWithProvenance(exp));
         } else if (!this.isPredictedTypeDef(exp.name)) {
           // issue #88 — a TypeDef-predicted export name (a non-object-like
           // `type` alias, or an enum) is excluded here: `exports.to`
@@ -4707,6 +4717,50 @@ export class TypeScriptToTypedMindConverter {
     }
 
     return { exportNames: [...new Set(exportNames)], reExportNames };
+  }
+
+  // RFC-TM-15 §S2 (rfc-tm-15-diamond.md, leaf X1) — a `reexports:` entry is
+  // bare when the re-exported binding resolves to a project declaration and
+  // `Owner.member` when its source is external. Fixture 110 shape B
+  // (`export { normalizeVehicleString } from 'vehicle-vendor-sdk'`) used to
+  // emit the bare name, which the resolver bound to the LOCAL
+  // `normalizeVehicleString` by coincidence of spelling. The external source
+  // is a fact the analyzer already holds (`ParsedExport.source`); carrying it
+  // needs no grammar change because `list_entry` accepts dotted tokens and
+  // the resolver gives a qualified name checked-ownership semantics. The
+  // Dependency is created HERE (not through `addExternalTypeToDepExports`,
+  // which is keyed by imported names and cannot see a re-export source) and
+  // the re-exported name is appended to its `exports`, the same shape the
+  // `originContext.bindings` loop in `convert` uses, so the resolver's
+  // Dependency arm resolves the entry to `external` instead of
+  // `missing-member`. The Dependency's name is pre-reserved in
+  // `reserveEntityNames` alongside the import-derived specifiers.
+  private reExportEntryWithProvenance(exp: ParsedExport): string {
+    const source = this.externalReExportSource(exp);
+    if (source === undefined) {
+      return exp.name;
+    }
+    this.createDependencyEntity(source);
+    const dependency = this.dependencies.get(source);
+    if (dependency === undefined) {
+      return exp.name;
+    }
+    if (!dependency.exports?.includes(exp.name)) {
+      this.dependencies.set(source, new DependencyNode({ ...dependency, exports: [...(dependency.exports ?? []), exp.name] }));
+    }
+    return `${dependency.name}.${exp.name}`;
+  }
+
+  // The external source of a named re-export whose binding did NOT resolve
+  // to a project declaration (a proven project origin stays bare, whatever
+  // the specifier's shape — `isExternalPackage` also treats tsconfig-paths
+  // aliases and workspace packages as external). `undefined` for local
+  // re-exports, star re-exports and project-resolved bindings.
+  private externalReExportSource(exp: ParsedExport): string | undefined {
+    if (exp.source === undefined || exp.declaration !== undefined || exp.name === '*' || !this.isExternalPackage(exp.source)) {
+      return undefined;
+    }
+    return exp.source;
   }
 
   private isReExport(exportItem: ParsedExport): boolean {

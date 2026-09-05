@@ -118,12 +118,24 @@ export class QualifiedNameResolver {
     if (owner instanceof FileNode || owner instanceof ClassFileNode) {
       const declared = this.#declaredMembers.get(ownerName)?.get(member);
       const exported = owner.exports.includes(name) || owner.exports.includes(member);
-      const reExported = owner instanceof FileNode && (owner.reExports.includes(name) || owner.reExports.includes(member));
+      // RFC-TM-15 §S2 — a `reexports:` entry is bare (a project binding) or
+      // `Owner.member` (an external binding forwarded from a Dependency).
+      // Both spellings match on the member part; a qualified entry is then
+      // resolved on its own, so the result is `external` for a Dependency
+      // owner and never the same-spelled local entity.
+      const reExportEntry =
+        owner instanceof FileNode
+          ? owner.reExports.find((entry) => entry === name || entry === member || entry.slice(entry.lastIndexOf('.') + 1) === member)
+          : undefined;
+      const reExported = reExportEntry !== undefined;
       if (declared !== undefined) {
         if (options.importingFile !== undefined && options.importingFile !== ownerName && !exported && !reExported) {
           return failure('private-member');
         }
         return { kind: 'entity', entity: declared };
+      }
+      if (!exported && reExportEntry !== undefined && reExportEntry.includes('.')) {
+        return this.resolveWithState(reExportEntry, {}, active);
       }
       if (exported || reExported) {
         const target = this.#byName.get(name) ?? this.#byName.get(member);

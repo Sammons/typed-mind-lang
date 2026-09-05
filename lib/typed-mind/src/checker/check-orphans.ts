@@ -180,8 +180,21 @@ const isFileConsumed = (context: CheckContext, file: FileNode): boolean => {
   // remaining bare-name credit from an UNRELATED importer is RX-B's other
   // half and stays deferred: closing it needs per-File import provenance
   // the language does not carry (fixture 111's README).
+  //
+  // RFC-TM-15 §S2 (rfc-tm-15-diamond.md, leaf X1) — a qualified entry
+  // (`VehicleVendorSdk.normalizeVehicleString`, fixture 110 shape B)
+  // resolves `external`: the forwarded binding is a Dependency member, not
+  // a project entity, so no importer of the same-spelled local entity (or
+  // of the Dependency itself) is evidence that this File is consumed.
+  // Consumption of an external-forwarding barrel is proven by the RX-6 fold
+  // (the third branch below) or, after RFC-TM-15 §S3, by a qualified
+  // importer entry.
   for (const reExportName of file.reExports) {
-    if (isEntityImported(context, resolvedNameTarget(context.names.resolveExport(file.name, reExportName))?.name ?? reExportName, file)) {
+    const resolution = context.names.resolveExport(file.name, reExportName);
+    if (resolution.kind === 'external') {
+      continue;
+    }
+    if (isEntityImported(context, resolvedNameTarget(resolution)?.name ?? reExportName, file)) {
       return true;
     }
   }
