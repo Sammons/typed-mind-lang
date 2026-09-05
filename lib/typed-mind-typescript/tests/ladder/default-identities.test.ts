@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { it, type TestContext } from 'node:test';
-import { ClassFileNode, ClassNode, ConstantsNode, FileNode, FunctionNode, TypedMind } from '@sammons/typed-mind';
+import { ClassFileNode, ClassNode, ConstantsNode, FileNode, FunctionNode, ProgramNode, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -104,4 +104,81 @@ it('TM13 D: source declarations reserve their name before a default owner is gen
   assert.ok(owner instanceof FileNode);
   assert.notEqual(owner.name, 'ValueFile');
   assert.ok(converted.entities.some((entity) => entity.name === `${owner.name}.default`));
+});
+
+it('TM13 D: local public aliases and default clauses converge across named and default imports', async (context) => {
+  for (const declaration of [
+    'const value = () => 1; const renamed = 9;',
+    'function value() { return 1; }',
+    'class value {}',
+    'const value = { read() { return 1; } };',
+  ]) {
+    for (const exports of ['export { value as default, value as renamed };', 'export { value as renamed }; export default value;']) {
+      const { converted } = fixture(context, `${declaration} ${exports}`, {
+        'other.ts': 'import { renamed as another } from "./value.js"; export function other() { return another; }',
+        'main.ts':
+          'import alias, { renamed as named } from "./value.js"; import { other } from "./other.js"; export function main() { return [alias, named, other]; }',
+      });
+      assert.equal(converted.success, true);
+      const owner = converted.entities.find((entity) => entity instanceof FileNode && entity.path === 'value.ts');
+      assert.ok(owner instanceof FileNode);
+      assert.deepEqual(owner.exports, ['ValueFile.default']);
+      assert.equal(converted.entities.filter((entity) => entity.name === 'ValueFile.default').length, 1);
+      assert.equal(
+        converted.entities.some((entity) => entity.name === 'renamed'),
+        false,
+      );
+      for (const path of ['main.ts', 'other.ts']) {
+        const importer = converted.entities.find((entity) => entity instanceof FileNode && entity.path === path);
+        assert.ok(importer instanceof FileNode);
+        assert.equal(importer.imports.filter((name) => name === 'ValueFile.default').length, 1);
+        assert.equal(importer.imports.includes('renamed'), false);
+      }
+      assert.deepEqual((await TypedMind.create()).check(converted.tmdContent).diagnostics, []);
+    }
+  }
+});
+
+it('TM13 D: anonymous defaults stay explicitly unsupported without malformed output identities', async (context) => {
+  for (const source of ['export default function() { return 1; }', 'export default class {}']) {
+    const { analysis, converted } = fixture(context, source, {
+      'main.ts': 'import alias from "./value.js"; export function main() { return alias; }',
+    });
+    assert.equal(analysis.diagnostics.filter((diagnostic) => diagnostic.category === 'unsupported-default-export').length, 1);
+    assert.equal(
+      converted.entities.some((entity) => entity.name.includes('<anonymous>') || entity.name.endsWith('.default')),
+      false,
+    );
+    assert.deepEqual(
+      (await TypedMind.create()).check(converted.tmdContent).diagnostics.filter((finding) => finding.code === 'syntax/error'),
+      [],
+    );
+  }
+});
+
+it('TM13 D: local named aliases alone retain the source declaration and canonical program export', async (context) => {
+  for (const declaration of ['const value = () => 1;', 'function value() { return 1; }', 'class value {}', 'const value = 1;']) {
+    const { analysis } = fixture(context, `${declaration} export { value as renamed };`, {
+      'main.ts': 'import { renamed } from "./value.js"; export function main() { return renamed; }',
+    });
+    const converted = new TypeScriptToTypedMindConverter().convert(analysis);
+    assert.equal(converted.success, true);
+    const main = converted.entities.find((entity) => entity instanceof FileNode && entity.path === 'main.ts');
+    assert.ok(main instanceof FileNode);
+    assert.deepEqual(main.imports, ['value']);
+    assert.equal(converted.entities.filter((entity) => entity.name === 'value').length, 1);
+    assert.deepEqual(
+      (await TypedMind.create())
+        .check(converted.tmdContent)
+        .diagnostics.filter((finding) => /unknown|qualified|multi-exported|syntax/.test(finding.code)),
+      [],
+    );
+  }
+  const { analysis } = fixture(context, 'const value = () => 1; export { value as renamed }; export default value;');
+  const valueModule = analysis.modules.find((module) => module.filePath.endsWith('/value.ts'));
+  assert.ok(valueModule);
+  const converted = new TypeScriptToTypedMindConverter().convert({ ...analysis, entryPoints: [valueModule.filePath] });
+  const program = converted.entities.find((entity) => entity instanceof ProgramNode);
+  assert.ok(program instanceof ProgramNode);
+  assert.deepEqual(program.exports, ['ValueFile.default']);
 });

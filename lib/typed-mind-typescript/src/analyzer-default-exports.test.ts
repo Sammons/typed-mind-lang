@@ -65,3 +65,36 @@ it('TM13 D: unresolved imported and nonidentifier defaults do not create local i
     assert.equal(analysis.diagnostics.filter((diagnostic) => diagnostic.category === 'unsupported-default-export').length, 1);
   }
 });
+
+it('TM13 D: local default and named export clauses retain public names and exact identity', (context) => {
+  for (const source of [
+    'const value = () => 1; export { value as default, value as renamed };',
+    'export { value as renamed }; export { value as default }; const value = () => 1;',
+    'const value = () => 1; export { value as renamed }; export default value;',
+  ]) {
+    const { analysis, module } = analyze(context, source);
+    assert.deepEqual(analysis.diagnostics, []);
+    assert.equal(module.exports.length, 2);
+    assert.deepEqual(module.exports.map((exp) => [exp.name, exp.isDefault, exp.type]).sort(), [
+      ['renamed', false, 'function'],
+      ['value', true, 'function'],
+    ]);
+    for (const exp of module.exports) assert.deepEqual(exp.declaration, module.functions[0]?.declaration);
+  }
+});
+
+it('TM13 D: anonymous and imported clause defaults report unsupported facts without synthetic names', (context) => {
+  for (const source of [
+    'export default function() { return 1; }',
+    'export default class {}',
+    'import { remote } from "./remote.js"; export { remote as default };',
+  ]) {
+    const { analysis, module } = analyze(context, source);
+    assert.deepEqual(module.exports, []);
+    assert.equal(analysis.diagnostics.filter((diagnostic) => diagnostic.category === 'unsupported-default-export').length, 1);
+    assert.equal(
+      [...module.functions, ...module.classes].some((item) => item.name === '<anonymous>'),
+      false,
+    );
+  }
+});

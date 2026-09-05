@@ -958,6 +958,10 @@ export class TypeScriptAnalyzer {
       } else if (isExportDeclaration(node)) {
         exports.push(...this.parseExportDeclaration(node));
       } else if (isFunction(node)) {
+        if (!node.name && this.hasDefaultModifier(node)) {
+          this.reportUnsupportedDefault(sourceFile, node);
+          return;
+        }
         const func = this.parseFunction(node);
         functions.push(func);
 
@@ -970,6 +974,10 @@ export class TypeScriptAnalyzer {
           } as const);
         }
       } else if (isClass(node)) {
+        if (!node.name && this.hasDefaultModifier(node)) {
+          this.reportUnsupportedDefault(sourceFile, node);
+          return;
+        }
         const cls = this.parseClass(node);
         classes.push(cls);
 
@@ -1109,14 +1117,48 @@ export class TypeScriptAnalyzer {
     for (const declaration of declarations) {
       if (declaration.declaration !== undefined) retained.set(key(declaration.declaration), declaration);
     }
-    const result = exports.map((exp) => {
-      if (!exp.isDefault) return exp;
-      const matches = declarations.filter((declaration) => declaration.name === exp.name && declaration.declaration !== undefined);
-      const identities = new Set(
-        matches.flatMap((declaration) => (declaration.declaration === undefined ? [] : [key(declaration.declaration)])),
-      );
-      return identities.size === 1 ? { ...exp, declaration: matches[0]?.declaration } : exp;
-    });
+    // Local export clauses preserve their public spelling and carry the exact
+    // retained declaration. Default clauses use the declaration name, matching
+    // named default declarations and identifier export assignments.
+    const localClauses = new Map<string, (typeof declarations)[number]>();
+    const unsupportedDefaults = new Set<string>();
+    for (const statement of source.statements) {
+      if (
+        !ts.isExportDeclaration(statement) ||
+        statement.moduleSpecifier ||
+        !statement.exportClause ||
+        !ts.isNamedExports(statement.exportClause)
+      )
+        continue;
+      for (const element of statement.exportClause.elements) {
+        const origin = this.resolveReferenceOriginAtLocation(element.propertyName ?? element.name);
+        const target = origin.kind === 'project' ? retained.get(key(origin.declaration)) : undefined;
+        if (target !== undefined) localClauses.set(element.name.text, target);
+        else if (element.name.text === 'default') {
+          unsupportedDefaults.add(element.name.text);
+          this.reportUnsupportedDefault(source, element);
+        }
+      }
+    }
+    const result = exports
+      .filter((exp) => exp.source !== undefined || !unsupportedDefaults.has(exp.name))
+      .map((exp) => {
+        const local = exp.source === undefined ? localClauses.get(exp.name) : undefined;
+        if (local !== undefined)
+          return {
+            ...exp,
+            name: exp.name === 'default' ? local.name : exp.name,
+            isDefault: exp.name === 'default',
+            declaration: local.declaration,
+            type: local.type,
+          };
+        if (!exp.isDefault) return exp;
+        const matches = declarations.filter((declaration) => declaration.name === exp.name && declaration.declaration !== undefined);
+        const identities = new Set(
+          matches.flatMap((declaration) => (declaration.declaration === undefined ? [] : [key(declaration.declaration)])),
+        );
+        return identities.size === 1 ? { ...exp, declaration: matches[0]?.declaration } : exp;
+      });
     for (const statement of source.statements) {
       if (!ts.isExportAssignment(statement) || statement.isExportEquals) continue;
       const origin = ts.isIdentifier(statement.expression) ? this.resolveReferenceOriginAtLocation(statement.expression) : undefined;
@@ -1127,16 +1169,20 @@ export class TypeScriptAnalyzer {
           result.push({ name: target.name, declaration: identity, isDefault: true, type: target.type, source: undefined });
         }
       } else {
-        this.diagnostics.push({
-          severity: 'warning',
-          category: 'unsupported-default-export',
-          message: `Default export '${statement.expression.getText()}' has no uniquely retained local declaration; no default identity was synthesized`,
-          filePath: source.fileName,
-          specifier: undefined,
-        });
+        this.reportUnsupportedDefault(source, statement.expression);
       }
     }
     return result;
+  }
+
+  private reportUnsupportedDefault(source: ts.SourceFile, expression: ts.Node): void {
+    this.diagnostics.push({
+      severity: 'warning',
+      category: 'unsupported-default-export',
+      message: `Default export '${expression.getText()}' has no uniquely retained local declaration; no default identity was synthesized`,
+      filePath: source.fileName,
+      specifier: undefined,
+    });
   }
 
   // RC-F (issue #108) — `isPureTypesFile` (typescript-to-typedmind-
