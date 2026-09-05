@@ -169,6 +169,10 @@ const checkEntityReferences = (context: CheckContext, entity: EntityNode): void 
       checkSingleReference(context, entity, 'containsProgram', entity.containsProgram);
     }
   } else if (entity instanceof ConstantsNode) {
+    for (const call of entity.calls) {
+      const callTarget = call.includes('.') ? (call.split('.').at(0) ?? call) : call;
+      checkSingleReference(context, entity, 'calls', callTarget);
+    }
     if (entity.schema !== undefined) {
       checkSingleReference(context, entity, 'schema', entity.schema);
     }

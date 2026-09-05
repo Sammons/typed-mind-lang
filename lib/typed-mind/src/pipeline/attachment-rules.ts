@@ -163,7 +163,7 @@ export const attachmentRules: Record<string, AttachmentRule> = {
   calls_list: {
     group: 'calls',
     label: 'calls list (`~> [...]`)',
-    accepts: (target) => target.kind === 'Function',
+    accepts: (target) => target.kind === 'Function' || target.kind === 'Constants',
     apply: (target, syntaxNode) => {
       target.slots.calls = namesOf(new CstCallsList(syntaxNode));
     },

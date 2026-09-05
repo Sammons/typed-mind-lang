@@ -11,7 +11,16 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-import { ClassFileNode, DependencyNode, type Diagnostic, FileNode, FunctionNode, type ParseOutput, ProgramNode } from '@sammons/typed-mind';
+import {
+  ClassFileNode,
+  ConstantsNode,
+  DependencyNode,
+  type Diagnostic,
+  FileNode,
+  FunctionNode,
+  type ParseOutput,
+  ProgramNode,
+} from '@sammons/typed-mind';
 
 export interface EnhancedRendererOptions {
   port?: number;
@@ -1293,7 +1302,7 @@ ${this.generateRendererJS()}
         }
       }
 
-      if (entity instanceof FunctionNode) {
+      if (entity instanceof FunctionNode || entity instanceof ConstantsNode) {
         for (const call of entity.calls) {
           if (byName.has(call)) {
             links.push({ source: entity.name, target: call, type: 'call' });

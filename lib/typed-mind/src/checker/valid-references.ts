@@ -39,7 +39,7 @@ export const VALID_REFERENCES: Record<ReferenceKind, ReferenceLegality> = {
     to: ['Function', 'Class', 'ClassFile', 'Constants', 'DTO', 'Asset', 'UIComponent', 'File'],
   },
   calls: {
-    from: ['Function'],
+    from: ['Function', 'Constants'],
     to: ['Function', 'Class'], // Class is allowed because of method calls
   },
   // Gap 67 (ladder rung sammons/slat-harness, fixture

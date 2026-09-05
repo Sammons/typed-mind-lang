@@ -196,6 +196,9 @@ const classFileToLongform = (entity: ClassFileNode): string[] => {
 
 const constantsToLongform = (entity: ConstantsNode): string[] => {
   const body: string[] = [`type: Constants`, `path: ${entity.path}`];
+  if (entity.calls.length > 0) {
+    body.push(`calls: [${entity.calls.join(', ')}]`);
+  }
   if (entity.schema !== undefined) {
     body.push(`schema: ${entity.schema}`);
   }

@@ -8,11 +8,13 @@ export class ConstantsNode extends EntityNode {
   readonly path: string;
   readonly schema: string | undefined;
   readonly purpose: string | undefined;
+  readonly calls: readonly string[];
 
-  constructor(args: EntityNodeArgs & { path: string; schema?: string; purpose?: string }) {
+  constructor(args: EntityNodeArgs & { path: string; schema?: string; purpose?: string; calls?: readonly string[] }) {
     super(args);
     this.path = args.path;
     this.schema = args.schema;
     this.purpose = args.purpose;
+    this.calls = args.calls ?? [];
   }
 }

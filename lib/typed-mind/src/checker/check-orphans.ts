@@ -12,6 +12,7 @@
 import { AssetNode } from '../ast/asset-node.ts';
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
+import { ConstantsNode } from '../ast/constants-node.ts';
 import { DtoNode } from '../ast/dto-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
@@ -87,6 +88,11 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
     if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
       for (const method of entity.methods) {
         referenced.add(method);
+      }
+    }
+    if (entity instanceof ConstantsNode) {
+      for (const call of entity.calls) {
+        referenced.add(call);
       }
     }
     if (entity instanceof ProgramNode) {
