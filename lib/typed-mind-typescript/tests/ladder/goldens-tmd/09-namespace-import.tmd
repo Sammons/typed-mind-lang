@@ -12,9 +12,12 @@ MainFile @ src/main.ts:
 MathutilsFile @ src/mathutils.ts:
   -> [add, sub]
 
-MathUtils <: NamespaceImport
-  "Namespace import: MathUtils from ./mathutils.js"
-  => [add, sub]
+class MathUtils {
+  type: Class
+  implements: [NamespaceImport]
+  description: "Namespace import: MathUtils from ./mathutils.js"
+  methods: [add, sub]
+}
 
 mainFn :: mainFn() => number
 
