@@ -6,14 +6,14 @@ program IndexApp {
 }
 
 IndexFile @ src/index.ts:
-  <- [list_types_route, TypesFile]
+  <- [TypesFile.list_types_route, TypesFile]
   -> [register_routes]
 
 TypesListFile @ src/routes/types-list.ts:
   -> [list_types_route]
 
 TypesFile @ src/routes/types.ts:
-  <- [list_types_route]
+  <- [TypesListFile.list_types_route]
   <-> [list_types_route]
 
 register_routes :: register_routes() => string

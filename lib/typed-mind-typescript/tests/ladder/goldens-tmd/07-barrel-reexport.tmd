@@ -6,14 +6,14 @@ program MainApp {
 }
 
 IndexFile @ src/lib/index.ts:
-  <- [makeWidget]
+  <- [WidgetFile.makeWidget]
   <-> [makeWidget]
 
 WidgetFile @ src/lib/widget.ts:
   -> [makeWidget]
 
 MainFile @ src/main.ts:
-  <- [makeWidget, IndexFile]
+  <- [IndexFile.makeWidget, IndexFile]
   -> [mainFn]
 
 makeWidget :: makeWidget() => string
