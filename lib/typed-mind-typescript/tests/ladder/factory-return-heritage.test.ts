@@ -116,3 +116,17 @@ it('TM13 H: anonymous structural union and missing factory returns retain explic
     ),
   );
 });
+
+it('TM13 H: a nested derived class cannot overwrite a same-named outer class', (context) => {
+  const { converted } = fixture(context, {
+    'main.ts':
+      'export class Base {} export const factory = () => Base; export class Derived {} export function nested() { class Derived extends factory() {} return Derived; }',
+  });
+  const derived = converted.entities.filter((entity) => entity instanceof ClassNode && entity.name === 'Derived');
+  assert.equal(derived.length, 2);
+  assert.deepEqual(
+    derived.map((entity) => (entity instanceof ClassNode ? entity.extends : undefined)),
+    [undefined, 'factory'],
+  );
+  assert.ok(converted.warnings.some((warning) => /source 'Derived' was not uniquely emitted/.test(warning.message)));
+});

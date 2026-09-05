@@ -2166,6 +2166,14 @@ export class TypeScriptToTypedMindConverter {
       for (const cls of module.classes) {
         const heritage = cls.factoryHeritage?.find((entry) => entry.index === 0);
         if (heritage?.origin.kind !== 'project') continue;
+        const name = this.resolveTypeEntityName(module, cls.name);
+        if (cls.declaration === undefined || targets.get(key(cls.declaration)) !== name) {
+          this.addWarning(
+            `Factory heritage source '${cls.name}' was not uniquely emitted; its inheritance was not changed`,
+            module.filePath,
+          );
+          continue;
+        }
         const target = targets.get(key(heritage.origin.declaration));
         if (target === undefined) {
           this.addWarning(
@@ -2174,7 +2182,6 @@ export class TypeScriptToTypedMindConverter {
           );
           continue;
         }
-        const name = this.resolveTypeEntityName(module, cls.name);
         const index = this.entities.findIndex((entity) => entity.name === name);
         const entity = this.entities[index];
         if (entity instanceof ClassFileNode) {
