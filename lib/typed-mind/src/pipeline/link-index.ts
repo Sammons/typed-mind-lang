@@ -200,6 +200,8 @@ const collectEntityLinks = (collector: LinkCollector, entity: EntityNode): void 
     reference: (node, args) => {
       if (args.length === 0 || !isPrimitiveType(node.name)) collector.addReference(node.name, entity);
     },
+    // RFC-TM-14 §S4 R4b: a `(typeof X)` leaf references the value X names.
+    valueReference: (name) => collector.addReference(name, entity),
   });
 };
 

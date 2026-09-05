@@ -11,6 +11,8 @@
 // RFC-TM-13 B1/G additionally collect structural type uses across fields,
 // aliases, signatures, constraints/defaults and heritage. Lexical binders and
 // unsupported opaque text never contribute guessed global edges.
+// RFC-TM-14 §S4 adds the members of a bounded inline-object leaf (R4a) and the
+// value a `(typeof X)` leaf names (R4b, `valueReference`).
 
 import { AssetNode } from '../ast/asset-node.ts';
 import { ClassFileNode } from '../ast/class-file-node.ts';
@@ -100,6 +102,8 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
       reference: (node, args) => {
         if (args.length === 0 || !isPrimitiveType(node.name)) addReference(node.name, referenced, context.names);
       },
+      // RFC-TM-14 §S4 R4b: a `(typeof X)` leaf uses the value X names.
+      valueReference: (name) => addReference(name, referenced, context.names),
     });
   }
   return referenced;

@@ -42,8 +42,14 @@ it('TM13 B1/G: builtin wrappers and opaque text create no false uses; constraint
     ]),
     ['DefaultValue', 'Promise', 'T', 'U', 'callback'].map((name) => `Orphaned entity '${name}'`).toSorted(),
   );
+  // RFC-TM-14 §S4 R4a: an inline-object leaf's members are references
+  // (`{ secret: Opaque }` names Opaque); a rejected member shape still is not.
   assert.deepEqual(
     orphanNames('go(value: "Literal", object: { secret: Opaque }) => Map<string, Wrapped>', ['Literal', 'Opaque', 'Map', 'Wrapped']),
+    ["Orphaned entity 'Literal'", "Orphaned entity 'Map'"],
+  );
+  assert.deepEqual(
+    orphanNames('go(value: "Literal", object: { [key: string]: Opaque }) => Map<string, Wrapped>', ['Literal', 'Opaque', 'Map', 'Wrapped']),
     ["Orphaned entity 'Literal'", "Orphaned entity 'Map'", "Orphaned entity 'Opaque'"],
   );
   assert.deepEqual(orphanNames('go(value: Promise) => Map', ['Promise', 'Map']), []);
