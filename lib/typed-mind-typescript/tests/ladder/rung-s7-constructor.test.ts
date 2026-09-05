@@ -211,35 +211,24 @@ describe('84 — a type used only inside a generic in a function signature is re
   });
 });
 
-describe('85 — types reachable only through a ClassFile method signature are reported orphaned', () => {
-  // Corpus: tools/worktree-mediator/src/store.ts. `StoreConfig` is the
-  // `LeaseStore` constructor's parameter type and `AllocationFailure` is half
-  // of `allocate`'s return union; together they are both of that entrypoint's
-  // 2 diagnostics.
-  it('knownGap — a ClassFile records method NAMES only, so signature-only types lose their referent', async () => {
+describe('85 — ClassFile method and constructor types retain their references', () => {
+  // The original corpus has two signature-only types: StoreConfig in the
+  // constructor and AllocationFailure in allocate's return union.
+  it('TM13 B3: original gap85 closes through retained signatures with exact removal controls', async () => {
     const result = convertFixture('85-classfile-method-signature-types', ['src', 'server.ts']);
     assert.equal(result.success, true);
-
-    // `ClassFileNode.methods` is `readonly string[]`
-    // (lib/typed-mind/src/ast/class-file-node.ts:12) and the grammar has no
-    // slot for a method's parameter or return types.
-    assert.ok(result.tmdContent.includes('=> [allocate, list]'), `methods emit as bare names. Got:\n${result.tmdContent}`);
-
-    // The ClassFile's `-> [...]` DOES name them, but check-orphans.ts
-    // deliberately does not count exports as references (its own header
-    // states the rule), so this list cannot rescue them.
-    assert.ok(result.tmdContent.includes('-> [Lease, StoreConfig, AllocationFailure, LeaseStore]'));
-
-    const check = await checkTmd(result.tmdContent);
-    assert.deepEqual(messagesOf(check).toSorted(), ["Orphaned entity 'AllocationFailure'", "Orphaned entity 'StoreConfig'"]);
-
-    // `Lease` is the control: it survives only because server.ts imports it by
-    // name directly, which is the one path a ClassFile method type can take
-    // to reach the referenced set.
-    assert.equal(
-      messagesOf(check).includes("Orphaned entity 'Lease'"),
-      false,
-      'a directly-imported type is still counted, which isolates the signature-only path as the trigger',
+    const constructorLine = '  constructor: "(config: StoreConfig, leases?: Lease[])"\n';
+    const allocation = 'method: "allocate(worktreePath: string) => Lease | AllocationFailure"';
+    assert.ok(result.tmdContent.includes(constructorLine));
+    assert.ok(result.tmdContent.includes(allocation));
+    assert.ok(result.tmdContent.includes('method: "list() => readonly Lease[]"'));
+    assert.ok(result.tmdContent.includes('exports: [Lease, StoreConfig, AllocationFailure, LeaseStore]'));
+    assert.deepEqual(messagesOf(await checkTmd(result.tmdContent)), []);
+    // Exports remain present in each negative control and cannot mask lost uses.
+    assert.deepEqual(messagesOf(await checkTmd(result.tmdContent.replace(constructorLine, ''))), ["Orphaned entity 'StoreConfig'"]);
+    assert.deepEqual(
+      messagesOf(await checkTmd(result.tmdContent.replace(allocation, 'method: "allocate(worktreePath: string) => Lease"'))),
+      ["Orphaned entity 'AllocationFailure'"],
     );
   });
 });

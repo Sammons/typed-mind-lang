@@ -52,7 +52,7 @@ initializers contribute optionality, while initializer expression text remains
 outside the extracted signature. Destructuring follows the existing analyzer's
 binding-name policy. The supported local method-name spelling is
 `[A-Za-z_]\w*`; unsupported computed, private `#`, dollar-sign or other names
-retain explicit signature diagnostics rather than inventing reference targets.
+retain their full signature payload and explicit diagnostics rather than inventing reference targets. With `includePrivateMembers: true`, a `#private` method therefore remains in `members.methods`, but has no guessed name in the derived `.methods` callable-name view. Emission and reparsing preserve that distinction; the default visibility filter still excludes it.
 Single-line string encoding follows the shared quoted-string codec. Literal
 values containing physical newlines retain the existing emission limitations.
 

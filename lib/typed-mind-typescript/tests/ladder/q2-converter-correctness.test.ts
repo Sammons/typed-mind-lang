@@ -49,7 +49,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
+import { ClassFileNode, ClassNode, SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -83,21 +83,37 @@ describe('RFC-TM-9 Q2 check — X-CONV-1: hash-private members excluded, zero # 
     assert.ok(classEntity?.methods.includes('publicMethod'), 'the public method is still emitted');
   });
 
-  it('--include-private lifts the filter for hard-private the same as keyword-private (per the doc: "hard-private members obey includePrivateMembers like keyword-private ones")', () => {
+  it('--include-private retains hard-private opaque payloads with explicit unsupported diagnostics', async () => {
     const analyzer = new TypeScriptAnalyzer(fixturePath('21-hash-private'));
     const analysis = analyzer.analyzeFromEntrypoint(fixturePath('21-hash-private', 'src', 'main.ts'));
     const defaultResult = new TypeScriptToTypedMindConverter().convert(analysis);
     const includedResult = new TypeScriptToTypedMindConverter({ includePrivateMembers: true }).convert(analysis);
 
-    const defaultClass = defaultResult.entities.find((e) => e.kind === 'Class' || e.kind === 'ClassFile') as
-      | { methods: readonly string[] }
-      | undefined;
-    const includedClass = includedResult.entities.find((e) => e.kind === 'Class' || e.kind === 'ClassFile') as
-      | { methods: readonly string[] }
-      | undefined;
-
-    assert.equal(defaultClass?.methods.length, 1, 'default: only the public method');
-    assert.equal(includedClass?.methods.length, 2, 'includePrivateMembers: true lifts the filter for hard-private too');
+    const defaultClass = defaultResult.entities.find((entity) => entity instanceof ClassNode || entity instanceof ClassFileNode);
+    const includedClass = includedResult.entities.find((entity) => entity instanceof ClassNode || entity instanceof ClassFileNode);
+    assert.ok(defaultClass instanceof ClassNode || defaultClass instanceof ClassFileNode);
+    assert.ok(includedClass instanceof ClassNode || includedClass instanceof ClassFileNode);
+    assert.equal(defaultClass.members?.methods.length, 1, 'default: only the public method');
+    assert.equal(includedClass.members?.methods.length, 2, 'includePrivate retains both canonical members');
+    assert.deepEqual(includedClass.methods, ['publicMethod'], 'unsupported names do not become guessed callable identities');
+    const privateMember = includedClass.members?.methods[1];
+    assert.equal(privateMember?.name, undefined);
+    assert.equal(privateMember?.signature?.kind, 'opaque');
+    if (privateMember?.signature?.kind !== 'opaque') assert.fail('expected retained opaque private signature');
+    assert.equal(privateMember.signature.text, '#privateHelper() => string');
+    assert.ok(includedResult.tmdContent.includes('method: "#privateHelper() => string"'));
+    const mind = await TypedMind.create();
+    const parsed = mind.parse(includedResult.tmdContent);
+    assert.deepEqual(parsed.diagnostics, []);
+    assert.deepEqual(
+      mind.check(includedResult.tmdContent).diagnostics.map((finding) => finding.code),
+      ['checker/unsupported-member-signature'],
+    );
+    assert.deepEqual(parsed.links.referencedBy('#privateHelper'), [], 'opaque text adds no phantom reference');
+    const reparsedClass = parsed.entities.find((entity) => entity instanceof ClassNode || entity instanceof ClassFileNode);
+    assert.ok(reparsedClass instanceof ClassNode || reparsedClass instanceof ClassFileNode);
+    assert.equal(reparsedClass.members?.methods.length, 2);
+    assert.deepEqual(reparsedClass.methods, ['publicMethod']);
   });
 });
 
@@ -190,7 +206,11 @@ describe('RFC-TM-9 Q2 check — X-CONV-4: collision-safe naming + I-13 degrade-n
       // BOTH colliding classes are present: the first declarer keeps the bare
       // name, the second is qualified by its sanitized module basename. Before
       // PR 1 only one survived, and the run failed.
-      assert.ok(content.includes('Widget <:'), 'main.ts keeps the bare Widget');
+      assert.match(
+        content,
+        /class Widget \{\n {2}type: Class\n {2}method: "render\(\) => string"/,
+        'main.ts keeps the bare Widget and typed method',
+      );
       assert.ok(content.includes('OtherFile.Widget'), 'other.ts is renamed, not dropped');
     } finally {
       rmSync(dirname(outputPath), { recursive: true, force: true });
