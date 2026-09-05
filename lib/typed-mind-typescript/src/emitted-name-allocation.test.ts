@@ -16,7 +16,7 @@ const fn = (name: string, inline = false): ParsedFunction => ({
   isAsync: false,
   description: undefined,
   decorators: [],
-  calledNames: [],
+  bodyReferences: [],
 });
 const cls = (name: string, base?: string, implemented?: string): ParsedClass => ({
   name,

@@ -15,6 +15,6 @@ class InternalRegistryEntry {
 }
 
 describe :: describe(label: string) => string
+  ~> [InternalRegistryEntry.constructor]
 
-suppress InternalRegistryEntry checker/orphaned-entity "generated-single-file-scope"
 suppress InternalRegistryEntry checker/class-not-exported "generated-single-file-scope"

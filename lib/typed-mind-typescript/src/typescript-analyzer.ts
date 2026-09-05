@@ -8,7 +8,7 @@ import type {
   AnalyzerDiagnostic,
   DeclarationIdentity,
   ModuleGraphEdge,
-  ParsedCallReference,
+  ParsedBodyReference,
   ParsedClass,
   ParsedConstant,
   ParsedConstructor,
@@ -1303,54 +1303,111 @@ export class TypeScriptAnalyzer {
     return names;
   }
 
-  // typedmind-diagnostic-legitimacy callgraph increment — collects
-  // same-file call-edge targets from a function/arrow/function-expression's
-  // OWN body: bare-identifier call targets (`foo()`, the same shape X-AN-11's
-  // `collectCalledFunctionNames` already recognizes) plus `new` expression
-  // targets (`new Bar()`) whose constructor expression is a bare identifier.
-  // Deliberately conservative — recurses through every descendant (a direct
-  // call/`new` can sit inside a nested callback, matching the ops-cli
-  // `runBackfill`-inside-`.action()`-closure shape this increment targets),
-  // but only ever records a BARE identifier: `obj.method()` call targets and
-  // computed/member-expression `new` targets are out of scope by design,
-  // since the converter can only resolve a call edge to a same-file
-  // TOP-LEVEL declared function or class, never to a property access whose
-  // owner is unknown at this layer. Unlike `collectCalledFunctionNames`,
-  // this walk does not descend into a NESTED function/arrow/function-expression
-  // body — a call inside a nested closure is still lexically inside the
-  // outer function for the dispatch-table shape this increment cares about
-  // (`.action(async (opts) => { ...await runBackfill(...) })` nested inside
-  // a top-level function is unaffected either way since nested closures are
-  // still part of the outer function's own descendant tree), but this
-  // exclusion matters for the FUNCTION-declaration case: a function
-  // expression assigned to a property and passed elsewhere should not have
-  // its inner calls double-counted against the OUTER function once the
-  // inner one is independently parsed as its own `ParsedFunction`. In
-  // practice this only excludes named nested `function` declarations and
-  // class expressions (both parsed independently elsewhere); anonymous
-  // arrow/function-expression callbacks passed as call arguments (the
-  // dispatch-table idiom) are NOT independently parsed as their own
-  // top-level `ParsedFunction`, so they must stay in scope here — hence the
-  // exclusion only applies to `ts.isFunctionDeclaration`/`ts.isClassDeclaration`,
-  // never to anonymous arrow/function-expression nodes.
-  private collectSameFileCallEdges(body: ts.Node): string[] {
-    const names: string[] = [];
-    const visit = (current: ts.Node): void => {
-      if (ts.isFunctionDeclaration(current) || ts.isClassDeclaration(current)) {
-        // A nested named function/class declaration is parsed independently
-        // as its own entity elsewhere in this analyzer; do not attribute its
-        // internal calls to the outer function.
+  // RFC-TM-14 §S1 — the one body-reference walk, shared by function bodies,
+  // class member bodies (methods, constructors, accessors, arrow-property
+  // methods), property initializers, static blocks, and TM13 F's Constants
+  // initializers. Visits with `ts.forEachChild` and does NOT descend into a
+  // nested `FunctionDeclaration`, `ClassDeclaration` or `ClassExpression`:
+  // named declarations are parsed independently as their own entities, so
+  // their internal references must not be attributed to the enclosing body.
+  // Anonymous arrow/function-expression callbacks stay in scope (the
+  // dispatch-table idiom, `.action(async () => { runBackfill() })`).
+  //
+  // Recorded: `call` for a `CallExpression` whose callee is an identifier;
+  // `construct` for a `NewExpression` whose expression is an identifier;
+  // `read` for an identifier that is the ROOT of an expression (a bare use or
+  // the root of a property chain / call receiver) whose symbol's
+  // `valueDeclaration` is a top-level `VariableDeclaration` (the same
+  // top-level container test `mapReferenceDeclarationToSource` applies).
+  // A callee or `new` target is not also a `read` (A2-7). Not recorded:
+  // identifiers in type positions, a `PropertyAccessExpression.name`,
+  // `QualifiedName.right`, `PropertyAssignment.name`, `BindingElement.
+  // propertyName` or any declaration name; a receiver that resolves to a
+  // class (`Klass.staticMethod()`, non-goal N-static) or to a function
+  // declaration (no value-use edge exists, N-read-fn) falls out of the
+  // top-level-variable test by construction; so does an ambient global
+  // (`Math`) or a package-declared value, which can never be a project
+  // Constants entity. A `ShorthandPropertyAssignment`
+  // (`{ LIMIT }`) resolves through `getShorthandAssignmentValueSymbol`
+  // (A-10). Every origin is resolved with `resolveReferenceOriginAtLocation`
+  // at the identifier, except a `ShorthandPropertyAssignment`, whose origin
+  // resolves from the value symbol; classification happens on the SYMBOL, never on the
+  // spelling, so a parameter or local named after a top-level constant is
+  // not a reference to it.
+  private collectBodyReferences(body: ts.Node | undefined): readonly ParsedBodyReference[] {
+    if (body === undefined) return [];
+    const references: ParsedBodyReference[] = [];
+    const record = (kind: ParsedBodyReference['kind'], identifier: ts.Identifier): void => {
+      // A shorthand property (`{ LIMIT }`) names the object-literal property
+      // at the identifier; the value symbol is the read target (A-10).
+      const origin = ts.isShorthandPropertyAssignment(identifier.parent)
+        ? resolveReferenceOrigin(this.checker.getShorthandAssignmentValueSymbol(identifier.parent), this.program, this.checker, {
+            mapDeclaration: (declaration) => this.mapReferenceDeclarationToSource(declaration),
+          })
+        : this.resolveReferenceOriginAtLocation(identifier);
+      references.push({ kind, writtenName: identifier.text, source: sourceRange(identifier), origin });
+    };
+    const visit = (node: ts.Node): void => {
+      if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isClassExpression(node)) return;
+      if (ts.isExpressionWithTypeArguments(node)) {
+        // An instantiation expression (`make<string>`) is classified as a
+        // type node by `ts.isTypeNode`; its expression is still a value use.
+        visit(node.expression);
         return;
       }
-      if (ts.isCallExpression(current) && ts.isIdentifier(current.expression)) {
-        names.push(current.expression.text);
-      } else if (ts.isNewExpression(current) && ts.isIdentifier(current.expression)) {
-        names.push(current.expression.text);
+      if (ts.isTypeNode(node)) return;
+      if ((ts.isCallExpression(node) || ts.isNewExpression(node)) && ts.isIdentifier(node.expression)) {
+        record(ts.isNewExpression(node) ? 'construct' : 'call', node.expression);
+        for (const argument of node.arguments ?? []) visit(argument);
+        return;
       }
-      ts.forEachChild(current, visit);
+      if (ts.isIdentifier(node)) {
+        if (this.isTopLevelVariableRead(node)) record('read', node);
+        return;
+      }
+      ts.forEachChild(node, visit);
     };
-    ts.forEachChild(body, visit);
-    return names;
+    // Visit the body node itself, not only its children: an arrow function's
+    // concise body (`() => new Cursor()`) and a Constants initializer
+    // (`= build()`) ARE the expression to record.
+    visit(body);
+    return references;
+  }
+
+  // The `read` predicate of `collectBodyReferences`: the identifier is a
+  // value use (not a name being declared or a member name being selected)
+  // whose symbol is a `VariableDeclaration` declared directly under a
+  // `SourceFile`.
+  private isTopLevelVariableRead(identifier: ts.Identifier): boolean {
+    const parent = identifier.parent;
+    if (ts.isPropertyAccessExpression(parent) && parent.name === identifier) return false;
+    if (ts.isQualifiedName(parent) && parent.right === identifier) return false;
+    if (ts.isPropertyAssignment(parent) && parent.name === identifier) return false;
+    if (ts.isBindingElement(parent) && parent.propertyName === identifier) return false;
+    if (ts.isLabeledStatement(parent) || ts.isBreakOrContinueStatement(parent)) return false;
+    const declaresName =
+      ts.isVariableDeclaration(parent) ||
+      ts.isParameter(parent) ||
+      ts.isBindingElement(parent) ||
+      ts.isFunctionExpression(parent) ||
+      ts.isArrowFunction(parent) ||
+      ts.isTypeParameterDeclaration(parent);
+    if (declaresName && parent.name === identifier) return false;
+    let symbol = ts.isShorthandPropertyAssignment(parent)
+      ? this.checker.getShorthandAssignmentValueSymbol(parent)
+      : this.checker.getSymbolAtLocation(identifier);
+    // An imported binding is an alias; the value declaration lives on the
+    // aliased symbol. `resolveReferenceOrigin` follows the same chain.
+    if (symbol !== undefined && (symbol.flags & ts.SymbolFlags.Alias) !== 0) symbol = this.checker.getAliasedSymbol(symbol);
+    const declaration = symbol?.valueDeclaration;
+    if (declaration === undefined || !ts.isVariableDeclaration(declaration)) return false;
+    // Ambient globals (`declare var Math`, lib.d.ts) and package-declared
+    // values pass the top-level test but can never be a project Constants
+    // entity; recording them would only be dropped by the converter.
+    const file = declaration.getSourceFile();
+    if (this.program.isSourceFileDefaultLibrary(file) || this.program.isSourceFileFromExternalLibrary(file)) return false;
+    const list = declaration.parent;
+    return ts.isVariableDeclarationList(list) && ts.isVariableStatement(list.parent) && ts.isSourceFile(list.parent.parent);
   }
 
   private lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
@@ -1517,10 +1574,10 @@ export class TypeScriptAnalyzer {
       isAsync,
       description: description || undefined,
       decorators,
-      // typedmind-diagnostic-legitimacy callgraph increment — `node.body` is
-      // `undefined` for an ambient/overload declaration (no implementation
-      // to collect calls from); real declarations always carry a body.
-      calledNames: node.body ? this.collectSameFileCallEdges(node.body) : [],
+      // `node.body` is `undefined` for an ambient/overload declaration (no
+      // implementation to collect references from).
+      bodyReferences: this.collectBodyReferences(node.body),
+      origin: 'declaration',
     } as const;
   }
 
@@ -1548,12 +1605,11 @@ export class TypeScriptAnalyzer {
       isAsync,
       description: description || undefined,
       decorators: [],
-      // typedmind-diagnostic-legitimacy callgraph increment — an arrow
-      // function's concise (non-block) body is itself a single expression,
-      // which `collectSameFileCallEdges` still walks correctly (it starts
-      // from `ts.forEachChild`, which recurses into an expression body's own
-      // descendants the same way it does a block's statements).
-      calledNames: this.collectSameFileCallEdges(node.body),
+      // An arrow function's concise (non-block) body is itself a single
+      // expression; `collectBodyReferences` visits the body node itself, so
+      // `() => new Cursor()` records the construct.
+      bodyReferences: this.collectBodyReferences(node.body),
+      origin: 'declaration',
     } as const;
   }
 
@@ -1567,6 +1623,7 @@ export class TypeScriptAnalyzer {
     const methods: ParsedMethod[] = [];
     const constructors: ParsedConstructor[] = [];
     const properties: ParsedProperty[] = [];
+    const initializerReferences: ParsedBodyReference[] = [];
     const decorators = this.parseDecorators(node);
     const description = node.name ? this.extractJSDocDescription(node.name) : this.extractJSDocDescriptionFallback(node);
 
@@ -1636,6 +1693,7 @@ export class TypeScriptAnalyzer {
           parameters,
           isPrivate: this.hasPrivateModifier(member),
           isProtected: this.hasProtectedModifier(member),
+          bodyReferences: this.collectBodyReferences(member.body),
         });
       } else if (ts.isMethodDeclaration(member)) {
         methods.push(this.parseMethod(member));
@@ -1647,7 +1705,13 @@ export class TypeScriptAnalyzer {
           methods.push(arrowMethod);
         } else if (property) {
           properties.push(property);
+          // RFC-TM-14 §S1 — a plain property's initializer is a body of the
+          // class (`readonly initial = LIMIT`).
+          initializerReferences.push(...this.collectBodyReferences(member.initializer));
         }
+      } else if (ts.isClassStaticBlockDeclaration(member)) {
+        // RFC-TM-14 §S1 — a static block is a body of the class.
+        initializerReferences.push(...this.collectBodyReferences(member.body));
       } else if (ts.isGetAccessorDeclaration(member) || ts.isSetAccessorDeclaration(member)) {
         const isGet = ts.isGetAccessorDeclaration(member);
         const parsedAccessor = this.parseAccessor(member);
@@ -1676,6 +1740,7 @@ export class TypeScriptAnalyzer {
               parameters,
               returnType,
               signature,
+              bodyReferences: [...existing.method.bodyReferences, ...parsedAccessor.bodyReferences],
               returnTypeInfo: isGet
                 ? parsedAccessor.returnTypeInfo
                 : existing.hasGet
@@ -1715,6 +1780,7 @@ export class TypeScriptAnalyzer {
       properties,
       decorators,
       description: description || undefined,
+      initializerReferences,
     } as const;
   }
 
@@ -1741,6 +1807,7 @@ export class TypeScriptAnalyzer {
       returnTypeInfo: isGet ? this.getTypeInfo(node.type) : { text: 'void', source: undefined, references: [] },
       isAsync: false,
       accessorKind: isGet ? 'get' : 'set',
+      bodyReferences: this.collectBodyReferences(node.body),
     } as const;
   }
 
@@ -1846,32 +1913,12 @@ export class TypeScriptAnalyzer {
         declaration: this.getRetainedDeclarationIdentity(declaration),
         value: value || undefined,
         isConst,
-        callReferences: this.collectInitializerCallReferences(initializer),
+        // TM13 F — the initializer is a body for the RFC-TM-14 §S1 walk.
+        callReferences: this.collectBodyReferences(initializer),
       } as const);
     }
 
     return { functions, constants };
-  }
-
-  private collectInitializerCallReferences(initializer: ts.Expression | undefined): readonly ParsedCallReference[] {
-    if (initializer === undefined) return [];
-    const references: ParsedCallReference[] = [];
-    const visit = (node: ts.Node): void => {
-      // Named declarations have their own bodies. Function expressions,
-      // including named callbacks, remain part of the initializer.
-      if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isClassExpression(node)) return;
-      if ((ts.isCallExpression(node) || ts.isNewExpression(node)) && ts.isIdentifier(node.expression)) {
-        references.push({
-          kind: ts.isNewExpression(node) ? 'construct' : 'call',
-          writtenName: node.expression.text,
-          source: { filePath: path.resolve(node.getSourceFile().fileName), start: node.getStart(), end: node.getEnd() },
-          origin: this.resolveReferenceOriginAtLocation(node.expression),
-        });
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(initializer);
-    return references;
   }
 
   private inferTypeFromInitializer(initializer?: ts.Expression): string {
@@ -1920,6 +1967,7 @@ export class TypeScriptAnalyzer {
       returnTypeInfo: this.getTypeInfo(node.type),
       isAsync,
       accessorKind: undefined,
+      bodyReferences: this.collectBodyReferences(node.body),
     } as const;
   }
 
@@ -1956,6 +2004,7 @@ export class TypeScriptAnalyzer {
           typeParameters: this.parseTypeParameters(initializer.typeParameters),
           isAsync,
           accessorKind: undefined,
+          bodyReferences: this.collectBodyReferences(initializer.body),
         },
       };
     }
@@ -2019,6 +2068,7 @@ export class TypeScriptAnalyzer {
       returnTypeInfo: this.getTypeInfo(node.type),
       isAsync,
       accessorKind: undefined,
+      bodyReferences: [],
     } as const;
   }
 

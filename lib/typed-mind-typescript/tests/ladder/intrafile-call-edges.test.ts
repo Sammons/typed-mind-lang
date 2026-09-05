@@ -72,7 +72,8 @@ describe('callgraph increment: same-file call edges clear genuinely-used exports
     assert.deepEqual(generateFindings, [], `generateSecret must not orphan: ${JSON.stringify(generateFindings)}`);
   });
 
-  it('fixture 1 (Cst*-wrapper shape) — a class new-d only inside a same-file function names it in that function.calls', () => {
+  // RFC-TM-14 §S2 — the construct edge is spelled `Owner.constructor`.
+  it('fixture 1 (Cst*-wrapper shape) — a class new-d only inside a same-file function names Owner.constructor in that function.calls', () => {
     const result = convert('47-intrafile-call-edges', ['src', 'index.ts']);
     assert.equal(result.success, true);
     const secretWalker = result.entities.find((e) => (e.kind === 'Class' || e.kind === 'ClassFile') && e.name === 'SecretWalker');
@@ -81,8 +82,8 @@ describe('callgraph increment: same-file call edges clear genuinely-used exports
       | { calls: readonly string[] }
       | undefined;
     assert.ok(
-      createSecret?.calls.includes('SecretWalker'),
-      `expected createSecret.calls to include 'SecretWalker', got: ${JSON.stringify(createSecret?.calls)}`,
+      createSecret?.calls.includes('SecretWalker.constructor'),
+      `expected createSecret.calls to include 'SecretWalker.constructor', got: ${JSON.stringify(createSecret?.calls)}`,
     );
   });
 
@@ -113,30 +114,30 @@ describe('callgraph increment: genuinely dead or test-only exports still flag (n
   });
 });
 
-describe('callgraph increment: a same-file new-target that converts as a ClassFile is never folded into calls', () => {
+describe('RFC-TM-14 §S2: a same-file new-target that converts as a ClassFile is folded as Owner.constructor', () => {
   // Real-corpus regression found during ladder verification against
   // webhookstorage: ingest's `s3-upload.ts` has `PayloadTooLargeError`
   // (an exported Error subclass) as its module's ONLY class, so
   // `convertToClassFile`'s primary-class fallback fuses it into the
   // module's own ClassFile entity. `calls.to`'s legal targets
-  // (valid-references.ts) are `['Function', 'Class']` only — never
-  // `ClassFile` — so a same-file `new PayloadTooLargeError(...)` call edge
-  // must be dropped, not folded, or the checker fires
-  // `checker/reference-to-illegal`.
-  it('uploadPayload.calls does not name the fused ClassFile', () => {
+  // (valid-references.ts) are `['Function', 'Class']` — never a bare
+  // `ClassFile` — so the callgraph increment DROPPED the edge and the class
+  // stayed an orphan. RFC-TM-14 U2 made `Owner.constructor` an implicit
+  // member of every Class and ClassFile (the resolver returns the owner, so
+  // legality and method-call checks pass), and U1 emits the edge in that
+  // spelling: the ClassFile is credited and `checker/reference-to-illegal`
+  // still never fires.
+  it('uploadPayload.calls names the fused ClassFile as PayloadTooLargeError.constructor', () => {
     const result = convert('49-intrafile-new-classfile-target', ['src', 'index.ts']);
     assert.equal(result.success, true);
     const uploadPayload = result.entities.find((e) => e.kind === 'Function' && e.name === 'uploadPayload') as
       | { calls: readonly string[] }
       | undefined;
     assert.notEqual(uploadPayload, undefined, 'uploadPayload must be extracted as a real entity');
-    assert.ok(
-      !uploadPayload?.calls.includes('PayloadTooLargeError'),
-      `expected uploadPayload.calls to NOT include the fused ClassFile 'PayloadTooLargeError', got: ${JSON.stringify(uploadPayload?.calls)}`,
-    );
+    assert.deepEqual(uploadPayload?.calls, ['PayloadTooLargeError.constructor']);
   });
 
-  it('checker verdict: zero reference-to-illegal findings (the pre-guard regression)', async () => {
+  it('checker verdict: zero reference-to-illegal findings and the ClassFile is not orphaned', async () => {
     const result = convert('49-intrafile-new-classfile-target', ['src', 'index.ts']);
     assert.equal(result.success, true);
     const emitter = new SyntaxEmitter();
@@ -145,5 +146,7 @@ describe('callgraph increment: a same-file new-target that converts as a ClassFi
     const checkResult = tm.check(longform);
     const illegalFindings = checkResult.diagnostics.filter((d) => d.code === 'checker/reference-to-illegal');
     assert.deepEqual(illegalFindings, [], `must have zero reference-to-illegal findings: ${JSON.stringify(illegalFindings)}`);
+    const findings = await orphanFindingsFor(result, 'PayloadTooLargeError');
+    assert.deepEqual(findings, [], `PayloadTooLargeError must not orphan: ${JSON.stringify(findings)}`);
   });
 });
