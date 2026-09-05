@@ -19,12 +19,14 @@ import {
   TypeDefNode,
   type TypeExprNode,
 } from '@sammons/typed-mind';
+import { EmittedNameAllocator } from './emitted-name-allocator.ts';
 import { mapStructuralSegments, stripComments } from './type-text-segments.ts';
 import type {
   ConversionError,
   ConversionOptions,
   ConversionResult,
   ConversionWarning,
+  DeclarationIdentity,
   ParsedClass,
   ParsedExport,
   ParsedFunction,
@@ -306,22 +308,17 @@ export class TypeScriptToTypedMindConverter {
   private readonly warnings: ConversionWarning[] = [];
   private readonly entities: EntityNode[] = [];
   private readonly entityNames = new Set<string>();
-  // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) — names
-  // reserved by `reserveNamedTypeEntityNames` for a module's own
-  // interface/type-alias/enum declarations, held SEPARATELY from
-  // `entityNames`. These names are NOT yet real entities (unlike
-  // `entityNames`, which means "an entity with this name already exists in
-  // `this.entities`"), so the later `convertInterfaceToDTO`/
-  // `convertTypeAliasToDTO`/`convertEnumToTypeDef` call that actually
-  // claims the name must not treat its OWN reservation as a collision.
-  // `reserveSynthesizedDTOName` still consults this set (in addition to
-  // `entityNames`) so a synthesized DTO correctly avoids a name a
-  // same-module interface/type-alias/enum has reserved but not yet
-  // converted into a real entity.
-  private readonly reservedNamedTypeNames = new Set<string>();
+  // RFC-TM-13 E: every source/generated identity is reserved in one index.
+  // entityNames separately records entities already emitted, so a declaration
+  // never mistakes its own reservation for a duplicate entity.
+  private readonly nameAllocator = new EmittedNameAllocator();
+  private readonly fusedModulePaths = new Set<string>();
+  private synthesizedNameSequence = 0;
+  private readonly sourceDeclarationIdentities = new Map<string, DeclarationIdentity[]>();
+  private readonly sourceDeclarationsWithoutIdentity = new Set<string>();
   // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) — a
   // top-level function that collided on its bare name and was renamed to
-  // `<baseName>__<name>` by `convertFunction`. `convertExports` consults
+  // `<FileEntity>.<name>` by `convertFunction`. `convertExports` consults
   // this so a File/ClassFile's `exports:` list names the FUNCTION'S ACTUAL
   // emitted entity name, not its raw source name — otherwise the export
   // list would reference a name no entity carries, producing a dangling
@@ -340,8 +337,8 @@ export class TypeScriptToTypedMindConverter {
   // across modules exactly the way the entity names themselves do — that IS
   // the bug being fixed). The value is the FINAL emitted entity name: the
   // bare name for the first module to declare it, and a module-qualified
-  // `<disambiguator>__<declName>` for every later one, per
-  // `reserveTypeEntityNames`.
+  // `<FileEntity>.<declName>` for every later one, per
+  // `reserveEntityNames`.
   //
   // Before this map, six sibling declaration sites (`convertToClassFile`,
   // `convertClass`, `convertInterfaceToDTO`, `convertTypeAliasToDTO`,
@@ -355,10 +352,10 @@ export class TypeScriptToTypedMindConverter {
   // a `.tmd` document by the grammar's own design (`grammar.md:30-41` keys
   // every entity form by one flat `<entity_name>`; `check-context.ts`'s
   // `byName` is a flat `Map<string, EntityNode>` with no module dimension),
-  // so module-qualification must produce a unique NAME, not a namespace.
+  // RFC-TM-13 Q validates each qualified name against its explicit File owner.
   private readonly typeNameRemap = new Map<string, string>();
   // decision-same-named-entities PR 1 — the first module (by
-  // `reserveTypeEntityNames`'s deterministic module order) to declare each
+  // `reserveEntityNames`'s deterministic module order) to declare each
   // bare type-side name, so the collision warning can name BOTH colliding
   // paths (`declared in both '<pathA>' and '<pathB>'`). Keyed by the bare
   // declaration name, valued by the declaring module's relative path.
@@ -392,9 +389,8 @@ export class TypeScriptToTypedMindConverter {
   // name. Unlike `functionNameRemap`, a File-like entity's name is not
   // always derivable from its module path alone (`convertToClassFile`
   // names the entity after the module's PRIMARY CLASS, not the module's
-  // base filename), so this is recorded at each construction site
-  // (`convertToSeparateEntities`'s FileNode, `convertToClassFile`'s
-  // ClassFileNode) rather than computed on demand.
+  // base filename). E reserves this map before any source qualification
+  // and confirms the same identity at the construction sites.
   private readonly fileEntityNameByModulePath = new Map<string, string>();
   // RC-E (issue #107) — a sibling of `fileEntityNameByModulePath`, keyed by
   // the module's project-relative, extension-stripped path instead of its
@@ -408,23 +404,9 @@ export class TypeScriptToTypedMindConverter {
   // module's own `filePath`). Populated at the same two construction sites
   // as `fileEntityNameByModulePath`.
   private readonly fileEntityNameByRelativePath = new Map<string, string>();
-  // RC-B (ladder-diagnostic-disposition-2026-08-29.md rank 2, issue #100) —
-  // `convertToSeparateEntities` used to derive `fileEntityName` from
-  // BASENAME ONLY (`createEntityName(`${baseName}File`)`), with no
-  // directory disambiguation, and its `if (!this.entityNames.has(...))`
-  // guard silently skipped creating a second FileNode when two modules in
-  // different directories shared a basename (`db/events.ts` vs
-  // `routes/events.ts`) — the LOSING module's File entity never existed,
-  // and its functions became ownerless. Which module "won" depended on
-  // traversal order, not a fixed rule. `reserveFileEntityNames` (below)
-  // is a whole-run pre-pass, mirroring `reserveNamedTypeEntityNames`'s own
-  // "reserve everything up front, across the WHOLE module list" shape:
-  // it groups every candidate module by basename FIRST (an order-
-  // independent set operation), and only a basename with more than one
-  // module gets disambiguated — deterministically, by directory path, not
-  // by which module happened to convert first. Keyed by `module.filePath`
-  // (absolute), consulted by `convertToSeparateEntities` in place of its
-  // own ad hoc `${baseName}File` computation.
+  // Actual separate File names, reserved after source bare winners. Modules
+  // sharing a basename use deterministic directory prefixes; all candidates
+  // share the global allocator, including ClassFile and Program identities.
   private readonly reservedFileEntityNameByModulePath = new Map<string, string>();
   private readonly dependencies = new Map<string, DependencyNode>();
   private readonly externalTypeToPackage = new Map<string, string>(); // Maps external types to their package
@@ -435,17 +417,9 @@ export class TypeScriptToTypedMindConverter {
   // exactly one stub, following the existing Node-builtins purpose-map
   // precedent (`derivePurpose`'s `nodeBuiltins` table).
   private readonly builtinExtendsStubNames = new Set<string>();
-  // RFC-TM-10 §3 (rfc-tm-10-diamond.md, D-LEG-3, issue #61, LEAD RULING: no
-  // new sigil). A namespace-qualified `implements` target (`ts.ParseConfigFileHost`)
-  // is unrepresentable by the grammar's `entity_name` token (no `.` accepted)
-  // — `ensureNamespaceImplementsStub` sanitizes it to a valid identifier and
-  // synthesizes a bare stub ClassNode, mirroring `builtinExtendsStubNames`'s
-  // idempotent one-stub-per-name discipline so a target referenced by
-  // multiple classes shares one stub. Deliberately UNBOUNDED (unlike the
-  // curated `KNOWN_AMBIENT_EXTENDS_TARGETS` allowlist below) because
-  // `implements` targets are structural — they can never introduce a real
-  // inheritance edge the checker's unknown-base-class/circular-inheritance
-  // rules police.
+  // Existing ambient namespace heritage stubs remain until A2 can rewrite
+  // proven source origins. E allocates each stub through the shared registry;
+  // the Q grammar accepting dots alone does not prove the namespace owner.
   private readonly namespaceImplementsStubNames = new Set<string>();
   // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — predicts, at Phase 1
   // registration time, whether a `types`-registry name will end up a
@@ -713,7 +687,9 @@ export class TypeScriptToTypedMindConverter {
 
     try {
       // Filter modules based on ignore patterns
-      const filteredModules = this.filterModules(analysis.modules);
+      const filteredModules = this.filterModules(analysis.modules).sort((left, right) =>
+        this.compareModulePaths(left.filePath, right.filePath),
+      );
 
       // Store entry points for reference during conversion
       this.entryPoints = new Set(analysis.entryPoints.map((ep) => this.getRelativePath(ep)));
@@ -931,7 +907,11 @@ export class TypeScriptToTypedMindConverter {
     this.warnings.length = 0;
     this.entities.length = 0;
     this.entityNames.clear();
-    this.reservedNamedTypeNames.clear();
+    this.nameAllocator.clear();
+    this.sourceDeclarationIdentities.clear();
+    this.sourceDeclarationsWithoutIdentity.clear();
+    this.fusedModulePaths.clear();
+    this.synthesizedNameSequence = 0;
     this.functionNameRemap.clear();
     this.typeNameRemap.clear();
     this.typeNameFirstDeclarer.clear();
@@ -1088,11 +1068,6 @@ export class TypeScriptToTypedMindConverter {
   private convertModules(modules: ParsedModule[]): void {
     // PHASE 1: Collection and Export Registration
 
-    // 1.1: Extract all dependencies first
-    for (const module of modules) {
-      this.extractDependencies(module);
-    }
-
     // 1.2: Build complete export registry for all modules
     for (const module of modules) {
       this.registerModuleExports(module);
@@ -1109,51 +1084,8 @@ export class TypeScriptToTypedMindConverter {
     // later) and before any Phase-2 conversion reads the prediction.
     this.predictInterfaceKinds();
 
-    // issue #72 (tm10-inc2), adversarial-review blocker fix (2nd round,
-    // PR #84 comment 19118) — the per-module reservation in `processModule`
-    // (`reserveNamedTypeEntityNames`) is not enough on its own: it only
-    // protects a hand-authored interface/type-alias/enum from a
-    // same-MODULE synthesized DTO. `regularFiles` (any module with a
-    // function, hence any module inline-DTO synthesis can fire from)
-    // ALWAYS process before `pureTypesFiles` below (X-CONV-3's own fixed
-    // ordering, unrelated to and unchanged by this fix) — so a
-    // hand-authored interface/type-alias/enum living in a DIFFERENT
-    // module that happens to be classified pure-types (a conventional
-    // `types.ts`) could still be silently evicted by a same-named
-    // synthesized DTO from a function in an EARLIER-processing regular
-    // module. Reserving every module's named-type entity names — across
-    // the WHOLE `modules` list, not just the current module — before ANY
-    // module's functions convert closes this for good, the same
-    // "reserve everything up front" shape `reserveFunctionEntityNames`
-    // already uses within one module, now applied at the run's full
-    // conservation boundary. `processModule`'s own per-module call to
-    // `reserveNamedTypeEntityNames` becomes redundant once this runs (the
-    // set is additive and idempotent — re-adding an already-reserved name
-    // is a no-op) but is left in place rather than removed: it costs
-    // nothing extra and keeps `processModule` correct in isolation for any
-    // future caller that invokes it without first running this whole-run
-    // pass.
-    for (const module of modules) {
-      this.reserveNamedTypeEntityNames(module);
-    }
-
-    // decision-same-named-entities PR 1 — reserve every module's TYPE-side
-    // entity names (class, interface, type alias, enum, constant) up front,
-    // across the WHOLE `modules` list, so a cross-module bare-name collision
-    // is resolved by a deterministic module-qualified rename instead of
-    // aborting the conversion at seven `addError` sites (or, for constants,
-    // silently dropping the loser). Runs next to the reservation passes
-    // above and before `reserveFileEntityNames` for the same reason they do:
-    // every downstream consumer needs the FINAL name, and "is this module
-    // the first to declare this name?" is only answerable with every module
-    // in view. See `reserveTypeEntityNames`'s own doc comment.
-    this.reserveTypeEntityNames(modules);
-
-    // RC-B (issue #100) — reserve every module's File-entity name up front,
-    // across the WHOLE `modules` list, before any module converts. See
-    // `reservedFileEntityNameByModulePath`'s own field comment and
-    // `reserveFileEntityNames`'s doc comment for the full mechanism.
-    this.reserveFileEntityNames(modules);
+    this.reserveEntityNames(modules);
+    for (const module of modules) this.extractDependencies(module);
 
     // PHASE 2: Processing with Complete Knowledge
 
@@ -1177,6 +1109,9 @@ export class TypeScriptToTypedMindConverter {
         regularFiles.push(module);
       }
     }
+
+    regularFiles.sort((left, right) => this.compareModulePaths(left.filePath, right.filePath));
+    pureTypesFiles.sort((left, right) => this.compareModulePaths(left.filePath, right.filePath));
 
     // 2.1: Process regular modules first (now imports can be resolved)
     for (const module of regularFiles) {
@@ -1503,55 +1438,11 @@ export class TypeScriptToTypedMindConverter {
     const isPureTypesFile = this.isPureTypesFile(module) && !isEntryPoint;
 
     // Decide whether to create separate entities or use ClassFile fusion
-    const hasClasses = module.classes.length > 0;
-    const hasFunctions = module.functions.length > 0;
-    const hasExports = module.exports.length > 0;
-
-    // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) —
-    // reserve this module's function entity names exactly once here, before
-    // EITHER downstream path (`convertToClassFile`, which may itself
-    // fall back to `convertToSeparateEntities`) builds an entity whose
-    // `exports:` list needs the final, possibly-disambiguated name. `pure
-    // types/constants` files have no functions by definition
-    // (`isPureTypesFile`), so this is a no-op for that branch.
-    if (!isPureTypesFile) {
-      this.reserveFunctionEntityNames(module, entityName);
-      // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) — a
-      // synthesized inline-DTO name (`${functionEntityName}Input`/`Output`)
-      // must never win a name-collision race against a HAND-AUTHORED
-      // interface/type-alias/enum declared in the SAME module, just
-      // because `convertToSeparateEntities`/`convertToClassFile` happen to
-      // convert functions before interfaces/type-aliases/enums (both
-      // paths' own fixed loop order, unchanged by this reservation).
-      // Without this reservation, `synthesizeInlineDTO` sees an empty slot
-      // in `entityNames` for a name like `CreateOrderInput`, claims it, and
-      // the LATER-converting `interface CreateOrderInput` then hits the
-      // pre-existing `Duplicate entity name` hard error and is silently
-      // dropped from the entity list — the wrong direction: an
-      // author-provided name must not be evicted by a converter-invented
-      // one. Reserving every exported interface/type-alias/enum's bare
-      // name up front (mirroring `reserveFunctionEntityNames`'s own
-      // pre-pass shape) closes this: `synthesizeInlineDTO`'s later
-      // `reserveSynthesizedDTOName` collision check sees the name already
-      // taken and disambiguates via `__2`, exactly as it already does for
-      // a same-module function-name collision.
-      //
-      // NOTE (2nd adversarial-review round, PR #84 comment 19118): a
-      // same-module reservation alone does not close the CROSS-module
-      // case (a hand-authored interface in a different, pure-types-
-      // classified file) — `convertModules` now also runs this same
-      // method over EVERY module up front, before either the
-      // `regularFiles` or `pureTypesFiles` loop starts (see that call
-      // site's own doc comment). This per-module call is additive/
-      // idempotent with that whole-run pass and is kept so
-      // `processModule` stays correct in isolation.
-      this.reserveNamedTypeEntityNames(module);
-    }
 
     if (isPureTypesFile) {
-      // For pure types/constants files, only create the individual type/constant entities
+      if (this.reservedFileEntityNameByModulePath.has(module.filePath)) this.createFileEntity(module, entityName);
       this.convertTypesAndConstants(module);
-    } else if (this.options.preferClassFile && hasClasses && (hasFunctions || hasExports) && !isEntryPoint) {
+    } else if (this.fusedModulePaths.has(module.filePath)) {
       // Use ClassFile fusion for service/controller patterns (but not for entry points)
       this.convertToClassFile(module, entityName);
     } else {
@@ -1561,16 +1452,7 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private createDependencyName(specifier: string): string {
-    // Handle scoped packages like @sammons/typed-mind-renderer
-    if (specifier.startsWith('@')) {
-      const sanitized = this.sanitizeEntityName(specifier.replace('@', '').replace('/', '_'));
-      // For @sammons/typed-mind -> SammonsTypedMind
-      // For @sammons/typed-mind-renderer -> SammonsTypedMindRenderer
-      return sanitized;
-    }
-
-    // Handle Node.js built-ins and regular packages
-    return this.sanitizeEntityName(specifier);
+    return this.nameAllocator.reserve(`dependency:${specifier}`, [this.sanitizeEntityName(specifier)]);
   }
 
   private extractVersionFromPackageJson(specifier: string): string | undefined {
@@ -1781,7 +1663,6 @@ export class TypeScriptToTypedMindConverter {
       return undefined;
     }
 
-    const entityName = createEntityName(extendsTarget);
     if (this.registryHasBareName('classes', extendsTarget) || this.registryHasBareName('interfaces', extendsTarget)) {
       // A real class/interface in the analyzed source happens to share a
       // name with a known ambient builtin (e.g. a project defines its own
@@ -1789,6 +1670,7 @@ export class TypeScriptToTypedMindConverter {
       return undefined;
     }
 
+    const entityName = this.nameAllocator.reserve(`builtin:${extendsTarget}`, [extendsTarget]);
     if (!this.builtinExtendsStubNames.has(entityName)) {
       this.builtinExtendsStubNames.add(entityName);
       this.entityNames.add(entityName);
@@ -1814,20 +1696,10 @@ export class TypeScriptToTypedMindConverter {
     return entityName;
   }
 
-  // RFC-TM-10 §3 (D-LEG-3, issue #61, LEAD RULING: no new sigil, `<:`
-  // mapping with representable qualified names). A namespace-qualified
-  // `implements` target's text contains a `.` (`ts.ParseConfigFileHost`) —
-  // the grammar's `entity_name` token accepts no dot, so the converter must
-  // not emit it verbatim. `sanitizeEntityName` already strips non-
-  // `[a-zA-Z0-9_]` characters (including `.`) and PascalCases the remainder
-  // (`ts.ParseConfigFileHost` -> `TsParseConfigFileHost`), the same
-  // deterministic transform X-CONV-4 already proved collision-safe. The
-  // stub is a bare ClassNode (zero methods, matching X-CONV-5's own
-  // zero-methods emission shape) so it never introduces a real inheritance
-  // edge the checker's unknown-base-class/circular-inheritance rules
-  // police — an `implements` target is structural, not a base class.
+  // Preserve the existing ambient heritage representation until A2 supplies
+  // proven origins; reserve the generated class identity before emission.
   private ensureNamespaceImplementsStub(target: string): string {
-    const entityName = this.sanitizeEntityName(target);
+    const entityName = this.nameAllocator.reserve(`namespace-heritage:${target}`, [this.sanitizeEntityName(target)]);
 
     if (!this.namespaceImplementsStubNames.has(entityName)) {
       this.namespaceImplementsStubNames.add(entityName);
@@ -1925,7 +1797,7 @@ export class TypeScriptToTypedMindConverter {
 
     // decision-same-named-entities PR 1 — resolve the primary class's final
     // name through `typeNameRemap` (whole-run pre-pass,
-    // `reserveTypeEntityNames`) instead of `createEntityName` + a hard
+    // `reserveEntityNames`) instead of `createEntityName` + a hard
     // `Duplicate entity name` abort, so a cross-module collision renames
     // rather than failing the whole conversion.
     const entityName = this.resolveTypeEntityName(module, primaryClass.name);
@@ -1988,7 +1860,7 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} #: ${this.getRelativePath(module.filePath)}`,
       sourceForm: 'shortform',
       path: this.getRelativePath(module.filePath),
-      extends: primaryClass.extends[0] || undefined, // TypedMind supports single inheritance
+      extends: primaryStubName ?? (primaryClass.extends[0] || undefined), // TypedMind supports single inheritance
       implements: this.convertImplementsList(primaryClass.extends.slice(1), primaryClass.implements),
       methods: this.convertMethods(primaryClass),
       imports: [...this.convertImports(module.filePath, module.imports, module.exports), ...stubNames],
@@ -2037,17 +1909,8 @@ export class TypeScriptToTypedMindConverter {
     this.convertConstants(module);
   }
 
-  private convertToSeparateEntities(module: ParsedModule, baseName: string): void {
-    // RC-B (issue #100) — the file-entity name comes from
-    // `reservedFileEntityNameByModulePath` (populated by `reserveFileEntityNames`'s
-    // whole-run, order-independent pre-pass in `convertModules`), not a bare
-    // `${baseName}File` recomputation here. `??` fallback covers callers
-    // that invoke this method directly without first running the whole-run
-    // pre-pass (kept for the same "correct in isolation" reason
-    // `reserveNamedTypeEntityNames`'s per-module call is kept alongside its
-    // own whole-run pass) — the fallback reproduces the PRE-FIX bare-name
-    // behavior for exactly the case the pre-pass could not have seen this
-    // module.
+  private createFileEntity(module: ParsedModule, baseName: string): void {
+    // The prepass reserves this actual owner before any member qualification.
     const fileEntityName = this.reservedFileEntityNameByModulePath.get(module.filePath) ?? createEntityName(`${baseName}File`);
 
     // SST-referenced-module orphan flags (lead-authorized amendment) —
@@ -2097,6 +1960,10 @@ export class TypeScriptToTypedMindConverter {
 
       this.entities.push(fileEntity);
     }
+  }
+
+  private convertToSeparateEntities(module: ParsedModule, baseName: string): void {
+    this.createFileEntity(module, baseName);
 
     // Convert other entities
     for (const cls of module.classes) {
@@ -2210,7 +2077,7 @@ export class TypeScriptToTypedMindConverter {
       span: SYNTHETIC_SPAN,
       raw: `${entityName} <: ${cls.extends.join(', ')}`,
       sourceForm: 'shortform',
-      extends: cls.extends[0] || undefined, // TypedMind supports single inheritance
+      extends: this.ensureBuiltinExtendsStub(cls.extends[0]) ?? (cls.extends[0] || undefined), // TypedMind supports single inheritance
       implements: this.convertImplementsList(cls.extends.slice(1), cls.implements),
       methods: this.convertMethods(cls),
       purpose: cls.description ? collapseDescription(cls.description) : undefined,
@@ -2219,303 +2086,187 @@ export class TypeScriptToTypedMindConverter {
     this.entities.push(classEntity);
   }
 
-  // RFC-TM-10 Q3 amendment (lead-authorized, D-LEG-6's live-clone check
-  // binding): a real multi-target SST-handler codebase (the webhookstorage
-  // clone) has multiple modules independently exporting a function literally
-  // named `handler` (`packages/functions/src/api/index.ts`,
-  // `.../auth/provision-tenant.ts`, `.../auth/teardown-tenant.ts`,
-  // `.../auth/deletion-verification.ts`) — traversal-enqueue is the first
-  // mechanism that ever traverses more than one of these together, so this
-  // bare-name collision was latent, never triggered, before Q3. Called as a
-  // PRE-PASS before either module-conversion path (`convertToClassFile`/
-  // `convertToSeparateEntities`) builds its File/ClassFile entity — the
-  // export list needs the FINAL emitted name before it can be built, so the
-  // remap must exist before that point, not after `convertFunction` runs.
-  // `baseName` is the module's own sanitized name (the same value used to
-  // derive `<baseName>File`). On the FIRST occurrence of a name (globally,
-  // across the whole conversion — `this.entityNames` is checked, not a
-  // per-module set), the name stays BARE: this is the narrow half of the
-  // guardrail, an uncollided function name is unaffected. Only on a
-  // DETECTED collision is `<baseName>__<name>` recorded, reusing
-  // `deriveProgramName`'s exact collision-proof rationale (X-CONV-4,
-  // RFC-TM-9 §4): `sanitizeEntityName` collapses every run of underscores to
-  // one and never re-inserts a separator when joining PascalCase parts, so
-  // no sanitized identifier can ever contain `__` — a literal `__` separator
-  // is provably outside `sanitizeEntityName`'s codomain and cannot collide
-  // with any real entity name derived from source. Deterministic, no
-  // runtime probe, no nondeterministic suffix (both rejected for the
-  // identical reason in RFC-TM-9's own Rejected Alternatives for the Class
-  // case). This pre-pass only RESERVES names in `this.entityNames` for
-  // functions that will actually be converted (mirrors
-  // `isFunctionExported`'s own filter) — it does not create entities.
-  private reserveFunctionEntityNames(module: ParsedModule, baseName: string): void {
-    for (const func of module.functions) {
-      if (!this.isFunctionExported(func, module)) {
-        continue;
-      }
-      const remapKey = `${module.filePath}::${func.name}`;
-      const bareName = createEntityName(func.name);
-      const finalName = this.entityNames.has(bareName) ? createEntityName(`${baseName}__${func.name}`) : bareName;
-      this.functionNameRemap.set(remapKey, finalName);
-      this.entityNames.add(finalName);
-    }
+  private compareModulePaths(left: string, right: string): number {
+    const a = this.getRelativePath(left);
+    const b = this.getRelativePath(right);
+    return a < b ? -1 : a > b ? 1 : 0;
   }
 
-  // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) — see
-  // this method's call site in `processModule` for the full rationale.
-  // Reserves this module's exported interface/type-alias/enum bare names
-  // in `entityNames` BEFORE any function in the module converts (and
-  // therefore before any inline-DTO synthesis can run), so a
-  // hand-authored name always wins a collision against a
-  // converter-synthesized one, regardless of the fixed pass order
-  // (`convertToSeparateEntities`/`convertToClassFile` always convert
-  // functions before interfaces/type-aliases/enums). This is a
-  // reservation only — it does not create entities, does not run
-  // `sanitizeEntityName` (interfaces/type-aliases/enums all resolve their
-  // final name via the identity `createEntityName`, per
-  // `convertInterfaceToDTO`/`convertTypeAliasToDTO`/`convertEnumToTypeDef`,
-  // so reserving that exact bare name here is provably the same name
-  // those methods will later look up), and does not touch classes (which
-  // already convert before functions in both call paths, so they are
-  // already safely registered by the time this method's caller runs).
-  // A collision AMONG interfaces/type-aliases/enums themselves is invalid
-  // TypeScript (a duplicate top-level declaration) and cannot occur from
-  // real source; this loop does not attempt to disambiguate that case —
-  // if it were ever reached, the later `convertInterfaceToDTO`-family
-  // call's own pre-existing `Duplicate entity name` guard reports it,
-  // unchanged by this reservation.
-  private reserveNamedTypeEntityNames(module: ParsedModule): void {
-    for (const iface of module.interfaces) {
-      if (this.isInterfaceExported(iface, module)) {
-        this.reservedNamedTypeNames.add(createEntityName(iface.name));
-      }
-    }
-    for (const typeAlias of module.types) {
-      if (this.isTypeAliasExported(typeAlias, module)) {
-        this.reservedNamedTypeNames.add(createEntityName(typeAlias.name));
-      }
-    }
-    for (const enumDef of module.enums ?? []) {
-      if (this.isEnumExported(enumDef, module)) {
-        this.reservedNamedTypeNames.add(createEntityName(enumDef.name));
-      }
-    }
+  private primaryClassOf(module: ParsedModule): ParsedClass | undefined {
+    const base = this.sanitizeEntityName(path.basename(module.filePath, path.extname(module.filePath)));
+    return module.classes.find((cls) => cls.name.toLowerCase() === base.toLowerCase()) ?? module.classes[0];
   }
 
-  // decision-same-named-entities PR 1 — the TYPE-side counterpart of
-  // `reserveFunctionEntityNames`, run as a WHOLE-RUN pre-pass (over the
-  // entire `modules` list, next to the existing `reserveNamedTypeEntityNames`
-  // and `reserveFileEntityNames` loops in `convertModules`) rather than
-  // per-module. Whole-run is required, not stylistic: the remap's whole job
-  // is to answer "is this module the FIRST to declare this name?", and that
-  // question is only answerable once every module's declarations are in
-  // view. A per-module pass would answer it by conversion order, which is
-  // exactly the traversal-order-dependent last-write-wins nondeterminism
-  // RC-B was filed to close for File entities.
-  //
-  // Collision-ONLY: a name declared in exactly one module is untouched. Only
-  // a name declared in two or more modules is disambiguated, and even then
-  // exactly one declaration keeps the bare name.
-  //
-  // WHICH declaration keeps it is decided by a canonical, order-independent
-  // rule: within each colliding group, the declaration whose PROJECT-RELATIVE
-  // FILE PATH sorts first in byte order wins. This is not the same as
-  // "whichever module was traversed first" - `modules` arrives in
-  // BFS-from-entrypoint order, so a first-wins rule makes the emitted names a
-  // function of import-line order and of which entrypoint was used, meaning
-  // two runs over identical source can disagree. Sorting a grouped set is
-  // immune to both. The rule is stated in the collision warning itself so a
-  // reader can predict the outcome without reading this code.
-  //
-  // Name UNIQUENESS is guaranteed by a single `assignedNames` set recording
-  // every name this pass hands out, bare and qualified alike, with all bare
-  // winners reserved BEFORE any qualification runs. Two properties follow: a
-  // qualified name can never be claimed ahead of the bare declarer of that
-  // same base name, and a qualified candidate can never land on a bare name
-  // some other group already owns. The tier ladder itself, and the
-  // collision-proof argument for the `__` separator, live in
-  // `qualifyCollidedTypeName`.
-  //
-  // Scope: class, interface, type alias, enum, and constant — every
-  // declaration form that lands in the flat global entity namespace and that
-  // previously either aborted the run (`addError`) or silently dropped the
-  // loser (`createConstantEntity`). Functions are NOT handled here; they
-  // keep their own pre-existing `reserveFunctionEntityNames` path unchanged.
-  private reserveTypeEntityNames(modules: readonly ParsedModule[]): void {
-    // PHASE 1 — collect every type-side declaration, with no naming decisions
-    // yet. `modulePathByRelativePath` is populated here too since it is a pure
-    // index over the same module list.
-    //
-    // Grouping by BARE NAME first, then sorting, is what makes this pass
-    // order-independent. `modules` arrives in BFS-from-entrypoint traversal
-    // order, so iterating it directly would let an import-line reordering (or
-    // a different entrypoint reaching the same modules by a different path)
-    // change which declaration keeps the bare name — `A__Config` under one
-    // ordering and `C__Config` under another, for the same source tree. Set
-    // operations over a sorted key are immune to that.
-    const declarationsByBareName = new Map<string, { module: ParsedModule; declName: string; relativePath: string }[]>();
-    const seenRemapKeys = new Set<string>();
-
-    for (const module of modules) {
-      this.modulePathByRelativePath.set(this.stripKnownSourceExtension(this.getRelativePath(module.filePath)), module.filePath);
-
-      const declNames = [
-        ...module.classes.map((cls) => cls.name),
-        ...module.interfaces.map((iface) => iface.name),
-        ...module.types.map((typeAlias) => typeAlias.name),
-        ...(module.enums ?? []).map((enumDef) => enumDef.name),
-        ...module.constants.map((constant) => constant.name),
-      ];
-
-      for (const declName of declNames) {
-        // A module may declare the same bare name under two different
-        // collection buckets (a `declare`-merged interface + type alias, an
-        // enum also surfaced as a constant). The first claim wins; re-claiming
-        // must not manufacture a phantom self-collision.
-        const remapKey = `${module.filePath}::${declName}`;
-        if (seenRemapKeys.has(remapKey)) {
-          continue;
-        }
-        seenRemapKeys.add(remapKey);
-
-        const bareName = createEntityName(declName);
-        const group = declarationsByBareName.get(bareName);
-        const entry = { module, declName, relativePath: this.getRelativePath(module.filePath) };
-        if (group) {
-          group.push(entry);
-        } else {
-          declarationsByBareName.set(bareName, [entry]);
+  private reserveEntityNames(modules: readonly ParsedModule[]): void {
+    const orderedModules = [...modules].sort((left, right) => this.compareModulePaths(left.filePath, right.filePath));
+    type Declaration = { module: ParsedModule; name: string; function: boolean };
+    const groups = new Map<string, Declaration[]>();
+    const add = (
+      module: ParsedModule,
+      declaration: { readonly name: string; readonly declaration?: DeclarationIdentity },
+      isFunction: boolean,
+    ): void => {
+      const name = declaration.name;
+      const key = `${module.filePath}::${name}`;
+      const identity = declaration.declaration;
+      if (identity === undefined) {
+        this.sourceDeclarationsWithoutIdentity.add(key);
+      } else {
+        const identities = this.sourceDeclarationIdentities.get(key) ?? [];
+        if (!identities.some((existing) => this.sameDeclarationIdentity(existing, identity))) {
+          identities.push(identity);
+          this.sourceDeclarationIdentities.set(key, identities);
+          if (identities.length === 2)
+            this.addError(
+              `Distinct source declarations named '${name}' share one allocation key in '${this.getRelativePath(module.filePath)}'; their lexical identities cannot be represented by one emitted entity name`,
+              module.filePath,
+            );
         }
       }
+      const group = groups.get(name) ?? [];
+      if (!group.some((entry) => entry.module.filePath === module.filePath)) group.push({ module, name, function: isFunction });
+      groups.set(name, group);
+    };
+    for (const module of orderedModules) {
+      for (const cls of module.classes) add(module, cls, false);
+      for (const iface of module.interfaces) if (this.isInterfaceExported(iface, module)) add(module, iface, false);
+      for (const type of module.types) if (this.isTypeAliasExported(type, module)) add(module, type, false);
+      for (const item of module.enums ?? []) if (this.isEnumExported(item, module)) add(module, item, false);
+      for (const constant of module.constants) if (this.isConstantExported(constant, module)) add(module, constant, false);
+      for (const fn of module.functions) if (this.isFunctionExported(fn, module)) add(module, fn, true);
+    }
+    const sourceKey = (entry: Declaration): string => `source:${entry.module.filePath}::${entry.name}`;
+    const store = (entry: Declaration, name: string): void => {
+      const key = `${entry.module.filePath}::${entry.name}`;
+      (entry.function ? this.functionNameRemap : this.typeNameRemap).set(key, name);
+    };
+    const losers: Declaration[] = [];
+    for (const name of [...groups.keys()].sort()) {
+      const group = groups.get(name) ?? [];
+      group.sort((a, b) => this.compareModulePaths(a.module.filePath, b.module.filePath));
+      const first = group[0];
+      if (first === undefined) continue;
+      store(first, this.nameAllocator.reserve(sourceKey(first), [name]));
+      this.typeNameFirstDeclarer.set(name, this.getRelativePath(first.module.filePath));
+      losers.push(...group.slice(1));
     }
 
-    // PHASE 2 — assign names in a canonical order.
-    //
-    // `assignedNames` is the SINGLE authoritative record of every name this
-    // pass hands out, bare and qualified alike. The previous implementation
-    // recorded only qualified names and wrote bare names unguarded, so a
-    // module literally declaring `Config__Config` could be handed a name a
-    // prior collision rename had already produced — two entities, one name,
-    // emitted silently and surfacing only as two `checker/duplicate-name`
-    // findings downstream.
-    const assignedNames = new Set<string>();
-
-    // Bare names are reserved for their winners BEFORE any qualification runs.
-    // Without this, a group processed earlier could burn `Types__Config` as a
-    // disambiguator and leave the module that genuinely declares
-    // `Types__Config` unable to hold its own name. Reserving first means a
-    // qualified name can never be claimed ahead of the bare declarer of that
-    // same base name — the ordering guarantee the tier ladder relies on.
-    const sortedBareNames = [...declarationsByBareName.keys()].sort();
-    const winnerByBareName = new Map<string, { module: ParsedModule; declName: string; relativePath: string }>();
-
-    for (const bareName of sortedBareNames) {
-      const group = declarationsByBareName.get(bareName) ?? [];
-      // THE CANONICAL RULE: the declaration whose project-relative file path
-      // sorts first in byte order keeps the bare name. Documented in the
-      // collision warning so a reader can predict the outcome without reading
-      // this code. Ties inside one file fall back to the declaration name,
-      // which is unique per file per `seenRemapKeys`.
-      const sortedGroup = [...group].sort((left, right) => {
-        if (left.relativePath !== right.relativePath) {
-          return left.relativePath < right.relativePath ? -1 : 1;
-        }
-        return left.declName < right.declName ? -1 : left.declName > right.declName ? 1 : 0;
-      });
-
-      const [winner] = sortedGroup;
-      if (winner === undefined) {
+    // A primary class that retained its bare identity can share it with the
+    // physical file. A qualified primary class needs a separate real owner.
+    const needsOwner = new Set(losers.map((entry) => entry.module.filePath));
+    const fileModules: ParsedModule[] = [];
+    for (const module of orderedModules) {
+      const primary = this.primaryClassOf(module);
+      const canFuse =
+        this.options.preferClassFile &&
+        primary !== undefined &&
+        (module.functions.length > 0 || module.exports.length > 0) &&
+        !this.isModuleEntryPoint(module) &&
+        this.typeNameRemap.get(`${module.filePath}::${primary.name}`) === primary.name;
+      if (canFuse && primary !== undefined) {
+        this.fusedModulePaths.add(module.filePath);
+        this.fileEntityNameByModulePath.set(module.filePath, primary.name);
         continue;
       }
-      winnerByBareName.set(bareName, winner);
-      declarationsByBareName.set(bareName, sortedGroup);
-      assignedNames.add(bareName);
-      this.typeNameFirstDeclarer.set(bareName, winner.relativePath);
-      this.typeNameRemap.set(`${winner.module.filePath}::${winner.declName}`, bareName);
+      if (!this.isPureTypesFile(module) || this.isModuleEntryPoint(module) || needsOwner.has(module.filePath)) fileModules.push(module);
     }
-
-    for (const bareName of sortedBareNames) {
-      const group = declarationsByBareName.get(bareName) ?? [];
-      const winner = winnerByBareName.get(bareName);
-      if (winner === undefined) {
+    const baseCounts = new Map<string, number>();
+    for (const module of fileModules) {
+      const base = this.sanitizeEntityName(path.basename(module.filePath, path.extname(module.filePath)));
+      baseCounts.set(base, (baseCounts.get(base) ?? 0) + 1);
+    }
+    for (const module of fileModules) {
+      const base = this.sanitizeEntityName(path.basename(module.filePath, path.extname(module.filePath)));
+      const parent = this.sanitizeEntityName(path.basename(path.dirname(module.filePath)));
+      const directory = this.sanitizeEntityName(this.getRelativePath(path.dirname(module.filePath)));
+      const candidates = [...((baseCounts.get(base) ?? 0) === 1 ? [`${base}File`] : []), `${parent}${base}File`, `${directory}${base}File`];
+      const name = this.nameAllocator.reserve(`file:${module.filePath}`, candidates);
+      this.reservedFileEntityNameByModulePath.set(module.filePath, name);
+      this.fileEntityNameByModulePath.set(module.filePath, name);
+    }
+    for (const entry of losers) {
+      const owner = this.fileEntityNameByModulePath.get(entry.module.filePath);
+      if (owner === undefined) {
+        this.addError('Missing reserved File owner for a qualified declaration', entry.module.filePath);
         continue;
       }
-
-      for (const entry of group) {
-        if (entry === winner) {
-          continue;
-        }
-
-        const qualifiedName = this.qualifyCollidedTypeName(entry.module, entry.declName, bareName, assignedNames);
-        this.typeNameRemap.set(`${entry.module.filePath}::${entry.declName}`, qualifiedName);
-        assignedNames.add(qualifiedName);
-        this.collidedTypeNames.add(bareName);
-
-        // The warning names BOTH colliding paths and the resulting name, and
-        // states the rule that decided the winner, so a reader can act on it
-        // without re-running the extraction or reading this file.
-        this.addWarning(
-          `Duplicate entity name '${bareName}' declared in both '${winner.relativePath}' and '${entry.relativePath}'; the declaration whose file path sorts first kept the bare name, so '${entry.relativePath}' was renamed to '${qualifiedName}'. TypedMind entity names are global to a document.`,
-          entry.module.filePath,
-        );
-      }
+      const name = this.nameAllocator.reserve(sourceKey(entry), [`${owner}.${entry.name}`]);
+      store(entry, name);
+      this.collidedTypeNames.add(entry.name);
+      this.addWarning(
+        `Duplicate entity name '${entry.name}' declared in both '${this.typeNameFirstDeclarer.get(entry.name)}' and '${this.getRelativePath(entry.module.filePath)}'; the declaration whose file path sorts first kept the bare name, so '${this.getRelativePath(entry.module.filePath)}' was renamed to '${name}'. TypedMind entity names are global to a document.`,
+        entry.module.filePath,
+      );
     }
+    if (this.options.generatePrograms) {
+      const entries = [...this.entryPoints].sort();
+      if (entries.length === 0 && modules[0] !== undefined) {
+        this.nameAllocator.reserve(`program:${this.getRelativePath(modules[0].filePath)}`, ['DefaultApp']);
+      }
+      for (const entry of entries)
+        this.nameAllocator.reserve(`program:${entry}`, [this.deriveProgramName(path.basename(entry, path.extname(entry)))]);
+    }
+    const dependencySpecifiers = new Set(
+      orderedModules.flatMap((module) => module.imports.filter((imp) => this.isExternalPackage(imp.specifier)).map((imp) => imp.specifier)),
+    );
+    for (const specifier of [...dependencySpecifiers].sort()) this.createDependencyName(specifier);
+    const builtinTargets = new Set(
+      orderedModules.flatMap((module) => module.classes.map((cls) => cls.extends[0]).filter((name): name is string => name !== undefined)),
+    );
+    for (const target of [...builtinTargets].sort()) {
+      if (
+        TypeScriptToTypedMindConverter.KNOWN_AMBIENT_EXTENDS_TARGETS.has(target) &&
+        !this.registryHasBareName('classes', target) &&
+        !this.registryHasBareName('interfaces', target)
+      )
+        this.nameAllocator.reserve(`builtin:${target}`, [target]);
+    }
+    const namespaceTargets = new Set(
+      orderedModules.flatMap((module) =>
+        [
+          ...module.classes.flatMap((cls) => [...cls.extends.slice(1), ...cls.implements]),
+          ...module.interfaces
+            .filter((iface) => this.isInterfaceExported(iface, module) && this.isPredictedClassInterface(iface.name))
+            .flatMap((iface) => iface.extends.slice(1)),
+        ].filter((name) => name.includes('.')),
+      ),
+    );
+    for (const target of [...namespaceTargets].sort())
+      this.nameAllocator.reserve(`namespace-heritage:${target}`, [this.sanitizeEntityName(target)]);
+    const namespaceImports = orderedModules
+      .filter((module) => this.fileEntityNameByModulePath.has(module.filePath))
+      .flatMap((module) =>
+        module.imports
+          .filter((imp) => imp.namespaceImport !== undefined && !this.isExternalPackage(imp.specifier))
+          .map((imp) => ({ module, imp })),
+      );
+    namespaceImports.sort((a, b) => {
+      const left = `${a.module.filePath}:${a.imp.specifier}:${a.imp.namespaceImport}`;
+      const right = `${b.module.filePath}:${b.imp.specifier}:${b.imp.namespaceImport}`;
+      return left < right ? -1 : left > right ? 1 : 0;
+    });
+    for (const { module, imp } of namespaceImports)
+      if (imp.namespaceImport !== undefined) this.reserveNamespaceImportName(module.filePath, imp.namespaceImport, imp.specifier);
   }
 
-  // decision-same-named-entities PR 1 — the disambiguator tier ladder for a
-  // declaration that lost its bare name. Tiers mirror `reserveFileEntityNames`
-  // exactly: sanitized module basename, then parent directory name, then the
-  // full sanitized relative directory path, then a `__2`/`__3` counter. Each
-  // tier exists because the one above it is lossy — `sanitizeEntityName`
-  // collapses `/`, `-`, `_` and case into one alnum-only PascalCase string, so
-  // two genuinely different modules can sanitize to the same disambiguator at
-  // any tier.
-  //
-  // The `__` separator is collision-proof for the reason `deriveProgramName`
-  // and `reserveFunctionEntityNames` already document: `sanitizeEntityName`
-  // collapses every run of underscores to exactly one and never re-inserts a
-  // separator, so a literal `__` is provably outside its codomain and cannot
-  // collide with any name derived from real source. Every candidate is checked
-  // against `isValidEntityName` (`/^[a-zA-Z_][a-zA-Z0-9_]*$/`, the grammar's
-  // own `entity_name` token shape) and against `assignedNames`, which by this
-  // point already holds every bare name this pass will hand out.
-  private qualifyCollidedTypeName(module: ParsedModule, declName: string, bareName: string, assignedNames: ReadonlySet<string>): string {
-    const moduleBaseName = this.sanitizeEntityName(path.basename(module.filePath, path.extname(module.filePath)));
-    const parentDirName = this.sanitizeEntityName(path.basename(path.dirname(module.filePath)));
-    const relativeDirName = this.sanitizeEntityName(this.getRelativePath(path.dirname(module.filePath)));
+  private sameDeclarationIdentity(left: DeclarationIdentity, right: DeclarationIdentity): boolean {
+    return left.filePath === right.filePath && left.name === right.name && left.start === right.start && left.end === right.end;
+  }
 
-    for (const tier of [moduleBaseName, parentDirName, relativeDirName]) {
-      if (tier === '') {
-        continue;
-      }
-      const candidate = createEntityName(`${tier}__${declName}`);
-      if (!assignedNames.has(candidate) && this.isValidEntityName(candidate)) {
-        return candidate;
-      }
-    }
-
-    // Last-resort counter tier. The seed is made a VALID entity name up front
-    // rather than being re-tested inside the loop: `isValidEntityName` is
-    // invariant under the `__${attempt}` suffix (appending digits can neither
-    // fix an empty seed nor fix a leading digit), so testing it in the loop
-    // guard would spin forever on exactly those seeds instead of terminating.
-    //
-    // Termination: with `isValidEntityName` hoisted out, the only remaining
-    // condition is a finite-set membership test and `attempt` is unbounded, so
-    // a free candidate is always reached.
-    const seedBase = moduleBaseName === '' ? bareName : createEntityName(`${moduleBaseName}__${declName}`);
-    const seed = this.isValidEntityName(seedBase) ? seedBase : this.sanitizeEntityName(seedBase);
-    let attempt = 2;
-    let candidate = `${seed}__${attempt}`;
-    while (assignedNames.has(candidate)) {
-      attempt += 1;
-      candidate = `${seed}__${attempt}`;
-    }
-    return candidate;
+  // F/H/A2 may consult this identity-proven allocation after the prepass.
+  // Consumers that need an emitted entity must separately verify exactly
+  // one final instance and its kind; a reservation is not an emitted node.
+  private getAssignedDeclarationName(identity: DeclarationIdentity): string | undefined {
+    const key = `${identity.filePath}::${identity.name}`;
+    const declarations = this.sourceDeclarationIdentities.get(key);
+    if (this.sourceDeclarationsWithoutIdentity.has(key) || declarations?.length !== 1) return undefined;
+    const declaration = declarations[0];
+    if (declaration === undefined || !this.sameDeclarationIdentity(declaration, identity)) return undefined;
+    return this.functionNameRemap.get(key) ?? this.typeNameRemap.get(key);
   }
 
   // decision-same-named-entities PR 1 — resolve a declaration's final entity
-  // name through `typeNameRemap`. `reserveTypeEntityNames` runs as a
+  // name through `typeNameRemap`. `reserveEntityNames` runs as a
   // whole-run pre-pass over every module, so every class/interface/type-
   // alias/enum/constant declaration reaching a converter has an entry. A
   // miss means a caller that constructed the converter's module list outside
@@ -2525,7 +2276,14 @@ export class TypeScriptToTypedMindConverter {
     if (module === undefined) {
       return createEntityName(declName);
     }
-    return this.typeNameRemap.get(`${module.filePath}::${declName}`) ?? createEntityName(declName);
+    const key = `${module.filePath}::${declName}`;
+    const identities = this.sourceDeclarationIdentities.get(key);
+    const identity = identities?.length === 1 ? identities[0] : undefined;
+    return (
+      (identity === undefined ? undefined : this.getAssignedDeclarationName(identity)) ??
+      this.typeNameRemap.get(key) ??
+      createEntityName(declName)
+    );
   }
 
   // decision-same-named-entities PR 1, INTERIM WINDOW instrumentation.
@@ -2566,104 +2324,12 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
-  // RC-B (issue #100) — order-independent File-entity name reservation.
-  // Groups every module by its bare basename FIRST (a pure set operation
-  // over the whole `modules` list, unaffected by which module a later loop
-  // happens to process first), then disambiguates only the basenames that
-  // actually collide. A non-colliding basename keeps the existing bare
-  // `${baseName}File` shape unchanged — this is a collision-ONLY mechanism,
-  // matching `reserveFunctionEntityNames`'s own `__`-disambiguator
-  // precedent (X-CONV-4/PR #74), not a blanket rename of every File entity.
-  //
-  // Disambiguator choice: the module's own parent directory name
-  // (`db`/`routes` for `db/events.ts` vs `routes/events.ts`), sanitized and
-  // joined with the same `__` double-underscore separator
-  // `deriveProgramName`/`reserveFunctionEntityNames` already establish as
-  // outside `sanitizeEntityName`'s codomain (see `deriveProgramName`'s own
-  // comment for the collision-proof argument — it applies identically
-  // here). If two colliding modules ALSO share the same parent directory
-  // name (a deeper nesting, e.g. `a/x/events.ts` vs `b/x/events.ts`), fall
-  // back to the full sanitized relative directory path.
-  //
-  // Adversarial review (PR #105) blocker fix — `sanitizeEntityName` is
-  // LOSSY (it collapses `/`, `-`, `_`, and case into one alnum-only
-  // PascalCase string), so two distinct full relative directory paths that
-  // differ only in separator/case/dash-vs-underscore shape (`pkg-a/x` vs
-  // `pkg/a/x`) can still sanitize to the identical disambiguator even at
-  // the full-path fallback tier — silently clobbering the SAME way RC-B
-  // itself was filed to close, just requiring a rarer directory-name
-  // shape. Closed by tracking every disambiguated name this method has
-  // already assigned in `assignedNames` and, on a genuine post-sanitize
-  // collision, appending a deterministic `__2`, `__3`, ... suffix (the
-  // same disambiguator shape `reserveSynthesizedDTOName` already uses) —
-  // this is a last-resort, should-not-fire-in-practice tier, but it makes
-  // every name this method emits provably unique regardless of how two
-  // real directory paths happen to sanitize.
-  private reserveFileEntityNames(modules: readonly ParsedModule[]): void {
-    const modulesByBaseName = new Map<string, ParsedModule[]>();
-    for (const module of modules) {
-      const baseName = this.sanitizeEntityName(path.basename(module.filePath, path.extname(module.filePath)));
-      const group = modulesByBaseName.get(baseName);
-      if (group) {
-        group.push(module);
-      } else {
-        modulesByBaseName.set(baseName, [module]);
-      }
-    }
-
-    const assignedNames = new Set<string>();
-    const assign = (modulePath: string, candidateName: string): void => {
-      let finalName = candidateName;
-      let attempt = 2;
-      while (assignedNames.has(finalName)) {
-        finalName = `${candidateName}__${attempt}`;
-        attempt += 1;
-      }
-      assignedNames.add(finalName);
-      this.reservedFileEntityNameByModulePath.set(modulePath, finalName);
-    };
-
-    for (const [baseName, group] of modulesByBaseName) {
-      if (group.length === 1) {
-        const [onlyModule] = group;
-        if (onlyModule) {
-          assign(onlyModule.filePath, createEntityName(`${baseName}File`));
-        }
-        continue;
-      }
-
-      // Collision: disambiguate every module in the group by parent
-      // directory name first; only fall back to the full directory path
-      // for a sub-collision (two modules sharing BOTH basename and parent
-      // directory name — only possible with a deeper, differently-rooted
-      // path, since same basename + same immediate parent + same full
-      // relative path would be the same file). `assign`'s numeric-suffix
-      // tier is the final backstop for the rare case where even the
-      // full-path fallback sanitizes to an identical string across two
-      // different real paths.
-      const parentDirNames = group.map((module) => this.sanitizeEntityName(path.basename(path.dirname(module.filePath))));
-      const parentDirNameCounts = new Map<string, number>();
-      for (const parentDirName of parentDirNames) {
-        parentDirNameCounts.set(parentDirName, (parentDirNameCounts.get(parentDirName) ?? 0) + 1);
-      }
-
-      group.forEach((module, index) => {
-        const parentDirName = parentDirNames[index] ?? '';
-        const disambiguator =
-          (parentDirNameCounts.get(parentDirName) ?? 0) > 1
-            ? this.sanitizeEntityName(this.getRelativePath(path.dirname(module.filePath)))
-            : parentDirName;
-        assign(module.filePath, createEntityName(`${disambiguator}__${baseName}File`));
-      });
-    }
-  }
-
   private convertFunction(func: ParsedFunction, module: ParsedModule): void {
     const moduleFilePath = module.filePath;
     const remapKey = `${moduleFilePath}::${func.name}`;
     const entityName = this.functionNameRemap.get(remapKey);
 
-    // `reserveFunctionEntityNames` runs as a pre-pass before every call site
+    // `reserveEntityNames` runs as a pre-pass before every call site
     // that reaches `convertFunction` (`convertToClassFile`,
     // `convertToSeparateEntities`), reserving this exact key. A missing
     // entry means a call path that skipped the pre-pass — defensive, not
@@ -2705,6 +2371,7 @@ export class TypeScriptToTypedMindConverter {
       output: outputDTO,
     });
 
+    this.entityNames.add(entityName);
     this.entities.push(functionEntity);
   }
 
@@ -2715,7 +2382,7 @@ export class TypeScriptToTypedMindConverter {
   // `module.functions` (resolved through `functionNameRemap`, the converter's
   // own collision-resolved name — the same map `convertFunction` itself uses
   // for its own name) or a sibling exported class in `module.classes`
-  // (resolved through `createEntityName`, since `reserveFunctionEntityNames`'s
+  // (resolved through `createEntityName`, since `reserveEntityNames`'s
   // own doc comment establishes classes are never touched by the function
   // disambiguation remap and always convert before this method runs, in both
   // `convertToClassFile` and `convertToSeparateEntities`). A name with no
@@ -3335,7 +3002,7 @@ export class TypeScriptToTypedMindConverter {
   // `fileEntityNameByModulePath` for the TARGET module is only guaranteed
   // populated once that module's own File/ClassFile entity has been
   // constructed, and `modules` processes in an arbitrary order relative to
-  // the source module — the same class of hazard `reserveNamedTypeEntityNames`'s
+  // the source module — the same class of hazard `reserveEntityNames`'s
   // own whole-run pre-pass (see its call site's comment above) already
   // fought for named-type collisions. A post-pass over the FINISHED entity
   // list has no such ordering dependency.
@@ -3808,12 +3475,12 @@ export class TypeScriptToTypedMindConverter {
   // Program's own entry file into the target function's final
   // (collision-resolved) entity name via `functionNameRemap`, keyed by
   // `${resolvedAbsolutePath}::${memberName}` (the exact key
-  // `reserveFunctionEntityNames` writes for every exported function in
+  // `reserveEntityNames` writes for every exported function in
   // every traversed module, populated before `generatePrograms` runs —
   // `convertModules` precedes it in `convert()`). A reference whose target
   // module was not traversed, or whose member is not itself a converted
   // exported function (e.g. a re-exported const arrow that never entered
-  // `reserveFunctionEntityNames`), resolves to `undefined` and is silently
+  // `reserveEntityNames`), resolves to `undefined` and is silently
   // skipped here — the recognizer's OWN not-found/not-exported diagnostics
   // (X-DIAG-1) already cover the failure surface; this fold only ever adds
   // an entity name it can prove exists.
@@ -3838,7 +3505,7 @@ export class TypeScriptToTypedMindConverter {
     selfInvokedFunctionNames: readonly string[] = [],
     sstHandlerReferences: readonly SstHandlerReference[] = [],
   ): void {
-    const entityName = createEntityName(programName);
+    const entityName = this.nameAllocator.reserve(`program:${this.getRelativePath(entryFilePath)}`, [programName]);
 
     if (this.entityNames.has(entityName)) {
       this.addError(`Duplicate program name: ${entityName}`);
@@ -4189,11 +3856,8 @@ export class TypeScriptToTypedMindConverter {
 
         if (imp.namespaceImport) {
           // Create a class-like entity for the namespace import
-          this.createNamespaceEntity(imp.namespaceImport, imp.specifier);
-          const entityName = this.resolveImportToEntity(importerFilePath, imp.namespaceImport, imp.specifier);
-          if (entityName) {
-            importNames.push(entityName);
-          }
+          const entityName = this.createNamespaceEntity(importerFilePath, imp.namespaceImport, imp.specifier);
+          importNames.push(entityName);
         }
 
         for (const namedImport of imp.namedImports) {
@@ -4282,8 +3946,10 @@ export class TypeScriptToTypedMindConverter {
     const declaringModulePath =
       resolvedTarget !== undefined ? this.modulePathByRelativePath.get(this.stripKnownSourceExtension(resolvedTarget)) : undefined;
     const entityName =
-      (declaringModulePath !== undefined ? this.typeNameRemap.get(`${declaringModulePath}::${importName}`) : undefined) ??
-      createEntityName(importName);
+      (declaringModulePath !== undefined
+        ? (this.functionNameRemap.get(`${declaringModulePath}::${importName}`) ??
+          this.typeNameRemap.get(`${declaringModulePath}::${importName}`))
+        : undefined) ?? createEntityName(importName);
 
     // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-CONV-2) — a `types`-registry name
     // predicted to become a TypeDef is EXCLUDED from import/export
@@ -4379,7 +4045,7 @@ export class TypeScriptToTypedMindConverter {
           // through `exports:`'s checked slot regardless of kind.
           //
           // RFC-TM-10 Q3 amendment (lead-authorized, X-CONV-4 extension) —
-          // a top-level function renamed by `reserveFunctionEntityNames`/
+          // a top-level function renamed by `reserveEntityNames`/
           // `convertFunction` on a bare-name collision must be named by
           // its ACTUAL emitted entity name here too, or this File's
           // `exports:` list would reference a name no entity carries.
@@ -4390,7 +4056,7 @@ export class TypeScriptToTypedMindConverter {
           //
           // decision-same-named-entities PR 1 — the same argument applies to a
           // class/interface/type-alias/enum/constant renamed by
-          // `reserveTypeEntityNames` on a cross-module collision: this File's
+          // `reserveEntityNames` on a cross-module collision: this File's
           // `exports:` list must name the entity that actually exists.
           // `typeNameRemap` is the second lane and returns `undefined` for
           // every export that is not a collision-renamed declaration, which is
@@ -4792,10 +4458,8 @@ export class TypeScriptToTypedMindConverter {
   // UNRELATED entity that happens to share the derived name (e.g. a
   // hand-named `DTO FooInput %` already exists) or between the input DTO
   // and output DTO for the SAME function if the caller derived the same
-  // suffix twice — resolved by appending the same `__2`, `__3`, ...
-  // double-underscore disambiguator `reserveFunctionEntityNames` already
-  // uses for function-name collisions, walked upward until a free name is
-  // found.
+  // suffix twice — resolved by appending collision-checked `2`, `3`, ...
+  // through the shared allocator, checking every reserved identity.
   //
   // Nesting: a field whose own type is ALSO an inline object literal
   // recurses into its own synthesized DTO, named by running
@@ -4832,28 +4496,11 @@ export class TypeScriptToTypedMindConverter {
 
   // Collision resolution shared by `synthesizeInlineDTO`'s two call sites
   // (an input DTO and an output DTO for the same function, or a synthesized
-  // name colliding with an unrelated pre-existing entity). Mirrors
-  // `reserveFunctionEntityNames`'s own `<baseName>__<disambiguator>` shape
-  // (X-CONV-4) rather than inventing a second collision convention.
+  // name colliding with any reserved source or generated identity).
+  // Canonical module traversal makes the per-conversion synthesis keys stable.
   private reserveSynthesizedDTOName(baseName: string): string {
-    // issue #72 (tm10-inc2), adversarial-review blocker fix (PR #84) —
-    // `reservedNamedTypeNames` holds this module's own
-    // interface/type-alias/enum names, reserved ahead of function
-    // conversion but not yet real entities (see that set's own doc
-    // comment). A synthesized name must avoid BOTH `entityNames` (real
-    // entities already converted) and this reservation set (entities that
-    // WILL exist once this module's own interface/type-alias/enum loop
-    // runs) — checking only `entityNames` is exactly the gap that let a
-    // synthesized DTO evict a same-module hand-authored interface.
-    const isTaken = (name: string): boolean => this.entityNames.has(name) || this.reservedNamedTypeNames.has(name);
-    if (!isTaken(baseName)) {
-      return baseName;
-    }
-    let attempt = 2;
-    while (isTaken(`${baseName}__${attempt}`)) {
-      attempt += 1;
-    }
-    return `${baseName}__${attempt}`;
+    this.synthesizedNameSequence += 1;
+    return this.nameAllocator.reserve(`synthesized:${this.synthesizedNameSequence}`, [baseName]);
   }
 
   // Brace-depth-aware property split for an inline object-literal type's
@@ -5177,37 +4824,21 @@ export class TypeScriptToTypedMindConverter {
   }
 
   private sanitizeEntityName(name: string): string {
-    // Convert to PascalCase and remove invalid characters
-    return name
+    const pascal = name
       .replace(/[^a-zA-Z0-9_]/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .replace(/^(\d)/, '_$1') // Ensure doesn't start with number
       .split('_')
+      .filter(Boolean)
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join('');
+    return /^[A-Za-z_]/.test(pascal) ? pascal : `Entity${pascal}`;
   }
 
   private isValidEntityName(name: string): boolean {
-    return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name);
+    return /^[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*$/.test(name);
   }
 
   private deriveProgramName(fileName: string): string {
-    // X-CONV-4 — collision-proof naming. The prior `endsWith('App') ? base :
-    // `${base}App`` scheme produces bare `App` for `App.tsx`, colliding with
-    // the real exported `App` component (census gap 6, issue #45's crash
-    // case). `<Base>__App` is provably outside `sanitizeEntityName`'s
-    // codomain: that function collapses every run of underscores to a
-    // single one and never re-inserts a separator when joining
-    // PascalCase-cased parts (`'_+' -> '_'` then `split('_').join('')` —
-    // see its own comment), so no sanitized identifier can ever contain
-    // `__`. A literal `__` separator therefore cannot collide with any real
-    // entity name derived from source, without needing a runtime collision
-    // probe or a nondeterministic suffix (both rejected in the Diamond
-    // Doc's Rejected Alternatives — `App2`/`AppProgram` are not
-    // collision-proof against adversarial real names).
-    const base = this.sanitizeEntityName(fileName);
-    return `${base}__App`;
+    return `${this.sanitizeEntityName(fileName)}App`;
   }
 
   private addError(message: string, filePath?: string): void {
@@ -5290,12 +4921,18 @@ export class TypeScriptToTypedMindConverter {
     return this.sanitizeEntityName(`${fileName}File`);
   }
 
-  private createNamespaceEntity(namespaceName: string, specifier: string): void {
-    const entityName = createEntityName(namespaceName);
+  private reserveNamespaceImportName(importerFilePath: string, namespaceName: string, specifier: string): string {
+    return this.nameAllocator.reserve(`namespace-import:${importerFilePath}:${specifier}:${namespaceName}`, [
+      this.sanitizeEntityName(namespaceName),
+    ]);
+  }
+
+  private createNamespaceEntity(importerFilePath: string, namespaceName: string, specifier: string): string {
+    const entityName = this.reserveNamespaceImportName(importerFilePath, namespaceName, specifier);
 
     // Don't create if it already exists
     if (this.entityNames.has(entityName)) {
-      return;
+      return entityName;
     }
 
     this.entityNames.add(entityName);
@@ -5315,6 +4952,7 @@ export class TypeScriptToTypedMindConverter {
     });
 
     this.entities.push(namespaceEntity);
+    return entityName;
   }
 
   private extractNamespaceMethods(_namespaceName: string, specifier: string): string[] {

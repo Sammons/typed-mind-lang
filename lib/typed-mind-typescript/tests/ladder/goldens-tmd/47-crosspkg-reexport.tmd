@@ -1,18 +1,18 @@
-program Main__App {
+program MainApp {
   type: Program
   entry: MainFile
   version: 1.0.0
   exports: [handleRequest]
 }
 
-MainFile @ src/main.ts:
-  <- [formatIp, ClientIpFile]
-  -> [handleRequest]
-
 ClientIpFile @ src/lib/client-ip.ts:
   -> [formatIp]
   <-> [getClientIp]
 
-handleRequest :: handleRequest(rawIp: string) => string
+MainFile @ src/main.ts:
+  <- [formatIp, ClientIpFile]
+  -> [handleRequest]
 
 formatIp :: formatIp(ip: string) => string
+
+handleRequest :: handleRequest(rawIp: string) => string

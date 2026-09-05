@@ -29,10 +29,10 @@
 // module-qualified name, reusing `reserveFunctionEntityNames`'s `__`
 // convention. Conversion now COMPLETES: `success: true`, no `Duplicate
 // entity name` error, and BOTH declarations survive as `JobRecord` (the
-// first declarer, bare) and `JobStore__JobRecord` (the second, qualified),
+// first declarer, bare) and `JobStoreFile.JobRecord` (the second, qualified),
 // each carrying its own fields. The collision is reported as a warning
 // naming both paths. The three MECHANICAL reference sites follow the
-// rename — this fixture's `MainFile` imports `JobStore__JobRecord` and
+// rename — this fixture's `MainFile` imports `JobStoreFile.JobRecord` and
 // `JobStoreFile` exports it, both resolved through
 // `resolveImportToEntity`/`convertExports` from the analyzer's own module
 // graph, with no type-origin inference needed.
@@ -104,7 +104,7 @@ describe('fixture 77: same-named interfaces in two files — declaration renamed
     assert.deepEqual(
       collisionWarnings.map((warning) => (warning as { message: string }).message),
       [
-        "Duplicate entity name 'JobRecord' declared in both 'src/job-store.ts' and 'src/main.ts'; the declaration whose file path sorts first kept the bare name, so 'src/main.ts' was renamed to 'Main__JobRecord'. TypedMind entity names are global to a document.",
+        "Duplicate entity name 'JobRecord' declared in both 'src/job-store.ts' and 'src/main.ts'; the declaration whose file path sorts first kept the bare name, so 'src/main.ts' was renamed to 'MainFile.JobRecord'. TypedMind entity names are global to a document.",
       ],
       'exactly one collision warning, naming both declaring paths and the resulting qualified name',
     );
@@ -121,14 +121,14 @@ describe('fixture 77: same-named interfaces in two files — declaration renamed
 
     assert.deepEqual(
       jobRecordDtos,
-      ['JobRecord', 'Main__JobRecord'],
+      ['JobRecord', 'MainFile.JobRecord'],
       'src/job-store.ts sorts first so it keeps the bare name; src/main.ts is qualified by its sanitized module basename',
     );
 
     // Each keeps its OWN fields — the collision loser is a real, distinct
     // entity, not the survivor wearing the wrong module's shape (which is
     // precisely what `createConstantEntity`'s old silent-skip produced).
-    const qualified = result.entities.find((entity) => (entity as { name: string }).name === 'Main__JobRecord');
+    const qualified = result.entities.find((entity) => (entity as { name: string }).name === 'MainFile.JobRecord');
     assert.deepEqual(
       (qualified as { fields: { name: string }[] }).fields.map((field) => field.name),
       ['id', 'title'],
@@ -157,7 +157,7 @@ describe('fixture 77: same-named interfaces in two files — declaration renamed
       `main.ts must import job-store.ts's bare-name entity: ${JSON.stringify((mainFile as { imports: string[] }).imports)}`,
     );
     assert.ok(
-      (mainFile as { exports: string[] }).exports.includes('Main__JobRecord'),
+      (mainFile as { exports: string[] }).exports.includes('MainFile.JobRecord'),
       `main.ts must export its OWN renamed entity: ${JSON.stringify((mainFile as { exports: string[] }).exports)}`,
     );
 

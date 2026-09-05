@@ -1,17 +1,17 @@
-program Main__App {
+program MainApp {
   type: Program
   entry: MainFile
   version: 1.0.0
   exports: [mainFn]
 }
 
-MainFile @ src/main.ts:
-  <- [LibFile]
-  -> [mainFn]
-
 LibFile @ src/lib.ts:
   <- [WidgetFile]
   <-> [makeWidget]
+
+MainFile @ src/main.ts:
+  <- [LibFile]
+  -> [mainFn]
 
 WidgetFile @ src/widget.ts:
   -> [makeWidget]

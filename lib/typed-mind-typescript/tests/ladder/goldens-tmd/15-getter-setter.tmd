@@ -1,4 +1,4 @@
-program Widget__App {
+program WidgetApp {
   type: Program
   entry: WidgetFile
   version: 1.0.0
