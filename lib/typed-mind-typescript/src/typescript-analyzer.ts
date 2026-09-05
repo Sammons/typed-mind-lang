@@ -1921,9 +1921,6 @@ export class TypeScriptAnalyzer {
         checkerReadSchema = this.printCheckerType(resolvedType, declaration.name);
         if (checkerReadSchema === undefined) {
           checkerReadUnsupported = true;
-        } else if (checkerReadSchema.references.length === 0) {
-          checkerReadSchema = undefined;
-          checkerReadUnsupported = true;
         }
       }
 
@@ -2334,7 +2331,7 @@ export class TypeScriptAnalyzer {
     }
 
     if (objectFlags !== undefined && (objectFlags & ts.ObjectFlags.Anonymous) !== 0) {
-      return undefined;
+      return this.checker.typeToString(type, undefined, ts.TypeFormatFlags.NoTruncation);
     }
 
     return undefined;
@@ -2386,7 +2383,9 @@ export class TypeScriptAnalyzer {
         if (defaultType === typeArgs[i]) break;
       }
       if (nonDefaultArgs.length > 0) cursor += 2;
-      const argText = this.printCheckerTypeRecursive(typeArgs[i]!, declarationNode, declarationSource, references, cursor);
+      const arg = typeArgs[i];
+      if (arg === undefined) return undefined;
+      const argText = this.printCheckerTypeRecursive(arg, declarationNode, declarationSource, references, cursor);
       if (argText === undefined) return undefined;
       cursor += argText.length;
       nonDefaultArgs.push(argText);
