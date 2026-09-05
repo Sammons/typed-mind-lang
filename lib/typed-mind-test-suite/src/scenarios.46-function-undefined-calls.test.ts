@@ -20,7 +20,7 @@ describe('Scenario 46: Function Undefined Method Calls', () => {
     // RFC-TM-4 §4 A2: `someConstant * "Constants"` (line 41) is now diagnosed
     // as a syntax error instead of being silently accepted — one new
     // diagnostic on top of the legacy 14.
-    assert.equal(result.diagnostics.length, 15); // More errors than expected
+    assert.equal(result.diagnostics.length, 13); // Q counts the two verified method owners as referenced.
 
     // Check specific errors
     const diagnostics = result.diagnostics;

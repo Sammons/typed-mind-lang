@@ -65,9 +65,9 @@ describe('Scenario 58: ClassFile vs Class+File mistakes', () => {
     // The exports should include helper but GoodService is implicit
     assert.ok(goodService?.exports.includes('helper'));
 
-    // Mistake 6: Cannot call ClassFile directly (method call syntax)
+    // Q permits this verified ClassFile method call; bare ClassFile calls remain illegal.
     const processUserError = errors.find((e) => e.message.includes("Cannot use 'calls' to reference ClassFile 'UserService'"));
-    assert.notEqual(processUserError, undefined);
+    assert.equal(processUserError, undefined);
 
     // Mistake 7: Classes not exported by any file
     // RFC-TM-4 §4 A4: legacy emitted "Class 'DataClass' is not exported by

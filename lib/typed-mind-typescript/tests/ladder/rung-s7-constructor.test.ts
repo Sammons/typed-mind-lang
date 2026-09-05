@@ -16,10 +16,10 @@
 //
 // Four fixtures (82-85). Fixture 82 is HALF fix-bound: its analyzer-side half
 // is fixed here and asserted green; its grammar-side half is pinned as a
-// knownGap in the same describe block. RFC-TM-13 B2 fixes fixture 83.
-// Fixtures 84 and 85 are documented knownGaps whose tests pin CURRENT behaviour, so each gap is a committed fact
-// rather than prose.
+// knownGap in the same describe block. RFC-TM-13 closes fixtures 83 and 84.
+// Fixture 85 remains pinned until typed methods and constructors land.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -190,7 +190,7 @@ describe('84 — a type used only inside a generic in a function signature is re
   // `ParseResult` appear only as `Promise<ApiResult<Construct[]>>` and
   // `ParseResult<Construct[]>`. Three of the lib/ui entrypoint's 14
   // diagnostics are this shape.
-  it('knownGap — `input`/`output` are matched as raw strings, never walked as type expressions', async () => {
+  it('TM13 B1: gap 84 keeps output bytes and removes exactly two orphan findings', async () => {
     const result = convertFixture('84-function-io-generic-orphan', ['src', 'index.ts']);
     assert.equal(result.success, true);
 
@@ -200,19 +200,18 @@ describe('84 — a type used only inside a generic in a function signature is re
     assert.ok(result.tmdContent.includes('countBoxes(boxes: ReadonlyArray<Boxed>) => number'));
 
     const check = await checkTmd(result.tmdContent);
-    assert.deepEqual(messagesOf(check).toSorted(), ["Orphaned entity 'Boxed'", "Orphaned entity 'Wrapped'"]);
+    assert.equal(result.tmdContent, readFileSync(join(testDir, 'goldens-tmd', '84-function-io-generic-orphan.tmd'), 'utf8'));
+    assert.deepEqual(messagesOf(check), []);
+    // Removing the two signature type uses restores exactly the old findings.
+    const withoutUses = result.tmdContent
+      .replace('Promise<Wrapped[]>', 'Promise<string[]>')
+      .replace('ReadonlyArray<Boxed>', 'ReadonlyArray<number>');
+    assert.deepEqual(messagesOf(await checkTmd(withoutUses)).toSorted(), ["Orphaned entity 'Boxed'", "Orphaned entity 'Wrapped'"]);
   });
 
-  it('knownGap — the asymmetry is the proof: a BARE output name is counted, a generic-wrapped one is not', async () => {
-    // `collectReferencedNames` (check-orphans.ts:77-81) does
-    // `referenced.add(entity.output)` on the RAW string, because
-    // `FunctionNode.input`/`output` are `string | undefined`
-    // (ast/function-node.ts:16-17) and are never parsed into a TypeExprNode.
-    // So the set gains the key "Promise<Wrapped>" and never "Wrapped".
-    //
-    // The same file ALREADY has the structured walker this needs —
-    // `collectTypeExprReferences` (check-orphans.ts:36-63) recurses through
-    // generic/union/array nodes — but it is applied to DTO fields only.
+  it('control: explicit IO retains its existing bare-name grammar and reference behavior', async () => {
+    // Explicit IO is still an entity-name slot. B1 reads signature types
+    // without widening IO grammar or DTO-kind validation.
     const typedMind = await TypedMind.create();
     const document = (output: string): string =>
       [

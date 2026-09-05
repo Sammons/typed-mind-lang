@@ -75,10 +75,10 @@ describe('scenario-21-aliased-import', () => {
       true,
     );
 
-    // Check for class export errors
+    // Q imports an explicit DB File carrier exporting its qualified declarations.
     assert.equal(
       result.diagnostics.some((diagnostic) => diagnostic.message.includes("Class 'DB.Connection' is not exported by any file")),
-      true,
+      false,
     );
 
     // All diagnostics should be severity 'error'

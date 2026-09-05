@@ -8,6 +8,8 @@
 // are NOT referenced (the legacy comment at :257-259 is the rule). Program and
 // Dependency entities are exempt candidates; Files get the
 // any-export-imported consumption escape.
+// RFC-TM-13 B1 additionally collects structured function-signature type uses;
+// opaque text, local generic binders and builtin wrappers add no false edges.
 
 import { AssetNode } from '../ast/asset-node.ts';
 import { ClassFileNode } from '../ast/class-file-node.ts';
@@ -20,7 +22,9 @@ import { ProgramNode } from '../ast/program-node.ts';
 import { type QualifiedNameResolver, resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
+import { parseSignatureText } from '../pipeline/parse-signature-text.ts';
 import type { CheckContext } from './check-context.ts';
+import { collectSignatureReferences } from './collect-signature-references.ts';
 
 const importsOf = (entity: EntityNode): readonly string[] | undefined => {
   if (entity instanceof FileNode || entity instanceof ClassFileNode) {
@@ -88,6 +92,12 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
       }
     }
     if (entity instanceof FunctionNode) {
+      const signature = parseSignatureText(entity.signature);
+      if (signature.kind === 'parsed') {
+        const signatureNames = new Set<string>();
+        collectSignatureReferences(signature.signature, signatureNames);
+        for (const name of signatureNames) addReference(name, referenced, context.names);
+      }
       for (const call of entity.calls) {
         addReference(call, referenced, context.names); // the RAW call string, dotted included (validator.ts:262)
       }
