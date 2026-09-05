@@ -36,6 +36,9 @@ export const CHECK_CODES = [
   // check-assets.ts
   'checker/asset-contains-non-program',
   'checker/asset-program-unknown',
+  'checker/invalid-member-signature',
+  'checker/unsupported-member-signature',
+  'semantics/invalid-member-property',
   // check-cycles.ts
   'checker/circular-containment',
   'checker/circular-import',

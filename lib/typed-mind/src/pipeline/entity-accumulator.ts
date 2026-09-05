@@ -8,6 +8,7 @@
 
 import { AssetNode } from '../ast/asset-node.ts';
 import { ClassFileNode } from '../ast/class-file-node.ts';
+import type { ClassMembers } from '../ast/class-members.ts';
 import { ClassNode } from '../ast/class-node.ts';
 import { ConstantsNode } from '../ast/constants-node.ts';
 import { DependencyNode } from '../ast/dependency-node.ts';
@@ -48,6 +49,7 @@ export interface AccumulatorSlots {
   extendsName?: string | undefined;
   implementsList?: string[] | undefined;
   methods?: string[] | undefined;
+  classMembers?: ClassMembers | undefined;
   schema?: string | undefined;
   fields?: DtoFieldNode[] | undefined;
   containsProgram?: string | undefined;
@@ -170,7 +172,7 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
       ...(slots.heritage !== undefined
         ? { heritage: slots.heritage }
         : { implements: slots.implementsList ?? [], ...(slots.extendsName !== undefined ? { extends: slots.extendsName } : {}) }),
-      methods: slots.methods ?? [],
+      ...(slots.classMembers === undefined ? { methods: slots.methods ?? [] } : { members: slots.classMembers }),
       ...(slots.typeParameters !== undefined ? { typeParameters: slots.typeParameters } : {}),
       ...(slots.purpose !== undefined ? { purpose: slots.purpose } : {}),
     });
@@ -183,7 +185,7 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
       ...(slots.heritage !== undefined
         ? { heritage: slots.heritage }
         : { implements: slots.implementsList ?? [], ...(slots.extendsName !== undefined ? { extends: slots.extendsName } : {}) }),
-      methods: slots.methods ?? [],
+      ...(slots.classMembers === undefined ? { methods: slots.methods ?? [] } : { members: slots.classMembers }),
       imports: slots.imports ?? [],
       // Auto-self-export lives in the ClassFileNode constructor (parser.ts:287).
       exports: slots.exports ?? [],
