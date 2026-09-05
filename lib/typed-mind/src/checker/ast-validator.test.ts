@@ -153,6 +153,46 @@ describe('orphan check (validator.ts:245-367)', () => {
     assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), []);
   });
 
+  // RFC-TM-11 Deferral RX-B, self-credit shape (ladder fixture 111 in
+  // typed-mind-typescript): a re-exporting File lists the re-exported name
+  // in its own `<-` too. Before the fix, `isFileConsumed`'s re-export branch
+  // found that very import and credited the barrel as consumed by itself.
+  const selfCreditBarrel = (mainImports: string) =>
+    [
+      'App -> Main v1.0.0',
+      'Main @ src/main.ts:',
+      mainImports,
+      '  -> [run]',
+      'Barrel @ src/barrel.ts:',
+      '  <- [helper]',
+      '  <-> [helper]',
+      'Origin @ src/origin.ts:',
+      '  -> [helper]',
+      'run :: () => void',
+      'helper :: () => void',
+      '',
+    ].join('\n');
+
+  it('does not let a re-exporting file prove its own consumption from its own import edge', async () => {
+    const { result } = await check(selfCreditBarrel('  <- []'));
+    assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), ["Orphaned file 'Barrel' - none of its exports are imported"]);
+  });
+
+  it('still credits a re-exporting file when another file imports it (the RX-6 fold shape)', async () => {
+    const { result } = await check(selfCreditBarrel('  <- [helper, Barrel]'));
+    assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), []);
+  });
+
+  // Deferred half of RX-B, pinned: an UNRELATED importer of the bare name
+  // still credits the barrel, because the document carries no per-File
+  // import provenance to tell "imported through Barrel" from "imported
+  // from Origin directly". Closing this needs that provenance (fixture
+  // 111's README); it is not a checker-local change.
+  it('pins RX-B: an unrelated importer of the re-exported name still credits the barrel', async () => {
+    const { result } = await check(selfCreditBarrel('  <- [helper]'));
+    assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), []);
+  });
+
   it('honors skipOrphanCheck (the ported ValidatorOptions surface)', async () => {
     const { result } = await check(orphanSource, { skipOrphanCheck: true });
     assert.deepEqual(

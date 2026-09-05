@@ -336,6 +336,26 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
+  // RFC-TM-13 burndown Q7 (reexport-provenance-residuals.test.ts). 109 is
+  // issue #62's import-then-bare-export residual, closed by unit R: the
+  // golden shows the declaring file as sole exporter and the forwarding
+  // File carrying `<->`. 110 is RFC-TM-11 Deferral RX-A: shape A (real
+  // re-export) checks clean; shape B (same name from an external package)
+  // is silent by design until a provenance slot exists — the golden pins
+  // that `VendorSurfaceFile` carries `<-> [normalizeVehicleString]` with no
+  // `<-`. 111 needs whole-project analysis and is absent here (like 81).
+  {
+    fixture: '109-import-then-bare-export-multi-exported',
+    entrySegments: ['src', 'main.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
+  {
+    fixture: '110-reexport-name-vs-independent-export',
+    entrySegments: ['src', 'main.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
 ];
 
 describe('RFC-TM-9 Q1 — .tmd goldens against the current language (per-fixture, RFC §8 golden discipline)', () => {

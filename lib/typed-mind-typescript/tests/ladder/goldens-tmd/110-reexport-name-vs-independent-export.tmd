@@ -1,0 +1,24 @@
+program MainApp {
+  type: Program
+  entry: MainFile
+  version: 1.0.0
+  exports: [run]
+}
+
+BarrelFile @ src/barrel.ts:
+  <- [normalizeVehicleString]
+  <-> [normalizeVehicleString]
+
+MainFile @ src/main.ts:
+  <- [normalizeVehicleString, BarrelFile, VendorSurfaceFile]
+  -> [run]
+
+NormalizeFile @ src/normalize.ts:
+  -> [normalizeVehicleString]
+
+VendorSurfaceFile @ src/vendor-surface.ts:
+  <-> [normalizeVehicleString]
+
+run :: run(raw: string) => string
+
+normalizeVehicleString :: normalizeVehicleString(raw: string) => string

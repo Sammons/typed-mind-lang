@@ -105,8 +105,14 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
   return referenced;
 };
 
-const isEntityImported = (context: CheckContext, entityName: string): boolean => {
+// `excluding` — the entity whose own `imports` list must NOT count as
+// evidence. Only `isFileConsumed`'s re-export branch passes it (see the
+// RX-B note there); every other caller scans the whole document.
+const isEntityImported = (context: CheckContext, entityName: string, excluding?: EntityNode): boolean => {
   for (const entity of context.byName.values()) {
+    if (entity === excluding) {
+      continue;
+    }
     for (const imported of importsOf(entity) ?? []) {
       if (resolvedNameTarget(context.names.resolve(imported, { importingFile: entity.name }))?.name === entityName) {
         return true;
@@ -162,8 +168,20 @@ const isFileConsumed = (context: CheckContext, file: FileNode): boolean => {
       return true;
     }
   }
+  // RFC-TM-11 Deferral RX-B (rfc-tm-11-diamond.md), self-credit shape —
+  // ladder fixture 111 (typed-mind-typescript). A re-exporting File carries
+  // the re-exported name in its OWN `imports` list too (`export { X } from
+  // './a'` is `import { X }` + `export { X }`, and the converter records the
+  // import edge). Scanning every entity's imports for the name therefore
+  // let a barrel that NOTHING imports prove its own consumption from its
+  // own import edge, hiding a dead file. The barrel's own imports are
+  // evidence that it consumes `a.ts`, never that anything consumes the
+  // barrel, so this branch excludes the File under evaluation. The
+  // remaining bare-name credit from an UNRELATED importer is RX-B's other
+  // half and stays deferred: closing it needs per-File import provenance
+  // the language does not carry (fixture 111's README).
   for (const reExportName of file.reExports) {
-    if (isEntityImported(context, resolvedNameTarget(context.names.resolveExport(file.name, reExportName))?.name ?? reExportName)) {
+    if (isEntityImported(context, resolvedNameTarget(context.names.resolveExport(file.name, reExportName))?.name ?? reExportName, file)) {
       return true;
     }
   }
