@@ -10,6 +10,7 @@ import type { Span } from '../ast/span.ts';
 import { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode, TypeNamedNode, TypeOpaqueNode } from '../ast/type-expr-node.ts';
 import type { TypeParameterNode } from '../ast/type-parameter-node.ts';
+import { parseOpaqueObjectMembers, parseTypeQueryReference } from './opaque-object-references.ts';
 import { type ParsedSignature, parseSignatureText, type SignatureTypePosition } from './parse-signature-text.ts';
 
 export type TypeReferencePosition =
@@ -25,6 +26,10 @@ export interface TypeReferenceHooks {
   readonly reference: (node: TypeNamedNode, args: readonly TypeExprNode[], position: TypeReferencePosition) => void;
   readonly parameters?: (parameters: readonly TypeParameterNode[]) => void;
   readonly opaque?: (node: TypeOpaqueNode, position: TypeReferencePosition) => void;
+  // RFC-TM-14 §S4 R4b: a `(typeof X)` opaque leaf names a VALUE (Constants,
+  // Function, Class). Only orphan credit and the link index consume it; the
+  // generic and DTO checks stay blind to it so no type finding is fabricated.
+  readonly valueReference?: (name: string, span: Span) => void;
   readonly heritage?: (reference: HeritageReference, role: 'extends' | 'implements', binders: ReadonlySet<string>) => void;
 }
 
@@ -58,40 +63,65 @@ export const walkTypeReferences = (
       for (const member of node.members) walkTypeReferences(member, binders, hooks, position);
       return;
     case 'opaque': {
-      const parsed = parseSignatureText(node.text, { baseLine: node.span.start.line, baseColumn: node.span.start.column });
-      if (parsed.kind === 'parsed') {
-        const sourceSpan = (value: Span): Span => {
-          if (node.textOffsets === undefined) return value;
-          const point = (value: Span['start']): Span['start'] => {
-            const offset = node.textOffsets?.[value.column - node.span.start.column];
-            return offset === undefined ? value : { line: value.line, column: node.span.start.column + offset };
-          };
-          return { start: point(value.start), end: point(value.end) };
+      // RFC-TM-14 §S4 (rfc-tm-14-diamond.md, R4a/R4b): `sourceSpan` is hoisted
+      // above the callable test so every branch maps spans through a quoted
+      // payload's `textOffsets` (G-6, G2-6). `mapped` forwards each hook with
+      // its span re-mapped; the `valueReference` arm keeps a `(typeof X)` leaf
+      // inside a `constructor:` payload on real columns (G2-5).
+      const base = { baseLine: node.span.start.line, baseColumn: node.span.start.column };
+      const sourceSpan = (value: Span): Span => {
+        if (node.textOffsets === undefined) return value;
+        const point = (value: Span['start']): Span['start'] => {
+          const offset = node.textOffsets?.[value.column - node.span.start.column];
+          return offset === undefined ? value : { line: value.line, column: node.span.start.column + offset };
         };
-        walkSignatureTypes(
-          parsed.signature,
-          binders,
-          node.textOffsets === undefined
-            ? hooks
-            : {
-                ...hooks,
-                reference: (reference, args, role) => hooks.reference({ ...reference, span: sourceSpan(reference.span) }, args, role),
-                ...(hooks.parameters === undefined
-                  ? {}
-                  : {
-                      parameters: (parameters: readonly TypeParameterNode[]) =>
-                        hooks.parameters?.(parameters.map((parameter) => ({ ...parameter, span: sourceSpan(parameter.span) }))),
-                    }),
-                ...(hooks.opaque === undefined
-                  ? {}
-                  : {
-                      opaque: (opaque: TypeOpaqueNode, role: TypeReferencePosition) =>
-                        hooks.opaque?.({ ...opaque, span: sourceSpan(opaque.span) }, role),
-                    }),
-              },
-          position,
-        );
-      } else hooks.opaque?.(node, position);
+        return { start: point(value.start), end: point(value.end) };
+      };
+      const mapped: TypeReferenceHooks =
+        node.textOffsets === undefined
+          ? hooks
+          : {
+              ...hooks,
+              reference: (reference, args, role) => hooks.reference({ ...reference, span: sourceSpan(reference.span) }, args, role),
+              ...(hooks.parameters === undefined
+                ? {}
+                : {
+                    parameters: (parameters: readonly TypeParameterNode[]) =>
+                      hooks.parameters?.(parameters.map((parameter) => ({ ...parameter, span: sourceSpan(parameter.span) }))),
+                  }),
+              ...(hooks.opaque === undefined
+                ? {}
+                : {
+                    opaque: (opaque: TypeOpaqueNode, role: TypeReferencePosition) =>
+                      hooks.opaque?.({ ...opaque, span: sourceSpan(opaque.span) }, role),
+                  }),
+              ...(hooks.valueReference === undefined
+                ? {}
+                : { valueReference: (name: string, span: Span) => hooks.valueReference?.(name, sourceSpan(span)) }),
+            };
+      const parsed = parseSignatureText(node.text, base);
+      if (parsed.kind === 'parsed') {
+        walkSignatureTypes(parsed.signature, binders, mapped, position);
+        return;
+      }
+      // The leaf stays opaque to every consumer that keys on it
+      // (`unsupported-generic-type` at constraint/default positions, G2-5);
+      // the arms below ADD references, they never replace the opaque fact.
+      hooks.opaque?.(node, position);
+      const query = parseTypeQueryReference(node.text, base);
+      if (query !== undefined) {
+        // R4b: a value query names a VALUE, so it never reaches the type-only
+        // consumers (`hooks.reference`; G-1). A miss is silent by design
+        // (non-goal N-tq-unknown).
+        mapped.valueReference?.(query.name, query.span);
+        return;
+      }
+      const object = parseOpaqueObjectMembers(node.text, base);
+      if (object.kind === 'rejected') return;
+      for (const member of object.members) {
+        if (member.kind === 'property') walkTypeReferences(member.typeExpr, binders, mapped, position);
+        else walkSignatureTypes(member.signature, binders, mapped, position);
+      }
       return;
     }
     case 'literal':

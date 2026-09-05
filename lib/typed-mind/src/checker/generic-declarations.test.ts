@@ -103,7 +103,9 @@ it('G.4 duplicate binders, unknown constraints and retained opaque bounds have e
     genericErrors(context).map((finding) => finding.code),
     ['checker/duplicate-type-parameter', 'checker/generic-unknown-type', 'checker/unsupported-generic-type'],
   );
-  assert.ok(orphans(context).includes("Orphaned entity 'Secret'"));
+  // RFC-TM-14 §S4 R4a: the opaque default still reports `unsupported-generic-type`
+  // (above), and its inline-object member `field: Secret` now names Secret.
+  assert.equal(orphans(context).includes("Orphaned entity 'Secret'"), false);
   const callable = await inspect('Input %\nOutput %\ndto A {\n typeParameter: "T extends (value: Input) => Output"\n}\n');
   assert.deepEqual(genericErrors(callable), []);
   assert.deepEqual(orphans(callable), ["Orphaned entity 'A'"]);
