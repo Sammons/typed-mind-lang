@@ -22,8 +22,8 @@ describe('scenario-22-nested-import', () => {
     // Should be invalid due to orphaned entities
     assert.equal(result.valid, false);
 
-    // Should have exactly 3 orphaned entity errors
-    assert.equal(result.diagnostics.length, 3);
+    // B1: User is referenced by a function signature; main and query remain orphaned.
+    assert.equal(result.diagnostics.length, 2);
 
     // Check for actual orphaned entity errors
     assert.equal(
@@ -32,7 +32,7 @@ describe('scenario-22-nested-import', () => {
     );
     assert.equal(
       result.diagnostics.some((diagnostic) => diagnostic.message.includes("Orphaned entity 'User'")),
-      true,
+      false,
     );
     assert.equal(
       result.diagnostics.some((diagnostic) => diagnostic.message.includes("Orphaned entity 'query'")),
