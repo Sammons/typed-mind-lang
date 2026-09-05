@@ -2160,12 +2160,17 @@ export class TypeScriptToTypedMindConverter {
       const group = groups.get(name) ?? [];
       group.sort((a, b) => this.compareModulePaths(a.module.filePath, b.module.filePath));
       const ordinary = group.filter((entry) => {
+        const key = `${entry.module.filePath}::${entry.name}`;
+        const identities = this.sourceDeclarationIdentities.get(key);
+        const identity = identities?.length === 1 ? identities[0] : undefined;
         const isDefault = entry.module.exports.some(
           (exp) =>
             exp.isDefault &&
             exp.source === undefined &&
-            exp.declaration?.filePath === entry.module.filePath &&
-            exp.declaration.name === entry.name,
+            exp.declaration !== undefined &&
+            identity !== undefined &&
+            !this.sourceDeclarationsWithoutIdentity.has(key) &&
+            this.sameDeclarationIdentity(exp.declaration, identity),
         );
         if (isDefault) defaults.push(entry);
         return !isDefault;
@@ -3985,8 +3990,7 @@ export class TypeScriptToTypedMindConverter {
     // reservation pass wrote. Falls through to the bare name when the target
     // module is unknown (empty `moduleGraph`, unit-test mock) or the name
     // never collided — both the pre-change behaviour.
-    const declaringModulePath =
-      resolvedTarget !== undefined ? this.modulePathByRelativePath.get(this.stripKnownSourceExtension(resolvedTarget)) : undefined;
+    const declaringModulePath = moduleExports.filePath;
     const entityName =
       (declaringModulePath !== undefined
         ? (this.functionNameRemap.get(`${declaringModulePath}::${importName}`) ??
