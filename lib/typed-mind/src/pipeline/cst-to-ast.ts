@@ -30,6 +30,7 @@ import {
 import { ImportStatementNode } from '../ast/import-statement-node.ts';
 import type { Span } from '../ast/span.ts';
 import { SuppressionNode } from '../ast/suppression-node.ts';
+import { decodeQuotedString, scanQuotedString } from '../quoted-string.ts';
 import { attachmentRules, illegalContinuationDiagnostic, orphanContinuationDiagnostic } from './attachment-rules.ts';
 import {
   openAsset,
@@ -201,11 +202,11 @@ export class CstToAstWalker {
     // Import statements do not close the open entity (parser.ts:80-83).
     const statement = new CstImportStatement(lineNode);
     const headText = statement.importHeadChildren().at(0)?.text ?? '';
-    const pathMatch = /"([^"\n]*)"/.exec(headText);
+    const pathMatch = scanQuotedString(headText, headText.indexOf('"'));
     const alias = statement.entityNameChildren().at(0)?.text;
     this.#imports.push(
       new ImportStatementNode({
-        path: pathMatch?.[1] ?? '',
+        path: pathMatch?.value ?? '',
         ...(alias !== undefined ? { alias } : {}),
         span: tokenSpanOf(lineNode),
         raw: lineNode.text.trimEnd(),
@@ -233,7 +234,7 @@ export class CstToAstWalker {
         code,
         // Strip the surrounding quotes the same way every other consumer of
         // $.string does (the token's raw text includes them).
-        reason: reason.length >= 2 ? reason.slice(1, -1) : reason,
+        reason: decodeQuotedString(reason),
         span: tokenSpanOf(lineNode),
         raw: lineNode.text.trimEnd(),
       }),
@@ -254,7 +255,7 @@ export class CstToAstWalker {
         new SuppressionNode({
           target,
           code,
-          reason: reason.length >= 2 ? reason.slice(1, -1) : reason,
+          reason: decodeQuotedString(reason),
           span: entry.span(),
           raw: entry.syntaxNode.text.trimEnd(),
         }),
