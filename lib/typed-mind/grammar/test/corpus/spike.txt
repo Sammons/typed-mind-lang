@@ -270,7 +270,7 @@ program ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -329,7 +329,7 @@ file ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -388,7 +388,7 @@ function ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -447,7 +447,7 @@ class ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -506,7 +506,7 @@ dto ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -565,7 +565,7 @@ component ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -624,7 +624,7 @@ asset ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -683,7 +683,7 @@ constants ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -742,7 +742,7 @@ parameter ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -801,7 +801,7 @@ dependency ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -860,7 +860,7 @@ classfile ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))
@@ -919,7 +919,7 @@ import ^ "d"
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)))
+      (heritage_type (type_named (entity_name)))))
   (classfile_declaration
     (entity_name)
     (path))

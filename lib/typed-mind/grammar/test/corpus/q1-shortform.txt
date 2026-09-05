@@ -64,8 +64,8 @@ UserController <: BaseController, IController
   (class_declaration
     (entity_name)
     (inherit_list
-      (entity_name)
-      (entity_name))))
+      (heritage_type (type_named (entity_name)))
+      (heritage_type (type_named (entity_name))))))
 
 ============================================================
 E4 CORRECTED: bare Class with EMPTY inheritance list (scenario-34-cli-tool.tmd:127 `cli <:`)
@@ -92,7 +92,7 @@ UserController #: src/controllers/user.ts <: BaseController
     (entity_name)
     (path)
     (inherit_list
-      (entity_name))))
+      (heritage_type (type_named (entity_name))))))
 
 ============================================================
 E5: ClassFile without inheritance

@@ -33,6 +33,8 @@ import type { Span } from '../ast/span.ts';
 import { decodeQuotedString } from '../quoted-string.ts';
 import { illegalContinuationDiagnostic } from './attachment-rules.ts';
 import { EntityAccumulator } from './entity-accumulator.ts';
+import { attachHeaderTypeParameters, attachParameterProperties, heritageFromCst } from './generic-declaration-syntax.ts';
+import { parseHeritageText } from './parse-heritage-text.ts';
 import { tokenSpanOf } from './spans.ts';
 import { parseTypeExprText } from './type-expr-from-text.ts';
 
@@ -478,6 +480,46 @@ const applyProperties = (accumulator: EntityAccumulator, collected: CollectedPro
 const buildResult = (accumulator: EntityAccumulator, collected: CollectedProperties): LongformBuildResult => {
   const diagnostics: Diagnostic[] = [];
   applyProperties(accumulator, collected, diagnostics);
+  for (const property of collected.all) {
+    if (property.key === 'typeParameter' && property.kind !== 'scalar')
+      diagnostics.push({
+        code: 'semantics/invalid-type-parameter',
+        severity: 'error',
+        span: property.span,
+        message: `Invalid type parameter in '${accumulator.name}'; write each parameter in its own quoted property.`,
+      });
+  }
+  diagnostics.push(
+    ...attachParameterProperties(
+      accumulator,
+      collected.all.filter((property): property is ScalarProperty => property.kind === 'scalar' && property.key === 'typeParameter'),
+    ),
+  );
+  const heritageProperties = (key: string) =>
+    collected.all.flatMap((property) => {
+      if (property.key !== key) return [];
+      const values = property.kind === 'scalar' ? [property.value] : property.kind === 'list' ? property.names : [];
+      return values.map((value) =>
+        parseHeritageText(value, { baseLine: property.span.start.line, baseColumn: property.span.start.column }),
+      );
+    });
+  const extendsReferences = heritageProperties('extends');
+  const implementsReferences = heritageProperties('implements');
+  if (accumulator.kind === 'DTO' && extendsReferences.length > 0) accumulator.slots.extendsReferences = extendsReferences;
+  if (accumulator.kind === 'Class' || accumulator.kind === 'ClassFile') {
+    if (extendsReferences.length > 1)
+      diagnostics.push({
+        code: 'semantics/multiple-class-bases',
+        severity: 'error',
+        span: accumulator.span,
+        message: 'A class may extend one base; use implements for additional contracts.',
+      });
+    const existing = accumulator.slots.heritage;
+    accumulator.slots.heritage = {
+      extends: extendsReferences[0] ?? existing?.extends,
+      implements: collected.all.some((property) => property.key === 'implements') ? implementsReferences : (existing?.implements ?? []),
+    };
+  }
   const attachments = collected.all.map((property) => ({
     entityName: accumulator.name,
     group: property.key,
@@ -509,6 +551,7 @@ export const buildFromLongformBlock = (block: CstLongformBlock): LongformBuildRe
     // RFC-TM-4 §2 (rfc-tm-4-diamond.md): a brace-block header is 'longform'.
     sourceForm: 'longform',
   });
+  attachHeaderTypeParameters(accumulator, header.typeParametersChildren().at(0));
   return buildResult(accumulator, collected);
 };
 
@@ -526,16 +569,7 @@ export const buildFromClassfileBlockSigil = (block: CstClassfileBlockSigil): Lon
   });
   // Header parts win their slots first; block properties may override.
   accumulator.slots.path = (block.pathChildren().at(0)?.text ?? '').trim();
-  const inheritNames =
-    block
-      .inheritListChildren()
-      .at(0)
-      ?.entityNameChildren()
-      .map((entityName) => entityName.text) ?? [];
-  const [extendsName, ...implementsList] = inheritNames;
-  if (extendsName !== undefined) {
-    accumulator.slots.extendsName = extendsName;
-    accumulator.slots.implementsList = implementsList;
-  }
+  accumulator.slots.heritage = heritageFromCst(block.inheritListChildren().at(0));
+  attachHeaderTypeParameters(accumulator, block.typeParametersChildren().at(0));
   return buildResult(accumulator, collected);
 };

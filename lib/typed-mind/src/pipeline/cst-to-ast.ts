@@ -30,6 +30,7 @@ import {
 import { ImportStatementNode } from '../ast/import-statement-node.ts';
 import type { Span } from '../ast/span.ts';
 import { SuppressionNode } from '../ast/suppression-node.ts';
+import { TypeDefNode } from '../ast/type-def-node.ts';
 import { decodeQuotedString, scanQuotedString } from '../quoted-string.ts';
 import { attachmentRules, illegalContinuationDiagnostic, orphanContinuationDiagnostic } from './attachment-rules.ts';
 import {
@@ -117,6 +118,16 @@ export class CstToAstWalker {
       this.#dispatch(lineNode);
     }
     this.#closeOpenEntity();
+    for (const entity of this.#entities) {
+      if (entity instanceof TypeDefNode && entity.variant === 'enum' && (entity.typeParameters?.length ?? 0) > 0) {
+        this.#diagnostics.push({
+          code: 'semantics/unsupported-generic-declaration',
+          severity: 'error',
+          span: entity.span,
+          message: `Enum '${entity.name}' does not accept type parameters; remove them or use an alias declaration.`,
+        });
+      }
+    }
     const diagnostics = [...collectSyntaxDiagnostics(this.#root.syntaxNode), ...this.#diagnostics].sort(compareDiagnosticsBySpan);
     return {
       outcome: { entities: this.#entities, imports: this.#imports, suppressions: this.#suppressions, diagnostics },
