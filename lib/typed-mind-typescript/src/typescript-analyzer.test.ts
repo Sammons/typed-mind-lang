@@ -221,3 +221,47 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
     }
   });
 });
+
+// RFC-TM-14 (rfc-tm-14-diamond.md) §S1 "one body-reference substrate", leaf
+// R1c-analyzer (Quantum U1), fixture 114: every class member body — private
+// method, constructor, accessor, property initializer, static block — yields
+// `ParsedBodyReference`s through the one shared walk. The converter half
+// (Class `calls`/`consumes`, R1c-conv/R2b) is Quantum U3b's.
+it('TM14 U1: every class member body yields body references', () => {
+  const project = join(import.meta.dirname, '..', 'tests', 'ladder', 'repros-analyzer', '114-member-body-edges');
+  const analysis = new TypeScriptAnalyzer(project).analyzeFromEntrypoint(join(project, 'src', 'main.ts'));
+  const storeModule = analysis.modules.find((module) => module.filePath.endsWith('store.ts'));
+  assert.ok(storeModule);
+  const store = storeModule.classes.find((cls) => cls.name === 'Store');
+  assert.ok(store);
+  const summary = (references: readonly { kind: string; writtenName: string; origin: { kind: string } }[] | undefined) =>
+    references?.map((reference) => `${reference.kind}:${reference.writtenName}:${reference.origin.kind}`);
+  const methodNamed = (name: string) => store.methods.find((method) => method.name === name);
+
+  assert.deepEqual(summary(methodNamed('hidden')?.bodyReferences), ['construct:Cache:project'], 'private method');
+  assert.deepEqual(summary(methodNamed('code')?.bodyReferences), ['read:ErrorTable:project'], 'static method: one read of the chain root');
+  assert.deepEqual(summary(store.constructors?.[0]?.bodyReferences), ['call:helper:project'], 'constructor');
+  assert.deepEqual(summary(methodNamed('size')?.bodyReferences), ['read:LIMIT:project'], 'accessor: `this.hidden()` is not a reference');
+  assert.deepEqual(summary(store.initializerReferences), ['read:LIMIT:project', 'call:helper:project'], 'property initializer + static block');
+
+  // Each reference carries the identifier's own source range and the origin
+  // resolves to the same-file declaration.
+  const cacheReference = methodNamed('hidden')?.bodyReferences[0];
+  assert.ok(cacheReference);
+  assert.equal(cacheReference.source.filePath, join(project, 'src', 'store.ts'));
+  assert.equal(cacheReference.source.end - cacheReference.source.start, 'Cache'.length);
+  assert.equal(cacheReference.origin.kind === 'project' && cacheReference.origin.declaration.name, 'Cache');
+
+  // S2-8 control: the analyzer records the self construct; the converter's
+  // class fold (U3b) skips the self target, so no `Self.constructor` edge.
+  const self = storeModule.classes.find((cls) => cls.name === 'Self');
+  assert.deepEqual(summary(self?.methods.find((method) => method.name === 'make')?.bodyReferences), ['construct:Self:project']);
+
+  // A top-level function body walks through the same substrate and no
+  // longer carries `calledNames`.
+  const main = analysis.modules.find((module) => module.filePath.endsWith('main.ts'))?.functions.find((fn) => fn.name === 'main');
+  assert.ok(main);
+  assert.equal('calledNames' in main, false);
+  assert.equal(main.origin, 'declaration');
+  assert.deepEqual(summary(main.bodyReferences), ['construct:Store:project']);
+});
