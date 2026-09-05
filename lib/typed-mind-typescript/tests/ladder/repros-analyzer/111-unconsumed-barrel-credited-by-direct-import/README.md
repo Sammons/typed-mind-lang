@@ -10,15 +10,15 @@ current main after RFC-TM-13 unit R, PR #170, PR #181.
 imports, so an unimported barrel only appears in a document through
 whole-project analysis or hand authoring.
 
-Emitted:
+Emitted (after RFC-TM-15 §S3, leaf I1):
 
 ```
 BarrelFile @ src/barrel.ts:
-  <- [normalizeVehicleString]
+  <- [NormalizeFile.normalizeVehicleString]
   <-> [normalizeVehicleString]
 
 MainFile @ src/main.ts:
-  <- [normalizeVehicleString]
+  <- [NormalizeFile.normalizeVehicleString]
   -> [run]
 
 NormalizeFile @ src/normalize.ts:
@@ -44,25 +44,41 @@ import edge") fails without the exclusion and passes with it; the sibling
 test proves a through-barrel importer (the RX-6 fold shape, `<- [helper,
 Barrel]`) still counts.
 
-## Unrelated-importer shape (the fixture as committed): PINNED, not fixed
+## Unrelated-importer shape (the fixture as committed): FIXED by RFC-TM-15 §S3 (leaf I1)
 
-With `main.ts`'s direct import present, `isEntityImported` finds
-`normalizeVehicleString` in `MainFile`'s imports and credits `BarrelFile`
-— but `MainFile` imports from `normalize.ts`, not the barrel. The barrel is
-still dead and still not reported. `valid: true`.
+Before: with `main.ts`'s direct import present, `isEntityImported` found the
+bare `normalizeVehicleString` in `MainFile`'s imports and credited
+`BarrelFile` — but `MainFile` imports from `normalize.ts`, not the barrel.
+The barrel was dead and not reported (`valid: true`).
 
-### Mechanism needed
+### Mechanism: owner-qualified import entries
 
-Per-File import provenance in the document. An extracted document already
-carries the distinguishing fact: RX-6's fold writes the barrel's own File
-name into any importer that goes THROUGH the barrel (`<- [X, BarrelFile]`),
-so `isFileConsumed`'s third branch (`isEntityImported(context, file.name)`)
-is sufficient for extracted documents and the `reExports` branch is only
-load-bearing for hand-authored ones. Making the `reExports` branch require
-the fold would change RX-3's accepted trust model for hand-authored
-documents (`<-> [X]` plus some `<- [X]` counts today) and is a policy
-change to the language, not a checker-local fix — the same provenance work
-RX-A names.
+The rule (`rfc-tm-15-diamond.md` §S3): an import entry is `Owner.name` when
+more than one File exports or re-exports `name`; otherwise it is bare.
+Hand-authors may always qualify. `Owner` is the File entity of the module
+the specifier resolved to.
+
+- Converter: `qualifyAmbiguousImportEntries`
+  (`typescript-to-typedmind-converter.ts`), a post-pass after the RX-6
+  fold, counts the Files that export or re-export each name and rewrites
+  the ambiguous bare entries `convertImports` produced. Here
+  `normalizeVehicleString` is exported by `NormalizeFile` and re-exported by
+  `BarrelFile`, so `main.ts`'s import from `./normalize.ts` becomes
+  `NormalizeFile.normalizeVehicleString` (and the barrel's own re-export
+  import likewise). An importer that goes THROUGH the barrel gets
+  `BarrelFile.normalizeVehicleString` next to the RX-6 fold's `BarrelFile`
+  (fixture 110's `MainFile`).
+- Checker: `isFileConsumed`'s `reExports` branch (`check-orphans.ts`)
+  passes `owner = file.name` to `isEntityImported`; a qualified entry
+  credits the barrel only when its owner IS the barrel. A bare entry keeps
+  today's credit — hand-authored documents are trusted as before (non-goal
+  N-15-hand-authored), so RX-3's trust model is unchanged. The `exports`
+  branch and the fold branch pass no owner.
+
+Result: exactly one `checker/orphaned-file` for `BarrelFile`, no
+`checker/qualified-name-unresolved`. The resolver binds
+`NormalizeFile.normalizeVehicleString` through `NormalizeFile`'s `exports`
+with no core change.
 
 ## Out of scope, observed here
 
@@ -77,7 +93,17 @@ Q7.
 
 ## What the test pins
 
-`reexport-provenance-residuals.test.ts` (Q7 item 3) pins the
-unrelated-importer shape (no `checker/orphaned-file`, and no importer names
-the barrel) and asserts the self-credit shape now reports exactly
-`Orphaned file 'BarrelFile' - none of its exports are imported`.
+`reexport-provenance-residuals.test.ts` (Q7 item 3):
+
+- `TM15 V3: an unrelated importer no longer credits an unimported barrel` —
+  `MainFile: <- [NormalizeFile.normalizeVehicleString]`, no importer names
+  the barrel, exactly one `checker/orphaned-file` for `BarrelFile`.
+- Controls: the through-barrel spelling
+  (`<- [BarrelFile.normalizeVehicleString, BarrelFile]`) and the
+  hand-authored bare spelling (`<- [normalizeVehicleString]`) both still
+  credit the barrel.
+- The self-credit shape still reports exactly
+  `Orphaned file 'BarrelFile' - none of its exports are imported`.
+
+Core-level checks live in `lib/typed-mind/src/checker/ast-validator.test.ts`
+(`TM15 V3: ...`).
