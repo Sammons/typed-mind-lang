@@ -180,3 +180,26 @@ it('TM13 A2: forged declaration ranges preserve the original slot and disclose u
   assert.equal(use.output, 'Model');
   assert.ok(result.warnings.some((warning) => /no uniquely emitted declaration/.test(warning.message)));
 });
+
+it('TM13 A2: alias rewriting preserves literal bytes unchanged sibling slots and multiline signature spans', (context) => {
+  const analysis = project(context, {
+    'base.ts': 'export interface Model { value: string }',
+    'index.ts':
+      'import {Model as Alias} from "./base.js"; export function use(value: Alias | "two  spaces", sibling: "keep  spaces"): Alias { throw 0; }',
+  });
+  // Parsed callers can retain a multiline signature even though the analyzer
+  // currently emits single-line signatures. Preserve those supplied bytes.
+  const signature = 'use(\n  value: Alias | "two  spaces",\n  sibling: "keep  spaces"\n) => Alias';
+  const supplied = {
+    ...analysis,
+    modules: analysis.modules.map((module) => ({
+      ...module,
+      functions: module.functions.map((func) => (func.name === 'use' ? { ...func, signature } : func)),
+    })),
+  };
+  const result = new TypeScriptToTypedMindConverter().convert(supplied);
+  const use = result.entities.find((entity) => entity.name === 'use');
+  assert.ok(use instanceof FunctionNode);
+  assert.equal(use.signature, 'use(\n  value: Model | "two  spaces",\n  sibling: "keep  spaces"\n) => Model');
+  assert.equal(supplied.modules.flatMap((module) => module.functions).find((func) => func.name === 'use')?.signature, signature);
+});

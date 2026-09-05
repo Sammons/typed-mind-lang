@@ -1,6 +1,15 @@
-import { parseSignatureText } from '@sammons/typed-mind';
+import { parseSignatureText, type Span } from '@sammons/typed-mind';
+import { mapStructuralSegments, stripComments } from './type-text-segments.ts';
 
-const collapseTypeWhitespace = (text: string): string => text.replace(/\s+/g, ' ').trim();
+const collapseTypeWhitespace = (text: string): string =>
+  mapStructuralSegments(stripComments(text), (segment) => segment.replace(/\s+/g, ' ')).trim();
+const offsetAt = (text: string, position: Span['start']): number =>
+  text
+    .split('\n')
+    .slice(0, position.line - 1)
+    .reduce((offset, line) => offset + line.length + 1, 0) +
+  position.column -
+  1;
 
 import type { DeclarationIdentity, ParsedModule, ParsedTypeParameter, ParsedTypeText } from './types.ts';
 
@@ -28,17 +37,17 @@ export const rewriteParsedTypeSlots = (
     const edits: { start: number; end: number; text: string }[] = [];
     if (changed && parsed.kind === 'parsed' && parsed.signature.parameters.length === args.length) {
       for (const [index, parameter] of parsed.signature.parameters.entries()) {
-        if (parameter.type !== undefined && args[index] !== undefined)
+        if (parameter.type !== undefined && args[index] !== undefined && args[index].type !== func.parameters[index]?.type)
           edits.push({
-            start: parameter.type.span.start.column - 1,
-            end: parameter.type.span.end.column - 1,
+            start: offsetAt(func.signature, parameter.type.span.start),
+            end: offsetAt(func.signature, parameter.type.span.end),
             text: collapseTypeWhitespace(args[index].type),
           });
       }
-      if (parsed.signature.returnType !== undefined)
+      if (parsed.signature.returnType !== undefined && returnType !== func.returnType)
         edits.push({
-          start: parsed.signature.returnType.span.start.column - 1,
-          end: parsed.signature.returnType.span.end.column - 1,
+          start: offsetAt(func.signature, parsed.signature.returnType.span.start),
+          end: offsetAt(func.signature, parsed.signature.returnType.span.end),
           text: collapseTypeWhitespace(returnType),
         });
     }
