@@ -77,6 +77,20 @@ const enumerateCorpus = (): string[] => {
 //   `?` from `(optional)`, a language design change out of mechanical-fix
 //   reach — bucket-b, not filed as a new issue (already documented in the
 //   emitter's own comments, no fix expected).
+// - scenario-49-dto-complex-structures.tmd: the SAME mechanism as
+//   scenario-61 above, on a different field — `ComplexDTO`'s `optional?:
+//   string` field authors the shortform `?` sigil (`optionalityMarker:
+//   'question'`); toggling to longform and back collapses it to
+//   `optionalityMarker: 'parenthesized'` (re-emits as `(optional)`), because
+//   `longform-builder.ts`'s longform reader (`optional: props.optional ?
+//   'parenthesized' : 'none'`) has no way to recover which shortform sigil
+//   produced `optional: true`. Confirmed by running the toggle directly on
+//   this scenario: every other entity and field is byte-for-byte identical
+//   across both toggles; `ComplexDTO`'s `optional` field's
+//   `optionalityMarker` is the only divergence. Same INTENTIONAL,
+//   pre-existing, documented lossy collapse as scenario-61 — no fix expected
+//   without the same new longform spelling that scenario-61's entry
+//   describes.
 // - scenario-31-mixed-syntax.tmd: a genuinely MIXED-format document
 //   (detectFormat === 'mixed', per-entity sourceForm). toggleFormat forces
 //   the WHOLE document to ONE form based on detectFormat's single document-
@@ -230,15 +244,22 @@ describe('toggle round-trip: both starting directions for a single-form corpus d
 interface ToggleFixture {
   readonly name: string;
   readonly source: string;
-  // When set, this fixture is expected to reproduce a KNOWN, documented
-  // gap (bucket-b, cross-referenced to the open issue that owns it) rather
-  // than round-trip cleanly. The test asserts the failure still reproduces
-  // exactly as described, so a change to this behavior requires a
-  // conscious decision (updating this fixture's expectation), never a
-  // silent pass or a silent new failure.
-  readonly knownGap?: string;
 }
 
+// Any fixture that reproduces a KNOWN, documented gap rather than round-
+// tripping cleanly does not belong in ALL_TARGETED_FIXTURES at all — it
+// belongs in KNOWN_CORPUS_TOGGLE_EXCEPTIONS above (or, for a non-corpus
+// source string, a targeted fixture list of its own with the same shape:
+// name the scenario, the field that diverges, and the mechanism, then assert
+// the divergence reproduces exactly via `assert.notDeepEqual` rather than
+// skipping the check). That mechanism replaced an earlier per-fixture
+// `knownGap?: string` field on `ToggleFixture`, which asserted only
+// `syntaxDiagnostics.length > 0` and could not express "reparses to a
+// DIFFERENT AST with ZERO diagnostics" — exactly the two silent corruptions
+// the alias-shape audit below found. `ALL_TARGETED_FIXTURES` below is
+// therefore held to a stricter bar: every entry must round-trip byte-for-
+// AST-identical, with no per-fixture escape hatch.
+//
 // The 21 alias shape classes enumerated by this PR's review. `TypeDef`'s
 // alias slot is the single most spelling-sensitive position in the language:
 // `typeDefToLongform`'s `aliasTypeValue` picks quoted or unquoted per shape,
@@ -246,12 +267,12 @@ interface ToggleFixture {
 // rewrite. This corpus pins the outcome for every class so a future change to
 // that rule cannot move one silently.
 //
-// The knownGap mechanism below asserts `syntaxDiagnostics.length > 0`, so it
-// can only express LOUD failures. Two classes (tuple, single string literal)
-// regressed into SILENT corruption during this PR's first round and produced
-// zero diagnostics — knownGap would not have caught either. That is why
-// `ALIAS_SHAPE_CLASSES` below carries its own AST-identity assertion suite:
-// silence is only acceptable when the round-trip is exact.
+// A `syntaxDiagnostics.length > 0` check alone can only express LOUD
+// failures. Two classes (tuple, single string literal) regressed into SILENT
+// corruption during this PR's first round and produced zero diagnostics —
+// that check would not have caught either. That is why `ALIAS_SHAPE_CLASSES`
+// below carries its own AST-identity assertion suite: silence is only
+// acceptable when the round-trip is exact.
 const TYPE_EXPR_KIND_FIXTURES: readonly ToggleFixture[] = [
   { name: 'typedef alias: bare identifier', source: 'Alias = Other\n' },
   { name: 'typedef alias: named', source: 'Named = string\n' },
@@ -437,7 +458,7 @@ describe('toggle round-trip: targeted fixtures for surfaces the standard corpus 
   });
 
   for (const fixture of ALL_TARGETED_FIXTURES) {
-    it(`${fixture.name}${fixture.knownGap !== undefined ? ' (documented KNOWN GAP, not fixed)' : ''}`, () => {
+    it(fixture.name, () => {
       const outcome = parser.parse(fixture.source);
       const preflightSyntaxDiagnostics = outcome.diagnostics.filter((diagnostic) => diagnostic.code.startsWith('syntax/'));
       assert.deepEqual(
@@ -450,15 +471,6 @@ describe('toggle round-trip: targeted fixtures for surfaces the standard corpus 
       const toggled1 = emitter.toggleFormat(outcome, originalFormat);
       const reparsed1 = parser.parse(toggled1);
       const toggled1SyntaxDiagnostics = reparsed1.diagnostics.filter((diagnostic) => diagnostic.code.startsWith('syntax/'));
-
-      if (fixture.knownGap !== undefined) {
-        assert.equal(
-          toggled1SyntaxDiagnostics.length > 0,
-          true,
-          `expected the documented known gap to still reproduce for "${fixture.name}" (${fixture.knownGap}), but toggling produced zero syntax/* diagnostics — if this now round-trips cleanly, the knownGap fixture expectation needs updating, not silently deleting`,
-        );
-        return;
-      }
 
       assert.deepEqual(
         toggled1SyntaxDiagnostics,
@@ -484,14 +496,13 @@ describe('toggle round-trip: targeted fixtures for surfaces the standard corpus 
 
 // The anti-silent-corruption gate for TypeDef's alias slot (this PR's review).
 //
-// The suite above cannot express this property. Its knownGap branch asserts
-// `syntaxDiagnostics.length > 0`, so a shape that reparses to a DIFFERENT AST
-// with ZERO diagnostics passes it either way. Both silent corruptions this
-// PR's first round introduced — `Tup = [string, number]` reparsing to
-// an escape-hatch-typed `named` leaf via longform-builder.ts's fallback
-// default, and
-// `Only = "active"` degrading `literal` -> `named` via P1's `unquote` — were
-// invisible to it.
+// The suite above cannot express this property: it asserts
+// `syntaxDiagnostics.length === 0`, so a shape that reparses to a DIFFERENT
+// AST with ZERO diagnostics still passes. Both silent corruptions this PR's
+// first round introduced — `Tup = [string, number]` reparsing to an
+// escape-hatch-typed `named` leaf via longform-builder.ts's fallback
+// default, and `Only = "active"` degrading `literal` -> `named` via P1's
+// `unquote` — were invisible to a diagnostics-only check.
 //
 // The rule enforced here is the one that actually matters: for every alias
 // shape class, toggling to longform and back either reproduces the source

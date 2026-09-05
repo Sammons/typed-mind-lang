@@ -131,16 +131,31 @@ pipeline parser needs (`<=`/`>=`/`=>` must not bump depth — see
 reserves the external scanner as a **stop-and-report** boundary (S-GRAMMAR-3),
 which is exactly what this is.
 
-Staying a knownGap is the recommendation: zero corpus instances
-(grep-verified across all 268 `.tmd`), the brace-wrapped form already works,
-the pipeline half is fixed, and any angle-depth work lands in the same
-`(`-position neighborhood where `_paramlist_opaque_run` and
-`_opaque_paren_group` already collide (PR #163 hit that conflict directly), so
-it carries real regression risk against issue #50's fix for a shape nothing
-uses. If prioritized, scope it as an external-scanner RFC, not a local tweak.
+At the time this section was written, staying a knownGap was the
+recommendation: zero corpus instances (grep-verified across all 268 `.tmd`),
+the brace-wrapped form already worked, the pipeline half was fixed, and any
+angle-depth work landed in the same `(`-position neighborhood where
+`_paramlist_opaque_run` and `_opaque_paren_group` already collide (PR #163 hit
+that conflict directly), carrying real regression risk against issue #50's fix
+for a shape nothing used.
+
+## FIXED (RFC-TM-13 C)
+
+The "external C scanner" and "staying a knownGap" analysis above predates
+RFC-TM-13 C. C closed the grammar half with the `_opaque_angle_group` atomic
+scanner described in "Fixed by RFC-TM-13 C — the grammar half" above: it owns
+`<` on opaque derivations, balances nested groups and quoted payloads, and
+stops exposing an inner union to the surrounding field — without the external
+scanner this section once called the only honest fix. The historical
+diagnosis above (the whitespace sensitivity table, the angle-group-is-a-no-op
+finding on the OLD scanner shape, and the top-level-plus-generic-plus-`|`
+conjunction) remains an accurate record of how the defect was found and why
+earlier attempts failed; it does not describe the shipped fix's mechanism.
 
 ## What the tests pin
 
-`rung-bens-almanac.test.ts` asserts the pipeline half directly (empty
-remainder, one opaque leaf, correct emitted text) and pins the residual
-`syntax/error` as the committed grammar knownGap.
+`rung-bens-almanac.test.ts`'s 'TM13 C' test asserts the grammar accepts the
+complete spaced generic union return with zero diagnostics, and that removing
+the closing `>` still produces a `syntax/error` (the fix narrows the defect,
+it does not disable syntax checking). See
+https://git.tail4ea214.ts.net/sammons/typed-mind-lang/pulls/181.

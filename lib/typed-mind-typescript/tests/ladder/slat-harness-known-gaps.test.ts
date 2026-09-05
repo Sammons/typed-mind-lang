@@ -26,9 +26,10 @@
 //     side. Both slots widen because shortform collapses them into one `<:`
 //     list (emit-shortform.ts `inheritanceSuffix`).
 //
-// RFC-TM-13 G now closes68 with declared parameters and lexical binding;
+// RFC-TM-13 G now closes 68 with declared parameters and lexical binding;
 // its controls retain the exact source declarations and remove a binding
-// to restore the original undefined-field diagnostic.
+// to restore the original undefined-field diagnostic. See the 'FIXED GAP 68'
+// describe block below and https://git.tail4ea214.ts.net/sammons/typed-mind-lang/pulls/181.
 //
 // The PR #162 review added two more suites, both enforcing the same standard
 // fixture 69's header sets — nothing this converter drops may drop silently:
@@ -374,21 +375,26 @@ describe('slat-harness rung, 69c: an unresolvable parent falls back to own membe
   });
 });
 
-// PR #162 review, non-blocking finding — a GENERIC heritage target emits its
-// argument list verbatim into the `<:` slot, producing `Unparsable text`.
+// PR #162 review, non-blocking finding — a GENERIC heritage target emitted its
+// argument list verbatim into the `<:` slot, which used to produce
+// `Unparsable text` because the grammar had no parameterized-base concept.
 //
-// Pinned rather than "fixed" because the obvious repair (strip the arguments
-// when emitting) is a change this repo has already rejected on purpose: it is
-// PR #152's original bug, and `slat-harness-mixin-heritage-controls.test.ts`
-// pins the verbatim recording as property 1 of the #152/#153 reconciliation,
-// warning in its own comment that asserting zero diagnostics there "would
-// pressure a future author to reintroduce the bug". Stripping on the interface
-// lane alone would additionally make the two lanes diverge, which is the
-// specific outcome the review asked to avoid.
+// The obvious repair (strip the arguments when emitting) was rejected on
+// purpose: it is PR #152's original bug, and
+// `slat-harness-mixin-heritage-controls.test.ts` pins the verbatim recording
+// as property 1 of the #152/#153 reconciliation, warning in its own comment
+// that asserting zero diagnostics there "would pressure a future author to
+// reintroduce the bug". Stripping on the interface lane alone would
+// additionally have made the two lanes diverge, which is the specific
+// outcome the review asked to avoid.
 //
-// These assertions therefore pin the CURRENT behavior on BOTH lanes. If a
-// future change teaches TypedMind to model a parameterized base (gap 68), this
-// suite fails loudly and the expectation is re-baselined deliberately — the
+// RFC-TM-13 G (gap 68, generic type parameters) closed the real gap instead:
+// the grammar now models a parameterized base, so the verbatim `Repo<Item>` /
+// `GenericBase<string>` text checks clean on BOTH lanes instead of producing
+// `Unparsable text`. FIXED — see 'FIXED G.2' below and
+// https://git.tail4ea214.ts.net/sammons/typed-mind-lang/pulls/181. These
+// assertions now pin the CLOSED behavior on both lanes. If a future change
+// regresses the parameterized-base grammar, this suite fails loudly — the
 // same gap-pin lifecycle fixtures 67 and 69 just went through.
 describe('slat-harness rung, 69d: a generic heritage target behaves identically on both lanes', () => {
   it('the interface lane resolves the generic parent for the LOOKUP, so the child is Class-lane', () => {

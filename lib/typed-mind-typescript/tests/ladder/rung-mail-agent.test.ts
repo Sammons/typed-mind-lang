@@ -16,12 +16,12 @@
 // multi-line `kind` union converted to a FIELDLESS `X %`: the checker reported
 // clean over an entity whose entire body had been silently dropped. Once the
 // union carries its members again, the members' string-literal discriminants
-// become visible, and those trip a separate pre-existing language-layer gap
-// (fixture 93). Fewer diagnostics over less content is not a better result.
+// become visible, and those tripped a separate pre-existing language-layer
+// gap (fixture 93). Fewer diagnostics over less content is not a better result.
 //
 // Fixtures 90/91/92 are fix-bound: each fails on main and passes here.
-// Fixture 93 is a documented knownGap — its test pins the CURRENT behaviour so
-// the gap is a committed fact rather than prose.
+// Fixture 93 is FIXED by PR #163 (grammar: quoted discriminants inside a
+// union of object literals) — see the '93' describe block below.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';

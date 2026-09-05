@@ -3,17 +3,16 @@
 // Target shape: a single-package Node 26 agent-friendly email service
 // (HATEOAS + MJML), 3 tsconfigs, generics-heavy, 163 TypeScript files.
 //
-// Fixture 94 is a FIX (fail-before / pass-after). Fixture 95 is a KNOWN GAP,
-// pinned with positive assertions per the harness convention
-// (slat-harness-known-gaps.test.ts:1-9): it asserts the defect is STILL
-// present, so the day it is fixed this suite fails loudly and the
-// expectation gets re-baselined deliberately rather than drifting.
+// Fixture 94 is a FIX (fail-before / pass-after). Fixture 95 was a KNOWN GAP
+// (a generic function's type parameter leaked as a fabricated global entity)
+// and is now FIXED (unit G) — see the 'FIXED GAP 95' describe block below.
 //
-// Fixture 96 was such a gap and has been PARTIALLY fixed by
-// decision-same-named-entities PR 1 — its declaration half is closed (the
-// abort is gone; the second declaration is renamed) and its reference half
-// remains pinned. That re-baselining is exactly the deliberate flip this
-// convention exists to force. See the describe block's own comment.
+// Fixture 96 was also a known gap and is now FULLY fixed by
+// decision-same-named-entities PR 1 (declaration identity) plus unit A2
+// (signature reference resolution): both the declaration half (the abort is
+// gone; the second declaration is renamed) and the reference half (each
+// signature resolves its own actual declaration, no interim collision
+// warnings) are closed. See the describe block's own comment.
 //
 // No existing assertion is weakened by this file.
 import assert from 'node:assert/strict';
@@ -108,7 +107,7 @@ describe('artifice rung, FIXED GAP 95: a generic function binds its return type 
 // declaration identities; A2 resolves signature aliases to those identities.
 // The companion converter test removes origins to restore exactly the old
 // unused LifecycleFile.PublishState and missing StoredPublishState findings.
-describe('artifice rung, gap 96: distinct aliases and signature references resolve by source identity', () => {
+describe('artifice rung, FIXED GAP 96: distinct aliases and signature references resolve by source identity', () => {
   it('FIXED (PR 1): the conversion completes — no duplicate-name abort', () => {
     const result = convert('96-same-name-type-alias-two-files');
     assert.equal(result.success, true, 'the duplicate-name abort is replaced by a rename');
