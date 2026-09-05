@@ -17,15 +17,15 @@ Evidence relative to the integrated C baseline `52811bf`:
 
 - All 234 tracked `.tmd` native parse trees are byte-identical after removing timing
   footers. Before and after use isolated parser caches.
-- All 154 existing native corpus fixtures pass, plus four new callback and malformed
-  locality fixtures in `grammar/test/corpus/tm13-quoted-callbacks.txt`.
+- All 154 existing corpus fixtures pass on native and WASM, plus four new callback
+  and malformed locality fixtures in `grammar/test/corpus/tm13-quoted-callbacks.txt`.
 - The 207 quoting, toggle and callback tests pass, including current issue #103
   fixtures. That issue remains closed.
 - `src/pipeline/quoted-callback-types.test.ts` preserves exact type text across
   LF/SF/LF, escaped quotes/backslashes, quoted closing delimiters, nested callbacks,
   structured string unions, descriptions and optional markers. Missing quotes or
   parentheses fail locally; valid-invalid-valid incremental trees match fresh trees
-  at EOF.
+  at EOF. Native incremental checks also match fresh trees in both directions.
 
 This change retains opaque type text. It does not evaluate TypeScript callback
 assignability or introduce a new type expression kind. Existing physical multiline
