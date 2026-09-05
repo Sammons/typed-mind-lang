@@ -193,6 +193,42 @@ describe('orphan check (validator.ts:245-367)', () => {
     assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), []);
   });
 
+  // RFC-TM-15 §S2 (rfc-tm-15-diamond.md, leaf X1) — ladder fixture 110
+  // shape B: a File forwards an EXTERNAL binding whose spelling matches a
+  // local declaration. The entry is owner-qualified (`Vendor.helper`), so
+  // the re-export branch resolves it `external` and must not credit the
+  // File through the same-spelled local `helper` that `Main` imports from
+  // `Origin`. Consumption is proven only by the RX-6 fold (an importer
+  // naming the File itself).
+  const externalForwardingBarrel = (mainImports: string) =>
+    [
+      'App -> Main v1.0.0',
+      'Vendor ^ "vendor"',
+      '  -> [helper]',
+      'Main @ src/main.ts:',
+      mainImports,
+      '  -> [run]',
+      'Surface @ src/surface.ts:',
+      '  <-> [Vendor.helper]',
+      'Origin @ src/origin.ts:',
+      '  -> [helper]',
+      'run :: () => void',
+      'helper :: () => void',
+      '',
+    ].join('\n');
+
+  it('TM15 V2: an external-forwarding re-export entry does not credit the file through the same-spelled local entity', async () => {
+    const { result } = await check(externalForwardingBarrel('  <- [helper]'));
+    assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), ["Orphaned file 'Surface' - none of its exports are imported"]);
+    assert.deepEqual(messagesByCode(result, 'checker/qualified-name-unresolved'), []);
+  });
+
+  it('TM15 V2: the RX-6 fold still credits an external-forwarding file', async () => {
+    const { result } = await check(externalForwardingBarrel('  <- [helper, Surface]'));
+    assert.deepEqual(messagesByCode(result, 'checker/orphaned-file'), []);
+    assert.deepEqual(messagesByCode(result, 'checker/multi-exported'), []);
+  });
+
   it('honors skipOrphanCheck (the ported ValidatorOptions surface)', async () => {
     const { result } = await check(orphanSource, { skipOrphanCheck: true });
     assert.deepEqual(
@@ -418,6 +454,28 @@ describe('export checks (validator.ts:804-940)', () => {
       ].join('\n'),
     );
     assert.deepEqual(messagesByCode(result, 'checker/multi-exported'), ["Entity 'thing' is exported by multiple files: Main, Other"]);
+  });
+
+  // RFC-TM-15 §S2 (leaf X1) — a Dependency's export entry names a member of
+  // the external package, never a project declaration that shares its
+  // spelling; two Files exporting the same entity still flag.
+  it('TM15 V2: a Dependency export spelled like a local entity is not a duplicate export', async () => {
+    const { result } = await check(
+      [
+        'App -> Main v1.0.0',
+        'Vendor ^ "vendor"',
+        '  -> [thing]',
+        'Main @ src/main.ts:',
+        '  <- [thing, Vendor]',
+        '  -> [run]',
+        'Other @ src/other.ts:',
+        '  -> [thing]',
+        'run :: () => void',
+        'thing :: () => void',
+        '',
+      ].join('\n'),
+    );
+    assert.deepEqual(messagesByCode(result, 'checker/multi-exported'), []);
   });
 
   // tm10-inc3a (lead-authorized amendment, SST-referenced-module orphan
