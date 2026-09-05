@@ -35,6 +35,8 @@ import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
 import { QualifiedNameResolver, resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
+import { isPrimitiveType } from './type-builtins.ts';
+import { walkEntityTypeReferences } from './type-reference-walk.ts';
 
 export interface Reference {
   readonly from: string;
@@ -139,12 +141,6 @@ class LinkCollector {
       if (target !== undefined) this.addReference(target.name, from);
     }
   }
-
-  addAll(targetNames: readonly string[] | undefined, from: EntityNode): void {
-    for (const targetName of targetNames ?? []) {
-      this.addReference(targetName, from);
-    }
-  }
 }
 
 const collectFunctionLinks = (collector: LinkCollector, fn: FunctionNode): void => {
@@ -179,15 +175,8 @@ const collectEntityLinks = (collector: LinkCollector, entity: EntityNode): void 
   } else if (entity instanceof ClassFileNode) {
     collector.addImports(entity, entity.imports);
     collector.addExports(entity, entity.exports);
-    collector.addAll(entity.implements, entity);
-    if (entity.extends !== undefined) {
-      collector.addReference(entity.extends, entity);
-    }
   } else if (entity instanceof ClassNode) {
-    collector.addAll(entity.implements, entity);
-    if (entity.extends !== undefined) {
-      collector.addReference(entity.extends, entity);
-    }
+    // Canonical heritage is walked below with the local binder scope.
   } else if (entity instanceof FunctionNode) {
     collectFunctionLinks(collector, entity);
   } else if (entity instanceof UiComponentNode) {
@@ -206,7 +195,11 @@ const collectEntityLinks = (collector: LinkCollector, entity: EntityNode): void 
   } else if (entity instanceof DependencyNode) {
     collector.addExports(entity, entity.exports);
   }
-  // DtoNode and RunParameterNode carry no forward reference fields.
+  walkEntityTypeReferences(entity, {
+    reference: (node, args) => {
+      if (args.length === 0 || !isPrimitiveType(node.name)) collector.addReference(node.name, entity);
+    },
+  });
 };
 
 export const computeLinks = (entities: readonly EntityNode[]): LinkIndex => {

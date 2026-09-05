@@ -12,6 +12,7 @@
 
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
+import { DtoNode } from '../ast/dto-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
@@ -147,14 +148,42 @@ export const checkCircularUiContainment = (context: CheckContext): void => {
 };
 
 export const checkInheritanceChains = (context: CheckContext): void => {
-  const inheritanceGraph = new Map<string, string>();
+  const inheritanceGraph = new Map<string, readonly string[]>();
 
   for (const [name, entity] of context.byName) {
-    if (!(entity instanceof ClassNode || entity instanceof ClassFileNode)) {
+    if (entity instanceof DtoNode) {
+      const parents: string[] = [];
+      for (const reference of entity.extendsReferences ?? []) {
+        if (reference.kind !== 'named' || entity.typeParameters?.some((parameter) => parameter.name === reference.base.name)) continue;
+        const nameOfBase = reference.base.name;
+        const resolution = context.names.resolve(nameOfBase);
+        const target = context.names.target(nameOfBase);
+        if (resolution.kind === 'external') continue;
+        parents.push(target?.name ?? nameOfBase);
+        if (target?.name === name)
+          context.addFinding({
+            code: 'checker/self-inheritance',
+            severity: 'error',
+            span: reference.span,
+            message: `DTO '${name}' inherits from itself`,
+            suggestion: 'Remove self-inheritance',
+          });
+        else if (target === undefined)
+          context.addFinding({
+            code: 'checker/unknown-base-class',
+            severity: 'error',
+            span: reference.span,
+            message: `DTO '${name}' extends '${nameOfBase}' which does not exist`,
+            suggestion: 'Declare the base type',
+          });
+      }
+      if (parents.length > 0) inheritanceGraph.set(name, parents);
       continue;
     }
-    if (entity.extends !== undefined) {
-      inheritanceGraph.set(name, context.names.target(entity.extends)?.name ?? entity.extends);
+    if (!(entity instanceof ClassNode || entity instanceof ClassFileNode)) continue;
+    const localBinders = new Set(entity.typeParameters?.map((parameter) => parameter.name));
+    if (entity.extends !== undefined && !localBinders.has(entity.extends)) {
+      inheritanceGraph.set(name, [context.names.target(entity.extends)?.name ?? entity.extends]);
 
       if (entity.extends !== undefined && (context.names.target(entity.extends)?.name ?? entity.extends) === name) {
         context.addFinding({
@@ -164,7 +193,7 @@ export const checkInheritanceChains = (context: CheckContext): void => {
           message: `Class '${name}' inherits from itself`,
           suggestion: 'Remove the self-inheritance or choose a different base class',
         });
-      } else if (context.names.target(entity.extends) === undefined) {
+      } else if (context.names.target(entity.extends) === undefined && context.names.resolve(entity.extends).kind !== 'external') {
         // Legacy `continue`s after self-inheritance, so the existence check
         // only runs for non-self extends (validator.ts:566-584).
         context.addFinding({
@@ -183,7 +212,11 @@ export const checkInheritanceChains = (context: CheckContext): void => {
       continue;
     }
     for (const implemented of entity.implements) {
-      if (context.names.target(implemented) === undefined) {
+      if (
+        !localBinders.has(implemented) &&
+        context.names.target(implemented) === undefined &&
+        context.names.resolve(implemented).kind !== 'external'
+      ) {
         context.addFinding({
           code: 'checker/unknown-interface',
           severity: 'error',
@@ -197,10 +230,7 @@ export const checkInheritanceChains = (context: CheckContext): void => {
 
   walkForCycles({
     nodes: [...inheritanceGraph.keys()],
-    neighborsOf: (node) => {
-      const parent = inheritanceGraph.get(node);
-      return parent === undefined ? undefined : [parent];
-    },
+    neighborsOf: (node) => inheritanceGraph.get(node),
     onCycle: (root, cycle) => {
       const entity = context.byName.get(root);
       if (entity !== undefined) {

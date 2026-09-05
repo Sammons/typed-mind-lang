@@ -162,3 +162,19 @@ surrounding prose must match.
   rather than at a DSL-author fix, since no DSL document can trigger it.
 
 | `checker/qualified-name-unresolved` | check-context.ts:79 | `Qualified name 'Missing.Type' has no declared owner 'Missing'` (other variants identify an invalid owner, missing member, or private member not exported for this reference) | CheckerFinding | PASS | Suggests declaring owner/member and exporting before a cross-file reference. |
+| `semantics/conflicting-type-parameters` | generic-declaration-syntax.ts | `Declare type parameters in either the header or properties.` | Diagnostic | PASS | Span locates the declaration; message states the corrective syntax choice. |
+| `semantics/invalid-type-parameter` | generic-declaration-syntax.ts / longform-builder.ts | `Invalid type parameter in 'Pair': close every bracket and quote.` | Diagnostic | PASS | Names the declaration and gives a specific correction, including explicit single-line literal limits. |
+| `semantics/multiple-class-bases` | longform-builder.ts | `A class may extend one base; use implements for additional contracts.` | Diagnostic | PASS | Span locates the declaration; message distinguishes base and contract roles and suggests correction. |
+| `semantics/unsupported-generic-declaration` | generic-declaration-syntax.ts / cst-to-ast.ts | `Enum 'Choice' does not accept type parameters; remove them or use an alias declaration.` | Diagnostic | PASS | Names the unsupported declaration and gives an applicable alternative. |
+
+Emission-only diagnostic `emitter/unsupported-multiline-type-parameter` (generic-declaration-emission.ts) is outside the suppressible checker registry. Grade: PASS. It names the parameter and declaration, identifies the unsupported multiline value, and asks for a single-line literal before emission.
+
+| `checker/conflicting-signature-type-parameters` | check-generic-declarations.ts | Function signature type parameters disagree with its declaration. | CheckerFinding | PASS | Aligns full binding facts. |
+| `checker/duplicate-type-parameter` | check-generic-declarations.ts | Duplicate type parameter T. | CheckerFinding | PASS | Names the repeated binding and requests a distinct name. |
+| `checker/invalid-type-parameter-modifiers` | check-generic-declarations.ts | Invalid modifier combination on a type parameter. | CheckerFinding | PASS | Lists supported combinations. |
+| `checker/generic-arity` | check-generic-declarations.ts | Type Pair received 0 arguments for 2 declared parameters. | CheckerFinding | PASS | Requests required arguments and permits defaulted omissions. |
+| `checker/generic-unknown-type` | check-generic-declarations.ts | Generic declaration references undefined type Missing. | CheckerFinding | PASS | Requests declaration or import. |
+| `checker/generic-non-data-type` | check-generic-declarations.ts | Generic declaration references Function work as a type. | CheckerFinding | PASS | Requests a data type. |
+| `checker/unsupported-generic-type` | check-generic-declarations.ts | Generic constraint is retained as opaque type text. | CheckerFinding | PASS | States the reference-checking limitation. |
+| `checker/unsupported-heritage` | check-generic-declarations.ts | Heritage is retained as opaque type text. | CheckerFinding | PASS | Requests a named base for reference checking. |
+| `checker/type-parameter-heritage-base` | check-generic-declarations.ts | Declaration cannot extend local type parameter T. | CheckerFinding | PASS | Requests a declared base with parameters as arguments. |

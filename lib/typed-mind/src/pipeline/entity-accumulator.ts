@@ -17,14 +17,19 @@ import type { EntityKind, RunParameterType, TypeDefVariant } from '../ast/entity
 import type { EntityNode, EntityNodeArgs, SourceForm } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
+import type { ClassHeritage, HeritageReference } from '../ast/heritage-reference.ts';
 import { ProgramNode } from '../ast/program-node.ts';
 import { RunParameterNode } from '../ast/run-parameter-node.ts';
 import type { Span } from '../ast/span.ts';
 import { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
+import type { TypeParameterNode } from '../ast/type-parameter-node.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 
 export interface AccumulatorSlots {
+  typeParameters?: TypeParameterNode[] | undefined;
+  heritage?: ClassHeritage | undefined;
+  extendsReferences?: HeritageReference[] | undefined;
   entry?: string | undefined;
   purpose?: string | undefined;
   version?: string | undefined;
@@ -148,6 +153,7 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
     return new FunctionNode({
       ...accumulator.baseArgs(),
       signature: slots.signature ?? '',
+      ...(slots.typeParameters !== undefined ? { typeParameters: slots.typeParameters } : {}),
       calls: slots.calls ?? [],
       pendingDependencies: slots.pendingDependencies ?? [],
       ...(slots.description !== undefined ? { description: slots.description } : {}),
@@ -161,9 +167,11 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
     const { slots } = accumulator;
     return new ClassNode({
       ...accumulator.baseArgs(),
-      implements: slots.implementsList ?? [],
+      ...(slots.heritage !== undefined
+        ? { heritage: slots.heritage }
+        : { implements: slots.implementsList ?? [], ...(slots.extendsName !== undefined ? { extends: slots.extendsName } : {}) }),
       methods: slots.methods ?? [],
-      ...(slots.extendsName !== undefined ? { extends: slots.extendsName } : {}),
+      ...(slots.typeParameters !== undefined ? { typeParameters: slots.typeParameters } : {}),
       ...(slots.purpose !== undefined ? { purpose: slots.purpose } : {}),
     });
   },
@@ -172,12 +180,14 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
     return new ClassFileNode({
       ...accumulator.baseArgs(),
       path: slots.path ?? '',
-      implements: slots.implementsList ?? [],
+      ...(slots.heritage !== undefined
+        ? { heritage: slots.heritage }
+        : { implements: slots.implementsList ?? [], ...(slots.extendsName !== undefined ? { extends: slots.extendsName } : {}) }),
       methods: slots.methods ?? [],
       imports: slots.imports ?? [],
       // Auto-self-export lives in the ClassFileNode constructor (parser.ts:287).
       exports: slots.exports ?? [],
-      ...(slots.extendsName !== undefined ? { extends: slots.extendsName } : {}),
+      ...(slots.typeParameters !== undefined ? { typeParameters: slots.typeParameters } : {}),
       ...(slots.purpose !== undefined ? { purpose: slots.purpose } : {}),
     });
   },
@@ -195,6 +205,8 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
     return new DtoNode({
       ...accumulator.baseArgs(),
       fields: slots.fields ?? [],
+      ...(slots.typeParameters !== undefined ? { typeParameters: slots.typeParameters } : {}),
+      ...(slots.extendsReferences !== undefined ? { extendsReferences: slots.extendsReferences } : {}),
       ...(slots.purpose !== undefined ? { purpose: slots.purpose } : {}),
     });
   },
@@ -240,7 +252,10 @@ const FINALIZERS: Record<EntityKind, Finalizer> = {
   },
   TypeDef: (accumulator) => {
     const { slots } = accumulator;
-    const purposeArgs = slots.purpose !== undefined ? { purpose: slots.purpose } : {};
+    const purposeArgs = {
+      ...(slots.purpose !== undefined ? { purpose: slots.purpose } : {}),
+      ...(slots.typeParameters !== undefined ? { typeParameters: slots.typeParameters } : {}),
+    };
     // Defensive default: a malformed/incomplete accumulation (e.g. a future
     // parse-recovery path that opens a TypeDef without ever setting its
     // variant) falls back to an empty alias-of-opaque rather than throwing —

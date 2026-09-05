@@ -8,23 +8,22 @@
 // are NOT referenced (the legacy comment at :257-259 is the rule). Program and
 // Dependency entities are exempt candidates; Files get the
 // any-export-imported consumption escape.
-// RFC-TM-13 B1 additionally collects structured function-signature type uses;
-// opaque text, local generic binders and builtin wrappers add no false edges.
+// RFC-TM-13 B1/G additionally collect structural type uses across fields,
+// aliases, signatures, constraints/defaults and heritage. Lexical binders and
+// unsupported opaque text never contribute guessed global edges.
 
 import { AssetNode } from '../ast/asset-node.ts';
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
-import { DtoNode } from '../ast/dto-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import { FileNode } from '../ast/file-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import { ProgramNode } from '../ast/program-node.ts';
 import { type QualifiedNameResolver, resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
-import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
-import { parseSignatureText } from '../pipeline/parse-signature-text.ts';
+import { walkEntityTypeReferences } from '../pipeline/type-reference-walk.ts';
 import type { CheckContext } from './check-context.ts';
-import { collectSignatureReferences } from './collect-signature-references.ts';
+import { isPrimitiveType } from './type-builtins.ts';
 
 const importsOf = (entity: EntityNode): readonly string[] | undefined => {
   if (entity instanceof FileNode || entity instanceof ClassFileNode) {
@@ -33,13 +32,6 @@ const importsOf = (entity: EntityNode): readonly string[] | undefined => {
   return undefined;
 };
 
-// RFC-TM-10 §8 (rfc-tm-10-diamond.md, D-LEG-8) — a referenced-name collector
-// over the COMPLETE TypeExprNode shape, structurally mirroring (but
-// independent of — this file collects, check-dto-fields.ts's walkTypeExpr
-// validates; neither calls the other) check-dto-fields.ts's per-kind walk.
-// Every non-terminal kind recurses; `literal` and `opaque` are terminal
-// leaves that carry no reference (matching walkTypeExpr's own no-op/no-finding
-// treatment of those two kinds).
 const addReference = (name: string, referenced: Set<string>, names: QualifiedNameResolver): void => {
   const resolved = names.target(name);
   if (resolved !== undefined) {
@@ -55,33 +47,6 @@ const addReference = (name: string, referenced: Set<string>, names: QualifiedNam
   } else if (!name.includes('.')) referenced.add(name);
 };
 
-const collectTypeExprReferences = (node: TypeExprNode, referenced: Set<string>, names: QualifiedNameResolver): void => {
-  switch (node.kind) {
-    case 'named':
-      addReference(node.name, referenced, names);
-      return;
-    case 'generic':
-      addReference(node.base.name, referenced, names);
-      for (const arg of node.args) {
-        collectTypeExprReferences(arg, referenced, names);
-      }
-      return;
-    case 'union':
-    case 'intersection':
-      for (const member of node.members) {
-        collectTypeExprReferences(member, referenced, names);
-      }
-      return;
-    case 'array':
-      collectTypeExprReferences(node.element, referenced, names);
-      return;
-    case 'literal':
-      return; // terminal, no reference
-    case 'opaque':
-      return; // unvalidated leaf, no structured reference (RFC-TM-8 §4)
-  }
-};
-
 const collectReferencedNames = (context: CheckContext): Set<string> => {
   const referenced = new Set<string>();
   for (const entity of context.byName.values()) {
@@ -92,12 +57,6 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
       }
     }
     if (entity instanceof FunctionNode) {
-      const signature = parseSignatureText(entity.signature);
-      if (signature.kind === 'parsed') {
-        const signatureNames = new Set<string>();
-        collectSignatureReferences(signature.signature, signatureNames);
-        for (const name of signatureNames) addReference(name, referenced, context.names);
-      }
       for (const call of entity.calls) {
         addReference(call, referenced, context.names); // the RAW call string, dotted included (validator.ts:262)
       }
@@ -130,11 +89,11 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
     if (entity instanceof AssetNode && entity.containsProgram !== undefined) {
       addReference(entity.containsProgram, referenced, context.names);
     }
-    if (entity instanceof DtoNode) {
-      for (const field of entity.fields) {
-        collectTypeExprReferences(field.typeExpr, referenced, context.names);
-      }
-    }
+    walkEntityTypeReferences(entity, {
+      reference: (node, args) => {
+        if (args.length === 0 || !isPrimitiveType(node.name)) addReference(node.name, referenced, context.names);
+      },
+    });
   }
   return referenced;
 };

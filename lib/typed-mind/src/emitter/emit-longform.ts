@@ -34,6 +34,7 @@ import type { ProgramNode } from '../ast/program-node.ts';
 import type { RunParameterNode } from '../ast/run-parameter-node.ts';
 import type { TypeDefNode } from '../ast/type-def-node.ts';
 import type { UiComponentNode } from '../ast/ui-component-node.ts';
+import { genericEmissionDiagnostics, heritageLines, parameterLines, printHeritage } from './generic-declaration-emission.ts';
 import { printTypeExpr } from './print-type-expr.ts';
 import { quoteStringLiteral } from './quote-string-literal.ts';
 
@@ -125,6 +126,7 @@ const fileToLongform = (entity: FileNode): string[] => {
 
 const functionToLongform = (entity: FunctionNode): string[] => {
   const body: string[] = [`type: Function`, `signature: ${entity.signature}`];
+  body.push(...parameterLines(entity));
   if (entity.description !== undefined) {
     body.push(`description: ${quoteStringLiteral(entity.description)}`);
   }
@@ -156,12 +158,8 @@ const functionToLongform = (entity: FunctionNode): string[] => {
 
 const classToLongform = (entity: ClassNode): string[] => {
   const body: string[] = [`type: Class`];
-  if (entity.extends !== undefined) {
-    body.push(`extends: ${entity.extends}`);
-  }
-  if (entity.implements.length > 0) {
-    body.push(`implements: [${entity.implements.join(', ')}]`);
-  }
+  body.push(...parameterLines(entity));
+  body.push(...heritageLines(entity));
   body.push(...descriptionAndPurposeLines(entity.comment, entity.purpose));
   if (entity.methods.length > 0) {
     body.push(`methods: [${entity.methods.join(', ')}]`);
@@ -171,12 +169,8 @@ const classToLongform = (entity: ClassNode): string[] => {
 
 const classFileToLongform = (entity: ClassFileNode): string[] => {
   const body: string[] = [`type: ClassFile`, `path: ${entity.path}`];
-  if (entity.extends !== undefined) {
-    body.push(`extends: ${entity.extends}`);
-  }
-  if (entity.implements.length > 0) {
-    body.push(`implements: [${entity.implements.join(', ')}]`);
-  }
+  body.push(...parameterLines(entity));
+  body.push(...heritageLines(entity));
   body.push(...descriptionAndPurposeLines(entity.comment, entity.purpose));
   if (entity.imports.length > 0) {
     body.push(`imports: [${entity.imports.join(', ')}]`);
@@ -227,6 +221,8 @@ const dtoFieldToLongform = (field: DtoNode['fields'][number]): string[] => {
 
 const dtoToLongform = (entity: DtoNode): string[] => {
   const body: string[] = [`type: DTO`, ...descriptionAndPurposeLines(entity.comment, entity.purpose)];
+  body.push(...parameterLines(entity));
+  body.push(...(entity.extendsReferences ?? []).map((reference) => `extends: ${quoteStringLiteral(printHeritage(reference))}`));
   if (entity.fields.length > 0) {
     const fieldLines = entity.fields.flatMap((field) => dtoFieldToLongform(field));
     body.push('fields: {', ...indent(fieldLines), '}');
@@ -301,6 +297,7 @@ const dependencyToLongform = (entity: DependencyNode): string[] => {
 // without ever printing a redundant `variant: alias` line.
 const typeDefToLongform = (entity: TypeDefNode): string[] => {
   const body: string[] = [];
+  body.push(...parameterLines(entity));
   if (entity.variant === 'enum') {
     body.push('variant: enum');
     body.push(`members: [${(entity.members ?? []).join(', ')}]`);
@@ -346,5 +343,5 @@ export const emitLongform = (entity: EntityNode): string[] => {
 
 // The diagnostic API remains available; escaped output requires no mutation warning.
 export const emitLongformWithDiagnostics = (entity: EntityNode): { lines: string[]; diagnostics: Diagnostic[] } => {
-  return { lines: emitLongform(entity), diagnostics: [] };
+  return { lines: emitLongform(entity), diagnostics: genericEmissionDiagnostics(entity) };
 };

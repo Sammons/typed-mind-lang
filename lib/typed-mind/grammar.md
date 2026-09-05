@@ -30,16 +30,16 @@ One entity per line. `<symbol>` names a grammar production; `[...]` marks an opt
 |---|---|
 | Program | `<entity_name> -> <entity_name> [<string>] [<version>]` |
 | File | `<entity_name> @ <path> :` |
-| Function | `<entity_name> :: <signature>` |
-| Class | `<entity_name> <: [<inherit_list>]` |
-| ClassFile | `<entity_name> #: <path> [<: <inherit_list>]` |
+| Function | `<entity_name> [<type_parameters>] :: <signature>` |
+| Class | `<entity_name> [<type_parameters>] <: [<inherit_list>]` |
+| ClassFile | `<entity_name> [<type_parameters>] #: <path> [<: <inherit_list>]` |
 | Constants | `<entity_name> ! <path> [: <entity_name>]` |
-| DTO | `<entity_name> % [<string>]` |
+| DTO | `<entity_name> [<type_parameters>] % [<string>]` |
 | Asset | `<entity_name> ~ <string>` |
 | UIComponent | `<entity_name> &!|& <string>` |
 | RunParameter | `<entity_name> <param_type> <string> [<param_marker>]` |
 | Dependency | `<entity_name>|<dependency_name> ^ <string> [<version>]` |
-| TypeDef | `<entity_name> = <typedef_enum_variant>|<type_expr>` |
+| TypeDef | `<entity_name> [<type_parameters>] = <typedef_enum_variant>|<type_expr>` |
 
 ## Continuation Operators
 

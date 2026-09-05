@@ -1,0 +1,210 @@
+==================
+G: names-only generic declaration heads and instantiated heritage
+==================
+Owner.Pair<T, U> %
+Owner.Alias<T> = T
+Owner.choose<T> :: choose(value: T) => T
+Owner.Child<T> <: Owner.Base<T>, Owner.Contract<T>
+Owner.ChildFile<T> #: child.ts <: Owner.Base<T>
+
+---
+
+(source_file
+  (dto_declaration
+    (entity_name)
+    (type_parameters
+      (type_parameter_name)
+      (type_parameter_name)))
+  (typedef_declaration
+    (entity_name)
+    (type_parameters
+      (type_parameter_name))
+    (type_expr
+      (type_union
+        (type_intersection
+          (type_postfix
+            (type_atom
+              (type_named
+                (entity_name))))))))
+  (function_declaration
+    (entity_name)
+    (type_parameters
+      (type_parameter_name))
+    (signature))
+  (class_declaration
+    (entity_name)
+    (type_parameters
+      (type_parameter_name))
+    (inherit_list
+      (heritage_type
+        (type_generic
+          (type_named)
+          (type_expr
+            (type_union
+              (type_intersection
+                (type_postfix
+                  (type_atom
+                    (type_named
+                      (entity_name)))))))))
+      (heritage_type
+        (type_generic
+          (type_named)
+          (type_expr
+            (type_union
+              (type_intersection
+                (type_postfix
+                  (type_atom
+                    (type_named
+                      (entity_name)))))))))))
+  (classfile_declaration
+    (entity_name)
+    (type_parameters
+      (type_parameter_name))
+    (path)
+    (inherit_list
+      (heritage_type
+        (type_generic
+          (type_named)
+          (type_expr
+            (type_union
+              (type_intersection
+                (type_postfix
+                  (type_atom
+                    (type_named
+                      (entity_name))))))))))))
+
+==================
+G: generic longform and ClassFile sigil headers
+==================
+dto Owner.Pair<T> {
+}
+typedef Owner.Alias<T> {
+  type: "T"
+}
+function Owner.choose<T> {
+  signature: "choose(value: T) => T"
+}
+class Owner.Child<T> {
+}
+classfile Owner.ChildFile<T> {
+  path: "child.ts"
+}
+Owner.Sigil<T> #: sigil.ts <: Owner.Base<T> {
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      (header_name_rest)
+      (type_parameters
+        (type_parameter_name))))
+  (longform_block
+    (block_header
+      (block_kw)
+      (header_name_rest)
+      (type_parameters
+        (type_parameter_name)))
+    (block_property
+      (property_string
+        (property_key)
+        (string))))
+  (longform_block
+    (block_header
+      (block_kw)
+      (header_name_rest)
+      (type_parameters
+        (type_parameter_name)))
+    (block_property
+      (property_string
+        (property_key)
+        (string))))
+  (longform_block
+    (block_header
+      (block_kw)
+      (header_name_rest)
+      (type_parameters
+        (type_parameter_name))))
+  (longform_block
+    (block_header
+      (block_kw)
+      (header_name_rest)
+      (type_parameters
+        (type_parameter_name)))
+    (block_property
+      (property_string
+        (property_key)
+        (string))))
+  (classfile_block_sigil
+    (entity_name)
+    (type_parameters
+      (type_parameter_name))
+    (path)
+    (inherit_list
+      (heritage_type
+        (type_generic
+          (type_named)
+          (type_expr
+            (type_union
+              (type_intersection
+                (type_postfix
+                  (type_atom
+                    (type_named
+                      (entity_name))))))))))))
+
+==================
+G: repeated full generic parameters and role-preserving inheritance
+==================
+dto Owner.Pair {
+  typeParameter: "out T extends Constraint = Default"
+  typeParameter: "U = Map<T, Other>"
+  extends: "Owner.Base<T>"
+  extends: "Owner.Other<U>"
+}
+class Owner.Child {
+  typeParameter: "T"
+  implements: "Owner.Contract<T>"
+  implements: "Owner.OtherContract<T>"
+}
+
+---
+
+(source_file
+  (longform_block
+    (block_header
+      (block_kw)
+      (header_name_rest))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))
+    (block_property
+      (property_string
+        (property_key)
+        (string))))
+  (longform_block
+    (block_header
+      (block_kw)
+      (header_name_rest))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))
+    (block_property
+      (property_string
+        (property_key)
+        (string)))))
