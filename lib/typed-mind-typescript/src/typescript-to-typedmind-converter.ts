@@ -1070,9 +1070,10 @@ export class TypeScriptToTypedMindConverter {
     // folded edges.
     const constructTargets = new Set<string>();
     for (const entity of entities) {
-      // Function and Constants carry `calls` today; U3b adds the Class and
-      // ClassFile carriers here when it folds member bodies.
-      const calls = entity instanceof FunctionNode || entity instanceof ConstantsNode ? entity.calls : [];
+      const calls =
+        entity instanceof FunctionNode || entity instanceof ConstantsNode || entity instanceof ClassNode || entity instanceof ClassFileNode
+          ? entity.calls
+          : [];
       for (const call of calls) {
         if (call.endsWith('.constructor')) constructTargets.add(call.slice(0, -'.constructor'.length));
       }
@@ -1498,6 +1499,7 @@ export class TypeScriptToTypedMindConverter {
     // (A-4: it must be a post-pass because Constants convert after functions
     // and ClassFiles before both, so every target entity exists by now).
     this.foldBodyReferences(modules);
+    this.foldClassBodyReferences(modules);
   }
 
   // RFC-TM-14 §S1 — the one target table both folds resolve against: every
@@ -1628,6 +1630,62 @@ export class TypeScriptToTypedMindConverter {
           calls: [...calls],
           consumes: consumes.size === 0 ? undefined : [...consumes],
         });
+        const index = this.entities.indexOf(entity);
+        this.entities[index] = replacement;
+        byName.set(name, replacement);
+      }
+    }
+  }
+
+  // RFC-TM-14 §S1/§S3 U3b — class member bodies (constructors, methods,
+  // property initializers, static blocks) fold into Class/ClassFile `calls`
+  // and `consumes`. Same-file gate as `foldBodyReferences`; self-construct
+  // targets are skipped (S2-8).
+  private foldClassBodyReferences(modules: readonly ParsedModule[]): void {
+    const { byName, targets, isUnique, key } = this.buildBodyReferenceTargets(modules);
+    for (const module of modules) {
+      for (const cls of module.classes) {
+        if (cls.declaration === undefined) continue;
+        const name = this.getAssignedDeclarationName(cls.declaration);
+        if (name === undefined || !isUnique(name)) continue;
+        const entity = byName.get(name);
+        if (!(entity instanceof ClassNode) && !(entity instanceof ClassFileNode)) continue;
+        const selfKey = key(cls.declaration);
+        const calls = new Set(entity.calls);
+        const consumes = new Set(entity.consumes ?? []);
+        const allReferences: readonly ParsedBodyReference[] = [
+          ...(cls.constructors ?? []).flatMap((ctor) => ctor.bodyReferences),
+          ...cls.methods.flatMap((method) => method.bodyReferences),
+          ...cls.initializerReferences,
+        ];
+        for (const reference of allReferences) {
+          if (reference.origin.kind !== 'project') continue;
+          if (reference.origin.declaration.filePath !== cls.declaration.filePath) continue;
+          const targetKey = key(reference.origin.declaration);
+          if (targetKey === selfKey) continue;
+          const target = targets.get(targetKey);
+          const edge = target === undefined ? undefined : this.bodyReferenceEdge(reference, target);
+          if (edge === undefined) continue;
+          (edge.slot === 'calls' ? calls : consumes).add(edge.entry);
+        }
+        if (calls.size === entity.calls.length && consumes.size === (entity.consumes?.length ?? 0)) continue;
+        const newCalls = [...calls];
+        const newConsumes = consumes.size === 0 ? undefined : [...consumes];
+        const memberArgs =
+          entity.members === undefined
+            ? { members: undefined as undefined, methods: entity.methods }
+            : { members: entity.members, methods: undefined as undefined };
+        const heritageArgs = { heritage: entity.heritage, extends: undefined as undefined, implements: undefined as undefined };
+        const replacement =
+          entity instanceof ClassNode
+            ? new ClassNode({ ...entity, ...heritageArgs, ...memberArgs, calls: newCalls, consumes: newConsumes })
+            : new ClassFileNode({
+                ...(entity as ClassFileNode),
+                ...heritageArgs,
+                ...memberArgs,
+                calls: newCalls,
+                consumes: newConsumes,
+              });
         const index = this.entities.indexOf(entity);
         this.entities[index] = replacement;
         byName.set(name, replacement);

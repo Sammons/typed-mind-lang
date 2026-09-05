@@ -53,6 +53,12 @@ const functionNamed = (converted: ReturnType<typeof convert>['converted'], name:
   return entity;
 };
 
+const classEntity = (converted: ReturnType<typeof convert>['converted'], name: string): ClassNode | ClassFileNode => {
+  const entity = converted.entities.find((candidate) => candidate.name === name);
+  assert.ok(entity instanceof ClassNode || entity instanceof ClassFileNode, `${name} is a Class or ClassFile`);
+  return entity;
+};
+
 it('TM14 U1: construct edge to a ClassFile is emitted and credits the class', async (context) => {
   const { converted } = convert(context, '126-same-file-construct-classfile');
   assert.ok(converted.entities.find((entity) => entity.name === 'Walker') instanceof ClassFileNode, 'Walker fused into a ClassFile');
@@ -129,4 +135,31 @@ it('TM14 D16: a class constructed only inside a private function stays orphaned 
   const readme = readFileSync(join(reprosDir, '125-private-helper-chain', 'README.md'), 'utf8');
   assert.ok(readme.includes('D-16'), 'README names the deferral');
   assert.ok(readme.includes('ParameterSource'), 'README names the live instance');
+});
+
+it('TM14 U3b: class member bodies emit calls and construct edges (R1c-conv)', async (context) => {
+  const { converted } = convert(context, '114-member-body-edges');
+  const store = classEntity(converted, 'Store');
+  assert.ok(store instanceof ClassFileNode, 'Store is fused into a ClassFile');
+  assert.deepEqual(store.calls.toSorted(), ['Cache.constructor', 'helper']);
+  assert.deepEqual([...(store.consumes ?? [])].sort(), ['ErrorTable', 'LIMIT']);
+  assert.ok(converted.tmdContent.includes('calls: [helper, Cache.constructor]'), 'calls emitted in tmd');
+  assert.ok(converted.tmdContent.includes('consumes: [ErrorTable, LIMIT]'), 'consumes emitted in tmd');
+  const orphans = await findingsOf(converted.tmdContent, 'checker/orphaned-entity');
+  for (const name of ['helper', 'Cache', 'LIMIT', 'ErrorTable']) {
+    assert.equal(orphans.includes(`Orphaned entity '${name}'`), false, `${name} is not orphaned`);
+  }
+
+  // S2-8 control: Self.make() calls new Self() but the self target is skipped.
+  const self = classEntity(converted, 'Self');
+  assert.deepEqual(self.calls, []);
+  assert.deepEqual(await findingsOf(converted.tmdContent, 'checker/orphaned-entity'), ["Orphaned entity 'Self'"]);
+});
+
+it('TM14 U3b: class member bodies emit consumes for Constants roots (R2b)', async (context) => {
+  const { converted } = convert(context, '114-member-body-edges');
+  const store = classEntity(converted, 'Store');
+  assert.deepEqual([...(store.consumes ?? [])].sort(), ['ErrorTable', 'LIMIT']);
+  // Cache is referenced via construct, not read — it does not appear in consumes.
+  assert.equal(store.consumes?.includes('Cache'), false);
 });
