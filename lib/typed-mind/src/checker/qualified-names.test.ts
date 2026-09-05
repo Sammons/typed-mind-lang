@@ -282,3 +282,54 @@ it('TM13 Q: a barrel cannot launder private exposure through a qualified export 
   const publicNames = namesFor(source.replace('Left @ left.ts:\n', 'Left @ left.ts:\n  -> [Left.Private]\n')).names;
   assert.equal(publicNames.resolve('Barrel.Left.Private').kind, 'entity');
 });
+
+it('TM13 Q+B1: signature-only qualified aliases use canonical declarations without leaking binders', () => {
+  const { outcome } = namesFor('File @ file.ts:\n  -> [Payload]\nPayload %\nT %\nCaller :: <T>(input: File.Payload, value: T) => void\n');
+  const context = new CheckContext({ entities: outcome.entities, links: computeLinks(outcome.entities), parseDiagnostics: [] });
+  checkOrphans(context);
+  assert.equal(
+    context.findings.some((finding) => finding.message === "Orphaned entity 'Payload'"),
+    false,
+  );
+  assert.equal(
+    context.findings.some((finding) => finding.message === "Orphaned entity 'T'"),
+    true,
+  );
+});
+
+it('TM13 Q: callable ClassFile methods do not become implicitly importable or cyclic', () => {
+  const source =
+    'Service #: service.ts\n  <- [Service]\n  => [run]\nConsumer @ consumer.ts:\n  <- [Service.run]\nCaller :: () => void\n  ~> [Service.run]\n';
+  const { names, outcome } = namesFor(source);
+  assert.equal(names.resolve('Service.run').kind, 'member');
+  const imported = names.resolve('Service.run', { importingFile: 'Consumer' });
+  assert.equal(imported.kind, 'unresolved');
+  if (imported.kind === 'unresolved') assert.equal(imported.reason, 'private-member');
+  const findings = findingsFor(source);
+  assert.equal(findings.filter((finding) => finding.code === 'checker/qualified-name-unresolved').length, 1);
+  assert.equal(
+    findings.some((finding) => finding.code === 'checker/circular-import' && finding.message.includes('Consumer')),
+    false,
+  );
+  assert.equal(
+    computeLinks(outcome.entities)
+      .referencedBy('Service')
+      .some((link) => link.from === 'Consumer'),
+    false,
+  );
+  const exportedDeclaration = source.replace('  => [run]\n', '  => [run]\n  -> [Service.run]\nService.run :: () => void\n');
+  assert.equal(namesFor(exportedDeclaration).names.resolve('Service.run', { importingFile: 'Consumer' }).kind, 'entity');
+});
+
+it('TM13 Q: external export and Constants field membership do not establish callable kinds', () => {
+  const source =
+    'External ^ "external"\n  -> [Item]\nShape %\n  - run: string\nConfig ! config.ts : Shape\nCaller :: () => void\n  ~> [External.Item, Config.run]\n';
+  const findings = findingsFor(source);
+  assert.deepEqual(
+    findings
+      .filter((finding) => finding.code === 'checker/reference-to-illegal')
+      .map((finding) => finding.message)
+      .sort(),
+    ["Cannot use 'calls' to reference Constants 'Config'", "Cannot use 'calls' to reference Dependency 'External'"],
+  );
+});

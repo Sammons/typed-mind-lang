@@ -28,9 +28,9 @@ describe('Scenario 53: ClassFile Inheritance Edge Cases', () => {
     const orphanedErrors = result.diagnostics.filter((diagnostic) => diagnostic.message.includes('Orphaned entity'));
     assert.ok(orphanedErrors.length > 0);
 
-    // Should find ClassFile reference errors
+    // Q permits the two verified ClassFile method calls.
     const callsErrors = result.diagnostics.filter((diagnostic) => diagnostic.message.includes("Cannot use 'calls' to reference ClassFile"));
-    assert.ok(callsErrors.length > 0);
+    assert.equal(callsErrors.length, 0);
 
     // Inheriting from non-existent class
     const nonExistentBaseError = result.diagnostics.find(

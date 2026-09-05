@@ -56,7 +56,7 @@ export const checkSingleReference = (context: CheckContext, from: EntityNode, re
         ? context.resolveExport(from.name, targetName, from.span)
         : context.resolveName(targetName, from.span, referenceKind === 'imports' ? from.name : undefined);
   // Dependency exports represent external types/members without a local kind.
-  if (result.kind === 'external') return;
+  if (result.kind === 'external' && referenceKind !== 'calls') return;
   const target =
     resolvedNameTarget(result) ??
     (referenceKind === 'calls' && result.kind === 'unresolved' && !result.ownerName.includes('.')

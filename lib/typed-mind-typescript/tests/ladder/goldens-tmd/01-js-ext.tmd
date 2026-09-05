@@ -1,17 +1,17 @@
-program Main__App {
+program MainApp {
   type: Program
   entry: MainFile
   version: 1.0.0
   exports: [mainFn]
 }
 
+HelperFile @ src/helper.ts:
+  -> [helperFn]
+
 MainFile @ src/main.ts:
   <- [helperFn]
   -> [mainFn]
 
-HelperFile @ src/helper.ts:
-  -> [helperFn]
+helperFn :: helperFn() => string
 
 mainFn :: mainFn() => string
-
-helperFn :: helperFn() => string

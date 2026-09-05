@@ -1,52 +1,9 @@
-// Fixture 77 — itp-maker ladder rung. PARTIAL FIX: the declaration half is
-// closed by decision-same-named-entities PR 1; the reference-following half
-// remains a KNOWN GAP and this fixture stays its pin.
-//
-// THE GAP: two files that each independently declare an interface with
-// the same bare name collide in a single GLOBAL entity namespace, and the
-// whole conversion reports failure. `convertInterfaceToDTO` derives the
-// entity name via `createEntityName(iface.name)`, which is the identity
-// function (`types.ts`, no module or file qualification), then rejects on
-// `this.entityNames`, a set spanning the entire conversion run. The
-// second declaration raises `Duplicate entity name`, `convert()` returns
-// `success: false`, and the CLI writes partial output only.
-//
-// Live evidence: itp-maker `functions/save-job.ts:58` +
-// `functions/lib/job-store.ts:58` each declare their own
-// `export interface JobRecord` (customer-facing shape vs. stored shape),
-// and `save-job.ts` imports the store's version ALIASED
-// (`JobRecord as JobStoreRecord`) without re-exporting it. The save-job
-// entrypoint fails conversion with 2 duplicate-name errors
-// (`JobRecord`, `PushHistoryEntry`) and emits partial output.
-//
-// NOT the deferred barrel/multi-exported re-export shape: `isReExport`
-// gates on `exportItem.source !== undefined` and never fires here,
-// because neither declaration has a `from` clause at all. The collision
-// is purely in the global DTO-entity namespace.
-//
-// WHAT PR 1 CHANGED. `reserveTypeEntityNames` is a whole-run pre-pass that
-// resolves a cross-module bare-name collision to a deterministic
-// module-qualified name, reusing `reserveFunctionEntityNames`'s `__`
-// convention. Conversion now COMPLETES: `success: true`, no `Duplicate
-// entity name` error, and BOTH declarations survive as `JobRecord` (the
-// first declarer, bare) and `JobStore__JobRecord` (the second, qualified),
-// each carrying its own fields. The collision is reported as a warning
-// naming both paths. The three MECHANICAL reference sites follow the
-// rename — this fixture's `MainFile` imports `JobStore__JobRecord` and
-// `JobStoreFile` exports it, both resolved through
-// `resolveImportToEntity`/`convertExports` from the analyzer's own module
-// graph, with no type-origin inference needed.
-//
-// WHAT REMAINS THE GAP, and what this fixture still pins: the reference
-// sites holding RAW TYPE TEXT. `getTypeString` (typescript-analyzer.ts) is
-// a bare `typeNode.getText()` and `types.ts` carries no resolved-type-origin
-// field, so `saveJob(record: JobRecord)` cannot be resolved to a declaring
-// module without PR 2's TypeChecker plumbing. Those references stay bare in
-// the interim, and PR 1 emits a warning at each one so the window is
-// visible rather than inferred from a downstream checker finding.
-//
-// The assertions below CHARACTERIZE that interim state. When PR 2 lands
-// they fail by design — that is the signal to re-pin them.
+// Fixture77, distilled from itp-maker: independent same-name interfaces and
+// an aliased import. E retains both declarations under distinct owned names;
+// A2 uses exact source identities for parameter, return and DTO I/O references.
+// Both original shapes survive and the original fixture checks clean.
+// converter-type-references.test.ts removes origins to restore the exact
+// previous missing JobStoreRecord output finding and original output bytes.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -65,7 +22,7 @@ const convert = () => {
   return converter.convert(analysis);
 };
 
-describe('fixture 77: same-named interfaces in two files — declaration renamed (PR 1), references still bare (PR 2 gap)', () => {
+describe('fixture 77: same-named interfaces in two files — distinct declarations and references resolve by source identity', () => {
   it('both files really do declare their own JobRecord — the fixture reproduces the real shape', () => {
     const analyzer = new TypeScriptAnalyzer(fixtureDir);
     const analysis = analyzer.analyzeFromEntrypoint(join(fixtureDir, 'src', 'main.ts'));
@@ -104,7 +61,7 @@ describe('fixture 77: same-named interfaces in two files — declaration renamed
     assert.deepEqual(
       collisionWarnings.map((warning) => (warning as { message: string }).message),
       [
-        "Duplicate entity name 'JobRecord' declared in both 'src/job-store.ts' and 'src/main.ts'; the declaration whose file path sorts first kept the bare name, so 'src/main.ts' was renamed to 'Main__JobRecord'. TypedMind entity names are global to a document.",
+        "Duplicate entity name 'JobRecord' declared in both 'src/job-store.ts' and 'src/main.ts'; the declaration whose file path sorts first kept the bare name, so 'src/main.ts' was renamed to 'MainFile.JobRecord'. TypedMind entity names are global to a document.",
       ],
       'exactly one collision warning, naming both declaring paths and the resulting qualified name',
     );
@@ -121,14 +78,14 @@ describe('fixture 77: same-named interfaces in two files — declaration renamed
 
     assert.deepEqual(
       jobRecordDtos,
-      ['JobRecord', 'Main__JobRecord'],
+      ['JobRecord', 'MainFile.JobRecord'],
       'src/job-store.ts sorts first so it keeps the bare name; src/main.ts is qualified by its sanitized module basename',
     );
 
     // Each keeps its OWN fields — the collision loser is a real, distinct
     // entity, not the survivor wearing the wrong module's shape (which is
     // precisely what `createConstantEntity`'s old silent-skip produced).
-    const qualified = result.entities.find((entity) => (entity as { name: string }).name === 'Main__JobRecord');
+    const qualified = result.entities.find((entity) => (entity as { name: string }).name === 'MainFile.JobRecord');
     assert.deepEqual(
       (qualified as { fields: { name: string }[] }).fields.map((field) => field.name),
       ['id', 'title'],
@@ -157,7 +114,7 @@ describe('fixture 77: same-named interfaces in two files — declaration renamed
       `main.ts must import job-store.ts's bare-name entity: ${JSON.stringify((mainFile as { imports: string[] }).imports)}`,
     );
     assert.ok(
-      (mainFile as { exports: string[] }).exports.includes('Main__JobRecord'),
+      (mainFile as { exports: string[] }).exports.includes('MainFile.JobRecord'),
       `main.ts must export its OWN renamed entity: ${JSON.stringify((mainFile as { exports: string[] }).exports)}`,
     );
 
@@ -168,26 +125,24 @@ describe('fixture 77: same-named interfaces in two files — declaration renamed
     );
   });
 
-  it('STILL THE GAP (PR 2): raw type-text references stay bare, and each one warns', () => {
+  it('FIXED (A2): type references resolve the exact declaring module without interim warnings', () => {
     const result = convert();
 
-    // `saveJob(record: JobRecord)` and `readJob(...): JobRecord` are raw
-    // source text. PR 1 cannot resolve which module's `JobRecord` each names,
-    // so both stay bare — and each emits an interim-window warning.
+    // The two source declarations retain distinct identities through aliases.
     const saveJob = result.entities.find((entity) => (entity as { name: string }).name === 'saveJob');
-    assert.equal((saveJob as { input?: string }).input, 'JobRecord', "saveJob's input stays the BARE name — reference-following is PR 2");
+    assert.equal((saveJob as { input?: string }).input, 'MainFile.JobRecord', "saveJob's input references its own source declaration");
 
     const interimWarnings = result.warnings
       .map((warning) => (warning as { message: string }).message)
       .filter((message) => message.startsWith("Reference to 'JobRecord'"));
     assert.equal(
       interimWarnings.length,
-      2,
-      `each unresolved reference must warn so the interim window is visible: ${JSON.stringify(interimWarnings)}`,
+      0,
+      `resolved references no longer carry interim collision warnings: ${JSON.stringify(interimWarnings)}`,
     );
   });
 
-  it('STILL THE GAP (PR 2): the emitted .tmd is free of duplicate-name and multi-exported findings', async () => {
+  it('FIXED (A2): the original aliased-import fixture checks clean', async () => {
     const result = convert();
 
     const typedMind = await TypedMind.create();
@@ -203,13 +158,7 @@ describe('fixture 77: same-named interfaces in two files — declaration renamed
       `no duplicate-name and no multi-exported finding may survive the rename: ${JSON.stringify(checkResult.diagnostics)}`,
     );
 
-    // The residual is the aliased-import shape this fixture was built for
-    // (`JobRecord as JobStoreRecord`), which PR 2 closes — pinned exactly so
-    // any OTHER finding appearing here fails.
-    assert.deepEqual(
-      codes,
-      ['checker/output-dto-not-found'],
-      `the only residual is the aliased-import gap PR 2 owns: ${JSON.stringify(checkResult.diagnostics)}`,
-    );
+    // A2 resolves JobRecord as JobStoreRecord to the actual DTO; no residual remains.
+    assert.deepEqual(codes, [], `the only residual is the aliased-import gap PR 2 owns: ${JSON.stringify(checkResult.diagnostics)}`);
   });
 });

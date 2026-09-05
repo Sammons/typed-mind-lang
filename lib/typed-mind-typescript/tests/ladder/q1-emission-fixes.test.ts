@@ -6,16 +6,16 @@
 //   - D-LEG-2 (issue #65): Pick<S3Client, "send"> in a DTO field AND a
 //     function-signature return type synthesizes an S3Client
 //     Dependency-exports stub.
-//   - D-LEG-3 (issue #61): implements ts.ParseConfigFileHost sanitizes to
-//     a representable stub (TsParseConfigFileHost), self-extraction's
-//     namespace-qualified implements line clears.
+//   - D-LEG-3 (issue #61), refined by A2: a proven external heritage name
+//     resolves through its actual Dependency export; missing provenance
+//     retains the existing sanitized stub fallback.
 //   - D-LEG-4 (issue #60): a two-paragraph JSDoc comment collapses to its
 //     whitespace-normalized first paragraph only.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
+import { DependencyNode, FileNode, SyntaxEmitter, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
@@ -110,25 +110,39 @@ describe('RFC-TM-10 Q1 check — D-LEG-2: generic type-argument Dependency stubs
   });
 });
 
-describe('RFC-TM-10 Q1 check — D-LEG-3: namespace-qualified implements sanitized stub', () => {
-  it('implements ts.ParseConfigFileHost sanitizes to a representable TsParseConfigFileHost stub', () => {
-    const analyzer = new TypeScriptAnalyzer(fixturePath('27-namespace-implements'));
-    const analysis = analyzer.analyzeFromEntrypoint(fixturePath('27-namespace-implements', 'src', 'main.ts'));
-    const converter = new TypeScriptToTypedMindConverter();
-    const result = converter.convert(analysis);
+describe('RFC-TM-10 Q1 check — D-LEG-3: namespace-qualified implements resolution', () => {
+  it('TM13 A2: proven package heritage replaces a synthetic stub with the actual dependency member', async () => {
+    const analysis = new TypeScriptAnalyzer(fixturePath('27-namespace-implements')).analyzeFromEntrypoint(
+      fixturePath('27-namespace-implements', 'src', 'main.ts'),
+    );
+    const result = new TypeScriptToTypedMindConverter().convert(analysis);
     assert.equal(result.success, true);
-
-    const stub = result.entities.find((e) => e.name === 'TsParseConfigFileHost') as
-      | { kind: string; methods: readonly string[] }
-      | undefined;
-    assert.notEqual(stub, undefined, 'a sanitized stub named TsParseConfigFileHost must be synthesized');
+    assert.equal(
+      result.entities.some((entity) => entity.name === 'TsParseConfigFileHost'),
+      false,
+    );
+    const dependency = result.entities.find((entity) => entity.kind === 'Dependency');
+    assert.ok(dependency instanceof DependencyNode);
+    assert.deepEqual(dependency.exports, ['ParseConfigFileHost']);
+    assert.ok(result.tmdContent.includes('CollectingParseConfigHost <: Typescript.ParseConfigFileHost'));
+    const owner = result.entities.find((entity) => entity.kind === 'File');
+    assert.ok(owner instanceof FileNode);
+    assert.deepEqual(owner.exports, ['CollectingParseConfigHost'], 'the dependency member is not falsely exported by this file');
+    const control = new TypeScriptToTypedMindConverter().convert({
+      ...analysis,
+      modules: analysis.modules.map((module) => ({
+        ...module,
+        classes: module.classes.map((cls) => ({ ...cls, implementsTypeInfo: undefined })),
+      })),
+    });
+    const stub = control.entities.find((entity) => entity.name === 'TsParseConfigFileHost');
     assert.equal(stub?.kind, 'Class');
-    assert.equal(stub?.methods.length, 0, 'the stub carries zero methods, matching X-CONV-5s zero-methods shape');
-
-    assert.equal(result.tmdContent.includes('ts.ParseConfigFileHost'), false, 'the raw dotted name must never appear verbatim');
+    const tm = await TypedMind.create();
+    assert.deepEqual(tm.check(result.tmdContent).diagnostics, []);
+    assert.deepEqual(tm.check(control.tmdContent).diagnostics, []);
   });
 
-  it('the class implementing the namespace-qualified interface references the sanitized stub, zero parse errors', async () => {
+  it('the class implementing the namespace-qualified interface keeps zero parse errors', async () => {
     const analyzer = new TypeScriptAnalyzer(fixturePath('27-namespace-implements'));
     const analysis = analyzer.analyzeFromEntrypoint(fixturePath('27-namespace-implements', 'src', 'main.ts'));
     const converter = new TypeScriptToTypedMindConverter();
