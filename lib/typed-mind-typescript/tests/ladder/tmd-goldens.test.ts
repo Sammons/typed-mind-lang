@@ -314,16 +314,12 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
-  // 88 records `false`: it is a knownGap fixture. `export default <identifier>`
-  // never reaches the export registry, so the route file's exports go unimported
-  // and the checker reports the orphan. Root cause and the reason it is not
-  // fixed here (two layers plus a missing constant-name reservation pass) are in
-  // repros-analyzer/88-export-assignment-default/README.md.
+  // RFC-TM-13 D/F: canonical default identity and actual initializer call close fixture88.
   {
     fixture: '88-export-assignment-default',
     entrySegments: ['src', 'index.ts'],
     expectConversionSuccess: true,
-    recordedCheckerValid: false,
+    recordedCheckerValid: true,
   },
   // 89 records `true`: the barrel no longer double-claims its re-exported
   // names, so the fixture checks clean end to end.

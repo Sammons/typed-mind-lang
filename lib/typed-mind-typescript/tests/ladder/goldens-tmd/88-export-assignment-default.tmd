@@ -6,11 +6,11 @@ program IndexApp {
 }
 
 IndexFile @ src/index.ts:
-  <- [namedHelper]
+  <- [HealthFile.default, namedHelper]
   -> [createApi]
 
 HealthFile @ src/routes/health.ts:
-  -> [HealthStatus, buildHealthStatus]
+  -> [HealthStatus, buildHealthStatus, HealthFile.default]
 
 HelperFile @ src/routes/helper.ts:
   -> [namedHelper]
@@ -24,3 +24,6 @@ namedHelper :: namedHelper() => string
 
 HealthStatus %
   - status: string
+
+HealthFile.default ! src/routes/health.ts
+  ~> [buildHealthStatus]

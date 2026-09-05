@@ -185,6 +185,7 @@ export interface ParsedImport {
 }
 
 export interface ParsedExport {
+  readonly declaration?: DeclarationIdentity;
   readonly name: string;
   readonly isDefault: boolean;
   // X-AN-3: 'namespace-reexport' models `export * from '<source>'` — `name`
@@ -291,7 +292,8 @@ export interface AnalyzerDiagnostic {
     | 'zero-entities'
     | 'recognizer-not-found'
     | 'recognizer-module-standalone-parsed'
-    | 'unresolved-factory-heritage';
+    | 'unresolved-factory-heritage'
+    | 'unsupported-default-export';
   readonly message: string;
   readonly filePath: string | undefined;
   readonly specifier: string | undefined;
