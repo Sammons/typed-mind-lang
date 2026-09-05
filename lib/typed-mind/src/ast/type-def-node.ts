@@ -10,6 +10,7 @@
 
 import { EntityNode, type EntityNodeArgs } from './entity-node.ts';
 import type { TypeExprNode } from './type-expr-node.ts';
+import type { TypeParameterNode } from './type-parameter-node.ts';
 
 export class TypeDefNode extends EntityNode {
   override readonly kind = 'TypeDef' as const;
@@ -19,18 +20,20 @@ export class TypeDefNode extends EntityNode {
   // Present only when variant === 'alias'; absent for 'enum'.
   readonly aliasType: TypeExprNode | undefined;
   readonly purpose: string | undefined;
+  readonly typeParameters: readonly TypeParameterNode[] | undefined;
 
   constructor(
     args: EntityNodeArgs &
       (
         | { variant: 'enum'; members: readonly string[]; aliasType?: undefined }
         | { variant: 'alias'; aliasType: TypeExprNode; members?: undefined }
-      ) & { purpose?: string },
+      ) & { purpose?: string; typeParameters?: readonly TypeParameterNode[] },
   ) {
     super(args);
     this.variant = args.variant;
     this.members = args.variant === 'enum' ? args.members : undefined;
     this.aliasType = args.variant === 'alias' ? args.aliasType : undefined;
     this.purpose = args.purpose;
+    this.typeParameters = args.typeParameters;
   }
 }
