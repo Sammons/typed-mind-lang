@@ -133,6 +133,8 @@ if (!assertion.success) {
 | Import/Export | File imports/exports | Dependency tracking |
 | Const/Enum | Constants | Configuration data |
 
+For collision handling, qualified ownership, and generated names, see [Emitted identities](NAMING.md).
+
 ## ClassFile Fusion
 
 When `preferClassFile` is true (default), the converter detects service/controller patterns:

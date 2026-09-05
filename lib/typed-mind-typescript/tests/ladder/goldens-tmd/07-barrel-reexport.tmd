@@ -1,13 +1,9 @@
-program Main__App {
+program MainApp {
   type: Program
   entry: MainFile
   version: 1.0.0
   exports: [mainFn]
 }
-
-MainFile @ src/main.ts:
-  <- [makeWidget, IndexFile]
-  -> [mainFn]
 
 IndexFile @ src/lib/index.ts:
   <- [makeWidget]
@@ -16,6 +12,10 @@ IndexFile @ src/lib/index.ts:
 WidgetFile @ src/lib/widget.ts:
   -> [makeWidget]
 
-mainFn :: mainFn() => string
+MainFile @ src/main.ts:
+  <- [makeWidget, IndexFile]
+  -> [mainFn]
 
 makeWidget :: makeWidget() => string
+
+mainFn :: mainFn() => string
