@@ -996,6 +996,7 @@ export class TypeScriptAnalyzer {
         if (this.hasExportModifier(node)) {
           exports.push({
             name: func.name,
+            declaration: func.declaration,
             isDefault: this.hasDefaultModifier(node),
             type: 'function',
             source: undefined,
@@ -1012,6 +1013,7 @@ export class TypeScriptAnalyzer {
         if (this.hasExportModifier(node)) {
           exports.push({
             name: cls.name,
+            declaration: cls.declaration,
             isDefault: this.hasDefaultModifier(node),
             type: 'class',
             source: undefined,
@@ -1024,6 +1026,7 @@ export class TypeScriptAnalyzer {
         if (this.hasExportModifier(node)) {
           exports.push({
             name: iface.name,
+            declaration: iface.declaration,
             isDefault: false,
             type: 'interface',
             source: undefined,
@@ -1036,6 +1039,7 @@ export class TypeScriptAnalyzer {
         if (this.hasExportModifier(node)) {
           exports.push({
             name: typeAlias.name,
+            declaration: typeAlias.declaration,
             isDefault: false,
             type: 'type',
             source: undefined,
@@ -1054,6 +1058,7 @@ export class TypeScriptAnalyzer {
           for (const func of arrowFunctions) {
             exports.push({
               name: func.name,
+              declaration: func.declaration,
               isDefault: false,
               type: 'function',
               source: undefined,
@@ -1062,6 +1067,7 @@ export class TypeScriptAnalyzer {
           for (const constant of plainConstants) {
             exports.push({
               name: constant.name,
+              declaration: constant.declaration,
               isDefault: false,
               type: 'constant',
               source: undefined,
@@ -1081,6 +1087,7 @@ export class TypeScriptAnalyzer {
         if (this.hasExportModifier(node)) {
           exports.push({
             name: parsedEnum.name,
+            declaration: parsedEnum.declaration,
             isDefault: false,
             type: 'type',
             source: undefined,
@@ -1346,11 +1353,13 @@ export class TypeScriptAnalyzer {
     }
 
     const namedImports: string[] = [];
+    const bindings: NonNullable<ParsedImport['bindings']>[number][] = [];
     let defaultImport: string | undefined;
     let namespaceImport: string | undefined;
 
     if (importClause.name) {
       defaultImport = importClause.name.text;
+      bindings.push({ localName: defaultImport, exportName: 'default', origin: this.resolveReferenceOriginAtLocation(importClause.name) });
     }
 
     if (importClause.namedBindings) {
@@ -1369,6 +1378,11 @@ export class TypeScriptAnalyzer {
           // The exported name is what the export registry is keyed by, so
           // that is what the import edge must carry.
           namedImports.push((element.propertyName ?? element.name).text);
+          bindings.push({
+            localName: element.name.text,
+            exportName: (element.propertyName ?? element.name).text,
+            origin: this.resolveReferenceOriginAtLocation(element.name),
+          });
         }
       }
     }
@@ -1379,6 +1393,7 @@ export class TypeScriptAnalyzer {
       namedImports,
       namespaceImport: namespaceImport || undefined,
       isTypeOnly: importClause.isTypeOnly || false,
+      bindings,
     } as const;
   }
 

@@ -190,6 +190,8 @@ export interface ParsedModule {
 }
 
 export interface ParsedImport {
+  /** Checker-proven identities of actual named/default import bindings. */
+  readonly bindings?: readonly { readonly localName: string; readonly exportName: string; readonly origin: ReferenceOrigin }[];
   readonly specifier: string;
   readonly defaultImport: string | undefined;
   readonly namedImports: readonly string[];
