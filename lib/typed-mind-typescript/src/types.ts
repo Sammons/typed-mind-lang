@@ -252,6 +252,15 @@ export interface ParsedConstant {
   // (so `read` entries are recorded too; the converter's Constants fold reads
   // only `call`/`construct`, per §S1: Constants have no `consumes` carrier).
   readonly callReferences?: readonly ParsedBodyReference[];
+  // RFC-TM-14 §S5 R6b — checker-read schema for a call/new initializer with
+  // explicit type arguments and no annotation. The analyzer reads
+  // `checker.getTypeAtLocation(declaration.name)` and maps it structurally
+  // via `printCheckerType`. Undefined when the initializer has no type args,
+  // has an explicit annotation, or the type is unsupported.
+  readonly checkerReadSchema?: ParsedTypeText;
+  // True when `printCheckerType` was attempted but the type was unsupported
+  // (conditional, mapped, any, error). The converter emits a warning.
+  readonly checkerReadUnsupported?: boolean;
 }
 
 // RFC-TM-14 §S1 frozen contract — one reference found by the shared body
