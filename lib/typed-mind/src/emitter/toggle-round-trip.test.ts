@@ -598,7 +598,7 @@ describe('TypeDef alias shape classes: a longform toggle round-trips exactly or 
         [],
         `"${shapeClass.name}" must reparse cleanly. Emitted:\n${longform}\ndiagnostics: ${JSON.stringify(syntaxDiagnostics)}`,
       );
-      // The assertion the knownGap mechanism structurally cannot make: zero
+      // The assertion a diagnostics-only check structurally cannot make: zero
       // diagnostics is only acceptable when the AST actually survived.
       assert.deepEqual(
         aliasTypesOf(reparsed),

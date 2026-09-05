@@ -7,7 +7,7 @@
 //
 // Root cause (language/grammar layer): a class fused into a ClassFile recorded
 // its methods as BARE NAMES only — `ClassFileNode.methods` is
-// `readonly string[]` (lib/typed-mind/src/ast/class-file-node.ts:14) — so
+// `readonly string[]` (lib/typed-mind/src/ast/class-file-node.ts:15) — so
 // every type reachable ONLY through a method signature had no referent. The
 // ClassFile's `-> [...]` export list did name them, but `check-orphans.ts`
 // deliberately does not count exports as references (its own header states
