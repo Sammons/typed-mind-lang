@@ -3,6 +3,11 @@ const PRIMITIVES = [
   'number',
   'boolean',
   'object',
+  // Intrinsic type keywords also appear in generic bounds and typed members.
+  'unknown',
+  'never',
+  'bigint',
+  'symbol',
   'any',
   'void',
   'null',

@@ -205,3 +205,33 @@ it('G.4/B3 generic agreement ignores observational quoted-source offsets', () =>
   checkGenericDeclarations(context);
   assert.deepEqual(context.findings, []);
 });
+
+it('TM13 EXIT: intrinsic keywords resolve in generic and member slots without hiding named types', async () => {
+  const context = await inspect(`Data %
+Unknown %
+Unused %
+class Api {
+  typeParameter: "T extends unknown = never"
+  constructor: "(details?: unknown)"
+  method: "process(value: T, data: Data, named: Unknown, key: symbol, count: bigint) => unknown"
+  method: "fail() => never"
+}
+`);
+  assert.deepEqual(genericErrors(context), []);
+  assert.deepEqual(orphans(context), ["Orphaned entity 'Api'", "Orphaned entity 'Unused'"]);
+  assert.equal(context.links.referencedBy('Data').length, 1);
+  assert.equal(context.links.referencedBy('Unknown').length, 1);
+  const wrongKind = await inspect('unknown :: unknown() => void\nclass Api {\n method: "process(value: unknown) => void"\n}\n');
+  assert.deepEqual(
+    genericErrors(wrongKind).map((finding) => finding.code),
+    ['checker/generic-non-data-type'],
+  );
+  const missing = await inspect('class Api {\n method: "process(value: unkown, named: Unknown) => never"\n}\n');
+  assert.deepEqual(
+    genericErrors(missing).map(({ code, message }) => ({ code, message })),
+    [
+      { code: 'checker/generic-unknown-type', message: "Generic declaration 'Api' references undefined type 'unkown'" },
+      { code: 'checker/generic-unknown-type', message: "Generic declaration 'Api' references undefined type 'Unknown'" },
+    ],
+  );
+});
