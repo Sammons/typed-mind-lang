@@ -13,6 +13,7 @@ import {
   FunctionNode,
   type ParseOutput,
   ProgramNode,
+  QualifiedNameResolver,
   UiComponentNode,
 } from '@sammons/typed-mind';
 
@@ -76,12 +77,14 @@ export interface Risk {
 export class GraphMetricsAnalyzer {
   private entities: readonly EntityNode[];
   private entityMap: Map<string, EntityNode>;
+  private names: QualifiedNameResolver;
   private dependencyGraph: Map<string, Set<string>> = new Map();
   private reverseDependencyGraph: Map<string, Set<string>> = new Map();
 
   constructor(graph: ParseOutput) {
     this.entities = graph.entities;
     this.entityMap = new Map(this.entities.map((e) => [e.name, e]));
+    this.names = new QualifiedNameResolver(this.entityMap);
     this.buildDependencyGraphs();
   }
 
@@ -482,7 +485,12 @@ export class GraphMetricsAnalyzer {
     if (entity instanceof FileNode || entity instanceof ClassFileNode) {
       entity.imports.forEach(addDependency);
     } else if (entity instanceof FunctionNode) {
-      entity.calls.forEach(addDependency);
+      // RFC-TM-14 §S2 — a qualified call (`Owner.constructor`, `Owner.method`)
+      // depends on its resolved owner, not on the raw dotted string.
+      for (const call of entity.calls) {
+        const target = this.names.target(call);
+        if (target !== undefined) addDependency(target.name);
+      }
       if (entity.input) addDependency(entity.input);
       if (entity.output) addDependency(entity.output);
       entity.consumes?.forEach(addDependency);

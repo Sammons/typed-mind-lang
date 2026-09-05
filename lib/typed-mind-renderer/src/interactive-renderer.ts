@@ -278,7 +278,10 @@ ${classMethods}
 
       if (entity instanceof FunctionNode || entity instanceof ConstantsNode) {
         for (const call of entity.calls) {
-          const target = entity instanceof ConstantsNode ? names.target(call)?.name : byName.get(call)?.name;
+          // RFC-TM-14 §S2 — call entries resolve through the qualified-name
+          // resolver so `Owner.constructor` and `Owner.method` draw an edge
+          // to the owner, as the Constants arm already did (TM13 F+Q).
+          const target = names.target(call)?.name;
           if (target !== undefined) {
             links.push({ source: entity.name, target, type: 'call' });
           }

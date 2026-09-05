@@ -18,6 +18,10 @@ export type QualifiedNameResolution =
       readonly reason: 'missing-name' | 'missing-owner' | 'invalid-owner' | 'missing-member' | 'private-member';
     };
 
+// The implicit member of every Class and ClassFile (RFC-TM-14 §S2). Member
+// tables in this resolver are `Map`s, so the prototype key is inert here.
+export const CONSTRUCTOR_MEMBER = 'constructor';
+
 export const resolvedNameTarget = (result: QualifiedNameResolution): EntityNode | undefined => {
   switch (result.kind) {
     case 'entity':
@@ -153,7 +157,10 @@ export class QualifiedNameResolver {
           return { kind: 'entity', entity: target };
         }
       }
-      if (owner instanceof ClassFileNode && owner.methods.includes(member)) {
+      // RFC-TM-14 §S2 — `constructor` is the member every class has; a
+      // construct edge is `~> [Owner.constructor]`. It ranks below declared and
+      // exported members and above the methods list. A plain File has none.
+      if (owner instanceof ClassFileNode && (member === CONSTRUCTOR_MEMBER || owner.methods.includes(member))) {
         if (
           options.importingFile !== undefined &&
           options.importingFile !== ownerName &&
@@ -176,7 +183,7 @@ export class QualifiedNameResolver {
       ) {
         return failure('private-member');
       }
-      return owner.methods.includes(member) ? { kind: 'member', owner, member } : failure('missing-member');
+      return member === CONSTRUCTOR_MEMBER || owner.methods.includes(member) ? { kind: 'member', owner, member } : failure('missing-member');
     }
     if (owner instanceof ConstantsNode) {
       const schema = owner.schema === undefined ? undefined : resolvedNameTarget(this.resolveWithState(owner.schema, {}, active));
