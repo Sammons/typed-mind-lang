@@ -4010,7 +4010,9 @@ export class TypeScriptToTypedMindConverter {
   // same finding shape the ambient-global leak (`String`) produced before
   // the analyzer-side filter. Both filters together make Program.exports
   // ⊆ {entities this document contains}. Names are the raw source names;
-  // `createProgramEntity` unions them with the already-remapped public
+  // `createProgramEntity` resolves each through `remapEntrypointExportName`
+  // (Q10 — a collision-renamed entrypoint declaration is emitted as
+  // `<FileEntity>.<name>`) before unioning with the already-remapped public
   // export list, which contains every exported function of the entrypoint.
   // The `?? []` mirrors the previous call-site tolerance (and
   // `hasTopLevelCallbackRegistration ?? false`): hand-built ParsedModule
