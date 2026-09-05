@@ -44,7 +44,25 @@ for (const [relativePath, names] of cases) {
     // Retain names, spans, input/output, calls and all other entity fields.
     // Only the signature's type-reference lane is removed in these clones.
     const control = validate(
-      entities.map((entity) => (entity instanceof FunctionNode ? new FunctionNode({ ...entity, signature: '() => void' }) : entity)),
+      entities.map((entity) =>
+        entity instanceof FunctionNode
+          ? new FunctionNode({
+              name: entity.name,
+              span: entity.span,
+              raw: entity.raw,
+              sourceForm: entity.sourceForm,
+              signature: '() => void',
+              calls: entity.calls,
+              pendingDependencies: entity.pendingDependencies,
+              ...(entity.comment === undefined ? {} : { comment: entity.comment }),
+              ...(entity.description === undefined ? {} : { description: entity.description }),
+              ...(entity.input === undefined ? {} : { input: entity.input }),
+              ...(entity.output === undefined ? {} : { output: entity.output }),
+              ...(entity.affects === undefined ? {} : { affects: entity.affects }),
+              ...(entity.consumes === undefined ? {} : { consumes: entity.consumes }),
+            })
+          : entity,
+      ),
     );
     const restored = control.filter((finding) => !current.some((present) => JSON.stringify(present) === JSON.stringify(finding)));
     assert.deepEqual(
