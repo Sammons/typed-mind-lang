@@ -156,6 +156,7 @@
     "bundle-lsp": "cd ../typed-mind-lsp && pnpm run build:bundled && cd - && rm -rf ./lsp-bundled && cp -r ../typed-mind-lsp/dist-bundled ./lsp-bundled",
     "dev": "tsup --watch",
     "package": "vsce package --no-dependencies",
+    "pretest": "pnpm --filter @sammons/typed-mind run build && pnpm --filter @sammons/typed-mind-renderer run build",
     "test": "node --test 'src/**/*.test.ts'",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
