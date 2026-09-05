@@ -100,6 +100,10 @@ export {
   type SignatureTypePosition,
 } from './pipeline/parse-signature-text.ts';
 export { parseTypeParameterListText, parseTypeParameterText } from './pipeline/parse-type-parameters.ts';
+// RFC-TM-13 residual R7/R8 — the ambient-type allowlist is shared with the
+// TypeScript converter (`isDTOLikeType`) so core and converter agree on which
+// names never denote a project DTO; one table, exported here, never copied.
+export { AMBIENT_PLATFORM_TYPES, isAmbientPlatformType } from './pipeline/type-builtins.ts';
 export { type ParseTypeExprTextOptions, type ParseTypeExprTextResult, parseTypeExprText } from './pipeline/type-expr-from-text.ts';
 export { walkClassMemberTypeReferences } from './pipeline/type-reference-walk.ts';
 export { canonicalizeTypeText } from './pipeline/type-text-lexical.ts';

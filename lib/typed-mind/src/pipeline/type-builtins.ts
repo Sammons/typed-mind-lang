@@ -1,57 +1,99 @@
-const PRIMITIVES = [
-  'string',
-  'number',
-  'boolean',
-  'object',
-  // Intrinsic type keywords also appear in generic bounds and typed members.
-  'unknown',
-  'never',
-  'bigint',
-  'symbol',
-  'any',
-  'void',
-  'null',
-  'undefined',
-  'Date',
+// One alphabetised allowlist of ambient types: the names TypeScript resolves
+// without an import on Node 26 + the DOM lib. Three families live here on
+// purpose, in one list, so a gap in any family is one audit of one table:
+//   - intrinsic keywords (`string`, `unknown`, ...);
+//   - TS utility types from lib.es5.d.ts (`Partial`, `Pick`, `Readonly` — issue
+//     #78 was the asymmetric gap where `Required` was listed and `Readonly`
+//     was not);
+//   - platform globals (`Date`, `Map`, the typed-array family per issue #89,
+//     and the web/Node globals `Buffer`, `ReadableStream`, `Request`,
+//     `Response`, `URL`, ... per RFC-TM-13 residual R7/R8).
+// None of these ever comes from an npm package, so
+// `addExternalTypeToDepExports`'s package-based stubbing can never cover them.
+//
+// Resolve-first rule (RFC-TM-13, formerly the `AbortSignal` special case):
+// a project declaration with the same name wins. Callers resolve the name
+// against the entity table FIRST and consult this list only for a name that
+// resolved to nothing; a declared `Response %` is a real DTO reference and a
+// declared `Response :: () => void` is a wrong-kind finding.
+export const AMBIENT_PLATFORM_TYPES: readonly string[] = [
+  'AbortSignal',
   'Array',
-  'Promise',
-  'Map',
-  'Set',
-  'Record',
-  'Partial',
-  'Required',
-  'Readonly', // issue #78 — asymmetric gap: `Required` was allowlisted, `Readonly` was not.
-  'Pick',
-  'Omit',
-  // issue #89 — same class of gap as #78: these are real lib.es2015+/lib.es5
-  // TS/JS builtins with no import statement (never from an npm package), so
-  // `addExternalTypeToDepExports`'s package-based stubbing can never cover
-  // them either. `ReadonlyMap`/`Uint8Array` were the two live corpus
-  // instances (`lib/typed-mind`'s own `LinkIndexMaps`/`TypedMindParserOptions`);
-  // `ReadonlySet`/`ReadonlyArray`/the rest of the typed-array family and
-  // `WeakMap`/`WeakSet` are the same class of builtin, added on audit.
-  'ReadonlyMap',
-  'ReadonlySet',
-  'ReadonlyArray',
-  'WeakMap',
-  'WeakSet',
-  'Uint8Array',
-  'Int8Array',
-  'Uint8ClampedArray',
-  'Uint16Array',
-  'Int16Array',
-  'Uint32Array',
-  'Int32Array',
-  'Float32Array',
-  'Float64Array',
+  'ArrayBuffer',
+  'AsyncIterable',
+  'AsyncIterableIterator',
+  'AsyncIterator',
+  'Awaited',
   'BigInt64Array',
   'BigUint64Array',
+  'Blob',
+  'Buffer',
+  'DataView',
+  'Date',
+  'Error',
+  'Exclude',
+  'Extract',
+  'Float32Array',
+  'Float64Array',
+  'FormData',
+  'Headers',
+  'InstanceType',
+  'Int16Array',
+  'Int32Array',
+  'Int8Array',
+  'Iterable',
+  'IterableIterator',
+  'Iterator',
+  'Map',
+  'NonNullable',
+  'Omit',
+  'Parameters',
+  'Partial',
+  'Pick',
+  'Promise',
+  'ReadableStream',
+  'Readonly',
+  'ReadonlyArray',
+  'ReadonlyMap',
+  'ReadonlySet',
+  'Record',
+  'RegExp',
+  'Request',
+  'Required',
+  'Response',
+  'ReturnType',
+  'Set',
+  'SharedArrayBuffer',
+  'TextDecoder',
+  'TextEncoder',
+  'URL',
+  'URLSearchParams',
+  'Uint16Array',
+  'Uint32Array',
+  'Uint8Array',
+  'Uint8ClampedArray',
+  'WeakMap',
+  'WeakSet',
+  'WritableStream',
+  'any',
+  'bigint',
+  'boolean',
+  'never',
+  'null',
+  'number',
+  'object',
+  'string',
+  'symbol',
+  'undefined',
+  'unknown',
+  'void',
 ];
 
-export const isPrimitiveType = (typeName: string): boolean => {
-  return PRIMITIVES.includes(typeName);
-};
+const AMBIENT_PLATFORM_TYPE_SET: ReadonlySet<string> = new Set(AMBIENT_PLATFORM_TYPES);
 
-// A measured platform global, separate from legacy primitive-first handling.
-// Callers must resolve real declarations before using this data-type fallback.
-export const isImplicitPlatformDataType = (typeName: string): boolean => typeName === 'AbortSignal';
+export const isAmbientPlatformType = (typeName: string): boolean => AMBIENT_PLATFORM_TYPE_SET.has(typeName);
+
+// Compatibility name kept for the reference collectors (link-index,
+// check-orphans, collect-signature-references), which skip only a
+// generic HEAD that is ambient (`Map<Foo>` references `Foo`, not `Map`).
+export const isPrimitiveType = isAmbientPlatformType;

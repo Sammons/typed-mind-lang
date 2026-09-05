@@ -35,24 +35,25 @@ import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { walkTypeReferences } from '../pipeline/type-reference-walk.ts';
 import type { CheckContext } from './check-context.ts';
 import { isDataTypeKind } from './data-type-kinds.ts';
-import { isImplicitPlatformDataType, isPrimitiveType } from './type-builtins.ts';
+import { isAmbientPlatformType } from './type-builtins.ts';
 
 const checkNamedPart = (context: CheckContext, entity: DtoNode, fieldName: string, name: string, span: Span): void => {
-  if (isPrimitiveType(name)) {
-    return;
-  }
-  // Lowercase names that are not in the primitive allowlist are treated as
+  // Lowercase names (intrinsic keywords and any other lowercase text) are
   // ordinary (unresolvable-by-convention) type text, not a reference —
   // mirrors the legacy `isCustomTypeName`'s uppercase-first requirement: only
   // a Capitalized name is a candidate entity-table reference.
   if (!name.includes('.') && !/^[A-Z]/.test(name)) {
     return;
   }
+  // Resolve-first (type-builtins.ts): a Capitalized ambient name (`Date`,
+  // `Buffer`, `Response`) is looked up in the entity table before the
+  // allowlist applies, so a project declaration with that name still owns
+  // it and still takes the kind check below.
   const resolution = context.resolveName(name, span);
   if (name.includes('.') && (resolution.kind === 'unresolved' || resolution.kind === 'external')) return;
   const referenced = resolvedNameTarget(resolution);
   if (referenced === undefined) {
-    if (isImplicitPlatformDataType(name)) return;
+    if (isAmbientPlatformType(name)) return;
     // RFC-TM-13 B2: external type exports resolve only absent local names.
     // A local declaration still owns its name and must pass the kind check.
     for (const dependency of context.byName.values()) {

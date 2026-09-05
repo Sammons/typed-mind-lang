@@ -13,6 +13,7 @@ import {
   type EntityNode,
   FileNode,
   FunctionNode,
+  isAmbientPlatformType,
   ProgramNode,
   parseSignatureText,
   parseTypeExprText,
@@ -4734,6 +4735,14 @@ export class TypeScriptToTypedMindConverter {
         // DTO-shaped by construction, no elimination heuristic needed).
         return this.synthesizeInlineDTO(param.type, `${functionEntityName}Input`);
       }
+      if (param && this.isAmbientGenericHead(param.type)) {
+        // RFC-TM-13 residual R7 — an ambient wrapper (`Map<string, S3Client>`)
+        // is never a DTO edge, but its arguments may still name package
+        // types that need a Dependency-exports stub (D-LEG-2); keep the
+        // stubs, drop the edge.
+        this.walkGenericArgsForExternalStubs(parseTypeExprText(param.type).typeExpr);
+        return undefined;
+      }
       if (param && this.isDTOLikeType(param.type)) {
         // If this is an external type, add it to the dependency's exports
         this.addExternalTypeToDepExports(param.type);
@@ -4782,6 +4791,12 @@ export class TypeScriptToTypedMindConverter {
       // inline object literals gets two distinct synthesized DTOs, never
       // one name serving both.
       return this.synthesizeInlineDTO(returnType, `${functionEntityName}Output`);
+    }
+    if (this.isAmbientGenericHead(returnType)) {
+      // RFC-TM-13 residual R7 — same ambient-wrapper rule as extractInputDTO,
+      // applied after the `Promise<>` strip (`Promise<Map<string, Foo>>`).
+      this.walkGenericArgsForExternalStubs(parseTypeExprText(returnType).typeExpr);
+      return undefined;
     }
     if (this.isDTOLikeType(returnType)) {
       // If this is an external type, add it to the dependency's exports
@@ -4923,6 +4938,20 @@ export class TypeScriptToTypedMindConverter {
       return true;
     }
 
+    // RFC-TM-13 residual R7 — an ambient platform type (`Date`, `Response`,
+    // `Buffer`, `URL`, ...) or a generic wrapper whose head is one
+    // (`Map<string, Foo>`, and `Promise<Response>` after the caller's
+    // `Promise<>` strip) is never a project DTO: it has no declaration to
+    // resolve, so an `input`/`output` edge on it can only produce
+    // `checker/{input,output}-dto-not-found`. The allowlist is the same
+    // table the checker uses (`@sammons/typed-mind`'s type-builtins). This
+    // check sits AFTER the registry lookups above so a project's own
+    // `interface Response { ... }` still wins (resolve-first), and the type
+    // text stays in `entity.signature` regardless — only the edge is dropped.
+    if (isAmbientPlatformType(cleaned) || this.isAmbientGenericHead(cleaned)) {
+      return false;
+    }
+
     // A quoted-string-literal or string-literal-union type is a structured
     // literal/union of literals, not a DTO reference.
     if (cleaned.startsWith('"') || cleaned.startsWith("'")) {
@@ -4974,6 +5003,17 @@ export class TypeScriptToTypedMindConverter {
     // heuristic's original fallback, gated by classification instead of a
     // surface-character guess.
     return cleaned.charAt(0).toUpperCase() === cleaned.charAt(0);
+  }
+
+  // Companion to the ambient-type exclusion in `isDTOLikeType`: true when
+  // `type` parses as a generic whose head is an ambient platform type
+  // (`Map<string, Foo>`, `Promise<Promise<Response>>` after one strip).
+  private isAmbientGenericHead(type: string): boolean {
+    if (!type.includes('<')) {
+      return false;
+    }
+    const parsed = parseTypeExprText(type).typeExpr;
+    return parsed.kind === 'generic' && isAmbientPlatformType(parsed.base.name);
   }
 
   // RFC-TM-10 D-LEG-2 / RFC-TM-13 B2: visit every structured type name,
