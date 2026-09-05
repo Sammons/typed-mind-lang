@@ -15,7 +15,7 @@ class Cache {
 }
 
 export class Store {
-  private hidden(): Cache {
+  private hidden() {
     return new Cache();
   }
 
@@ -41,7 +41,7 @@ export class Store {
 // S2-8 control: a class constructing itself inside its own static factory is
 // not an edge (self targets are skipped by the class fold) and stays orphaned.
 export class Self {
-  static make(): Self {
+  static make() {
     return new Self();
   }
 }
