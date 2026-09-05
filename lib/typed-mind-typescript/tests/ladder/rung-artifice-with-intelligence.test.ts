@@ -99,26 +99,11 @@ describe('artifice rung, KNOWN GAP 95: a generic function type parameter leaks i
   });
 });
 
-// decision-same-named-entities PR 1 — RE-PINNED. Gap 96 was the type-alias
-// twin of fixture 77: both files declare `export type PublishState`, and
-// `convertTypeAliasToDTO` aborted the whole conversion with
-// `Duplicate entity name: PublishState` (`success: false`, partial output).
-// The memo this PR implements named exactly this fixture as one of the two
-// knownGaps it unblocks.
-//
-// The abort is GONE. The DECLARATION half is fixed: `reserveTypeEntityNames`
-// renames the second declarer to `LifecycleFile.PublishState`, both TypeDefs
-// survive carrying their own right-hand sides, and the run completes.
-//
-// The REFERENCE half is still the gap, so this fixture stays a pin for it —
-// same status as fixture 77, and for the same reason. `advance(state:
-// PublishState)` and `nextState(...)` hold raw type TEXT that PR 1 cannot
-// resolve to a declaring module (`getTypeString` is a bare
-// `typeNode.getText()`; `types.ts` has no resolved-type-origin field), so
-// those references stay bare and each one emits an interim-window warning.
-// The assertions below characterize that interim state; when PR 2 lands they
-// fail by design and get re-baselined deliberately.
-describe('artifice rung, gap 96: same type alias in two files — declaration renamed (PR 1), references still bare (PR 2)', () => {
+// Fixture96 retains two distinct PublishState aliases. E allocates their
+// declaration identities; A2 resolves signature aliases to those identities.
+// The companion converter test removes origins to restore exactly the old
+// unused LifecycleFile.PublishState and missing StoredPublishState findings.
+describe('artifice rung, gap 96: distinct aliases and signature references resolve by source identity', () => {
   it('FIXED (PR 1): the conversion completes — no duplicate-name abort', () => {
     const result = convert('96-same-name-type-alias-two-files');
     assert.equal(result.success, true, 'the duplicate-name abort is replaced by a rename');
@@ -164,25 +149,24 @@ describe('artifice rung, gap 96: same type alias in two files — declaration re
     );
   });
 
-  it('STILL THE GAP (PR 2): raw type-text references stay bare, and each one warns', () => {
+  it('FIXED (A2): each signature references the correct type alias without interim warnings', () => {
     const result = convert('96-same-name-type-alias-two-files');
 
-    // Three reference positions hold raw text PR 1 cannot resolve:
-    // `advance`'s input, and `nextState`'s input and output.
+    // Each signature position resolves its own actual declaration.
     const interimWarnings = result.warnings
       .map((warning) => warning.message)
       .filter((message) => message.startsWith("Reference to 'PublishState'"));
     assert.equal(
       interimWarnings.length,
-      3,
-      `each unresolved reference must warn so the interim window is visible: ${JSON.stringify(interimWarnings)}`,
+      0,
+      `resolved references no longer carry interim collision warnings: ${JSON.stringify(interimWarnings)}`,
     );
 
-    // The signature text itself is untouched — still naming the bare alias.
-    assert.ok(result.tmdContent.includes('advance(state: PublishState)'), 'the reference stays BARE — reference-following is PR 2');
+    assert.ok(result.tmdContent.includes('advance(state: PublishState) => LifecycleFile.PublishState'));
+    assert.ok(result.tmdContent.includes('nextState(current: LifecycleFile.PublishState) => LifecycleFile.PublishState'));
   });
 
-  it('STILL THE GAP (PR 2): no duplicate-name or multi-exported finding; the residual is the aliased import', async () => {
+  it('FIXED (A2): the original alias-import fixture checks clean and signature removal restores real orphans', async () => {
     const result = convert('96-same-name-type-alias-two-files');
     const diagnostics = await diagnose(result.tmdContent);
     const codes = diagnostics.map((diagnostic) => diagnostic.code);
@@ -195,29 +179,18 @@ describe('artifice rung, gap 96: same type alias in two files — declaration re
       `no duplicate-name and no multi-exported finding may survive the rename: ${JSON.stringify(codes)}`,
     );
 
-    // Residuals pinned exactly so any OTHER finding appearing here fails.
-    // B1 recognizes the bare PublishState signature use. The renamed
-    // TypeDef and aliased StoredPublishState output still require A2.
-    assert.deepEqual(
-      codes.sort(),
-      ['checker/orphaned-entity', 'checker/output-dto-not-found'],
-      `unexpected residual diagnostics: ${JSON.stringify(codes)}`,
-    );
-    assert.deepEqual(
-      diagnostics.filter((diagnostic) => diagnostic.code === 'checker/orphaned-entity').map((diagnostic) => diagnostic.message),
-      ["Orphaned entity 'LifecycleFile.PublishState'"],
-    );
+    assert.deepEqual(diagnostics, []);
     const control = await diagnose(
       result.tmdContent
-        .replace('advance(state: PublishState)', 'advance(state: string)')
-        .replace('nextState(current: PublishState) => PublishState', 'nextState(current: string) => string'),
+        .replace('advance(state: PublishState) => LifecycleFile.PublishState', 'advance(state: string) => string')
+        .replace('nextState(current: LifecycleFile.PublishState) => LifecycleFile.PublishState', 'nextState(current: string) => string'),
     );
-    const restored = control.filter((diagnostic) => diagnostic.message === "Orphaned entity 'PublishState'");
-    assert.equal(restored.length, 1);
-    assert.equal(restored[0]?.code, 'checker/orphaned-entity');
     assert.deepEqual(
-      control.filter((diagnostic) => !restored.includes(diagnostic)).map(({ code, message }) => ({ code, message })),
-      diagnostics.map(({ code, message }) => ({ code, message })),
+      control.map(({ code, message }) => ({ code, message })).sort((left, right) => (left.message < right.message ? -1 : 1)),
+      [
+        { code: 'checker/orphaned-entity', message: "Orphaned entity 'LifecycleFile.PublishState'" },
+        { code: 'checker/orphaned-entity', message: "Orphaned entity 'PublishState'" },
+      ],
     );
   });
 });

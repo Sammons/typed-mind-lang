@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { it, type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { ClassNode, ConstantsNode, DependencyNode, DtoNode, FunctionNode, TypeDefNode } from '@sammons/typed-mind';
+import { ClassNode, ConstantsNode, DependencyNode, DtoNode, FunctionNode, TypeDefNode, TypedMind } from '@sammons/typed-mind';
+import type { TypeScriptProjectAnalysis } from './types.ts';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from './typescript-to-typedmind-converter.ts';
 
@@ -96,7 +97,7 @@ it('TM13 A2: aliases and literals with equal spelling do not cross-rewrite', (co
   assert.ok(converted.warnings.some((warning) => /unsupported syntax/.test(warning.message)));
 });
 
-it('TM13 A2: forged and ambiguous source identities cannot borrow emitted names', (context) => {
+it('TM13 A2: ambiguous source identities cannot borrow emitted names', (context) => {
   const analysis = project(context, {
     'index.ts':
       'export interface Model { a: string } export function nested() { interface Model { b: number } class Holder { value!: Model } return Holder; }',
@@ -106,4 +107,76 @@ it('TM13 A2: forged and ambiguous source identities cannot borrow emitted names'
   const holder = converted.entities.find((entity) => entity.name === 'Holder');
   assert.ok(holder instanceof ClassNode);
   assert.ok(converted.warnings.some((warning) => /no uniquely emitted declaration/.test(warning.message)));
+});
+
+it('TM13 A2: gaps 77 and 96 resolve correct entities with exact fixture deltas', async () => {
+  const expected = JSON.parse(readFileSync(join(import.meta.dirname, 'goldens/type-reference-rewrites.json'), 'utf8'));
+  const tm = await TypedMind.create({ wasmPath: join(import.meta.dirname, '../../typed-mind/grammar/grammar.wasm') });
+  const metadata = new Set(['typeInfo', 'returnTypeInfo', 'extendsTypeInfo', 'implementsTypeInfo', 'typeParameters']);
+  const stripOrigins = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(stripOrigins);
+    if (value !== null && typeof value === 'object')
+      return Object.fromEntries(
+        Object.entries(value)
+          .filter(([key]) => !metadata.has(key))
+          .map(([key, child]) => [key, stripOrigins(child)]),
+      );
+    return value;
+  };
+  for (const [name, entry] of [
+    ['77-same-name-interface-two-files', 'main.ts'],
+    ['96-same-name-type-alias-two-files', 'index.ts'],
+  ]) {
+    const analysis = fixture(name, entry);
+    const result = new TypeScriptToTypedMindConverter().convert(analysis);
+    const withoutOrigins = stripOrigins(analysis) as TypeScriptProjectAnalysis;
+    const control = new TypeScriptToTypedMindConverter().convert(withoutOrigins);
+    const diagnostics = (text: string) => tm.check(text).diagnostics.map(({ code, message, severity }) => ({ code, message, severity }));
+    assert.deepEqual({ tmdContent: result.tmdContent, diagnostics: diagnostics(result.tmdContent) }, expected[name].after);
+    assert.deepEqual({ tmdContent: control.tmdContent, diagnostics: diagnostics(control.tmdContent) }, expected[name].before);
+    assert.deepEqual(analysis.moduleGraph, withoutOrigins.moduleGraph);
+    assert.deepEqual(analysis.diagnostics, withoutOrigins.diagnostics);
+  }
+});
+
+it('TM13 A2: forged declaration ranges preserve the original slot and disclose uncertainty', (context) => {
+  const analysis = project(context, {
+    'base.ts': 'export interface Model { value: string }',
+    'index.ts': 'import {Model as Alias} from "./base.js"; export function use(value: Alias): Alias { return value; }',
+  });
+  const forged = {
+    ...analysis,
+    modules: analysis.modules.map((module) => ({
+      ...module,
+      functions: module.functions.map((func) => ({
+        ...func,
+        parameters: func.parameters.map((parameter) => ({
+          ...parameter,
+          typeInfo:
+            parameter.typeInfo === undefined
+              ? undefined
+              : {
+                  ...parameter.typeInfo,
+                  references: parameter.typeInfo.references.map((reference) => ({
+                    ...reference,
+                    origin:
+                      reference.origin.kind === 'project'
+                        ? {
+                            ...reference.origin,
+                            declaration: { ...reference.origin.declaration, start: reference.origin.declaration.start + 1 },
+                          }
+                        : reference.origin,
+                  })),
+                },
+        })),
+      })),
+    })),
+  };
+  const result = new TypeScriptToTypedMindConverter().convert(forged);
+  const use = result.entities.find((entity) => entity.name === 'use');
+  assert.ok(use instanceof FunctionNode);
+  assert.equal(use.signature, 'use(value: Alias) => Model');
+  assert.equal(use.input, 'Alias', 'unsupported unresolved input retains existing visible fallback');
+  assert.equal(use.output, 'Model');
+  assert.ok(result.warnings.some((warning) => /no uniquely emitted declaration/.test(warning.message)));
 });

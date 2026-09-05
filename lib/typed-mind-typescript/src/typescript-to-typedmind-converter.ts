@@ -306,6 +306,7 @@ interface EntityRegistry {
 interface OriginConversionContext {
   readonly entitiesByName: ReadonlyMap<string, EntityNode>;
   readonly replacementNames: ReadonlyMap<TypeReferenceOccurrence, string>;
+  readonly resolvedNames: ReadonlySet<string>;
   readonly sourceModules: ReadonlyMap<string, ParsedModule>;
   readonly bindings: readonly { specifier: string; exportName: string }[];
 }
@@ -765,6 +766,7 @@ export class TypeScriptToTypedMindConverter {
       {
         entitiesByName,
         replacementNames,
+        resolvedNames: new Set(replacementNames.values()),
         sourceModules: new Map(analysis.modules.map((module) => [module.filePath, module])),
         bindings: [...bindings.values()],
       },
@@ -1841,7 +1843,7 @@ export class TypeScriptToTypedMindConverter {
   // Preserve the existing ambient heritage representation until A2 supplies
   // proven origins; reserve the generated class identity before emission.
   private ensureNamespaceImplementsStub(target: string): string {
-    if (this.originContext?.entitiesByName.has(target)) return target;
+    if (this.originContext?.resolvedNames.has(target)) return target;
     const entityName = this.nameAllocator.reserve(`namespace-heritage:${target}`, [this.sanitizeEntityName(target)]);
 
     if (!this.namespaceImplementsStubNames.has(entityName)) {
@@ -1900,7 +1902,7 @@ export class TypeScriptToTypedMindConverter {
     const stubNames: string[] = [];
     for (const cls of classes) {
       for (const target of cls.implements) {
-        if (target.includes('.')) {
+        if (target.includes('.') && !this.originContext?.resolvedNames.has(target)) {
           stubNames.push(this.ensureNamespaceImplementsStub(target));
         }
       }
