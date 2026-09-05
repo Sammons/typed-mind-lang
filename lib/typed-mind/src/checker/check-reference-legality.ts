@@ -36,6 +36,7 @@ import { ProgramNode } from '../ast/program-node.ts';
 import { resolvedNameTarget } from '../ast/qualified-name-resolver.ts';
 import { RunParameterNode } from '../ast/run-parameter-node.ts';
 import { UiComponentNode } from '../ast/ui-component-node.ts';
+import { walkTypeReferences } from '../pipeline/type-reference-walk.ts';
 import type { CheckContext } from './check-context.ts';
 import { type ReferenceKind, VALID_REFERENCES } from './valid-references.ts';
 
@@ -199,8 +200,12 @@ const checkEntityReferences = (context: CheckContext, entity: EntityNode): void 
     for (const call of entity.calls) {
       checkSingleReference(context, entity, 'calls', call);
     }
-    if (entity.schema !== undefined) {
-      checkSingleReference(context, entity, 'schema', entity.schema);
+    if (entity.schemaType !== undefined) {
+      // RFC-TM-14 R6a (G2-8): the `schema` legality row runs for every named
+      // leaf of the type expression, so `: SomeFunction[]` and
+      // `: Record<string, SomeFunction>` still report reference-to-illegal.
+      // Binders are empty — a Constants declares no type parameters.
+      walkTypeReferences(entity.schemaType, new Set(), { reference: (node) => checkSingleReference(context, entity, 'schema', node.name) }, 'alias');
     }
   } else if (entity instanceof RunParameterNode) {
     // Legacy walked param.consumedBy (validator.ts:1430-1437), populated only

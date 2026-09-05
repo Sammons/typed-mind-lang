@@ -3571,6 +3571,15 @@ export class TypeScriptToTypedMindConverter {
 
     const schemaText = constant.typeInfo === undefined ? constant.type : this.rewriteTypeSlot(constant.typeInfo).text;
     const constantSchema = schemaText && schemaText !== 'any' ? this.convertTypeToSchema(schemaText) : undefined;
+    // RFC-TM-14 R6a: the schema slot is a full type expression (the TypeDef
+    // alias lane above is the precedent); `convertTypeToSchema` returns ''
+    // for an annotation with no rendering, which omits the slot entirely.
+    const schemaType = constantSchema === undefined || constantSchema === '' ? undefined : parseTypeExprText(constantSchema).typeExpr;
+    if (schemaType !== undefined) {
+      // D-LEG-2: a package type inside the annotation needs its
+      // Dependency-exports stub, exactly as an alias's generic argument does.
+      this.walkGenericArgsForExternalStubs(schemaType);
+    }
 
     const constantsEntity = new ConstantsNode({
       name: entityName,
@@ -3578,11 +3587,7 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} ! ${realPath}`,
       sourceForm: 'shortform',
       path: realPath,
-      // Add schema information if we can infer it from the type.
-      // `convertTypeToSchema` returns '' for a type with no grammatical
-      // entity_name rendering; normalize that to `undefined` so the emitter
-      // omits the `:` slot entirely rather than emitting a dangling one.
-      schema: constantSchema === '' ? undefined : constantSchema,
+      ...(schemaType === undefined ? {} : { schemaType }),
     });
 
     this.entities.push(constantsEntity);
@@ -5696,46 +5701,21 @@ export class TypeScriptToTypedMindConverter {
 
   private convertTypeToSchema(type: string): string {
     if (this.originContext?.entitiesByName.has(type)) return type;
-    // Convert TypeScript types to schema names.
+    // RFC-TM-14 R6a (rfc-tm-14-diamond.md §S5, delta R6-ann): the Constants
+    // schema slot is a `type_expr` (`grammar/grammar.js` constants_declaration,
+    // the typedef_declaration twin; `grammar.md` "Constants" row), so the
+    // whole annotation is emitted — `Record<string, AttachmentRule>`,
+    // `ReadonlyMap<string, CheckCode>`, `'read' | 'write'`, `Rule[]` — and
+    // every named leaf credits its type. Before R6a the slot was an
+    // `entity_name`, and this method reduced generics to their base
+    // (`Record`, `Map`, `ReadonlySet`), arrays to `Array`, inline objects to
+    // `Object` and dropped unions outright (fixture 94's four pinned
+    // reductions, migrated in `rung-artifice-with-intelligence.test.ts`).
     //
-    // The Constants type slot is grammatically an `entity_name`
-    // (`grammar/grammar.js:761` — `optional(seq(':', $.entity_name))`,
-    // matching `grammar.md:35`), so whatever this returns must match
-    // `/[A-Za-z_]\w*/`. Anything else emits a line the checker rejects as
-    // "Unparsable text".
-    if (type.includes('[]')) {
-      return 'Array';
-    }
-    if (type.includes('Record<')) {
-      return 'Record';
-    }
-    if (type.includes('Map<')) {
-      return 'Map';
-    }
-    if (type.includes('{') && type.includes('}')) {
-      return 'Object';
-    }
-
-    // Ladder rung `artifice-with-intelligence` (fixture 94), corpus
-    // `server/lib/parse-embed.ts:7`: `ReadonlySet<string>`. The two
-    // allowlist entries above generalize — ANY generic must degrade to its
-    // base name, or its `<...>` argument list reaches the entity_name slot
-    // verbatim. Reducing to the base is the same lossy-but-grammatical
-    // answer `Record<string, string>` -> `Record` already gives.
-    const genericBase = /^([A-Za-z_]\w*)\s*</.exec(type);
-    if (genericBase?.[1] !== undefined) {
-      return genericBase[1];
-    }
-
-    // A type that is still not a bare identifier (a union, an intersection,
-    // a function type, a tuple, a qualified `ns.Type`) has no entity_name
-    // rendering at all. Drop the annotation rather than emit an
-    // ungrammatical line — the Constants entity itself is still recorded.
-    if (!/^[A-Za-z_]\w*$/.test(type)) {
-      return '';
-    }
-
-    return type;
+    // The text takes the alias lane's normalization (comment strip, single
+    // line, leading `|` drop, `(typeof X)` wrap) because a Constants
+    // declaration is one line, exactly like a TypeDef alias.
+    return normalizeUnionAliasText(type);
   }
 
   private getRelativePath(filePath: string): string {

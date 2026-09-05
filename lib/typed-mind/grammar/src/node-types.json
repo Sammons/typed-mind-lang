@@ -413,6 +413,10 @@
         {
           "type": "path",
           "named": true
+        },
+        {
+          "type": "type_expr",
+          "named": true
         }
       ]
     }
@@ -435,6 +439,10 @@
         },
         {
           "type": "path",
+          "named": true
+        },
+        {
+          "type": "type_expr",
           "named": true
         }
       ]

@@ -393,7 +393,7 @@ describe('ConstantsNode', () => {
       raw,
       sourceForm: 'shortform',
       path: 'src/config.ts',
-      schema: 'ConfigSchema',
+      schemaType: { kind: 'named', name: 'ConfigSchema', span: span(40, 29, 40, 41) },
     });
     assert.equal(node instanceof EntityNode, true);
     assert.deepEqual(
@@ -407,6 +407,8 @@ describe('ConstantsNode', () => {
         sourceForm: 'shortform',
         comment: undefined,
         path: 'src/config.ts',
+        // RFC-TM-14 R6a: `schema` is derived from `schemaType` (base name).
+        schemaType: { kind: 'named', name: 'ConfigSchema', span: span(40, 29, 40, 41) },
         schema: 'ConfigSchema',
         purpose: undefined,
       },
@@ -434,6 +436,7 @@ describe('ConstantsNode', () => {
         sourceForm: 'longform',
         comment: undefined,
         path: 'src/config.ts',
+        schemaType: undefined,
         schema: undefined,
         purpose: 'application configuration',
       },

@@ -17,6 +17,7 @@
 import type { ParsedSignature, SignatureParseResult, SignatureTypePosition } from '../ast/callable-signature.ts';
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
+import { ConstantsNode } from '../ast/constants-node.ts';
 import { parametersOf } from '../ast/declared-type-parameters.ts';
 import { DtoNode } from '../ast/dto-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
@@ -92,6 +93,11 @@ export const honestFieldsOf = (entity: EntityNode): Record<string, unknown> => {
   }
   if (entity instanceof TypeDefNode && entity.aliasType !== undefined) {
     return { ...fields, aliasType: honestTypeExprOf(entity.aliasType) };
+  }
+  // RFC-TM-14 R6a: ConstantsNode.schemaType carries the same span tree as
+  // TypeDefNode.aliasType; the derived `schema` name needs no stripping.
+  if (entity instanceof ConstantsNode && entity.schemaType !== undefined) {
+    return { ...fields, schemaType: honestTypeExprOf(entity.schemaType) };
   }
   return fields;
 };

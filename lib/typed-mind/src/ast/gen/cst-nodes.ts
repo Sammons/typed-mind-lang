@@ -305,6 +305,9 @@ export class CstConstantsDeclaration extends CstNode {
   pathChildren(): CstPath[] {
     return this.childrenOfTypes(['path'], CstPath);
   }
+  typeExprChildren(): CstTypeExpr[] {
+    return this.childrenOfTypes(['type_expr'], CstTypeExpr);
+  }
 }
 
 export class CstConsumesList extends CstNode {

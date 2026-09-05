@@ -151,12 +151,15 @@ export const openClassFile = (syntaxNode: SyntaxNode): EntityAccumulator => {
 
 export const openConstants = (syntaxNode: SyntaxNode): EntityAccumulator => {
   const declaration = new CstConstantsDeclaration(syntaxNode);
-  const names = declaration.entityNameChildren();
-  const accumulator = new EntityAccumulator(baseArgs('Constants', names.at(0)?.text ?? '', syntaxNode, inlineCommentTextOf(declaration)));
+  const accumulator = new EntityAccumulator(
+    baseArgs('Constants', declaration.entityNameChildren().at(0)?.text ?? '', syntaxNode, inlineCommentTextOf(declaration)),
+  );
   accumulator.slots.path = (declaration.pathChildren().at(0)?.text ?? '').trim();
-  const schemaName = names.at(1)?.text;
-  if (schemaName !== undefined) {
-    accumulator.slots.schema = schemaName;
+  // RFC-TM-14 R6a: the schema slot is a `type_expr` child (the
+  // typedef_declaration alias precedent above), not a second entity_name.
+  const schemaCst = declaration.typeExprChildren().at(0);
+  if (schemaCst !== undefined) {
+    accumulator.slots.schemaType = typeExprFromCst(schemaCst);
   }
   return accumulator;
 };

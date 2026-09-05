@@ -188,7 +188,11 @@ export class QualifiedNameResolver {
         : failure('missing-member');
     }
     if (owner instanceof ConstantsNode) {
-      const schema = owner.schema === undefined ? undefined : resolvedNameTarget(this.resolveWithState(owner.schema, {}, active));
+      // RFC-TM-14 R6a (U-7): members resolve through the schema only when it
+      // is a bare named type; a generic, array, union or opaque schema has
+      // no member surface here, so the name is missing-member.
+      const schema =
+        owner.schemaType?.kind === 'named' ? resolvedNameTarget(this.resolveWithState(owner.schemaType.name, {}, active)) : undefined;
       return schema instanceof DtoNode && schema.fields.some((field) => field.name === member)
         ? { kind: 'member', owner, member }
         : failure('missing-member');

@@ -251,8 +251,10 @@ const classFileToShortform = (entity: ClassFileNode): string[] => {
 
 const constantsToShortform = (entity: ConstantsNode): string[] => {
   let line = `${entity.name} ! ${entity.path}`;
-  if (entity.schema !== undefined) {
-    line += ` : ${entity.schema}`;
+  if (entity.schemaType !== undefined) {
+    // RFC-TM-14 R6a: print the whole schema type expression (X-TYPE-3
+    // canonical printer), the TypeDef alias precedent below.
+    line += ` : ${printTypeExpr(entity.schemaType)}`;
   }
   const lines = [line];
   if (entity.calls.length > 0) {

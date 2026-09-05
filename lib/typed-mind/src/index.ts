@@ -76,6 +76,12 @@ export { UiComponentNode } from './ast/ui-component-node.ts';
 export { QUOTE_SWAP_CODE, UNREPRESENTABLE_ALIAS_CODE } from './emitter/emitter-diagnostics.ts';
 export { printHeritage, printTypeParameter } from './emitter/generic-declaration-emission.ts';
 export { printSignature } from './emitter/print-signature.ts';
+// RFC-TM-14 R6a (rfc-tm-14-diamond.md §S5, U2-9): the LSP hover prints a
+// Constants schema through the canonical TypeExprNode printer. X-TYPE-7
+// declined this export for TypeDef (hover.ts renders the variant only); the
+// Constants schema is the first hover surface whose whole value IS a type
+// expression, so the printer becomes public here.
+export { printTypeExpr } from './emitter/print-type-expr.ts';
 // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — the TypeScript converter builds a
 // synthetic ParseOutcome directly (it never runs source through the parser),
 // so it needs SyntaxEmitter itself rather than going through TypedMind's

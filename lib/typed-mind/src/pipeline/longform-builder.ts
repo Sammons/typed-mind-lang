@@ -405,9 +405,20 @@ const applyProperties = (accumulator: EntityAccumulator, collected: CollectedPro
     case 'Constants': {
       slots.path = scalar('path') ?? '';
       slots.calls = list('calls') ?? [];
-      const schema = scalar('schema');
-      if (schema !== undefined) {
-        slots.schema = schema;
+      // RFC-TM-14 R6a: `schema:` carries a full type expression. The value
+      // is either a bare entity_name (`schema: ConfigSchema`, every existing
+      // longform document) or a quoted string (`schema: "Record<string,
+      // Rule>"`, the C-prime quoted slot emit-longform.ts writes, because an
+      // unquoted `"read" | "write"` is a syntax error at the property
+      // grammar). Both decode to type text parsed at the property's span,
+      // mirroring the TypeDef alias `type:` branch below.
+      const schemaText = scalar('schema');
+      if (schemaText !== undefined) {
+        const schemaSpanStart = collected.all.find((property) => property.key === 'schema')?.span.start ?? accumulator.span.start;
+        slots.schemaType = parseTypeExprText(schemaText, {
+          baseLine: schemaSpanStart.line,
+          baseColumn: schemaSpanStart.column,
+        }).typeExpr;
       }
       if (purposeOrDescription !== undefined) {
         slots.purpose = purposeOrDescription;

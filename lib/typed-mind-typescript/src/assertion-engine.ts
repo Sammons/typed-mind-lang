@@ -7,9 +7,13 @@ import {
   FileNode,
   FunctionNode,
   ProgramNode,
+  printTypeExpr,
   TypedMind,
 } from '@sammons/typed-mind';
 import type { AssertionResult, ConversionResult, Deviation } from './types.ts';
+
+const printSchema = (entity: ConstantsNode): string | undefined =>
+  entity.schemaType === undefined ? undefined : printTypeExpr(entity.schemaType);
 
 export class AssertionEngine {
   // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — moved off the legacy sync DSLChecker
@@ -333,7 +337,9 @@ export class AssertionEngine {
       });
     }
 
-    this.compareStringProperty(actual.name, 'schema', actual.schema, expected.schema, deviations);
+    // RFC-TM-14 R6a: compare the whole schema type expression as printed
+    // text, so `Record<string, Rule>` vs `Record<string, Other>` deviates.
+    this.compareStringProperty(actual.name, 'schema', printSchema(actual), printSchema(expected), deviations);
     this.compareArrayProperty(actual.name, 'calls', actual.calls, expected.calls, deviations);
   }
 
