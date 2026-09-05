@@ -242,7 +242,11 @@ it('TM14 U1: every class member body yields body references', () => {
   assert.deepEqual(summary(methodNamed('code')?.bodyReferences), ['read:ErrorTable:project'], 'static method: one read of the chain root');
   assert.deepEqual(summary(store.constructors?.[0]?.bodyReferences), ['call:helper:project'], 'constructor');
   assert.deepEqual(summary(methodNamed('size')?.bodyReferences), ['read:LIMIT:project'], 'accessor: `this.hidden()` is not a reference');
-  assert.deepEqual(summary(store.initializerReferences), ['read:LIMIT:project', 'call:helper:project'], 'property initializer + static block');
+  assert.deepEqual(
+    summary(store.initializerReferences),
+    ['read:LIMIT:project', 'call:helper:project'],
+    'property initializer + static block',
+  );
 
   // Each reference carries the identifier's own source range and the origin
   // resolves to the same-file declaration.

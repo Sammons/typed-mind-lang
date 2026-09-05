@@ -103,7 +103,10 @@ it('TM14 U1: function-body Constants reads emit consumes', async (context) => {
   // The shadowing controls resolve to their own declarations at the analyzer.
   const functions = analysis.modules.flatMap((module) => module.functions);
   const readsOf = (name: string) =>
-    functions.find((fn) => fn.name === name)?.bodyReferences.filter((reference) => reference.kind === 'read').map((reference) => reference.writtenName);
+    functions
+      .find((fn) => fn.name === name)
+      ?.bodyReferences.filter((reference) => reference.kind === 'read')
+      .map((reference) => reference.writtenName);
   assert.deepEqual(readsOf('apply'), ['LIMIT', 'TABLE']);
   assert.deepEqual(readsOf('shadow'), []);
   assert.deepEqual(readsOf('local'), []);
@@ -114,7 +117,11 @@ it('TM14 U1: function-body Constants reads emit consumes', async (context) => {
 it('TM14 D16: a class constructed only inside a private function stays orphaned and is documented', async (context) => {
   const { converted } = convert(context, '125-private-helper-chain');
   assert.ok(converted.entities.find((entity) => entity.name === 'Source') instanceof ClassFileNode, 'Source fused into a ClassFile');
-  assert.equal(converted.entities.some((entity) => entity.name === 'parse'), false, 'the private function has no entity (P8)');
+  assert.equal(
+    converted.entities.some((entity) => entity.name === 'parse'),
+    false,
+    'the private function has no entity (P8)',
+  );
   assert.deepEqual(functionNamed(converted, 'parseText').calls, [], 'no transitive edge is stated');
   assert.deepEqual(await findingsOf(converted.tmdContent, 'checker/orphaned-entity'), ["Orphaned entity 'Source'"]);
   const readme = readFileSync(join(reprosDir, '125-private-helper-chain', 'README.md'), 'utf8');
