@@ -72,26 +72,9 @@ const sortIntoLegacySectionOrder = (entities: readonly EntityNode[]): EntityNode
 // the ENTIRE first paragraph however long, whitespace-normalize it to one
 // line. Every purpose/description assignment site routes through this.
 //
-// issue #113 — the grammar's `string` token is `/"[^"\n]*"/`
-// (grammar.js:1209): a literal `"` inside the description text is
-// structurally UNREPRESENTABLE in `.tmd` — there is no escape production
-// (confirmed: no `\"` handling anywhere in grammar.js). A JSDoc comment
-// containing a quoted phrase (`/** A "needs you" item... */`) emitted
-// verbatim breaks the description's own closing quote, corrupting every
-// line after it (confirmed against the real slat-harness corpus:
-// `NeedsItem % "A "needs you" item..."` desyncs the parser at the second
-// `"`). Same fix shape as the newline case above (collapse, never
-// truncate, no grammar change): swap every embedded double quote for a
-// single quote — `'` is NOT excluded by the `string` token, unlike `"`,
-// so this is a meaning-preserving substitution the grammar can actually
-// carry, not a strip. `\n` is already handled by the paragraph-split
-// above; `"` needed its own pass because it is a grammar delimiter, not
-// whitespace.
-const escapeDescriptionQuotes = (text: string): string => text.replace(/"/g, "'");
-
 const collapseDescription = (raw: string): string => {
   const [firstParagraph] = raw.split(/\n\s*\n/);
-  return escapeDescriptionQuotes((firstParagraph ?? '').replace(/\s+/g, ' ').trim());
+  return (firstParagraph ?? '').replace(/\s+/g, ' ').trim();
 };
 
 // RFC-TM-10 follow-up (issue #77) — `extractInputDTO`/`extractOutputDTO`

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { it } from 'node:test';
 import type { ParsedTypeText, TypeScriptProjectAnalysis } from './types.ts';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
@@ -37,6 +37,9 @@ export function go<const T extends Model = Model>(value: T): Model { return valu
 export const arrow = <T extends Model>(value: T): Model => value;
 export const setting: Model = { value: '' };
 export enum Color { Red }
+export namespace Merged { export const marker = 1; }
+export class Merged {}
+export interface Owner { value: Merged }
 `,
     );
     const analysis = new TypeScriptAnalyzer(root).analyzeFromEntrypoint(join(root, 'index.ts'));
@@ -96,6 +99,15 @@ export enum Color { Red }
       check(fn.parameters[0]?.typeInfo, 'T', ['T']);
       check(fn.returnTypeInfo, 'Model', ['Model']);
     }
+    const merged = required(module.classes.find((candidate) => candidate.name === 'Merged'));
+    const mergedReference = module.interfaces.find((candidate) => candidate.name === 'Owner')?.properties[0]?.typeInfo?.references[0]
+      ?.origin;
+    assert.equal(mergedReference?.kind, 'project');
+    assert.deepEqual(
+      mergedReference?.kind === 'project' && mergedReference.declaration,
+      merged.declaration,
+      'retained and referenced merged symbols use the same canonical declaration',
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -109,6 +121,25 @@ it('TM13 A1: referenced package declarations map to real source positions', () =
     const cli = join(root, 'packages/cli');
     mkdirSync(join(cli, 'node_modules/@fixture'), { recursive: true });
     symlinkSync(join(root, 'packages/core'), join(cli, 'node_modules/@fixture/core'), 'dir');
+    const coreSourcePath = join(root, 'packages/core/src/index.ts');
+    const coreSource = `${readFileSync(coreSourcePath, 'utf8')}\nexport function lookup(value: string): string;
+export function lookup(value: number): number;
+export function lookup(value: string | number): string | number { return value; }
+export interface NestedModel { topLevel: true }
+export namespace Namespace { export interface NestedModel { nested: true } }
+export namespace Merged { export const marker = 1; }
+export class Merged {}\n`;
+    writeFileSync(coreSourcePath, coreSource);
+    const declarationPath = join(root, 'packages/core/dist/index.d.ts');
+    writeFileSync(
+      declarationPath,
+      `${readFileSync(declarationPath, 'utf8')}\nexport declare function lookup(value: string): string;\nexport declare function lookup(value: number): number;\nexport interface NestedModel { topLevel: true }\nexport declare namespace Namespace { interface NestedModel { nested: true } }\nexport declare namespace Merged { const marker: 1; }\nexport declare class Merged {}\n`,
+    );
+    const entryPath = join(cli, 'src/index.ts');
+    writeFileSync(
+      entryPath,
+      `${readFileSync(entryPath, 'utf8')}\nimport { lookup, Namespace, Merged } from '@fixture/core';\nexport type LookupType = typeof lookup;\nexport type Nested = Namespace.NestedModel;\nexport type MergedUse = Merged;\n`,
+    );
     const analysis = new TypeScriptAnalyzer(cli).analyzeFromEntrypoint(join(cli, 'src/index.ts'));
     const module = required(analysis.modules.find((candidate) => candidate.filePath === join(cli, 'src/index.ts')));
     const origin = module.interfaces.find((candidate) => candidate.name === 'CliOptions')?.properties[0]?.typeInfo?.references[0]?.origin;
@@ -121,12 +152,47 @@ it('TM13 A1: referenced package declarations map to real source positions', () =
         "export type OutputFormat = 'json' | 'yaml' | 'text';",
       );
     }
+    const overload = module.types.find((candidate) => candidate.name === 'LookupType')?.typeInfo?.references[0]?.origin;
+    assert.equal(overload?.kind, 'project', JSON.stringify(overload));
+    if (overload?.kind === 'project') {
+      assert.equal(overload.declaration.filePath, coreSourcePath);
+      assert.equal(overload.declaration.start, coreSource.indexOf('export function lookup'));
+      assert.equal(
+        coreSource.slice(overload.declaration.start, overload.declaration.end),
+        'export function lookup(value: string): string;',
+      );
+      const retained = required(analysis.modules.find((candidate) => candidate.filePath === coreSourcePath));
+      assert.ok(
+        retained.functions
+          .filter((fn) => fn.name === 'lookup')
+          .every((fn) => JSON.stringify(fn.declaration) === JSON.stringify(overload.declaration)),
+      );
+    }
+    const nested = module.types.find((candidate) => candidate.name === 'Nested')?.typeInfo?.references[0]?.origin;
+    assert.deepEqual(
+      nested,
+      { kind: 'unresolved', reason: 'ambiguous-declaration' },
+      'nested emitted declarations cannot borrow equal-spelling top-level source identity',
+    );
+    const merged = analysis.modules
+      .find((candidate) => candidate.filePath === coreSourcePath)
+      ?.classes.find((candidate) => candidate.name === 'Merged');
+    const mergedReference = module.types.find((candidate) => candidate.name === 'MergedUse')?.typeInfo?.references[0]?.origin;
+    assert.equal(mergedReference?.kind, 'project', JSON.stringify(mergedReference));
+    assert.deepEqual(
+      mergedReference?.kind === 'project' && mergedReference.declaration,
+      merged?.declaration,
+      'mapped merged symbols share the retained canonical source identity',
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
 it('TM13 A1: origin-only extraction is byte-identical', () => {
+  // Captured with the unmodified analyzer from 8559841, before A1. These
+  // fixtures had no complete checked-in output snapshots in the main suite.
+  const baseline = JSON.parse(readFileSync(join(import.meta.dirname, 'goldens/type-origins/baseline-8559841.json'), 'utf8'));
   const fixtures = [
     ['77-same-name-interface-two-files', 'main.ts'],
     ['96-same-name-type-alias-two-files', 'index.ts'],
@@ -150,6 +216,20 @@ it('TM13 A1: origin-only extraction is byte-identical', () => {
   for (const [name, entry] of fixtures) {
     const root = resolve(import.meta.dirname, '../tests/ladder/repros-analyzer', name);
     const analysis = new TypeScriptAnalyzer(root).analyzeFromEntrypoint(join(root, 'src', entry));
+    assert.deepEqual(
+      JSON.parse(
+        JSON.stringify({
+          tmdContent: new TypeScriptToTypedMindConverter().convert(analysis).tmdContent,
+          moduleGraph: analysis.moduleGraph,
+          diagnostics: analysis.diagnostics.map((diagnostic) => ({
+            ...diagnostic,
+            message: diagnostic.message.replaceAll(root, '<fixture>'),
+            filePath: diagnostic.filePath === undefined ? undefined : relative(root, diagnostic.filePath),
+          })),
+        }),
+      ),
+      baseline[name],
+    );
     const stripped = strip(analysis) as TypeScriptProjectAnalysis;
     assert.deepEqual(new TypeScriptToTypedMindConverter().convert(analysis), new TypeScriptToTypedMindConverter().convert(stripped), name);
     assert.deepEqual(analysis.moduleGraph, stripped.moduleGraph);

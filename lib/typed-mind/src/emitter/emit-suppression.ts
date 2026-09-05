@@ -9,10 +9,8 @@
 // preservation — mirrored by round-trip.test.ts's honestFieldsOf projection,
 // which already excludes span/raw from its comparison.
 
-import type { Diagnostic } from '../ast/diagnostic.ts';
 import type { SuppressionNode } from '../ast/suppression-node.ts';
-import { quoteSwapDiagnostic } from './emitter-diagnostics.ts';
-import { quoteStringLiteral, quoteSwapOccurred } from './quote-string-literal.ts';
+import { quoteStringLiteral } from './quote-string-literal.ts';
 
 // One shortform suppression line: `suppress Target code/name "reason"`.
 export const suppressionToShortformLine = (suppression: SuppressionNode): string => {
@@ -34,18 +32,4 @@ export const suppressionsToLongformBlock = (suppressions: readonly SuppressionNo
     return [];
   }
   return ['suppress {', ...suppressions.map(suppressionToLongformEntry), '}'];
-};
-
-// Issue #130, disposition (b) — a suppression's `reason` is the one
-// non-entity free-text field `quoteStringLiteral` quotes (emit-suppression.ts
-// has no EntityNode to key a diagnostic off, so this reports against the
-// suppression's own `target`/`span` instead of an entity name).
-export const quoteSwapDiagnosticsForSuppressions = (suppressions: readonly SuppressionNode[]): Diagnostic[] => {
-  const diagnostics: Diagnostic[] = [];
-  for (const suppression of suppressions) {
-    if (quoteSwapOccurred(suppression.reason)) {
-      diagnostics.push(quoteSwapDiagnostic(suppression.target, 'reason', suppression.span));
-    }
-  }
-  return diagnostics;
 };

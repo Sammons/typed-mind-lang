@@ -26,6 +26,7 @@ import type {
 } from '../ast/gen/cst-nodes.ts';
 import type { Span } from '../ast/span.ts';
 import type { TypeExprNode, TypeNamedNode } from '../ast/type-expr-node.ts';
+import { decodeQuotedString } from '../quoted-string.ts';
 import { typeSpanOf } from './spans.ts';
 // Lazy dependency on the string-based type parser (doc §1's "shared
 // verbatim" vocabulary): the readonly-array element and the longform
@@ -63,7 +64,7 @@ const typeAtomFromCst = (wrapped: CstTypeAtom): TypeExprNode => {
     return {
       kind: 'literal',
       literalKind: 'string',
-      value: rawText.replace(/^"/, '').replace(/"$/, ''),
+      value: decodeQuotedString(rawText),
       span: typeSpanOf(literalString.syntaxNode),
     };
   }

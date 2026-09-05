@@ -1,0 +1,79 @@
+{
+  "77-same-name-interface-two-files": {
+    "tmdContent": "program Main__App {\n  type: Program\n  entry: MainFile\n  version: 1.0.0\n  exports: [Main__JobRecord, saveJob]\n}\n\nMainFile @ src/main.ts:\n  <- [JobRecord, readJob]\n  -> [Main__JobRecord, saveJob]\n\nJobStoreFile @ src/job-store.ts:\n  -> [JobRecord, readJob]\n\nsaveJob :: saveJob(record: JobRecord) => JobStoreRecord\n  <- JobRecord\n  -> JobStoreRecord\n\nreadJob :: readJob(id: string) => JobRecord\n  -> JobRecord\n\nMain__JobRecord %\n  - id: string\n  - title: string\n\nJobRecord %\n  - id: string\n  - procoreTemplateId?: number",
+    "moduleGraph": [
+      {
+        "sourceModule": "src/main.ts",
+        "specifier": "./job-store.ts",
+        "resolvedTarget": "src/job-store.ts",
+        "classification": "internal"
+      }
+    ],
+    "diagnostics": []
+  },
+  "96-same-name-type-alias-two-files": {
+    "tmdContent": "program Index__App {\n  type: Program\n  entry: IndexFile\n  version: 1.0.0\n  exports: [advance]\n}\n\nIndexFile @ src/index.ts:\n  <- [nextState]\n  -> [advance]\n\nLifecycleFile @ src/lifecycle.ts:\n  -> [nextState]\n\nadvance :: advance(state: PublishState) => StoredPublishState\n  -> StoredPublishState\n\nnextState :: nextState(current: PublishState) => PublishState\n\nPublishState = 'draft' | 'published'\n\nLifecycle__PublishState = (typeof publishStates)[number]",
+    "moduleGraph": [
+      {
+        "sourceModule": "src/index.ts",
+        "specifier": "./lifecycle.ts",
+        "resolvedTarget": "src/lifecycle.ts",
+        "classification": "internal"
+      }
+    ],
+    "diagnostics": []
+  },
+  "83-generic-base-external-stub": {
+    "tmdContent": "program Index__App {\n  type: Program\n  entry: IndexFile\n  version: 1.0.0\n  exports: [AccountsTable, describeAccount]\n}\n\nExternalLib ^ \"external lib library\"\n  -> [Generated, ExternalThing]\n\nIndexFile @ src/index.ts:\n  <- [ExternalLib]\n  -> [AccountsTable, describeAccount]\n\ndescribeAccount :: describeAccount(row: AccountsTable) => string\n  <- AccountsTable\n\nAccountsTable %\n  - id: Generated<string>\n  - picked: Pick<ExternalThing, \"id\">\n  - name: string",
+    "moduleGraph": [
+      {
+        "sourceModule": "src/index.ts",
+        "specifier": "external-lib",
+        "classification": "unresolved"
+      }
+    ],
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "category": "unresolvable-import",
+        "message": "Could not resolve import specifier 'external-lib' from <fixture>/src/index.ts",
+        "filePath": "src/index.ts",
+        "specifier": "external-lib"
+      }
+    ]
+  },
+  "84-function-io-generic-orphan": {
+    "tmdContent": "program Index__App {\n  type: Program\n  entry: IndexFile\n  version: 1.0.0\n  exports: [boot]\n}\n\nIndexFile @ src/index.ts:\n  <- [fetchWrapped, countBoxes]\n  -> [boot]\n\nApiFile @ src/api.ts:\n  -> [Wrapped, Boxed, fetchWrapped, countBoxes]\n\nboot :: async boot() => Promise<number>\n\nfetchWrapped :: async fetchWrapped() => Promise<Wrapped[]>\n\ncountBoxes :: countBoxes(boxes: ReadonlyArray<Boxed>) => number\n\nWrapped %\n  - value: string\n\nBoxed %\n  - count: number",
+    "moduleGraph": [
+      {
+        "sourceModule": "src/index.ts",
+        "specifier": "./api.ts",
+        "resolvedTarget": "src/api.ts",
+        "classification": "internal"
+      }
+    ],
+    "diagnostics": []
+  },
+  "85-classfile-method-signature-types": {
+    "tmdContent": "program Server__App {\n  type: Program\n  entry: ServerFile\n  version: 1.0.0\n  exports: [runServer]\n}\n\nServerFile @ src/server.ts:\n  <- [LeaseStore, Lease]\n  -> [runServer]\n\nLeaseStore #: src/store.ts\n  => [allocate, list]\n  -> [Lease, StoreConfig, AllocationFailure, LeaseStore]\n\nrunServer :: runServer() => readonly Lease[]\n\nLease %\n  - id: string\n  - portBase: number\n\nStoreConfig %\n  - rangeBase: number\n  - rangeCount: number\n\nAllocationFailure %\n  - kind: 'no_capacity'",
+    "moduleGraph": [
+      {
+        "sourceModule": "src/server.ts",
+        "specifier": "./store.ts",
+        "resolvedTarget": "src/store.ts",
+        "classification": "internal"
+      }
+    ],
+    "diagnostics": []
+  },
+  "68-generic-type-parameters": {
+    "tmdContent": "program Index__App {\n  type: Program\n  entry: IndexFile\n  version: 1.0.0\n  exports: [HalEnvelope, Pair, unwrap]\n}\n\nIndexFile @ src/index.ts:\n  -> [HalEnvelope, Pair, unwrap]\n\nunwrap :: unwrap(envelope: HalEnvelope<string>, pair: Pair<number, string>) => void\n\nHalEnvelope %\n  - data: T\n  - self: string\n\nPair %\n  - left: A\n  - right: B",
+    "moduleGraph": [],
+    "diagnostics": []
+  },
+  "95-generic-function-type-parameter": {
+    "tmdContent": "program Index__App {\n  type: Program\n  entry: IndexFile\n  version: 1.0.0\n  exports: [Ledger, withTransaction, readLedger, countOf]\n}\n\nIndexFile @ src/index.ts:\n  -> [Ledger, withTransaction, readLedger, countOf]\n\nwithTransaction :: withTransaction(run: () => T) => T\n  -> T\n\nreadLedger :: readLedger() => Ledger\n  -> Ledger\n\ncountOf :: countOf(items: readonly Ledger[]) => number\n\nLedger %\n  - balance: number",
+    "moduleGraph": [],
+    "diagnostics": []
+  }
+}

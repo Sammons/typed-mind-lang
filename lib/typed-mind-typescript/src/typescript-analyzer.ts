@@ -4,6 +4,7 @@ import * as ts from 'typescript';
 import { getDeclarationIdentity, parseTypeTextOrigins, resolveReferenceOrigin, sourceRange } from './type-reference-origins.ts';
 import type {
   AnalyzerDiagnostic,
+  DeclarationIdentity,
   ModuleGraphEdge,
   ParsedCallReference,
   ParsedClass,
@@ -1327,7 +1328,7 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
-      declaration: getDeclarationIdentity(node),
+      declaration: this.getRetainedDeclarationIdentity(node),
       typeParameters: this.parseTypeParameters(node.typeParameters),
       signature,
       parameters,
@@ -1358,7 +1359,7 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
-      declaration: ts.isVariableDeclaration(nameNode.parent) ? getDeclarationIdentity(nameNode.parent) : undefined,
+      declaration: ts.isVariableDeclaration(nameNode.parent) ? this.getRetainedDeclarationIdentity(nameNode.parent) : undefined,
       typeParameters: this.parseTypeParameters(node.typeParameters),
       signature,
       parameters,
@@ -1473,7 +1474,7 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
-      declaration: getDeclarationIdentity(node),
+      declaration: this.getRetainedDeclarationIdentity(node),
       typeParameters: this.parseTypeParameters(node.typeParameters),
       extendsTypeInfo:
         node.heritageClauses
@@ -1549,7 +1550,7 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
-      declaration: getDeclarationIdentity(node),
+      declaration: this.getRetainedDeclarationIdentity(node),
       typeParameters: this.parseTypeParameters(node.typeParameters),
       extendsTypeInfo:
         node.heritageClauses
@@ -1572,7 +1573,7 @@ export class TypeScriptAnalyzer {
       type,
       typeInfo: this.getTypeInfo(node.type),
       typeParameters: this.parseTypeParameters(node.typeParameters),
-      declaration: getDeclarationIdentity(node),
+      declaration: this.getRetainedDeclarationIdentity(node),
       description: description || undefined,
     } as const;
   }
@@ -1588,7 +1589,7 @@ export class TypeScriptAnalyzer {
 
     return {
       name,
-      declaration: getDeclarationIdentity(node),
+      declaration: this.getRetainedDeclarationIdentity(node),
       members,
       description: description || undefined,
     } as const;
@@ -1618,7 +1619,7 @@ export class TypeScriptAnalyzer {
         name,
         type,
         typeInfo: this.getTypeInfo(declaration.type),
-        declaration: getDeclarationIdentity(declaration),
+        declaration: this.getRetainedDeclarationIdentity(declaration),
         value: value || undefined,
         isConst,
         callReferences: this.collectInitializerCallReferences(initializer),
@@ -1919,12 +1920,28 @@ export class TypeScriptAnalyzer {
     });
   }
 
+  private getRetainedDeclarationIdentity(declaration: ts.Declaration): DeclarationIdentity | undefined {
+    const name = ts.getNameOfDeclaration(declaration);
+    if (name !== undefined) {
+      const origin = this.resolveReferenceOriginAtLocation(name);
+      if (origin.kind === 'project') return origin.declaration;
+    }
+    return getDeclarationIdentity(declaration);
+  }
+
   private mapReferenceDeclarationToSource(declaration: ts.Declaration): ts.Declaration | null | undefined {
     const sourcePath = this.mapDeclarationToSource(this.realpathOrSelf(declaration.getSourceFile().fileName));
     if (sourcePath === undefined) return undefined;
     const source = this.program.getSourceFile(sourcePath);
     const identity = getDeclarationIdentity(declaration);
     if (source === undefined || identity === undefined) return null;
+    const container =
+      ts.isVariableDeclaration(declaration) && ts.isVariableDeclarationList(declaration.parent)
+        ? declaration.parent.parent.parent
+        : declaration.parent;
+    // The mapping below proves only top-level declarations. A nested namespace
+    // or member with the same spelling must never borrow a top-level identity.
+    if (!ts.isSourceFile(container)) return null;
     // A source mapping identifies the file, not the declaration. Match only
     // a unique actual declaration with the same declared name and syntax kind.
     // Do not transfer positions from the emitted .d.ts into the source file.
@@ -1939,12 +1956,33 @@ export class TypeScriptAnalyzer {
         ts.isClassDeclaration(statement) ||
         ts.isInterfaceDeclaration(statement) ||
         ts.isTypeAliasDeclaration(statement) ||
-        ts.isEnumDeclaration(statement)
+        ts.isEnumDeclaration(statement) ||
+        ts.isModuleDeclaration(statement)
       ) {
         if (statement.kind === declaration.kind && getDeclarationIdentity(statement)?.name === identity.name) candidates.push(statement);
       }
     }
-    return candidates.length === 1 ? candidates[0] : null;
+    // Real overloads and merged declarations share a checker symbol. Equal
+    // spelling alone is insufficient to merge independently declared targets.
+    const symbols = candidates.map((candidate) => {
+      const name = ts.getNameOfDeclaration(candidate);
+      return name === undefined ? undefined : this.checker.getSymbolAtLocation(name);
+    });
+    if (symbols.length === 0 || symbols[0] === undefined || symbols.some((symbol) => symbol !== symbols[0])) return null;
+    const sourceSymbol = symbols[0];
+    const canonical = resolveReferenceOrigin(sourceSymbol, this.program, this.checker);
+    if (canonical.kind !== 'project') return null;
+    return (
+      sourceSymbol.getDeclarations()?.find((candidate) => {
+        const identity = getDeclarationIdentity(candidate);
+        return (
+          identity?.filePath === canonical.declaration.filePath &&
+          identity.start === canonical.declaration.start &&
+          identity.end === canonical.declaration.end &&
+          identity.name === canonical.declaration.name
+        );
+      }) ?? null
+    );
   }
 
   // The single mixin-heritage helper, reconciling PR #152 (slat-harness,
