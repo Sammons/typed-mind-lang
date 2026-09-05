@@ -21,13 +21,10 @@ import {
   CstTypedefDeclaration,
   CstUicomponentDeclaration,
 } from '../ast/gen/cst-nodes.ts';
+import { decodeQuotedString } from '../quoted-string.ts';
 import { EntityAccumulator, type EntityAccumulatorArgs } from './entity-accumulator.ts';
 import { tokenSpanOf } from './spans.ts';
 import { typeExprFromCst } from './type-expr-from-cst.ts';
-
-const unquote = (text: string): string => {
-  return text.replace(/^"/, '').replace(/"$/, '');
-};
 
 // Legacy version captures strip the `v` prefix (parser-patterns.ts PROGRAM
 // `v([\d.]+)` and DEPENDENCY `v?([\d.\-\w]+)`); the grammar's `version` token
@@ -104,7 +101,7 @@ export const openProgram = (syntaxNode: SyntaxNode): EntityAccumulator => {
   accumulator.slots.entry = names.at(1)?.text ?? '';
   const purposeText = declaration.stringChildren().at(0)?.text;
   if (purposeText !== undefined) {
-    accumulator.slots.purpose = unquote(purposeText);
+    accumulator.slots.purpose = decodeQuotedString(purposeText);
   }
   const versionText = declaration.versionChildren().at(0)?.text;
   if (versionText !== undefined) {
@@ -184,7 +181,7 @@ export const openDto = (syntaxNode: SyntaxNode): EntityAccumulator => {
   );
   const purposeText = declaration.stringChildren().at(0)?.text;
   if (purposeText !== undefined) {
-    accumulator.slots.purpose = unquote(purposeText);
+    accumulator.slots.purpose = decodeQuotedString(purposeText);
   }
   return accumulator;
 };
@@ -194,7 +191,7 @@ export const openAsset = (syntaxNode: SyntaxNode): EntityAccumulator => {
   const accumulator = new EntityAccumulator(
     baseArgs('Asset', declaration.entityNameChildren().at(0)?.text ?? '', syntaxNode, inlineCommentTextOf(declaration)),
   );
-  accumulator.slots.description = unquote(declaration.stringChildren().at(0)?.text ?? '""');
+  accumulator.slots.description = decodeQuotedString(declaration.stringChildren().at(0)?.text ?? '""');
   return accumulator;
 };
 
@@ -203,7 +200,7 @@ export const openUiComponent = (syntaxNode: SyntaxNode): EntityAccumulator => {
   const accumulator = new EntityAccumulator(
     baseArgs('UIComponent', declaration.entityNameChildren().at(0)?.text ?? '', syntaxNode, inlineCommentTextOf(declaration)),
   );
-  accumulator.slots.purpose = unquote(declaration.stringChildren().at(0)?.text ?? '""');
+  accumulator.slots.purpose = decodeQuotedString(declaration.stringChildren().at(0)?.text ?? '""');
   // The `&!` root sigil is an anonymous token (like the dto_field `?`):
   // detected by walking the full child list.
   let root = false;
@@ -225,7 +222,7 @@ export const openRunParameter = (syntaxNode: SyntaxNode): EntityAccumulator => {
   );
   // param_type token is `$word`; the sigil is stripped (parser.ts:397).
   accumulator.slots.paramType = (declaration.paramTypeChildren().at(0)?.text ?? '$env').slice(1);
-  accumulator.slots.description = unquote(declaration.stringChildren().at(0)?.text ?? '""');
+  accumulator.slots.description = decodeQuotedString(declaration.stringChildren().at(0)?.text ?? '""');
   // Legacy: only the literal `(required)` marker sets required=true; any other
   // marker (incl. `(optional)`) leaves it undefined (parser.ts:398-405).
   const marker = declaration.paramMarkerChildren().at(0)?.text;
@@ -239,7 +236,7 @@ export const openDependency = (syntaxNode: SyntaxNode): EntityAccumulator => {
   const declaration = new CstDependencyDeclaration(syntaxNode);
   const name = declaration.entityNameChildren().at(0)?.text ?? declaration.dependencyNameChildren().at(0)?.text ?? '';
   const accumulator = new EntityAccumulator(baseArgs('Dependency', name, syntaxNode, inlineCommentTextOf(declaration)));
-  accumulator.slots.purpose = unquote(declaration.stringChildren().at(0)?.text ?? '""');
+  accumulator.slots.purpose = decodeQuotedString(declaration.stringChildren().at(0)?.text ?? '""');
   const versionText = declaration.versionChildren().at(0)?.text;
   if (versionText !== undefined) {
     accumulator.slots.version = stripVersionPrefix(versionText);

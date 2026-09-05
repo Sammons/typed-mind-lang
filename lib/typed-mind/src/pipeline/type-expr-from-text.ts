@@ -27,6 +27,7 @@
 
 import type { Position, Span } from '../ast/span.ts';
 import type { TypeExprNode, TypeNamedNode } from '../ast/type-expr-node.ts';
+import { scanQuotedString } from '../quoted-string.ts';
 
 export interface ParseTypeExprTextOptions {
   // The 1-based line/column where `text[0]` sits in the real document —
@@ -213,19 +214,17 @@ const parseNamed = (cursor: TextCursor): TypeNamedNode | undefined => {
 };
 
 const parseStringLiteral = (cursor: TextCursor): TypeExprNode | undefined => {
-  if (cursor.peek()[0] !== '"') {
+  const startIndex = cursor.index;
+  const literal = scanQuotedString(cursor.text, startIndex);
+  if (literal === undefined) {
     return undefined;
   }
-  const startIndex = cursor.index;
-  const closingIndex = cursor.text.indexOf('"', cursor.index + 1);
-  const endIndex = closingIndex === -1 ? cursor.text.length : closingIndex + 1;
-  const raw = cursor.text.slice(startIndex, endIndex);
-  cursor.index = endIndex;
+  cursor.index = literal.endIndex;
   return {
     kind: 'literal',
     literalKind: 'string',
-    value: raw.replace(/^"/, '').replace(/"$/, ''),
-    span: spanFrom(cursor, startIndex, endIndex),
+    value: literal.value,
+    span: spanFrom(cursor, startIndex, cursor.index),
   };
 };
 
