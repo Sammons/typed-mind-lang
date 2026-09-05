@@ -1,0 +1,42 @@
+program MainApp {
+  type: Program
+  entry: MainFile
+  version: 1.0.0
+  exports: [describeSource]
+}
+
+DetectFormatFile @ src/detect-format.ts:
+  -> [FormatDetectionResult, detectFormat]
+
+FormatApiFile @ src/format-api.ts:
+  <- [detectFormat, FormatDetectionResult]
+  -> [formatLabel]
+  <-> [FormatDetectionResult, detectFormat]
+
+MainFile @ src/main.ts:
+  <- [formatLabel, detectFormat, FormatDetectionResult, SyntaxEmitter]
+  -> [describeSource]
+
+classfile SyntaxEmitter {
+  type: ClassFile
+  path: src/syntax-emitter.ts
+  imports: [detectFormat, FormatDetectionResult]
+  method: "emit(source: string, options?: EmitOptions) => string"
+  exports: [EmitOptions, SyntaxEmitter]
+}
+
+detectFormat :: detectFormat(source: string) => FormatDetectionResult
+  -> FormatDetectionResult
+
+formatLabel :: formatLabel(source: string) => string
+
+describeSource :: describeSource(source: string) => string
+
+FormatDetectionResult %
+  - format: SyntaxFormat
+  - confidence: number
+
+EmitOptions %
+  - forceForm?: SyntaxFormat
+
+SyntaxFormat = 'shortform' | 'longform' | 'mixed'
