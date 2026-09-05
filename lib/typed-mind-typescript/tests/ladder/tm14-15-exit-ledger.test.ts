@@ -46,9 +46,7 @@ describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
       join(repoRoot, 'lib/typed-mind-typescript/tsconfig.json'),
       join(repoRoot, 'lib/typed-mind-typescript/src/cli.ts'),
     );
-    const orphanNames = result.orphans
-      .map((d) => d.message.replace("Orphaned entity '", '').replace("'", ''))
-      .sort();
+    const orphanNames = result.orphans.map((d) => d.message.replace("Orphaned entity '", '').replace("'", '')).sort();
     assert.deepEqual(orphanNames, [
       'AccumulatorSlots',
       'CONSTRUCTOR_MEMBER',
@@ -87,9 +85,7 @@ describe('TM14/15 EXIT: core (typed-mind)', () => {
       join(repoRoot, 'lib/typed-mind/tsconfig.json'),
       join(repoRoot, 'lib/typed-mind/src/typed-mind.ts'),
     );
-    const orphanNames = result.orphans
-      .map((d) => d.message.replace("Orphaned entity '", '').replace("'", ''))
-      .sort();
+    const orphanNames = result.orphans.map((d) => d.message.replace("Orphaned entity '", '').replace("'", '')).sort();
     assert.deepEqual(orphanNames, [
       'AccumulatorSlots',
       'CST_FINAL_TWIN_COUNT',
