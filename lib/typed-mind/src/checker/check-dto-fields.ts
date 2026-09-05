@@ -21,6 +21,7 @@
 // minimal trigger (doc §"FAQ", "What exactly triggers the enum closed-set
 // check?").
 
+import { DependencyNode } from '../ast/dependency-node.ts';
 import { DtoNode } from '../ast/dto-node.ts';
 import type { Span } from '../ast/span.ts';
 import { TypeDefNode } from '../ast/type-def-node.ts';
@@ -96,6 +97,13 @@ const checkNamedPart = (context: CheckContext, entity: DtoNode, fieldName: strin
   }
   const referenced = context.byName.get(name);
   if (referenced === undefined) {
+    // RFC-TM-13 B2: external type exports resolve only absent local names.
+    // A local declaration still owns its name and must pass the kind check.
+    for (const dependency of context.byName.values()) {
+      if (dependency instanceof DependencyNode && dependency.exports?.includes(name)) {
+        return;
+      }
+    }
     context.addFinding({
       code: 'checker/dto-field-unknown-type',
       severity: 'error',
