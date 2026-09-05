@@ -193,6 +193,10 @@ it('TM13 A1: origin-only extraction is byte-identical', () => {
   // Captured with the unmodified analyzer from 8559841, before A1. These
   // fixtures had no complete checked-in output snapshots in the main suite.
   const baseline = JSON.parse(readFileSync(join(import.meta.dirname, 'goldens/type-origins/baseline-8559841.json'), 'utf8'));
+  // E changes only Program/source identities and canonical emission order.
+  // Keep the immutable A1 proof and its exact graph/diagnostics; pin E's
+  // emitted names separately while retaining metadata-stripped equality.
+  const emittedNames = JSON.parse(readFileSync(join(import.meta.dirname, 'goldens/type-origins/emitted-names-tm13-e.json'), 'utf8'));
   const fixtures = [
     ['77-same-name-interface-two-files', 'main.ts'],
     ['96-same-name-type-alias-two-files', 'index.ts'],
@@ -228,7 +232,7 @@ it('TM13 A1: origin-only extraction is byte-identical', () => {
           })),
         }),
       ),
-      baseline[name],
+      { ...baseline[name], tmdContent: emittedNames[name] },
     );
     const stripped = strip(analysis) as TypeScriptProjectAnalysis;
     assert.deepEqual(new TypeScriptToTypedMindConverter().convert(analysis), new TypeScriptToTypedMindConverter().convert(stripped), name);
