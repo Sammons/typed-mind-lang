@@ -8,14 +8,19 @@ program IndexApp {
 IndexFile @ src/index.ts:
   -> [BaseWidget, applyMixin, IsolatedLeaf, LightWidget]
 
-BaseWidget <:
-  => [render]
+class BaseWidget {
+  type: Class
+  method: "render() => string"
+}
 
 IsolatedLeaf <: BaseWidget
   "The zero-method shape — this is the one that leaked unparsable text."
 
-LightWidget <: BaseWidget
-  "The with-methods shape — took the ClassFile path and emitted safely."
-  => [createRoot]
+class LightWidget {
+  type: Class
+  extends: BaseWidget
+  description: "The with-methods shape — took the ClassFile path and emitted safely."
+  method: "createRoot() => string"
+}
 
 applyMixin :: applyMixin(base: (typeof BaseWidget)) => (typeof BaseWidget)

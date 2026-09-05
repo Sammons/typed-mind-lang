@@ -8,7 +8,14 @@
 // survives (I-2), so highlighting/references/word-ranges cannot drift from
 // the grammar's real name class again.
 
-import type { CstNode, CstSourceFile, EntityNode } from '@sammons/typed-mind';
+import {
+  ClassFileNode,
+  ClassNode,
+  type CstNode,
+  type CstSourceFile,
+  type EntityNode,
+  walkClassMemberTypeReferences,
+} from '@sammons/typed-mind';
 
 export interface NameOccurrence {
   readonly name: string;
@@ -97,15 +104,29 @@ const collectOccurrences = (node: CstNode, out: NameOccurrence[]): void => {
 // version) and answers every LSP feature that used to hand-roll its own
 // text scan: semantic tokens, references, word-range-at-position.
 export class NameOccurrenceIndex {
-  // Sorted by position (line, then column) — the walk visits the CST in
-  // source order, which already satisfies this; asserted by construction,
-  // not re-sorted.
+  // CST tokens and parsed quoted member references share source ordering.
   readonly #occurrences: readonly NameOccurrence[];
   readonly #byName: ReadonlyMap<string, readonly NameOccurrence[]>;
 
   constructor(cst: CstSourceFile, entities: readonly EntityNode[] = []) {
     const occurrences: NameOccurrence[] = [];
     collectOccurrences(cst, occurrences);
+    for (const entity of entities) {
+      if (!(entity instanceof ClassNode || entity instanceof ClassFileNode)) continue;
+      walkClassMemberTypeReferences(entity, {
+        reference(node) {
+          occurrences.push({
+            name: node.name,
+            startLine: node.span.start.line,
+            startColumn: node.span.start.column,
+            endLine: node.span.end.line,
+            endColumn: node.span.end.column,
+            isDeclaration: false,
+          });
+        },
+      });
+    }
+    occurrences.sort((left, right) => left.startLine - right.startLine || left.startColumn - right.startColumn);
     this.#occurrences = occurrences.map((occurrence) => {
       if (occurrence.referenceKind === undefined) return occurrence;
       const owner = entities.findLast((entity) => entity.span.start.line <= occurrence.startLine);

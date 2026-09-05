@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { type EntityNode, TypedMind } from '@sammons/typed-mind';
+import { ClassFileNode, ClassNode, type EntityNode, TypedMind } from '@sammons/typed-mind';
 import type { ParsedModule, TypeScriptProjectAnalysis } from '../types.ts';
 import { createFilePath } from '../types.ts';
 import { TypeScriptToTypedMindConverter } from '../typescript-to-typedmind-converter.ts';
@@ -367,6 +367,34 @@ const stripDeliberateProgramNameChange = (entities: readonly unknown[]): unknown
     return rest;
   });
 
+// B3 adds two exact signatures to this fixed mock. Pin those new facts before
+// comparing the rest of the old semantic graph; immutable baselines stay intact.
+const assertTypedMembers = (entities: readonly EntityNode[]): void => {
+  const classes = entities.filter((entity) => entity instanceof ClassNode || entity instanceof ClassFileNode);
+  assert.equal(classes.length, 1);
+  const entity = classes[0];
+  assert.ok(entity instanceof ClassNode || entity instanceof ClassFileNode);
+  assert.equal(entity.name, 'UserService');
+  assert.deepEqual(entity.members?.constructors, []);
+  assert.deepEqual(
+    entity.members?.methods.map((method) => ({
+      name: method.name,
+      text: method.signature?.kind === 'parsed' ? method.signature.signature.text : undefined,
+    })),
+    [
+      { name: 'createUser', text: 'async createUser(data: CreateUserDTO) => Promise<UserDTO>' },
+      { name: 'findUser', text: 'async findUser(id: string) => Promise<UserDTO | null>' },
+    ],
+  );
+};
+const stripDeliberateTypedMemberChange = (entities: readonly unknown[]): unknown[] =>
+  entities.map((entity) => {
+    const record = entity as Record<string, unknown>;
+    if ((record.kind !== 'Class' && record.kind !== 'ClassFile') || record.name !== 'UserService') return entity;
+    const { members: _members, raw: _raw, sourceForm: _sourceForm, ...rest } = record;
+    return rest;
+  });
+
 describe('RFC-TM-6 Q3 — converter flip: semantic-equivalence gate + live goldens', () => {
   let originalCwd: string;
   let typedMind: TypedMind;
@@ -406,9 +434,10 @@ describe('RFC-TM-6 Q3 — converter flip: semantic-equivalence gate + live golde
       const legacyParsed = typedMind.parse(legacyGoldenText);
       const liveParsed = typedMind.parse(result.tmdContent);
 
+      assertTypedMembers(liveParsed.entities);
       assert.deepEqual(
-        stripDeliberateProgramNameChange(stripSpans(liveParsed.entities)),
-        stripDeliberateProgramNameChange(stripSpans(legacyParsed.entities)),
+        stripDeliberateTypedMemberChange(stripDeliberateProgramNameChange(stripSpans(liveParsed.entities))),
+        stripDeliberateTypedMemberChange(stripDeliberateProgramNameChange(stripSpans(legacyParsed.entities))),
       );
     });
   }

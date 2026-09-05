@@ -8,14 +8,23 @@ program IndexApp {
 IndexFile @ src/index.ts:
   -> [Item, Repo, GenericChild, GenericBase, GenericDerived, drive]
 
-GenericBase<T> <:
-  => [hold]
+class GenericBase {
+  type: Class
+  typeParameter: "T"
+  method: "hold(value: T) => void"
+}
 
-GenericDerived <: GenericBase<string>
-  => [run]
+class GenericDerived {
+  type: Class
+  extends: "GenericBase<string>"
+  method: "run() => void"
+}
 
-Repo<T> <:
-  => [find]
+class Repo {
+  type: Class
+  typeParameter: "T"
+  method: "find(id: string) => T"
+}
 
 GenericChild <: Repo<Item>
 

@@ -36,7 +36,7 @@ import { illegalContinuationDiagnostic } from './attachment-rules.ts';
 import { EntityAccumulator } from './entity-accumulator.ts';
 import { attachHeaderTypeParameters, attachParameterProperties, heritageFromCst } from './generic-declaration-syntax.ts';
 import { parseHeritageText } from './parse-heritage-text.ts';
-import { parseSignatureText } from './parse-signature-text.ts';
+import { parseQuotedSignature } from './parse-quoted-signature.ts';
 import { tokenSpanOf } from './spans.ts';
 import { parseTypeExprText } from './type-expr-from-text.ts';
 
@@ -69,7 +69,7 @@ const LONGFORM_KIND_BY_KEYWORD: Record<string, EntityKind> = {
 };
 
 interface ScalarProperty {
-  quoted?: boolean;
+  quoted?: { text: string; span: Span };
   kind: 'scalar';
   key: string;
   value: string;
@@ -195,7 +195,10 @@ const classifyBlockProperty = (property: CstBlockProperty): LongformProperty | u
     return {
       kind: 'scalar',
       key: stringProperty.propertyKeyChildren().at(0)?.text ?? '',
-      quoted: true,
+      quoted: {
+        text: stringProperty.stringChildren().at(0)?.text ?? '""',
+        span: stringProperty.stringChildren().at(0)?.span() ?? span,
+      },
       value: decodeQuotedString(stringProperty.stringChildren().at(0)?.text ?? '""'),
       span,
     };
@@ -543,11 +546,7 @@ const buildResult = (accumulator: EntityAccumulator, collected: CollectedPropert
         });
         continue;
       }
-      const signature = parseSignatureText(property.value, {
-        baseLine: property.span.start.line,
-        baseColumn: property.span.start.column,
-        allowMissingReturnType: property.key === 'constructor',
-      });
+      const signature = parseQuotedSignature(property.quoted.text, property.quoted.span, property.key === 'constructor');
       if (property.key === 'constructor') constructors.push({ signature, span: property.span });
       else
         methods.push({

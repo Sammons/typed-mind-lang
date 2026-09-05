@@ -199,6 +199,8 @@ it('TM13 A1: origin-only extraction is byte-identical', () => {
   // historical compatibility proof converts metadata-stripped analysis.
   // A2's own exact-output and removal controls cover origin-aware conversion.
   const emittedNames = JSON.parse(readFileSync(join(import.meta.dirname, 'goldens/type-origins/emitted-names-tm13-e.json'), 'utf8'));
+  // B3 adds only typed members/constructors in fixture85; preserve the A1/E snapshots.
+  const typedMembers = JSON.parse(readFileSync(join(import.meta.dirname, 'goldens/type-origins/typed-members-tm13-b3.json'), 'utf8'));
   const fixtures = [
     ['77-same-name-interface-two-files', 'main.ts'],
     ['96-same-name-type-alias-two-files', 'index.ts'],
@@ -235,7 +237,7 @@ it('TM13 A1: origin-only extraction is byte-identical', () => {
           })),
         }),
       ),
-      { ...baseline[name], tmdContent: emittedNames[name] },
+      { ...baseline[name], tmdContent: typedMembers[name] ?? emittedNames[name] },
     );
 
     assert.deepEqual(analysis.moduleGraph, stripped.moduleGraph);

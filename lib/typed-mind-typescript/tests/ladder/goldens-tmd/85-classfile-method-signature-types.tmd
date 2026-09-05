@@ -1,0 +1,32 @@
+program ServerApp {
+  type: Program
+  entry: ServerFile
+  version: 1.0.0
+  exports: [runServer]
+}
+
+ServerFile @ src/server.ts:
+  <- [LeaseStore, Lease]
+  -> [runServer]
+
+classfile LeaseStore {
+  type: ClassFile
+  path: src/store.ts
+  method: "allocate(worktreePath: string) => Lease | AllocationFailure"
+  method: "list() => readonly Lease[]"
+  constructor: "(config: StoreConfig, leases?: Lease[])"
+  exports: [Lease, StoreConfig, AllocationFailure, LeaseStore]
+}
+
+runServer :: runServer() => readonly Lease[]
+
+Lease %
+  - id: string
+  - portBase: number
+
+StoreConfig %
+  - rangeBase: number
+  - rangeCount: number
+
+AllocationFailure %
+  - kind: 'no_capacity'

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { it, type TestContext } from 'node:test';
 import { ClassFileNode, ClassNode, TypedMind } from '@sammons/typed-mind';
 import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
@@ -11,7 +11,11 @@ const fixture = (context: TestContext, files: Record<string, string>) => {
   const root = mkdtempSync(join(tmpdir(), 'tm13-members-'));
   context.after(() => rmSync(root, { recursive: true, force: true }));
   writeFileSync(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true, module: 'NodeNext' } }));
-  for (const [name, text] of Object.entries(files)) writeFileSync(join(root, name), text);
+  for (const [name, text] of Object.entries(files)) {
+    const path = join(root, name);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text);
+  }
   return new TypeScriptAnalyzer(root).analyzeFromEntrypoint(join(root, 'main.ts'));
 };
 const classNamed = (entities: readonly unknown[], name: string) => {
@@ -119,4 +123,31 @@ export function main() { return [PrivateStore, ProtectedStore, PublicStore]; }`,
     assert.equal(classNamed(result.entities, 'PublicStore').members?.constructors.length, 1);
     assert.ok(result.tmdContent.includes('(config: Config, label?: any)'));
   }
+});
+
+it('TM13 B3b: external member types and nested local binders preserve provenance', async (context) => {
+  const analysis = fixture(context, {
+    'main.ts': 'import { Store } from "./store.js"; export function main() { return Store; }',
+    'node_modules/contracts/package.json': JSON.stringify({ name: 'contracts', version: '1.0.0', types: 'index.d.ts' }),
+    'node_modules/contracts/index.d.ts': 'export interface PublicShape { value: string; }',
+    'store.ts': `import type { PublicShape as External } from 'contracts';
+export interface T { unrelated: boolean; }
+export interface Bound { bound: string; }
+export interface Result { result: number; }
+export class Store<T extends Bound> {
+  constructor(outer: T, external: External) {}
+  pick<T extends External>(value: T): T { return value; }
+  visit(callback: <T>(value: T, external: External) => Result): void {}
+}`,
+  });
+  const result = new TypeScriptToTypedMindConverter().convert(analysis);
+  assert.equal(result.success, true, JSON.stringify(result.errors));
+  assert.ok(result.tmdContent.includes('Contracts.PublicShape'), result.tmdContent);
+  assert.ok(result.tmdContent.includes('pick<T extends Contracts.PublicShape>'));
+  assert.ok(result.tmdContent.includes('constructor: "(outer: T, external: Contracts.PublicShape)"'));
+  const findings = (await TypedMind.create()).check(result.tmdContent).diagnostics;
+  assert.deepEqual(
+    findings.map((finding) => finding.message),
+    ["Orphaned entity 'T'"],
+  );
 });

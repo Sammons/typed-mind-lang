@@ -6,6 +6,7 @@ import { DtoNode } from '../ast/dto-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
 import { FunctionNode } from '../ast/function-node.ts';
 import type { HeritageReference } from '../ast/heritage-reference.ts';
+import type { Span } from '../ast/span.ts';
 import { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode, TypeNamedNode, TypeOpaqueNode } from '../ast/type-expr-node.ts';
 import type { TypeParameterNode } from '../ast/type-parameter-node.ts';
@@ -58,8 +59,36 @@ export const walkTypeReferences = (
       return;
     case 'opaque': {
       const parsed = parseSignatureText(node.text, { baseLine: node.span.start.line, baseColumn: node.span.start.column });
-      if (parsed.kind === 'parsed') walkSignatureTypes(parsed.signature, binders, hooks, position);
-      else hooks.opaque?.(node, position);
+      if (parsed.kind === 'parsed') {
+        const sourceSpan = (value: Span): Span => {
+          if (node.textOffsets === undefined) return value;
+          const point = (value: Span['start']): Span['start'] => {
+            const offset = node.textOffsets?.[value.column - node.span.start.column];
+            return offset === undefined ? value : { line: value.line, column: node.span.start.column + offset };
+          };
+          return { start: point(value.start), end: point(value.end) };
+        };
+        walkSignatureTypes(
+          parsed.signature,
+          binders,
+          node.textOffsets === undefined
+            ? hooks
+            : {
+                ...hooks,
+                reference: (reference, args, role) => hooks.reference({ ...reference, span: sourceSpan(reference.span) }, args, role),
+                parameters:
+                  hooks.parameters === undefined
+                    ? undefined
+                    : (parameters) =>
+                        hooks.parameters?.(parameters.map((parameter) => ({ ...parameter, span: sourceSpan(parameter.span) }))),
+                opaque:
+                  hooks.opaque === undefined
+                    ? undefined
+                    : (opaque, role) => hooks.opaque?.({ ...opaque, span: sourceSpan(opaque.span) }, role),
+              },
+          position,
+        );
+      } else hooks.opaque?.(node, position);
       return;
     }
     case 'literal':
@@ -93,6 +122,18 @@ export const walkSignatureTypes = (
   if (signature.returnType !== undefined) visit(signature.returnType);
 };
 
+export const walkClassMemberTypeReferences = (entity: ClassNode | ClassFileNode, hooks: TypeReferenceHooks): void => {
+  const binders = new Set(entity.typeParameters?.map((parameter) => parameter.name));
+  for (const member of entity.members?.methods ?? []) {
+    const signature = methodSignature(member);
+    if (signature !== undefined) walkSignatureTypes(signature, binders, hooks, 'member-signature');
+  }
+  for (const member of entity.members?.constructors ?? []) {
+    const signature = constructorSignature(member);
+    if (signature !== undefined) walkSignatureTypes(signature, binders, hooks, 'member-signature');
+  }
+};
+
 export const walkEntityTypeReferences = (entity: EntityNode, hooks: TypeReferenceHooks): void => {
   const parameters = parametersOf(entity);
   const binders = new Set(parameters?.map((parameter) => parameter.name));
@@ -105,16 +146,7 @@ export const walkEntityTypeReferences = (entity: EntityNode, hooks: TypeReferenc
     const parsed = parseSignatureText(entity.signature, { baseLine: entity.span.start.line, baseColumn: entity.span.start.column });
     if (parsed.kind === 'parsed') walkSignatureTypes(parsed.signature, binders, hooks, 'signature', parameters === undefined);
   }
-  if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
-    for (const member of entity.members?.methods ?? []) {
-      const signature = methodSignature(member);
-      if (signature !== undefined) walkSignatureTypes(signature, binders, hooks, 'member-signature');
-    }
-    for (const member of entity.members?.constructors ?? []) {
-      const signature = constructorSignature(member);
-      if (signature !== undefined) walkSignatureTypes(signature, binders, hooks, 'member-signature');
-    }
-  }
+  if (entity instanceof ClassNode || entity instanceof ClassFileNode) walkClassMemberTypeReferences(entity, hooks);
   const heritage = (reference: HeritageReference, role: 'extends' | 'implements'): void => {
     hooks.heritage?.(reference, role, binders);
     if (reference.kind !== 'named') return;

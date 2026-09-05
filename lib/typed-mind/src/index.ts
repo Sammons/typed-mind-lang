@@ -75,6 +75,7 @@ export { UiComponentNode } from './ast/ui-component-node.ts';
 // RFC-TM-13 C-prime preserves quotes and nested aliases, so neither fires.
 export { QUOTE_SWAP_CODE, UNREPRESENTABLE_ALIAS_CODE } from './emitter/emitter-diagnostics.ts';
 export { printHeritage, printTypeParameter } from './emitter/generic-declaration-emission.ts';
+export { printSignature } from './emitter/print-signature.ts';
 // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — the TypeScript converter builds a
 // synthetic ParseOutcome directly (it never runs source through the parser),
 // so it needs SyntaxEmitter itself rather than going through TypedMind's
@@ -100,6 +101,7 @@ export {
 } from './pipeline/parse-signature-text.ts';
 export { parseTypeParameterListText, parseTypeParameterText } from './pipeline/parse-type-parameters.ts';
 export { type ParseTypeExprTextOptions, type ParseTypeExprTextResult, parseTypeExprText } from './pipeline/type-expr-from-text.ts';
+export { walkClassMemberTypeReferences } from './pipeline/type-reference-walk.ts';
 export { canonicalizeTypeText } from './pipeline/type-text-lexical.ts';
 // RFC-TM-4 §3 (rfc-tm-4-diamond.md) — the new primary surface (the flip's
 // original new export). This is the only checker/parser entry point left —

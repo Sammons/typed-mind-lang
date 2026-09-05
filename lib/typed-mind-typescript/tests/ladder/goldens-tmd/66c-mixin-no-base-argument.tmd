@@ -8,10 +8,15 @@ program IndexApp {
 IndexFile @ src/index.ts:
   -> [Widget, makeWidget, SelfMadeWidget]
 
-Widget <:
-  => [render]
+class Widget {
+  type: Class
+  method: "render() => string"
+}
 
-SelfMadeWidget <: Widget
-  => [label]
+class SelfMadeWidget {
+  type: Class
+  extends: Widget
+  method: "label() => string"
+}
 
 makeWidget :: makeWidget() => (typeof Widget)

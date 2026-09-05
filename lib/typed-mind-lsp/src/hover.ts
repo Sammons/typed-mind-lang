@@ -23,6 +23,7 @@ import {
   type LinkIndex,
   ProgramNode,
   printHeritage,
+  printSignature,
   printTypeParameter,
   RunParameterNode,
   TypeDefNode,
@@ -114,7 +115,15 @@ const renderClass = (entity: ClassNode): string[] => {
     section('Purpose', entity.purpose),
     section('Extends', entity.heritage.extends === undefined ? undefined : printHeritage(entity.heritage.extends)),
     listSection('Implements', entity.heritage.implements.map(printHeritage)),
-    listSection('Methods', entity.methods),
+    listSection(
+      'Methods',
+      entity.members?.methods.map((member) => (member.signature === undefined ? (member.name ?? '') : printSignature(member.signature))) ??
+        entity.methods,
+    ),
+    listSection(
+      'Constructors',
+      entity.members?.constructors.map((member) => printSignature(member.signature)),
+    ),
   ].filter((line): line is string => line !== undefined);
 };
 
@@ -128,7 +137,15 @@ const renderClassFile = (entity: ClassFileNode): string[] => {
     section('Purpose', entity.purpose),
     section('Extends', entity.heritage.extends === undefined ? undefined : printHeritage(entity.heritage.extends)),
     listSection('Implements', entity.heritage.implements.map(printHeritage)),
-    listSection('Methods', entity.methods),
+    listSection(
+      'Methods',
+      entity.members?.methods.map((member) => (member.signature === undefined ? (member.name ?? '') : printSignature(member.signature))) ??
+        entity.methods,
+    ),
+    listSection(
+      'Constructors',
+      entity.members?.constructors.map((member) => printSignature(member.signature)),
+    ),
     listSection('Imports', entity.imports),
     listSection('Exports', entity.exports),
   ].filter((line): line is string => line !== undefined);

@@ -301,6 +301,13 @@ const cases: readonly FixtureCase[] = [
     expectConversionSuccess: true,
     recordedCheckerValid: true,
   },
+  // B3 retains constructor and method references; both original false orphans close.
+  {
+    fixture: '85-classfile-method-signature-types',
+    entrySegments: ['src', 'server.ts'],
+    expectConversionSuccess: true,
+    recordedCheckerValid: true,
+  },
   // TM13 C closes the shared grammar gap: both fixtures now check clean.
   {
     fixture: '86-fn-type-union-in-generic-return',

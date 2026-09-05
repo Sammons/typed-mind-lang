@@ -62,6 +62,9 @@ export interface TypeIntersectionNode {
 export interface TypeOpaqueNode {
   readonly kind: 'opaque';
   readonly text: string;
+  // Optional source provenance: decoded text offsets to source-column offsets.
+  // Quoted payload escapes make these differ; absent means the ordinary raw span.
+  readonly textOffsets?: readonly number[];
   readonly span: Span;
 }
 
