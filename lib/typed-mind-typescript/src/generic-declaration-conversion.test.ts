@@ -236,3 +236,22 @@ export function take<T>(values: T[], limit: number = 1): T[] { return values.sli
     assert.deepEqual(mind.check(text).diagnostics, []);
   }
 });
+
+it('TM13 EXIT: tooling constructor unknown and intrinsic method types remain valid source facts', async () => {
+  const { result } = convert(`
+export class NotionApiError extends Error {
+  constructor(status: number, message: string, code?: string, details?: unknown) { super(message); }
+  value(key: symbol, count: bigint, details: unknown): unknown { return details; }
+  fail(): never { throw this; }
+}
+export function choose<T extends unknown = never>(value: T): T { return value; }
+`);
+  assert.equal(result.success, true);
+  const owner = result.entities.find((entity) => entity.name === 'NotionApiError');
+  assert.ok(owner instanceof ClassNode || owner instanceof ClassFileNode);
+  assert.match(result.tmdContent, /constructor: "\(status: number, message: string, code\?: string, details\?: unknown\)"/);
+  assert.match(result.tmdContent, /method: "value\(key: symbol, count: bigint, details: unknown\) => unknown"/);
+  assert.match(result.tmdContent, /method: "fail\(\) => never"/);
+  const mind = await TypedMind.create();
+  assert.deepEqual(mind.check(result.tmdContent).diagnostics, []);
+});

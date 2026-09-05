@@ -205,3 +205,83 @@ it('G.4/B3 generic agreement ignores observational quoted-source offsets', () =>
   checkGenericDeclarations(context);
   assert.deepEqual(context.findings, []);
 });
+
+it('TM13 EXIT: intrinsic keywords resolve in generic and member slots without hiding named types', async () => {
+  const context = await inspect(`Data %
+Unknown %
+Unused %
+class Api {
+  typeParameter: "T extends unknown = never"
+  constructor: "(details?: unknown)"
+  method: "process(value: T, data: Data, named: Unknown, key: symbol, count: bigint) => unknown"
+  method: "fail() => never"
+}
+`);
+  assert.deepEqual(genericErrors(context), []);
+  assert.deepEqual(orphans(context), ["Orphaned entity 'Api'", "Orphaned entity 'Unused'"]);
+  assert.equal(context.links.referencedBy('Data').length, 1);
+  assert.equal(context.links.referencedBy('Unknown').length, 1);
+  const wrongKind = await inspect('unknown :: unknown() => void\nclass Api {\n method: "process(value: unknown) => void"\n}\n');
+  assert.deepEqual(
+    genericErrors(wrongKind).map((finding) => finding.code),
+    ['checker/generic-non-data-type'],
+  );
+  const missing = await inspect('class Api {\n method: "process(value: unkown, named: Unknown) => never"\n}\n');
+  assert.deepEqual(
+    genericErrors(missing).map(({ code, message }) => ({ code, message })),
+    [
+      { code: 'checker/generic-unknown-type', message: "Generic declaration 'Api' references undefined type 'unkown'" },
+      { code: 'checker/generic-unknown-type', message: "Generic declaration 'Api' references undefined type 'Unknown'" },
+    ],
+  );
+});
+
+it('TM13 EXIT: AbortSignal resolves only as an absent platform data type', async () => {
+  const implicit = await inspect(`WorkerDeps %
+  - signal: AbortSignal
+  - sleep?: (ms: number, signal?: AbortSignal) => Promise<void>
+class Worker {
+  typeParameter: "T extends AbortSignal = AbortSignal"
+  constructor: "(signal: AbortSignal)"
+  method: "sleep(signal: AbortSignal) => Promise<void>"
+}
+`);
+  assert.deepEqual(genericErrors(implicit), []);
+  const declared = await inspect('AbortSignal %\nWorkerDeps %\n  - signal: AbortSignal\n');
+  assert.deepEqual(genericErrors(declared), []);
+  assert.deepEqual(orphans(declared), ["Orphaned entity 'WorkerDeps'"]);
+  assert.equal(declared.links.referencedBy('AbortSignal').length, 1);
+  const wrongKind = await inspect(`AbortSignal :: () => void
+WorkerDeps %
+  - signal: AbortSignal
+class Worker {
+  method: "sleep(signal: AbortSignal) => void"
+}
+`);
+  assert.deepEqual(
+    genericErrors(wrongKind)
+      .map((finding) => finding.code)
+      .sort(),
+    ['checker/dto-field-non-data-type', 'checker/generic-non-data-type'],
+  );
+  const missing = await inspect(`WorkerDeps %
+  - signal: AbortSigal
+class Worker {
+  method: "sleep(signal: Missing) => void"
+}
+`);
+  assert.deepEqual(
+    genericErrors(missing)
+      .map((finding) => finding.code)
+      .sort(),
+    ['checker/dto-field-unknown-type', 'checker/generic-unknown-type'],
+  );
+  const local = await inspect(`AbortSignal %
+class Worker<AbortSignal> {
+  method: "sleep(signal: AbortSignal) => AbortSignal"
+}
+`);
+  assert.deepEqual(genericErrors(local), []);
+  assert.deepEqual(orphans(local), ["Orphaned entity 'AbortSignal'", "Orphaned entity 'Worker'"]);
+  assert.deepEqual(local.links.referencedBy('AbortSignal'), []);
+});
