@@ -96,8 +96,15 @@ it('TM13 B3a: typed local names do not consume unrelated global functions', asyn
     legacy.some((finding) => finding.message === "Orphaned entity 'run'" || finding.code === 'checker/function-not-exported'),
     false,
   );
-  assert.ok(
+  // RFC-TM-14 §S2 (U2): `Store.constructor` is the implicit member every
+  // class has, so the call resolves; a typed constructor still adds no
+  // `methods` entry, and an unknown member is still reported.
+  assert.equal(
     mind.check(source.replace('[Store.run]', '[Store.constructor]')).diagnostics.some((finding) => finding.message.includes('constructor')),
+    false,
+  );
+  assert.ok(
+    mind.check(source.replace('[Store.run]', '[Store.build]')).diagnostics.some((finding) => finding.code === 'checker/unknown-method'),
   );
 });
 
