@@ -4002,7 +4002,12 @@ export class TypeScriptToTypedMindConverter {
       if (modules.length > 0) {
         const firstModule = modules[0];
         if (firstModule) {
-          this.createProgramEntity('DefaultApp', firstModule.filePath, firstModule.selfInvokedFunctionNames, sstHandlerReferences);
+          this.createProgramEntity(
+            'DefaultApp',
+            firstModule.filePath,
+            this.emittedSelfInvokedFunctionNames(firstModule),
+            sstHandlerReferences,
+          );
         }
       }
       return;
@@ -4012,8 +4017,33 @@ export class TypeScriptToTypedMindConverter {
       const fileName = path.basename(entryPoint, path.extname(entryPoint));
       const programName = this.deriveProgramName(fileName);
       const entryModule = modules.find((module) => module.filePath === entryPoint);
-      this.createProgramEntity(programName, entryPoint, entryModule?.selfInvokedFunctionNames ?? [], sstHandlerReferences);
+      this.createProgramEntity(
+        programName,
+        entryPoint,
+        entryModule === undefined ? [] : this.emittedSelfInvokedFunctionNames(entryModule),
+        sstHandlerReferences,
+      );
     }
+  }
+
+  // Q3 (typedmind residual burndown) — the X-AN-11 fold may only name
+  // functions this converter EMITS. `convertModule` converts a module's
+  // functions solely through `isFunctionExported` (a non-exported function
+  // never becomes a Function entity), so a self-invoked private function
+  // (`function main() {}` + guarded `main()`) pushed into Program.exports
+  // named an entity the document lacks — `checker/undefined-export`, the
+  // same finding shape the ambient-global leak (`String`) produced before
+  // the analyzer-side filter. Both filters together make Program.exports
+  // ⊆ {entities this document contains}. Names are the raw source names;
+  // `createProgramEntity` unions them with the already-remapped public
+  // export list, which contains every exported function of the entrypoint.
+  // The `?? []` mirrors the previous call-site tolerance (and
+  // `hasTopLevelCallbackRegistration ?? false`): hand-built ParsedModule
+  // mocks and legacy analysis JSON omit the field.
+  private emittedSelfInvokedFunctionNames(module: ParsedModule): string[] {
+    return (module.selfInvokedFunctionNames ?? []).filter((name) =>
+      module.functions.some((func) => func.name === name && this.isFunctionExported(func, module)),
+    );
   }
 
   // SST-referenced-module orphan flags (issue #52's own PR #74 closing

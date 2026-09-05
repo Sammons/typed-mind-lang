@@ -1103,6 +1103,10 @@ export class TypeScriptAnalyzer {
         // — the doc's mechanism is "mark the invoked function as a root,"
         // which tolerates a false-positive match costing nothing (an
         // already-reachable function simply gains a redundant root marking).
+        // The raw call-target list is filtered to this module's own
+        // top-level functions after the walk (Q3 note below) — the walk
+        // itself cannot filter because a guard may precede the declarations
+        // it calls.
         if (node.expression.getText(sourceFile).includes('import.meta.url')) {
           for (const calledName of this.collectCalledFunctionNames(node.thenStatement)) {
             selfInvokedFunctionNames.push(calledName);
@@ -1114,6 +1118,26 @@ export class TypeScriptAnalyzer {
     };
 
     ts.forEachChild(sourceFile, visit);
+
+    // Q3 (typedmind residual burndown) — the X-AN-11 walk above records
+    // EVERY bare-identifier call under the guard, and the converter folds
+    // the list into Program.exports verbatim. A guard body like
+    // `runWorker().catch((error) => { console.error(String(error)); })`
+    // (webhookstorage outbound-delivery index.ts:211-228) therefore listed
+    // the JavaScript builtin `String` as a Program export and the checker
+    // reported `Export 'String' is not defined anywhere in the codebase`.
+    // The rule as intended is "the module's own functions the guard
+    // invokes": keep only names this module's walk collected into
+    // `functions` (function declarations and arrow/function-expression
+    // initializers, at any nesting `visit` reaches), in first-call order
+    // and deduplicated. Ambient globals (`String`,
+    // `Number`, `setTimeout`, `require`) and imported functions never
+    // become Program exports through this path. Filtered AFTER the walk
+    // because a guard may precede the declarations it calls.
+    const declaredFunctionNames = new Set(functions.map((func) => func.name));
+    const selfInvokedDeclaredFunctionNames = Array.from(
+      new Set(selfInvokedFunctionNames.filter((name) => declaredFunctionNames.has(name))),
+    );
 
     const defaultExports = this.collectDefaultExports(sourceFile, exports, [
       ...functions.map((declaration) => ({ ...declaration, type: 'function' as const })),
@@ -1137,7 +1161,7 @@ export class TypeScriptAnalyzer {
       constants,
       enums,
       dynamicImportSpecifiers,
-      selfInvokedFunctionNames,
+      selfInvokedFunctionNames: selfInvokedDeclaredFunctionNames,
       hasTopLevelCallbackRegistration: this.hasTopLevelCallbackRegistration(sourceFile),
     } as const;
   }
@@ -1267,7 +1291,12 @@ export class TypeScriptAnalyzer {
   // `obj.method()`) within a guard's `then` branch. A self-invocation guard
   // calls its entrypoint function directly by name; method-call targets are
   // out of scope for this pattern (the doc's mechanism is a Program.exports
-  // entry, which names top-level functions, not class methods).
+  // entry, which names top-level functions, not class methods). Recurses
+  // through nested callbacks on purpose: `main().catch((e) => cleanup(e))`
+  // and the `void (async () => { await main(); })()` IIFE idiom both invoke
+  // same-module roots from inside a closure. The RAW list still names
+  // ambient globals (`String`, `setTimeout`) and imported functions; the
+  // caller intersects it with the module's declared functions (Q3).
   private collectCalledFunctionNames(node: ts.Node): string[] {
     const names: string[] = [];
     const visit = (current: ts.Node): void => {
