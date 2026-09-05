@@ -1668,28 +1668,28 @@ export class TypeScriptToTypedMindConverter {
     // Re-export: export { X } from './module' is equivalent to:
     // 1. import { X } from './module'
     // 2. export { X }
-
-    // For now, just log that we found a re-export
-    // The actual handling will be done when we process imports/dependencies
-    // during the second phase when we have full access to the analysis
-
-    // Add a warning if the re-export source might not be included
+    // The entity-level handling happens in the second phase once every
+    // module's exports are registered; this pass only reports a re-export
+    // whose source the analyzer could not resolve.
+    //
+    // Fixture 71 / fixture 111 — the analyzer's `ts.resolveModuleName`
+    // resolver (X-AN-1) is the ONLY resolver. Both `analyze()` and
+    // `analyzeFromEntrypoint` record every re-export edge in
+    // `analysis.moduleGraph` (`recordModuleEdges`), indexed here as
+    // `moduleGraphResolution`. The converter used to keep its own
+    // `fs.existsSync` extension probe as a fallback; given an already
+    // `.ts`-suffixed specifier (legal under `allowImportingTsExtensions`)
+    // it probed `normalize.ts.ts` / `normalize.ts/index.ts`, found nothing,
+    // and warned about a file that exists. Whole-project mode recorded no
+    // graph edges at all, so it always hit that probe. The probe is gone:
+    // an edge the analyzer resolved is trusted, and an edge the analyzer
+    // did not resolve internally is reported, matching the analyzer's own
+    // `unresolvable-import` diagnostic for the same specifier.
     if (reExport.source !== undefined && !this.isExternalPackage(reExport.source)) {
-      // Fixture 71 — consult the analyzer's own resolved module graph FIRST.
-      // `resolveModulePath` below is a hand-rolled `fs.existsSync` extension
-      // probe: given an already-suffixed specifier (`./types-list.ts`, legal
-      // under `allowImportingTsExtensions` and idiomatic in Node
-      // type-stripping projects) it appends extensions to the suffixed path,
-      // probes `types-list.ts.ts`/`types-list.ts/index.ts`, finds nothing,
-      // and warns that a file which plainly exists was not found. This is the
-      // census's A-g2 `.js`-suffix defect surviving in the converter's own
-      // copy of the resolver; the analyzer's `ts.resolveModuleName` (X-AN-1)
-      // already resolved this exact edge and recorded it here.
       const graphResolved = this.moduleGraphResolution.has(
         TypeScriptToTypedMindConverter.moduleGraphResolutionKey(this.getRelativePath(module.filePath), reExport.source),
       );
-      const sourceModulePath = graphResolved ? undefined : this.resolveModulePath(reExport.source, path.dirname(module.filePath));
-      if (!graphResolved && (!sourceModulePath || !fs.existsSync(sourceModulePath))) {
+      if (!graphResolved) {
         this.warnings.push({
           message: `Re-export source module not found: ${reExport.source} (re-exporting ${reExport.name})`,
           filePath: module.filePath,
@@ -1697,32 +1697,6 @@ export class TypeScriptToTypedMindConverter {
         });
       }
     }
-  }
-
-  private resolveModulePath(specifier: string, basePath: string): string | null {
-    // Handle relative paths
-    if (specifier.startsWith('./') || specifier.startsWith('../')) {
-      const fullPath = path.resolve(basePath, specifier);
-
-      // Try common TypeScript extensions
-      const extensions = ['.ts', '.tsx', '.js', '.jsx'];
-      for (const ext of extensions) {
-        const withExt = fullPath + ext;
-        if (fs.existsSync(withExt)) {
-          return withExt;
-        }
-      }
-
-      // Try as directory with index file
-      for (const ext of extensions) {
-        const indexPath = path.join(fullPath, `index${ext}`);
-        if (fs.existsSync(indexPath)) {
-          return indexPath;
-        }
-      }
-    }
-
-    return null;
   }
 
   private collectModuleEntities(module: ParsedModule): void {

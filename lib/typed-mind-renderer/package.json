@@ -82,6 +82,7 @@
     "copy-static": "mkdir -p dist && cp -r src/static dist/",
     "dev": "tsc --build --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
+    "pretest": "pnpm --filter @sammons/typed-mind run build",
     "test": "node --test",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "check:golden-deltas": "node scripts/check-golden-deltas.mjs",

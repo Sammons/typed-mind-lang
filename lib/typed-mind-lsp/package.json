@@ -39,6 +39,7 @@
     "build": "tsc --build",
     "build:bundled": "tsup --config tsup.bundled.config.ts",
     "dev": "tsc --build --watch",
+    "pretest": "pnpm --filter @sammons/typed-mind run build",
     "test": "node --test 'src/**/*.test.ts'",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",

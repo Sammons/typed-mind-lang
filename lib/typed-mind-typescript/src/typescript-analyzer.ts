@@ -415,6 +415,16 @@ export class TypeScriptAnalyzer {
     const sourceFiles = this.program.getSourceFiles().filter((file) => !file.isDeclarationFile && !file.fileName.includes('node_modules'));
 
     const modules = sourceFiles.map((file) => this.analyzeModule(file));
+    // Fixture 111 — whole-project mode used to record no `moduleGraph`
+    // edges at all, so the converter's `processReExport` had nothing to
+    // consult and fell back to its own extension-probing resolver (the
+    // fixture-71 `.ts`-suffix defect). Every module's edges now go through
+    // the same `resolveImportPath` resolver entrypoint mode uses; the
+    // internal targets it returns are already in `modules`, so nothing is
+    // enqueued here.
+    for (const module of modules) {
+      this.recordModuleEdges(module.filePath, module);
+    }
     const entryPoints = this.detectEntryPoints(modules);
 
     if (modules.length === 0) {
@@ -568,60 +578,12 @@ export class TypeScriptAnalyzer {
         this.scanSstHandlerStrings(sourceFile, currentPath, traverseQueue, visitedModules);
       }
 
-      // Add imported modules to the traversal queue
-      for (const importSpec of module.imports) {
-        const outcome = this.resolveImportPath(currentPath, importSpec.specifier);
-        this.recordModuleGraphEdge(currentPath, importSpec.specifier, outcome);
-        if (outcome.resolvedPath && outcome.classification === 'internal' && !visitedModules.has(outcome.resolvedPath)) {
-          traverseQueue.push(outcome.resolvedPath);
-        } else if (outcome.classification === 'unresolved') {
-          this.diagnostics.push({
-            severity: 'warning',
-            category: 'unresolvable-import',
-            message: `Could not resolve import specifier '${importSpec.specifier}' from ${currentPath}`,
-            filePath: currentPath,
-            specifier: importSpec.specifier,
-          });
-        }
-      }
-
-      // Add re-exported modules to the traversal queue.
-      // Both named re-exports (export { X } from './module') and X-AN-3's
-      // star re-exports (export * from './module', type: 'namespace-reexport')
-      // carry a `source` and are followed the same way.
-      for (const exportSpec of module.exports) {
-        if (exportSpec.source) {
-          const outcome = this.resolveImportPath(currentPath, exportSpec.source);
-          this.recordModuleGraphEdge(currentPath, exportSpec.source, outcome);
-          if (outcome.resolvedPath && outcome.classification === 'internal' && !visitedModules.has(outcome.resolvedPath)) {
-            traverseQueue.push(outcome.resolvedPath);
-          } else if (outcome.classification === 'unresolved') {
-            this.diagnostics.push({
-              severity: 'warning',
-              category: 'unresolvable-import',
-              message: `Could not resolve re-export source '${exportSpec.source}' from ${currentPath}`,
-              filePath: currentPath,
-              specifier: exportSpec.source,
-            });
-          }
-        }
-      }
-
-      // X-AN-2 — dynamic import() targets discovered during the visitor
-      // walk also join the traversal queue, mirroring static imports.
-      for (const dynamicSpecifier of module.dynamicImportSpecifiers) {
-        const outcome = this.resolveImportPath(currentPath, dynamicSpecifier);
-        this.recordModuleGraphEdge(currentPath, dynamicSpecifier, outcome);
-        if (outcome.resolvedPath && outcome.classification === 'internal' && !visitedModules.has(outcome.resolvedPath)) {
-          traverseQueue.push(outcome.resolvedPath);
-        } else if (outcome.classification === 'unresolved') {
-          this.diagnostics.push({
-            severity: 'warning',
-            category: 'unresolvable-import',
-            message: `Could not resolve dynamic import specifier '${dynamicSpecifier}' from ${currentPath}`,
-            filePath: currentPath,
-            specifier: dynamicSpecifier,
-          });
+      // Static imports, re-exports (named and X-AN-3 star), and X-AN-2
+      // dynamic imports all resolve through the one `resolveImportPath`
+      // resolver and join the traversal queue in that order.
+      for (const resolvedPath of this.recordModuleEdges(currentPath, module)) {
+        if (!visitedModules.has(resolvedPath)) {
+          traverseQueue.push(resolvedPath);
         }
       }
     }
@@ -839,6 +801,38 @@ export class TypeScriptAnalyzer {
     };
     ts.forEachChild(sourceFile, visit);
     return found;
+  }
+
+  // The single edge-recording path shared by `analyze()` and
+  // `analyzeFromEntrypoint`: every static import, sourced re-export, and
+  // dynamic import of `module` resolves through `resolveImportPath`
+  // (X-AN-1), lands in `moduleGraph`, and raises an `unresolvable-import`
+  // diagnostic when resolution fails. Returns the internal resolutions in
+  // source order (imports, then re-exports, then dynamic imports) so the
+  // entrypoint traversal can enqueue them under its own visited guard.
+  private recordModuleEdges(currentPath: string, module: ParsedModule): string[] {
+    const edges = [
+      ...module.imports.map((importSpec) => ({ specifier: importSpec.specifier, label: 'import specifier' })),
+      ...module.exports.flatMap((exportSpec) => (exportSpec.source ? [{ specifier: exportSpec.source, label: 're-export source' }] : [])),
+      ...module.dynamicImportSpecifiers.map((specifier) => ({ specifier, label: 'dynamic import specifier' })),
+    ];
+    const internalTargets: string[] = [];
+    for (const edge of edges) {
+      const outcome = this.resolveImportPath(currentPath, edge.specifier);
+      this.recordModuleGraphEdge(currentPath, edge.specifier, outcome);
+      if (outcome.resolvedPath && outcome.classification === 'internal') {
+        internalTargets.push(outcome.resolvedPath);
+      } else if (outcome.classification === 'unresolved') {
+        this.diagnostics.push({
+          severity: 'warning',
+          category: 'unresolvable-import',
+          message: `Could not resolve ${edge.label} '${edge.specifier}' from ${currentPath}`,
+          filePath: currentPath,
+          specifier: edge.specifier,
+        });
+      }
+    }
+    return internalTargets;
   }
 
   private recordModuleGraphEdge(sourceModule: string, specifier: string, outcome: ResolutionOutcome): void {

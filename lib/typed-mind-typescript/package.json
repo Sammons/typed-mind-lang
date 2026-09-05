@@ -39,6 +39,7 @@
     "build": "tsc --build && chmod +x dist/cli.js",
     "dev": "tsc --build --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
+    "pretest": "pnpm --filter @sammons/typed-mind run build",
     "test": "node --test",
     "test:watch": "node --test --watch 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
