@@ -4670,28 +4670,18 @@ export class TypeScriptToTypedMindConverter {
     return cleaned.charAt(0).toUpperCase() === cleaned.charAt(0);
   }
 
-  // RFC-TM-10 §2 (rfc-tm-10-diamond.md, D-LEG-2, issue #65) — a walk
-  // distinct from `ensureBuiltinExtendsStub`'s `extends`-triggered
-  // allowlist mechanism. Once a `TypeExprNode` exists for a DTO field, a
-  // function parameter, or a return type (via `parseTypeExprText`), every
-  // `generic`-kind node's `args` is walked for a `named`-kind argument whose
-  // name resolves via `externalTypeToPackage` to an external package import
-  // — `Pick<S3Client, "send">`'s `S3Client` argument, not `Pick` itself
-  // (`Pick` is a builtin generic, matches the checker's own PRIMITIVES
-  // allowlist, check-dto-fields.ts:30-49) and not `"send"` (a literal, no
-  // stub needed). Reuses `addExternalTypeToDepExports`'s existing
-  // rebuild-and-append `DependencyNode.exports` mechanism directly — no new
-  // stub-synthesis function, closing the latent duplication risk between
-  // this item and D-LEG-1's independently-authored issue.
+  // RFC-TM-10 D-LEG-2 / RFC-TM-13 B2: visit every structured type name,
+  // including generic bases and names nested inside argument containers.
+  // Only an existing externalTypeToPackage mapping authorizes an export;
+  // builtins, unknown names and opaque text never invent package exports.
+  // Reuse the existing DependencyNode rebuild-and-append mechanism.
   private walkGenericArgsForExternalStubs(node: TypeExprNode): void {
     switch (node.kind) {
       case 'generic':
+        // RFC-TM-13 B2: a package type can be the generic base too.
+        this.addExternalTypeToDepExports(node.base.name);
         for (const arg of node.args) {
-          if (arg.kind === 'named') {
-            this.addExternalTypeToDepExports(arg.name);
-          } else {
-            this.walkGenericArgsForExternalStubs(arg);
-          }
+          this.walkGenericArgsForExternalStubs(arg);
         }
         return;
       case 'union':
@@ -4704,6 +4694,9 @@ export class TypeScriptToTypedMindConverter {
         this.walkGenericArgsForExternalStubs(node.element);
         return;
       case 'named':
+        // Includes names nested inside argument arrays, unions and intersections.
+        this.addExternalTypeToDepExports(node.name);
+        return;
       case 'literal':
       case 'opaque':
         return;
