@@ -205,7 +205,12 @@ const checkEntityReferences = (context: CheckContext, entity: EntityNode): void 
       // leaf of the type expression, so `: SomeFunction[]` and
       // `: Record<string, SomeFunction>` still report reference-to-illegal.
       // Binders are empty — a Constants declares no type parameters.
-      walkTypeReferences(entity.schemaType, new Set(), { reference: (node) => checkSingleReference(context, entity, 'schema', node.name) }, 'alias');
+      walkTypeReferences(
+        entity.schemaType,
+        new Set(),
+        { reference: (node) => checkSingleReference(context, entity, 'schema', node.name) },
+        'alias',
+      );
     }
   } else if (entity instanceof RunParameterNode) {
     // Legacy walked param.consumedBy (validator.ts:1430-1437), populated only

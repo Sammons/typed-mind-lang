@@ -69,7 +69,7 @@ describe('TM14 U5a: Constants schema carries a full type expression and credits 
     const mind = await TypedMind.create();
     const longform = mind.emitLongform(tmdContent);
     assert.equal(longform.includes('schema: "Record<string, Rule>"'), true, longform);
-    assert.equal(longform.includes('schema: "\'read\' | \'write\'"'), true, longform);
+    assert.equal(longform.includes("schema: \"'read' | 'write'\""), true, longform);
     assert.deepEqual(mind.check(longform).diagnostics, []);
     const backToShortform = mind.emitShortform(longform);
     assert.deepEqual(

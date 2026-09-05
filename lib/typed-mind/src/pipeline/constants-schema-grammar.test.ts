@@ -36,9 +36,21 @@ const probes = [
     schema: undefined,
     kind: 'opaque',
   },
-  { name: 'NAMES', source: 'NAMES ! src/names.ts : ReadonlyMap<string, Rule>', printed: 'ReadonlyMap<string, Rule>', schema: 'ReadonlyMap', kind: 'generic' },
+  {
+    name: 'NAMES',
+    source: 'NAMES ! src/names.ts : ReadonlyMap<string, Rule>',
+    printed: 'ReadonlyMap<string, Rule>',
+    schema: 'ReadonlyMap',
+    kind: 'generic',
+  },
   { name: 'MODE', source: 'MODE ! src/mode.ts : "read" | "write"\n', printed: '"read" | "write"', schema: undefined, kind: 'union' },
-  { name: 'Toasts', source: 'Toasts ! src/toast.ts : Dep.Signal<Toast[]>\n', printed: 'Dep.Signal<Toast[]>', schema: 'Dep.Signal', kind: 'generic' },
+  {
+    name: 'Toasts',
+    source: 'Toasts ! src/toast.ts : Dep.Signal<Toast[]>\n',
+    printed: 'Dep.Signal<Toast[]>',
+    schema: 'Dep.Signal',
+    kind: 'generic',
+  },
   {
     name: 'App',
     source: 'App ! src/app.ts : Dep.Box<{ Variables: AuthVars; }>\n',
@@ -71,7 +83,10 @@ describe('TM14 U5a: the six schema probes parse and round-trip in the Constants 
       const shortform = typedMind.emitShortform(probe.source);
       const longform = typedMind.emitLongform(probe.source);
       const comment = probe.source.includes('#') ? ` # ${probe.source.split('#')[1]?.trim()}` : '';
-      assert.equal(shortform.split('\n')[0], `${probe.name} ! ${probe.source.split(' ! ')[1]?.split(' : ')[0]} : ${probe.printed}${comment}`);
+      assert.equal(
+        shortform.split('\n')[0],
+        `${probe.name} ! ${probe.source.split(' ! ')[1]?.split(' : ')[0]} : ${probe.printed}${comment}`,
+      );
       assert.equal(longform.includes(`schema: ${JSON.stringify(probe.printed)}`), true, longform);
       const fromShortform = typedMind.parse(shortform);
       const fromLongform = typedMind.parse(longform);
@@ -96,7 +111,17 @@ describe('TM14 U5a: the six schema probes parse and round-trip in the Constants 
   });
 
   it('the schema slot references credit the orphan walk and keep the pinned silence on an undeclared schema', () => {
-    const source = ['App -> Main', 'Main @ src/main.ts:', '  <- [RULES, LIST, BROKEN]', 'RULES ! src/rules.ts : Record<string, Rule>', 'LIST ! src/list.ts : Rule[]', 'BROKEN ! src/broken.ts : NonExistentSchema', 'Rule %', '  - ok: boolean', ''].join('\n');
+    const source = [
+      'App -> Main',
+      'Main @ src/main.ts:',
+      '  <- [RULES, LIST, BROKEN]',
+      'RULES ! src/rules.ts : Record<string, Rule>',
+      'LIST ! src/list.ts : Rule[]',
+      'BROKEN ! src/broken.ts : NonExistentSchema',
+      'Rule %',
+      '  - ok: boolean',
+      '',
+    ].join('\n');
     const outcome = typedMind.check(source);
     assert.deepEqual(outcome.diagnostics, []);
     const withoutSchemas = source.replace(' : Record<string, Rule>', '').replace(' : Rule[]', '');
@@ -107,7 +132,19 @@ describe('TM14 U5a: the six schema probes parse and round-trip in the Constants 
   });
 
   it('member resolution runs only through a bare named schema (U-7): `LIST.ok` on `Rule[]` is missing-member', () => {
-    const source = ['App -> Main', 'Main @ src/main.ts:', '  <- [RULES, LIST]', '  -> [use]', 'RULES ! src/rules.ts : Rule', 'LIST ! src/list.ts : Rule[]', 'Rule %', '  - ok: boolean', 'use :: () => void', '  $< [RULES.ok, LIST.ok]', ''].join('\n');
+    const source = [
+      'App -> Main',
+      'Main @ src/main.ts:',
+      '  <- [RULES, LIST]',
+      '  -> [use]',
+      'RULES ! src/rules.ts : Rule',
+      'LIST ! src/list.ts : Rule[]',
+      'Rule %',
+      '  - ok: boolean',
+      'use :: () => void',
+      '  $< [RULES.ok, LIST.ok]',
+      '',
+    ].join('\n');
     assert.deepEqual(
       typedMind.check(source).diagnostics.map((finding) => finding.message),
       [
@@ -119,7 +156,15 @@ describe('TM14 U5a: the six schema probes parse and round-trip in the Constants 
   });
 
   it('the schema legality row runs for every named leaf (G2-8): `: SomeFunction[]` still reports', () => {
-    const source = ['App -> Main', 'Main @ src/main.ts:', '  <- [LIST]', '  -> [work]', 'LIST ! src/list.ts : work[]', 'work :: () => void', ''].join('\n');
+    const source = [
+      'App -> Main',
+      'Main @ src/main.ts:',
+      '  <- [LIST]',
+      '  -> [work]',
+      'LIST ! src/list.ts : work[]',
+      'work :: () => void',
+      '',
+    ].join('\n');
     assert.deepEqual(
       typedMind.check(source).diagnostics.map((finding) => finding.message),
       ["Cannot use 'schema' to reference Function 'work'"],
