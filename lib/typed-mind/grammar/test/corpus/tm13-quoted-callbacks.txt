@@ -1,0 +1,44 @@
+==================
+TM13 RQ: literal callback parameters and description boundaries
+==================
+Example %
+  - cb: (mode: "read" | "write") => void "callback" (optional)
+
+---
+
+(source_file (dto_declaration (entity_name)) (dto_field (field_name) (field_type (type_expr (type_union (type_intersection (type_postfix (type_atom (type_opaque (string) (string)))))))) (string) (optional_marker)))
+
+==================
+TM13 RQ: nested callback quoted delimiters and structured union control
+==================
+Example %
+  - nested: { cb: (mode: "literal ) | } text") => void }
+  - union: ("a" | "b")[]
+
+---
+
+(source_file (dto_declaration (entity_name)) (dto_field (field_name) (field_type (type_expr (type_union (type_intersection (type_postfix (type_atom (type_opaque (string))))))))) (dto_field (field_name) (field_type (type_expr (type_union (type_intersection (type_postfix (type_atom (type_expr (type_union (type_intersection (type_postfix (type_atom (type_literal_string (string))))) (type_intersection (type_postfix (type_atom (type_literal_string (string)))))))))))))))
+
+==================
+TM13 RQ: malformed quote preserves following declaration
+==================
+Example %
+  - cb: (mode: "unfinished) => void
+Next %
+  - id: string
+
+---
+
+(source_file (dto_declaration (entity_name)) (ERROR (field_name) (UNEXPECTED '\n')) (dto_declaration (entity_name)) (dto_field (field_name) (field_type (type_expr (type_union (type_intersection (type_postfix (type_atom (type_named (entity_name))))))))))
+
+==================
+TM13 RQ: missing callback close preserves following declaration
+==================
+Example %
+  - cb: (mode: "read" => void
+Next %
+  - id: string
+
+---
+
+(source_file (dto_declaration (entity_name)) (dto_field (field_name) (field_type (type_expr (type_union (type_intersection (type_postfix (type_atom (type_opaque (string) (MISSING ")"))))))))) (dto_declaration (entity_name)) (dto_field (field_name) (field_type (type_expr (type_union (type_intersection (type_postfix (type_atom (type_named (entity_name))))))))))
