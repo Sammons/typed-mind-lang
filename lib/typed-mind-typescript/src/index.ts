@@ -6,6 +6,7 @@ export type {
   ConversionOptions,
   ConversionResult,
   ConversionWarning,
+  DeclarationIdentity,
   Deviation,
   ModuleGraphEdge,
   ParsedClass,
@@ -20,9 +21,14 @@ export type {
   ParsedParameter,
   ParsedProperty,
   ParsedTypeAlias,
+  ParsedTypeParameter,
+  ParsedTypeText,
   RecognizerName,
+  ReferenceOrigin,
+  SourceRange,
   SstHandlerReference,
   SuppressionReason,
+  TypeReferenceOccurrence,
   TypeScriptProjectAnalysis,
 } from './types.ts';
 export {

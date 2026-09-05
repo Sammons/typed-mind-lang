@@ -1,7 +1,54 @@
 import type { EntityNode } from '@sammons/typed-mind';
 import * as ts from 'typescript';
 
+// RFC-TM-13 A1: serializable declaration identity and per-occurrence provenance.
+// All ranges use zero-based, end-exclusive UTF-16 offsets and absolute paths.
+export interface SourceRange {
+  readonly filePath: string;
+  readonly start: number;
+  readonly end: number;
+}
+
+export interface DeclarationIdentity extends SourceRange {
+  readonly name: string;
+}
+
+export type ReferenceOrigin =
+  | { readonly kind: 'type-parameter'; readonly declaration: DeclarationIdentity }
+  | { readonly kind: 'project'; readonly declaration: DeclarationIdentity }
+  | { readonly kind: 'external-package'; readonly packageName: string; readonly declaration: DeclarationIdentity }
+  | { readonly kind: 'typescript-lib'; readonly declaration: DeclarationIdentity }
+  | {
+      readonly kind: 'unresolved';
+      readonly reason: 'missing-symbol' | 'missing-declaration' | 'checker-unavailable' | 'ambiguous-declaration';
+    };
+
+export interface TypeReferenceOccurrence {
+  readonly writtenName: string;
+  readonly source: SourceRange;
+  readonly start: number;
+  readonly end: number;
+  readonly origin: ReferenceOrigin;
+}
+
+export interface ParsedTypeText {
+  readonly text: string;
+  readonly source: SourceRange | undefined;
+  readonly references: readonly TypeReferenceOccurrence[];
+}
+
+export interface ParsedTypeParameter {
+  readonly text: string;
+  readonly name: string;
+  readonly declaration: DeclarationIdentity;
+  readonly constraint: ParsedTypeText | undefined;
+  readonly defaultType: ParsedTypeText | undefined;
+}
+
 export interface ParsedFunction {
+  readonly returnTypeInfo?: ParsedTypeText;
+  readonly typeParameters?: readonly ParsedTypeParameter[];
+  readonly declaration?: DeclarationIdentity;
   readonly name: string;
   readonly signature: string;
   readonly parameters: readonly ParsedParameter[];
@@ -20,6 +67,7 @@ export interface ParsedFunction {
 }
 
 export interface ParsedParameter {
+  readonly typeInfo?: ParsedTypeText;
   readonly name: string;
   readonly type: string;
   readonly isOptional: boolean;
@@ -27,6 +75,10 @@ export interface ParsedParameter {
 }
 
 export interface ParsedClass {
+  readonly implementsTypeInfo?: readonly ParsedTypeText[];
+  readonly extendsTypeInfo?: readonly ParsedTypeText[];
+  readonly typeParameters?: readonly ParsedTypeParameter[];
+  readonly declaration?: DeclarationIdentity;
   readonly name: string;
   readonly isAbstract: boolean;
   readonly extends: readonly string[];
@@ -38,6 +90,8 @@ export interface ParsedClass {
 }
 
 export interface ParsedMethod {
+  readonly returnTypeInfo?: ParsedTypeText;
+  readonly typeParameters?: readonly ParsedTypeParameter[];
   readonly name: string;
   readonly signature: string;
   readonly isStatic: boolean;
@@ -53,6 +107,7 @@ export interface ParsedMethod {
 }
 
 export interface ParsedProperty {
+  readonly typeInfo?: ParsedTypeText;
   readonly name: string;
   readonly type: string;
   readonly isReadonly: boolean;
@@ -63,6 +118,9 @@ export interface ParsedProperty {
 }
 
 export interface ParsedInterface {
+  readonly extendsTypeInfo?: readonly ParsedTypeText[];
+  readonly typeParameters?: readonly ParsedTypeParameter[];
+  readonly declaration?: DeclarationIdentity;
   readonly name: string;
   readonly extends: readonly string[];
   readonly properties: readonly ParsedProperty[];
@@ -126,12 +184,17 @@ export interface ParsedExport {
 }
 
 export interface ParsedTypeAlias {
+  readonly typeInfo?: ParsedTypeText;
+  readonly typeParameters?: readonly ParsedTypeParameter[];
+  readonly declaration?: DeclarationIdentity;
   readonly name: string;
   readonly type: string;
   readonly description: string | undefined;
 }
 
 export interface ParsedConstant {
+  readonly typeInfo?: ParsedTypeText;
+  readonly declaration?: DeclarationIdentity;
   readonly name: string;
   readonly type: string;
   readonly value: string | undefined;
@@ -150,6 +213,7 @@ export interface ParsedConstant {
 // expressions (`Active = 'active'`) are not part of the frozen TypeDef
 // shape and are intentionally not carried past this analyzer boundary.
 export interface ParsedEnum {
+  readonly declaration?: DeclarationIdentity;
   readonly name: string;
   readonly members: readonly string[];
   readonly description: string | undefined;
