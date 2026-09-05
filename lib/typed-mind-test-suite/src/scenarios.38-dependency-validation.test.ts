@@ -45,8 +45,8 @@ describe('scenario-38-dependency-validation', () => {
     // Should detect that class is not exported by any file
     assert.ok(findingMessages.includes("Class 'AuthService' is not exported by any file"));
 
-    // Should detect that method calls cannot be made on dependencies
-    assert.ok(findingMessages.includes("Cannot call method 'post' on Dependency 'axios'. Only Classes and ClassFiles can have methods"));
+    // Q reports missing external members through checked dependency export membership.
+    assert.ok(findingMessages.includes("Qualified name 'axios.post' has no declared member 'post' on 'axios'"));
 
     // Verify specific finding positions for key validation findings
     const axiosCallFinding = validation.findings.find((finding) =>
