@@ -122,36 +122,40 @@ describe('RFC-TM-9 Q3 check — X-SUPP-6: converter-emitted suppressions with en
     assert.equal(result.success, true);
 
     // EXACT counts per reason (doc §9: "ladder fixtures assert exact
-    // counts and reasons per target"). issue #91 — a qualifying class now
-    // gets TWO suppression entries (checker/orphaned-entity AND its
+    // counts and reasons per target"). issue #91 — a qualifying class got
+    // TWO suppression entries (checker/orphaned-entity AND its
     // checker/class-not-exported twin), both sharing this one reason code
     // (SuppressionNode's grain is one (code, target) pair, so the twin is a
-    // second entry, not a merged one) — count rises from 1 to 2 for this
-    // fixture's single qualifying class.
+    // second entry, not a merged one). RFC-TM-14 §S1 (A-6) — the class is
+    // now a construct target (`describe ~> [InternalRegistryEntry.constructor]`),
+    // a real reference, so the orphaned-entity pre-suppression is no longer
+    // emitted and the count drops from 2 to 1: only the class-not-exported
+    // twin remains (the non-export is still true).
     assert.deepEqual(result.suppressionCounts, {
-      'generated-single-file-scope': 2,
+      'generated-single-file-scope': 1,
     });
 
-    assert.ok(
+    assert.ok(result.tmdContent.includes('describe :: describe(label: string) => string\n  ~> [InternalRegistryEntry.constructor]'));
+    assert.equal(
       result.tmdContent.includes('suppress InternalRegistryEntry checker/orphaned-entity "generated-single-file-scope"'),
-      'the suppression line names the exact target, code, and enumerated reason',
+      false,
+      'RFC-TM-14 — no orphan pre-suppression for a construct target',
     );
     assert.ok(
       result.tmdContent.includes('suppress InternalRegistryEntry checker/class-not-exported "generated-single-file-scope"'),
-      'issue #91 — the class-not-exported twin suppression is emitted alongside the orphaned-entity one',
+      'issue #91 — the class-not-exported suppression names the exact target, code, and enumerated reason',
     );
 
-    // Both suppressions actually match a real finding this run (never
+    // The suppression actually matches a real finding this run (never
     // stale) and the checker's suppressed-not-silenced semantics (I-9)
-    // keep both diagnostics visible with their `suppression` annotation
-    // rather than dropping them.
+    // keep the diagnostic visible with its `suppression` annotation
+    // rather than dropping it; the orphan finding is closed by the edge.
     const tm = await TypedMind.create();
     const checkResult = tm.check(result.tmdContent);
     const orphanFinding = checkResult.diagnostics.find(
       (d) => d.code === 'checker/orphaned-entity' && d.message.includes('InternalRegistryEntry'),
     );
-    assert.notEqual(orphanFinding, undefined, 'the orphan finding this suppression targets must still be present, annotated');
-    assert.equal(orphanFinding?.suppression?.reason, 'generated-single-file-scope');
+    assert.equal(orphanFinding, undefined, 'RFC-TM-14 — the construct edge closes the orphan finding');
 
     const classNotExportedFinding = checkResult.diagnostics.find(
       (d) => d.code === 'checker/class-not-exported' && d.message.includes('InternalRegistryEntry'),
@@ -166,7 +170,7 @@ describe('RFC-TM-9 Q3 check — X-SUPP-6: converter-emitted suppressions with en
     assert.equal(
       checkResult.diagnostics.some((d) => d.code === 'checker/stale-suppression'),
       false,
-      'both suppressions matched a real finding, so neither is stale',
+      'the suppression matched a real finding, so it is not stale',
     );
   });
 

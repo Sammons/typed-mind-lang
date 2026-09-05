@@ -53,7 +53,7 @@ const createBaseAnalysis = (): TypeScriptProjectAnalysis => ({
           returnType: 'Promise<void>',
           isAsync: true,
           decorators: [],
-          calledNames: [],
+          bodyReferences: [],
         },
       ],
       classes: [],

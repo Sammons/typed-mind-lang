@@ -41,7 +41,9 @@ it('TM13 F: constant initializer call references are recorded without guessed di
   assert.equal(converted.success, true);
   const app = converted.entities.find((entity) => entity.name === 'app');
   assert.ok(app instanceof ConstantsNode);
-  assert.deepEqual(app.calls, ['Constructed', 'imported', 'used']);
+  // RFC-TM-14 §S2 — a construct edge is spelled `Owner.constructor`; the
+  // cross-file `imported` target is F's gate (recorded as non-goal N-X).
+  assert.deepEqual(app.calls, ['Constructed.constructor', 'imported', 'used']);
   const references = analysis.modules.flatMap((module) => module.constants).find((constant) => constant.name === 'app')?.callReferences;
   assert.ok(references);
   assert.equal(
@@ -93,7 +95,11 @@ it('TM13 F: same-file lexical declarations do not collapse into one callable ide
   assert.deepEqual(oldApp.calls, [], 'without exact public declaration identity the original ambiguity remains');
 });
 
-it('TM13 F: registration callbacks count real helper calls without crediting private constructors', (context) => {
+// RFC-TM-14 §S1 (A-6) — a private same-file class constructed by the
+// initializer is credited through the construct edge (`Command.constructor`);
+// before TM-14 the fold refused a non-exported class and `app.calls` was
+// `['runBackfill']` only.
+it('TM13 F: registration callbacks count real helper calls and credit the private constructor', (context) => {
   const { converted } = fixture(
     context,
     `
@@ -104,7 +110,7 @@ it('TM13 F: registration callbacks count real helper calls without crediting pri
   );
   const app = converted.entities.find((entity) => entity.name === 'app');
   assert.ok(app instanceof ConstantsNode);
-  assert.deepEqual(app.calls, ['runBackfill']);
+  assert.deepEqual(app.calls, ['Command.constructor', 'runBackfill']);
 });
 
 it('TM13 F: fixture 88 retains initializer origin before default identity is emitted', () => {

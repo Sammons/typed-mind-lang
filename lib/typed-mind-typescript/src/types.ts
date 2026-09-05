@@ -62,14 +62,18 @@ export interface ParsedFunction {
   readonly isAsync: boolean;
   readonly description: string | undefined;
   readonly decorators: readonly string[];
-  // Same-file call-edge closure (typedmind-diagnostic-legitimacy, callgraph
-  // increment) — bare-identifier call targets (`foo()`) and `new` targets
-  // (`new Bar()`) found anywhere in this function's own body, via the same
-  // `collectCalledFunctionNames`-family walk X-AN-11 already uses for the
-  // self-invocation-guard case. Raw names as written in source, unresolved:
-  // the converter decides which names resolve to a same-file declared
-  // function/class before folding any of them into `FunctionNode.calls`.
-  readonly calledNames: readonly string[];
+  // RFC-TM-14 §S1 — every call, construct and top-level-constant read found
+  // in this function's own body (nested named function/class declarations
+  // excluded), each with its resolved origin. Replaces the raw `calledNames`
+  // list: the converter's `foldBodyReferences` resolves origins against
+  // emitted entities instead of matching names.
+  readonly bodyReferences: readonly ParsedBodyReference[];
+  // RFC-TM-14 §S1 (A3-2) — 'declaration' for a function declaration or an
+  // arrow/function-expression const; 'callable-initializer' for a const whose
+  // call/new initializer has call signatures (§S6, Quantum U6). The fold
+  // applies the same-file gate to the first and F's cross-file gate to the
+  // second.
+  readonly origin?: 'declaration' | 'callable-initializer';
 }
 
 export interface ParsedParameter {
@@ -96,6 +100,8 @@ export interface ParsedConstructor {
   readonly parameters: readonly ParsedParameter[];
   readonly isPrivate: boolean;
   readonly isProtected: boolean;
+  // RFC-TM-14 §S1 — body references of the constructor body.
+  readonly bodyReferences: readonly ParsedBodyReference[];
 }
 export interface ParsedClass {
   readonly mixinHeritage?: readonly ParsedMixinHeritage[];
@@ -113,6 +119,10 @@ export interface ParsedClass {
   readonly properties: readonly ParsedProperty[];
   readonly decorators: readonly string[];
   readonly description: string | undefined;
+  // RFC-TM-14 §S1 — body references of property initializers and static
+  // blocks, in member order. Neither has a member entry of its own, so the
+  // class carries them.
+  readonly initializerReferences: readonly ParsedBodyReference[];
 }
 
 export interface ParsedMethod {
@@ -130,6 +140,10 @@ export interface ParsedMethod {
   // X-AN-8: get/set pairs on the same name fold into one method entry.
   // undefined for a plain method (not an accessor).
   readonly accessorKind: 'get' | 'set' | 'both' | undefined;
+  // RFC-TM-14 §S1 — body references of the method body (both halves of a
+  // folded accessor pair; empty for an interface method signature or an
+  // abstract/ambient method).
+  readonly bodyReferences: readonly ParsedBodyReference[];
 }
 
 export interface ParsedProperty {
@@ -233,15 +247,29 @@ export interface ParsedConstant {
   readonly type: string;
   readonly value: string | undefined;
   readonly isConst?: boolean;
-  readonly callReferences?: readonly ParsedCallReference[];
+  // TM13 F — call and construct references inside the initializer, walked
+  // by the same RFC-TM-14 §S1 substrate the function and member bodies use
+  // (so `read` entries are recorded too; the converter's Constants fold reads
+  // only `call`/`construct`, per §S1: Constants have no `consumes` carrier).
+  readonly callReferences?: readonly ParsedBodyReference[];
 }
 
-export interface ParsedCallReference {
-  readonly kind: 'call' | 'construct';
+// RFC-TM-14 §S1 frozen contract — one reference found by the shared body
+// walk. `kind`: `call` for `foo()`, `construct` for `new Foo()`, `read` for a
+// value use whose symbol is a top-level `VariableDeclaration`. `writtenName`
+// is the bare identifier or the ROOT identifier of a property chain
+// (`ErrorCode.UNAUTHORIZED.code` -> one read of `ErrorCode`). `source` is the
+// identifier's own range; `origin` is the A1 origin resolved at the
+// identifier.
+export interface ParsedBodyReference {
+  readonly kind: 'call' | 'construct' | 'read';
   readonly writtenName: string;
   readonly source: SourceRange;
   readonly origin: ReferenceOrigin;
 }
+
+// Public alias kept for TM13 F consumers (src/index.ts).
+export type ParsedCallReference = ParsedBodyReference;
 
 // RFC-TM-9 §4 (rfc-tm-9-diamond.md, X-AN-7) — a real TS `enum` declaration
 // gets its own analyzer shape, distinct from `ParsedConstant`. Previously a

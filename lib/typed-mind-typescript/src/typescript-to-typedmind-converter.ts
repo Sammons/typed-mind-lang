@@ -36,6 +36,7 @@ import type {
   ConversionResult,
   ConversionWarning,
   DeclarationIdentity,
+  ParsedBodyReference,
   ParsedClass,
   ParsedConstructor,
   ParsedExport,
@@ -1054,6 +1055,21 @@ export class TypeScriptToTypedMindConverter {
   private computeSuppressions(entities: readonly EntityNode[]): SuppressionNode[] {
     const suppressions: SuppressionNode[] = [];
     const classRegistryByEntityName = this.buildClassRegistryEntryByEntityName();
+    // RFC-TM-14 §S1 (A-6) — a class that is a construct target
+    // (`~> [X.constructor]` on any emitted entity) has a real reference, so
+    // its `checker/orphaned-entity` pre-suppression is NOT emitted; the
+    // `class-not-exported` one stays (the non-export is true). Runs after
+    // every fold (`computeSuppressions` is called last), so it sees the
+    // folded edges.
+    const constructTargets = new Set<string>();
+    for (const entity of entities) {
+      // Function and Constants carry `calls` today; U3b adds the Class and
+      // ClassFile carriers here when it folds member bodies.
+      const calls = entity instanceof FunctionNode || entity instanceof ConstantsNode ? entity.calls : [];
+      for (const call of calls) {
+        if (call.endsWith('.constructor')) constructTargets.add(call.slice(0, -'.constructor'.length));
+      }
+    }
     for (const entity of entities) {
       if (entity.kind !== 'Class') {
         continue;
@@ -1067,15 +1083,17 @@ export class TypeScriptToTypedMindConverter {
         continue;
       }
       const reason: SuppressionReason = 'generated-single-file-scope';
-      suppressions.push(
-        new SuppressionNode({
-          target: entity.name,
-          code: 'checker/orphaned-entity',
-          reason,
-          span: SYNTHETIC_SPAN,
-          raw: `suppress ${entity.name} checker/orphaned-entity "${reason}"`,
-        }),
-      );
+      if (!constructTargets.has(entity.name)) {
+        suppressions.push(
+          new SuppressionNode({
+            target: entity.name,
+            code: 'checker/orphaned-entity',
+            reason,
+            span: SYNTHETIC_SPAN,
+            raw: `suppress ${entity.name} checker/orphaned-entity "${reason}"`,
+          }),
+        );
+      }
       // issue #91 — the identical unconditional-conversion gap that makes
       // this class trip `checker/orphaned-entity` (suppressed above) ALSO
       // makes it trip `checker/class-not-exported` (check-exports.ts,
@@ -1469,35 +1487,74 @@ export class TypeScriptToTypedMindConverter {
     // 2.3: Add dependencies to entities
     this.entities.push(...this.dependencies.values());
     this.foldConstantInitializerCalls(modules);
+    // RFC-TM-14 §S1 — the function-body fold runs after F's Constants fold
+    // (A-4: it must be a post-pass because Constants convert after functions
+    // and ClassFiles before both, so every target entity exists by now).
+    this.foldBodyReferences(modules);
   }
 
-  private foldConstantInitializerCalls(modules: readonly ParsedModule[]): void {
+  // RFC-TM-14 §S1 — the one target table both folds resolve against: every
+  // uniquely emitted Function, Class, ClassFile and Constants entity, keyed
+  // by the full declaration identity (file, name, offsets) so a parameter or
+  // local binding can never borrow the name of a top-level declaration.
+  // A class is a target REGARDLESS of export (A-6): a module-private class
+  // constructed by a same-file body is a real reference, and a ClassFile is a
+  // legal construct target once spelled `Owner.constructor` (§S2).
+  private buildBodyReferenceTargets(modules: readonly ParsedModule[]): {
+    readonly byName: Map<string, EntityNode>;
+    readonly targets: Map<string, { readonly name: string; readonly kind: 'Function' | 'Class' | 'ClassFile' | 'Constants' }>;
+    readonly isUnique: (name: string) => boolean;
+    readonly key: (identity: DeclarationIdentity) => string;
+  } {
     const byName = new Map(this.entities.map((entity) => [entity.name, entity]));
-    const targets = new Map<string, string>();
+    const targets = new Map<string, { readonly name: string; readonly kind: 'Function' | 'Class' | 'ClassFile' | 'Constants' }>();
     const key = (identity: DeclarationIdentity): string => JSON.stringify([identity.filePath, identity.name, identity.start, identity.end]);
     const entityCounts = new Map<string, number>();
     for (const entity of this.entities) entityCounts.set(entity.name, (entityCounts.get(entity.name) ?? 0) + 1);
     const isUnique = (name: string): boolean => entityCounts.get(name) === 1;
+    const register = (declaration: DeclarationIdentity | undefined): void => {
+      const name = declaration === undefined ? undefined : this.getAssignedDeclarationName(declaration);
+      if (declaration === undefined || name === undefined || !isUnique(name)) return;
+      const entity = byName.get(name);
+      if (entity instanceof FunctionNode) targets.set(key(declaration), { name, kind: 'Function' });
+      else if (entity instanceof ClassNode) targets.set(key(declaration), { name, kind: 'Class' });
+      else if (entity instanceof ClassFileNode) targets.set(key(declaration), { name, kind: 'ClassFile' });
+      else if (entity instanceof ConstantsNode) targets.set(key(declaration), { name, kind: 'Constants' });
+    };
     for (const module of modules) {
-      for (const fn of module.functions) {
-        const name = fn.declaration === undefined ? undefined : this.getAssignedDeclarationName(fn.declaration);
-        if (fn.declaration !== undefined && name !== undefined && isUnique(name) && byName.get(name) instanceof FunctionNode) {
-          targets.set(key(fn.declaration), name);
-        }
-      }
-      for (const cls of module.classes) {
-        const name = cls.declaration === undefined ? undefined : this.getAssignedDeclarationName(cls.declaration);
-        if (
-          cls.declaration !== undefined &&
-          name !== undefined &&
-          isUnique(name) &&
-          module.exports.some((exp) => this.exportMatchesDeclaration(exp, cls)) &&
-          byName.get(name) instanceof ClassNode
-        ) {
-          targets.set(key(cls.declaration), name);
-        }
-      }
+      for (const fn of module.functions) register(fn.declaration);
+      for (const cls of module.classes) register(cls.declaration);
+      for (const constant of module.constants) register(constant.declaration);
     }
+    return { byName, targets, isUnique, key };
+  }
+
+  // RFC-TM-14 §S1/§S2 — maps one resolved body reference to its edge entry:
+  // `call` -> the Function's name in `calls`; `construct` -> `Owner.constructor`
+  // in `calls` for a Class or ClassFile target (U2-6: a construct of anything
+  // else, e.g. a Constants holding a class value, is dropped); `read` -> the
+  // Constants' name in `consumes` (U-14: a read of a Function is dropped, the
+  // language has no value-use edge for functions). Every other combination
+  // resolves to nothing.
+  private bodyReferenceEdge(
+    reference: ParsedBodyReference,
+    target: { readonly name: string; readonly kind: 'Function' | 'Class' | 'ClassFile' | 'Constants' },
+  ): { readonly slot: 'calls' | 'consumes'; readonly entry: string } | undefined {
+    if (reference.kind === 'call' && target.kind === 'Function') return { slot: 'calls', entry: target.name };
+    if (reference.kind === 'construct' && (target.kind === 'Class' || target.kind === 'ClassFile')) {
+      return { slot: 'calls', entry: `${target.name}.constructor` };
+    }
+    if (reference.kind === 'read' && target.kind === 'Constants') return { slot: 'consumes', entry: target.name };
+    return undefined;
+  }
+
+  // TM13 F — Constants initializer call/construct references fold into
+  // `ConstantsNode.calls`. Cross-file targets are kept (pinned by
+  // constant-initializer-calls.test.ts; RFC-TM-14 records the asymmetry with
+  // the same-file function fold as non-goal N-X). Reads are dropped:
+  // Constants have no `consumes` carrier (A-16).
+  private foldConstantInitializerCalls(modules: readonly ParsedModule[]): void {
+    const { byName, targets, isUnique, key } = this.buildBodyReferenceTargets(modules);
     for (const module of modules) {
       for (const constant of module.constants) {
         const name = constant.declaration === undefined ? undefined : this.getAssignedDeclarationName(constant.declaration);
@@ -1507,13 +1564,58 @@ export class TypeScriptToTypedMindConverter {
         const calls = new Set(entity.calls);
         for (const reference of constant.callReferences ?? []) {
           if (reference.origin.kind !== 'project') continue;
-          // Full declaration identity prevents a parameter/local binding from
-          // borrowing the name of an exported function in the same file.
           const target = targets.get(key(reference.origin.declaration));
-          if (target !== undefined) calls.add(target);
+          const edge = target === undefined ? undefined : this.bodyReferenceEdge(reference, target);
+          if (edge?.slot === 'calls') calls.add(edge.entry);
         }
         if (calls.size === entity.calls.length) continue;
         const replacement = new ConstantsNode({ ...entity, calls: [...calls].sort() });
+        const index = this.entities.indexOf(entity);
+        this.entities[index] = replacement;
+        byName.set(name, replacement);
+      }
+    }
+  }
+
+  // RFC-TM-14 §S1 — function-body references fold into `FunctionNode.calls`
+  // (`call`, `construct`) and `FunctionNode.consumes` (`read`). Gate: the
+  // target is declared in the SAME module as the function, compared on the
+  // resolved declaration paths (A-20); cross-file body edges are non-goal
+  // N-X (credited through import lists). A Function reclassified from a
+  // callable const (§S6, `origin: 'callable-initializer'`) keeps F's
+  // cross-file gate for its initializer references (S2-1). Direct recursion
+  // (the function's own identity) is skipped, as before. Entries keep first-
+  // occurrence order, the order the previous same-file fold emitted.
+  // Class/ClassFile member bodies are folded by Quantum U3b, not here.
+  private foldBodyReferences(modules: readonly ParsedModule[]): void {
+    const { byName, targets, isUnique, key } = this.buildBodyReferenceTargets(modules);
+    for (const module of modules) {
+      for (const fn of module.functions) {
+        if (fn.declaration === undefined) continue;
+        const name = this.getAssignedDeclarationName(fn.declaration);
+        if (name === undefined || !isUnique(name)) continue;
+        const entity = byName.get(name);
+        if (!(entity instanceof FunctionNode)) continue;
+        const selfKey = key(fn.declaration);
+        const crossFile = fn.origin === 'callable-initializer';
+        const calls = new Set(entity.calls);
+        const consumes = new Set(entity.consumes ?? []);
+        for (const reference of fn.bodyReferences) {
+          if (reference.origin.kind !== 'project') continue;
+          if (!crossFile && reference.origin.declaration.filePath !== fn.declaration.filePath) continue;
+          const targetKey = key(reference.origin.declaration);
+          if (targetKey === selfKey) continue;
+          const target = targets.get(targetKey);
+          const edge = target === undefined ? undefined : this.bodyReferenceEdge(reference, target);
+          if (edge === undefined) continue;
+          (edge.slot === 'calls' ? calls : consumes).add(edge.entry);
+        }
+        if (calls.size === entity.calls.length && consumes.size === (entity.consumes?.length ?? 0)) continue;
+        const replacement = new FunctionNode({
+          ...entity,
+          calls: [...calls],
+          consumes: consumes.size === 0 ? undefined : [...consumes],
+        });
         const index = this.entities.indexOf(entity);
         this.entities[index] = replacement;
         byName.set(name, replacement);
@@ -2893,7 +2995,9 @@ export class TypeScriptToTypedMindConverter {
       sourceForm: 'shortform',
       signature: func.signature,
       typeParameters,
-      calls: this.resolveSameFileCallEdges(func, module),
+      // RFC-TM-14 §S1 — filled by the `foldBodyReferences` post-pass once
+      // every same-file target entity exists.
+      calls: [],
       pendingDependencies: [],
       description: func.description ? collapseDescription(func.description) : undefined,
       input: inputDTO,
@@ -2902,89 +3006,6 @@ export class TypeScriptToTypedMindConverter {
 
     this.entityNames.add(entityName);
     this.entities.push(functionEntity);
-  }
-
-  // typedmind-diagnostic-legitimacy callgraph increment — resolves
-  // `ParsedFunction.calledNames` (raw identifiers found in the function's own
-  // body, per `collectSameFileCallEdges`) against SAME-FILE declared,
-  // exported entities only: a sibling exported function/arrow-const in
-  // `module.functions` (resolved through `functionNameRemap`, the converter's
-  // own collision-resolved name — the same map `convertFunction` itself uses
-  // for its own name) or a sibling exported class in `module.classes`
-  // (resolved through `createEntityName`, since `reserveEntityNames`'s
-  // own doc comment establishes classes are never touched by the function
-  // disambiguation remap and always convert before this method runs, in both
-  // `convertToClassFile` and `convertToSeparateEntities`). A name with no
-  // same-file resolution (a module-private helper, an imported/global
-  // identifier, a method-call receiver, anything `collectSameFileCallEdges`
-  // could not attribute to a same-file top-level declaration) is DROPPED,
-  // not guessed — an unresolved raw string folded into `calls` would
-  // misfire `checker/unknown-call-target`/`checker/method-call-on-non-class`
-  // (check-method-calls.ts only inspects DOTTED calls, but
-  // `checkOrphans`/`collectReferencedNames` unions every raw string
-  // regardless, so an unresolved non-dotted name is merely inert — dropping
-  // it here is a precision choice, not a soundness requirement, made to keep
-  // `calls` an honest same-file-resolved edge list rather than a bag of
-  // unresolved source text). Cross-file calls are intentionally out of scope
-  // — this increment targets the same-file-closure diagnostic family only;
-  // a cross-file call edge is a separate, larger surface (the converter's
-  // import-graph resolution, not this per-function walk) this increment does
-  // not touch.
-  private resolveSameFileCallEdges(func: ParsedFunction, module: ParsedModule): string[] {
-    if (func.calledNames.length === 0) {
-      return [];
-    }
-    const resolved = new Set<string>();
-    for (const calledName of func.calledNames) {
-      if (calledName === func.name) {
-        // Direct recursion: the function's own (not-yet-assigned) entity
-        // name is not a useful liveness edge for the orphan check (a
-        // function cannot make itself non-orphaned by calling itself), and
-        // resolving it would just re-add the function's own remap entry.
-        continue;
-      }
-      const siblingFunctionRemapKey = `${module.filePath}::${calledName}`;
-      const siblingFunctionEntityName = this.functionNameRemap.get(siblingFunctionRemapKey);
-      if (siblingFunctionEntityName !== undefined) {
-        resolved.add(siblingFunctionEntityName);
-        continue;
-      }
-      // issue #91 / X-SUPP-6 (rfc-tm-9-diamond.md §9) — a class converts to
-      // an entity REGARDLESS of export status (`convertToSeparateEntities`/
-      // `convertToClassFile` never gate on `isClassExported`, unlike
-      // functions), so `this.entityNames.has(...)` alone is not a safe
-      // "genuinely reachable" signal the way it is for the function branch
-      // above. A module-private class deliberately keeps its
-      // `checker/orphaned-entity` finding (converter-emitted,
-      // pre-suppressed with reason 'generated-single-file-scope') as a
-      // STATEMENT ABOUT NON-EXPORT, not a same-file-reachability question —
-      // crediting a same-file `new` call here would silently erase that
-      // designed-in finding (fixture 25-generated-single-file). Only an
-      // EXPORTED sibling class is a legitimate same-file call-edge target.
-      const siblingClass = module.classes.find((cls) => cls.name === calledName);
-      if (siblingClass !== undefined && module.exports.some((exp) => exp.name === siblingClass.name)) {
-        // decision-same-named-entities PR 1 — same-file by construction
-        // (`siblingClass` came from THIS module's own class list), so the
-        // declaring module is known exactly and the rename resolves with no
-        // origin-resolution problem.
-        const siblingClassEntityName = this.resolveTypeEntityName(module, siblingClass.name);
-        // valid-references.ts's VALID_REFERENCES table legalizes `calls.to`
-        // as `['Function', 'Class']` ONLY — a ClassFile (a File fused with
-        // its module's primary class, per `convertToClassFile`) is NOT a
-        // legal `calls` target (confirmed against the real webhookstorage
-        // corpus: an Error subclass that IS the module's own primary class,
-        // e.g. ingest's `PayloadTooLargeError extends Error` in
-        // `s3-upload.ts`, `new`'d only inside a same-file function, fired
-        // `checker/reference-to-illegal` — "Cannot use 'calls' to reference
-        // ClassFile" — before this guard). Only fold in a sibling class that
-        // actually converted as a plain ClassNode.
-        const siblingClassEntity = this.entities.find((entity) => entity.name === siblingClassEntityName);
-        if (siblingClassEntity !== undefined && siblingClassEntity.kind === 'Class') {
-          resolved.add(siblingClassEntityName);
-        }
-      }
-    }
-    return Array.from(resolved);
   }
 
   // Gap 69 / gap 67 (ladder rung sammons/slat-harness, fixtures
