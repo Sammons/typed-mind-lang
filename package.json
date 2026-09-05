@@ -44,8 +44,8 @@
     "release": "pnpm run validate && pnpm run check:release-manifests && pnpm -r --filter './lib/*' publish --access public"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.10",
-    "@types/node": "^26.4.0",
+    "@biomejs/biome": "2.5.12",
+    "@types/node": "^26.4.1",
     "typescript": "^6.0.3"
   },
   "engines": {

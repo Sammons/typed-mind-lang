@@ -51,7 +51,7 @@
     "prepublishOnly": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\" && pnpm run clean && pnpm run build && pnpm test"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0"
+    "@types/node": "^26.4.1"
   },
   "publishConfig": {
     "access": "public"

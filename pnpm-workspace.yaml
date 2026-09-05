@@ -21,3 +21,11 @@ supportedArchitectures:
   cpu:
     - arm64
     - x64
+
+# Dev-only transitive pin. tsup 8.5.1 declares esbuild ^0.27.0, which lands on
+# 0.27.7 (GHSA-g7r4-m6w7-qqqr, low, dev-server file read on Windows). wrangler
+# already resolves esbuild 0.28.1 in this tree and esbuild 0.28.0 changed no JS
+# API (CHANGELOG 0.28.0: text imports, install integrity check, Go 1.26). Drop
+# this entry once tsup's own floor passes 0.28.1.
+overrides:
+  esbuild@^0.27.0: ^0.28.1
