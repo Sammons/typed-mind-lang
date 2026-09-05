@@ -59,3 +59,21 @@ it('TM13 F: absent and wrong-kind Constants calls remain errors', async () => {
   const invalid = parser.parse('Data %\n  ~> [used]');
   assert.equal(invalid.diagnostics.length > 0, true);
 });
+
+it('TM13 F+Q: qualified initializer calls use canonical ownership and method targets', async () => {
+  const parser = await parserPromise;
+  const outcome = parser.parse(
+    'Owner @ owner.ts:\n  -> [Owner.used, Owner.Service]\nOwner.used :: () => void\nOwner.Service <:\n  => [run]\nConfig ! config.ts\n  ~> [Owner.used, Owner.Service.run]',
+  );
+  const links = computeLinks(outcome.entities);
+  const findings = new AstValidator().validate(outcome, links).findings;
+  assert.equal(
+    findings.some((finding) => finding.code === 'checker/reference-to-illegal'),
+    false,
+  );
+  assert.equal(
+    findings.some((finding) => finding.code === 'checker/orphaned-entity' && /Owner\.(used|Service)/.test(finding.message)),
+    false,
+  );
+  assert.ok(links.referencedBy('Owner.Service').some((link) => link.from === 'Config'));
+});
