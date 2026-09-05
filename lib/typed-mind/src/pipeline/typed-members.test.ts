@@ -7,6 +7,7 @@ import { honestFieldsAcrossToggleOf } from '../emitter/honest-fields.ts';
 import { quoteStringLiteral } from '../emitter/quote-string-literal.ts';
 import { SyntaxEmitter } from '../emitter/syntax-emitter.ts';
 import { TypedMind } from '../typed-mind.ts';
+import { walkEntityTypeReferences } from './type-reference-walk.ts';
 import { TypedMindParser } from './typed-mind-parser.ts';
 
 const wasmPath = join(import.meta.dirname, '../../grammar/grammar.wasm');
@@ -98,4 +99,23 @@ it('TM13 B3a: typed local names do not consume unrelated global functions', asyn
   assert.ok(
     mind.check(source.replace('[Store.run]', '[Store.constructor]')).diagnostics.some((finding) => finding.message.includes('constructor')),
   );
+});
+
+it('TM13 B3a: quoted signature references retain exact source columns after escapes', async () => {
+  const parser = await TypedMindParser.create({ wasmPath });
+  const payload = 'run<T extends Bound>(label: "say \\"hi\\" \\q", value: Request, callback: (input: Input) => Output) => Result';
+  const source = `class Store {\n  method: ${quoteStringLiteral(payload)}\n}`;
+  const parsed = parser.parse(source);
+  assert.deepEqual(parsed.diagnostics, []);
+  const entity = parsed.entities[0];
+  assert.ok(entity);
+  const references: string[] = [];
+  walkEntityTypeReferences(entity, {
+    reference: (node) => {
+      references.push(node.name);
+      const line = source.split('\n')[node.span.start.line - 1];
+      assert.equal(line?.slice(node.span.start.column - 1, node.span.end.column - 1), node.name);
+    },
+  });
+  assert.deepEqual(references, ['Bound', 'Request', 'Input', 'Output', 'Result']);
 });
