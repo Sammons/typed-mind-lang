@@ -1,12 +1,4 @@
-// issue #113 — the emitter broke on inner double quotes in a description
-// because the grammar's `string` token (`/"[^"\n]*"/`, grammar.js:1209) has
-// no escape production for `"`. Repro'd against the real slat-harness
-// corpus (`NeedsItem`'s JSDoc: `A "needs you" item...`). Fixed by
-// `escapeDescriptionQuotes` in typescript-to-typedmind-converter.ts,
-// swapping an embedded `"` for `'` — a meaning-preserving substitution the
-// grammar's `string` token can actually carry, mirroring the existing
-// `collapseDescription` newline-collapse precedent (mechanical, no
-// truncation, no grammar change).
+// RFC-TM-13 C-prime preserves the original issue #113 source quotes.
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -27,7 +19,7 @@ const convert = () => {
 };
 
 describe('issue #113: a description with an inner double-quoted phrase round-trips through emission and parses', () => {
-  it('the DTO purpose text is extracted with the inner quotes swapped to single quotes, not truncated', () => {
+  it('TM13 CP: extraction retains source description quotes', () => {
     const result = convert();
     assert.equal(result.success, true);
 
@@ -35,8 +27,8 @@ describe('issue #113: a description with an inner double-quoted phrase round-tri
     assert.notEqual(needsItem, undefined, 'NeedsItem must be extracted as a real entity');
     assert.equal(
       needsItem?.purpose,
-      "A 'needs you' item — an agent waiting on the human in a thread.",
-      `expected the full description with swapped quotes, got: ${JSON.stringify(needsItem?.purpose)}`,
+      'A "needs you" item — an agent waiting on the human in a thread.',
+      `expected the full description with original quotes, got: ${JSON.stringify(needsItem?.purpose)}`,
     );
   });
 
@@ -47,14 +39,7 @@ describe('issue #113: a description with an inner double-quoted phrase round-tri
     const longform = emitter.emitLongform({ entities: result.entities as never, imports: [], suppressions: [], diagnostics: [] });
     const needsItemLine = longform.split('\n').find((line) => line.includes('needs you'));
     assert.notEqual(needsItemLine, undefined, `expected a line containing the description text, got:\n${longform}`);
-    // The grammar's `string` token is `/"[^"\n]*"/` — a well-formed quoted
-    // description has exactly two `"` characters on its line (open/close).
-    const quoteCount = (needsItemLine?.match(/"/g) ?? []).length;
-    assert.equal(
-      quoteCount,
-      2,
-      `expected exactly 2 double quotes (open+close) on the description line, got ${quoteCount}: ${JSON.stringify(needsItemLine)}`,
-    );
+    assert.ok(needsItemLine?.includes(String.raw`\"needs you\"`), needsItemLine);
   });
 
   it('the emitted .tmd parses cleanly (checker verdict has zero syntax/* findings)', async () => {
@@ -66,5 +51,7 @@ describe('issue #113: a description with an inner double-quoted phrase round-tri
     const checkResult = tm.check(longform);
     const syntaxFindings = checkResult.diagnostics.filter((d) => d.code.startsWith('syntax/'));
     assert.deepEqual(syntaxFindings, [], `must have zero syntax/* findings: ${JSON.stringify(syntaxFindings)}`);
+    const recovered = tm.parse(longform).entities.find((entity) => entity.name === 'NeedsItem');
+    assert.equal(Reflect.get(recovered ?? {}, 'purpose'), 'A "needs you" item — an agent waiting on the human in a thread.');
   });
 });

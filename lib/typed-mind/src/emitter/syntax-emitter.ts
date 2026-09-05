@@ -25,7 +25,7 @@ import type { ParseOutcome } from '../pipeline/parse-outcome.ts';
 import { detectFormat, type FormatDetectionResult, type SyntaxFormat } from './detect-format.ts';
 import { emitLongform, emitLongformWithDiagnostics } from './emit-longform.ts';
 import { emitShortform, emitShortformWithDiagnostics, shortformCannotExpress } from './emit-shortform.ts';
-import { quoteSwapDiagnosticsForSuppressions, suppressionsToLongformBlock, suppressionToShortformLine } from './emit-suppression.ts';
+import { suppressionsToLongformBlock, suppressionToShortformLine } from './emit-suppression.ts';
 
 export type { FormatDetectionResult, SyntaxFormat };
 export { detectFormat };
@@ -51,8 +51,7 @@ const emitEntity = (entity: EntityNode, options: EmitOptions): string[] => {
 };
 
 // Issue #130, disposition (b) — same per-entity form resolution as
-// `emitEntity`, additionally collecting the quote-swap diagnostics each
-// entity's emission produced.
+// `emitEntity`, additionally collecting any diagnostics each entity emission produces.
 const emitEntityWithDiagnostics = (entity: EntityNode, options: EmitOptions): { lines: string[]; diagnostics: Diagnostic[] } => {
   const form = resolvedFormFor(entity, options);
   return form === 'longform' ? emitLongformWithDiagnostics(entity) : emitShortformWithDiagnostics(entity);
@@ -107,7 +106,7 @@ export class SyntaxEmitter {
   }
 
   // Issue #130, disposition (b) — sibling of `emit` that additionally
-  // collects every quote-swap `Diagnostic` (emitter-diagnostics.ts) produced
+  // collects every emission `Diagnostic` (emitter-diagnostics.ts) produced
   // while quoting free-text fields. Added as a new method rather than
   // changing `emit`'s own return shape so every existing caller of
   // `emit`/`emitShortform`/`emitLongform`/`toggleFormat` keeps compiling and
@@ -122,7 +121,6 @@ export class SyntaxEmitter {
     });
     const suppressionForm: SyntaxFormat = options.forceForm ?? 'shortform';
     const suppressionLines = emitSuppressions(outcome.suppressions, suppressionForm);
-    diagnostics.push(...quoteSwapDiagnosticsForSuppressions(outcome.suppressions));
     const blocks = suppressionLines.length === 0 ? entityBlocks : [...entityBlocks, suppressionLines.join('\n')];
     return { text: blocks.join('\n\n').trim(), diagnostics };
   }
@@ -136,7 +134,7 @@ export class SyntaxEmitter {
   }
 
   // Same honest-toggle contract as `toggleFormat`, additionally surfacing
-  // the quote-swap diagnostics for the caller to display (LSP toggle-format
+  // the emission diagnostics for the caller to display (LSP toggle-format
   // command, playground, a future CLI emission surface).
   toggleFormatWithDiagnostics(outcome: ParseOutcome, currentFormat: SyntaxFormat): { text: string; diagnostics: Diagnostic[] } {
     const targetForm: SyntaxFormat = currentFormat === 'longform' ? 'shortform' : 'longform';
