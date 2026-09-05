@@ -38,8 +38,17 @@ const importsOf = (entity: EntityNode): readonly string[] | undefined => {
 // treatment of those two kinds).
 const addReference = (name: string, referenced: Set<string>, names: QualifiedNameResolver): void => {
   const resolved = names.target(name);
-  if (resolved !== undefined) referenced.add(resolved.name);
-  else if (!name.includes('.')) referenced.add(name);
+  if (resolved !== undefined) {
+    referenced.add(resolved.name);
+    // Using an owned declaration also uses its physical file. Merely
+    // declaring/exporting a member does not reach this reference walk.
+    let ownerName = resolved.name;
+    while (ownerName.includes('.')) {
+      ownerName = ownerName.slice(0, ownerName.lastIndexOf('.'));
+      const owner = names.target(ownerName);
+      if (owner instanceof FileNode || owner instanceof ClassFileNode) referenced.add(owner.name);
+    }
+  } else if (!name.includes('.')) referenced.add(name);
 };
 
 const collectTypeExprReferences = (node: TypeExprNode, referenced: Set<string>, names: QualifiedNameResolver): void => {
