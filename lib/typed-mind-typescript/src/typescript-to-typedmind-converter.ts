@@ -737,6 +737,7 @@ export class TypeScriptToTypedMindConverter {
 
       // Convert TypeScript constructs to TypedMind entities
       this.convertModules(filteredModules);
+      this.foldFactoryHeritage(filteredModules);
 
       // SST-referenced-module orphan flags (lead-authorized amendment,
       // half 1 of 2 — see `foldSstHandlerImportsIntoSourceFiles`'s own doc
@@ -2155,6 +2156,46 @@ export class TypeScriptToTypedMindConverter {
   // through `typeNameRemap`. Optional because the converter's own unit tests
   // construct classes without a surrounding module; a missing module falls
   // back to the bare name, the pre-change behaviour.
+  private foldFactoryHeritage(modules: readonly ParsedModule[]): void {
+    // The returned class need not be written in the heritage expression.
+    // Resolve its full source identity against retained declarations only,
+    // after allocation has established the actual emitted entity names.
+    const targets = new Map<string, string>();
+    const key = (identity: NonNullable<ParsedClass['declaration']>): string =>
+      JSON.stringify([identity.filePath, identity.name, identity.start, identity.end]);
+    for (const module of modules) {
+      for (const cls of module.classes) {
+        if (cls.declaration === undefined) continue;
+        const name = this.resolveTypeEntityName(module, cls.name);
+        if (this.entities.some((entity) => entity.name === name && (entity instanceof ClassNode || entity instanceof ClassFileNode))) {
+          targets.set(key(cls.declaration), name);
+        }
+      }
+    }
+    for (const module of modules) {
+      for (const cls of module.classes) {
+        const heritage = cls.factoryHeritage?.find((entry) => entry.index === 0);
+        if (heritage?.origin.kind !== 'project') continue;
+        const target = targets.get(key(heritage.origin.declaration));
+        if (target === undefined) {
+          this.addWarning(
+            `Factory heritage of '${cls.name}' resolves to a class that was not emitted; retaining the factory fallback`,
+            module.filePath,
+          );
+          continue;
+        }
+        const name = this.resolveTypeEntityName(module, cls.name);
+        const index = this.entities.findIndex((entity) => entity.name === name);
+        const entity = this.entities[index];
+        if (entity instanceof ClassFileNode) {
+          this.entities[index] = new ClassFileNode({ ...entity, extends: target });
+        } else if (entity instanceof ClassNode) {
+          this.entities[index] = new ClassNode({ ...entity, extends: target });
+        }
+      }
+    }
+  }
+
   private convertClass(cls: ParsedClass, sourceFile?: string, module?: ParsedModule): void {
     const entityName = this.resolveTypeEntityName(module, cls.name);
 
