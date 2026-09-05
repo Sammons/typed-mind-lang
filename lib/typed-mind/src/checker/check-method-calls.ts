@@ -14,12 +14,7 @@ import type { CheckContext } from './check-context.ts';
 export const checkMethodCalls = (context: CheckContext): void => {
   for (const entity of context.byName.values()) {
     if (
-      !(
-        entity instanceof FunctionNode ||
-        entity instanceof ConstantsNode ||
-        entity instanceof ClassNode ||
-        entity instanceof ClassFileNode
-      )
+      !(entity instanceof FunctionNode || entity instanceof ConstantsNode || entity instanceof ClassNode || entity instanceof ClassFileNode)
     ) {
       continue;
     }

@@ -88,8 +88,8 @@ it('TM14 U3: Class and ClassFile calls and consumes round-trip in both forms and
       assert.match(text, /class Service \{[\s\S]*calls: \[helper, Widget\.render\][\s\S]*consumes: \[LIMIT, PORT\][\s\S]*\}/);
       assert.match(text, /classfile Store \{[\s\S]*calls: \[helper, Widget\.render\][\s\S]*consumes: \[LIMIT, PORT\][\s\S]*\}/);
     } else {
-      assert.match(text, /Service <:\n  => \[run\]\n  ~> \[helper, Widget\.render\]\n  \$< \[LIMIT, PORT\]/);
-      assert.match(text, /Store #: store\.ts\n  => \[load\]\n  ~> \[helper, Widget\.render\]\n  \$< \[LIMIT, PORT\]/);
+      assert.ok(text.includes('Service <:\n  => [run]\n  ~> [helper, Widget.render]\n  $< [LIMIT, PORT]'), text);
+      assert.ok(text.includes('Store #: store.ts\n  => [load]\n  ~> [helper, Widget.render]\n  $< [LIMIT, PORT]'), text);
     }
     outcome = parser.parse(text);
   }
@@ -117,7 +117,10 @@ it('TM14 U3: removing a Class edge restores exactly that orphan', async () => {
       .map((finding) => finding.message)
       .toSorted();
   assert.deepEqual(await orphans(source), []);
-  assert.deepEqual(await orphans(source.replaceAll('  ~> [helper, Widget.render]\n', '')), ["Orphaned entity 'Widget'", "Orphaned entity 'helper'"]);
+  assert.deepEqual(await orphans(source.replaceAll('  ~> [helper, Widget.render]\n', '')), [
+    "Orphaned entity 'Widget'",
+    "Orphaned entity 'helper'",
+  ]);
   assert.deepEqual(await orphans(source.replaceAll('  $< [LIMIT, PORT]\n', '')), ["Orphaned entity 'LIMIT'", "Orphaned entity 'PORT'"]);
 });
 
@@ -131,7 +134,10 @@ it('TM14 U3: Class and ClassFile consumes are existence- and kind-checked with t
     {
       unknown: ["ClassFile 'Store' consumes unknown entity 'Typo'", "Class 'Service' consumes unknown entity 'Typo'"],
       wrongKind: [
-        ["ClassFile 'Store' cannot consume 'Main' (it's a File)", 'ClassFiles can only consume: RunParameter, Asset, Dependency, Constants'],
+        [
+          "ClassFile 'Store' cannot consume 'Main' (it's a File)",
+          'ClassFiles can only consume: RunParameter, Asset, Dependency, Constants',
+        ],
         ["Class 'Service' cannot consume 'Main' (it's a File)", 'Classes can only consume: RunParameter, Asset, Dependency, Constants'],
       ],
     },

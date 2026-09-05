@@ -163,7 +163,8 @@ export const attachmentRules: Record<string, AttachmentRule> = {
     group: 'calls',
     label: 'calls list (`~> [...]`)',
     // RFC-TM-14 §S3: Class and ClassFile carry member-body call edges.
-    accepts: (target) => target.kind === 'Function' || target.kind === 'Constants' || target.kind === 'Class' || target.kind === 'ClassFile',
+    accepts: (target) =>
+      target.kind === 'Function' || target.kind === 'Constants' || target.kind === 'Class' || target.kind === 'ClassFile',
     apply: (target, syntaxNode) => {
       target.slots.calls = namesOf(new CstCallsList(syntaxNode));
     },
