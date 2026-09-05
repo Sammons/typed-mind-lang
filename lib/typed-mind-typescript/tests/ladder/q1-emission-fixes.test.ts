@@ -124,7 +124,9 @@ describe('RFC-TM-10 Q1 check — D-LEG-3: namespace-qualified implements resolut
     const dependency = result.entities.find((entity) => entity.kind === 'Dependency');
     assert.ok(dependency instanceof DependencyNode);
     assert.deepEqual(dependency.exports, ['ParseConfigFileHost']);
-    assert.ok(result.tmdContent.includes('class CollectingParseConfigHost {\n  type: Class\n  implements: [Typescript.ParseConfigFileHost]'));
+    assert.ok(
+      result.tmdContent.includes('class CollectingParseConfigHost {\n  type: Class\n  implements: [Typescript.ParseConfigFileHost]'),
+    );
     const owner = result.entities.find((entity) => entity.kind === 'File');
     assert.ok(owner instanceof FileNode);
     assert.deepEqual(owner.exports, ['CollectingParseConfigHost'], 'the dependency member is not falsely exported by this file');
