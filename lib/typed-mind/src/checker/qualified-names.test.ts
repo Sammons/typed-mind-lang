@@ -247,3 +247,15 @@ it('TM13 Q: verified ClassFile methods are callable without accepting bare Class
   assert.ok(findingsFor(source.replace('Service.run]', 'Service]')).some((finding) => finding.code === 'checker/reference-to-illegal'));
   assert.ok(findingsFor(source.replace('Service.run]', 'Service.missing]')).some((finding) => finding.code === 'checker/unknown-method'));
 });
+
+it('TM13 Q: an exact nested declaration cannot use a shorter export owner to recurse', () => {
+  const source = 'File @ file.ts:\n  -> [File.Missing.Member]\nFile.Missing.Member %\n';
+  const { names } = namesFor(source);
+  const result = names.resolve('File.Missing.Member');
+  assert.equal(result.kind, 'unresolved');
+  if (result.kind === 'unresolved') {
+    assert.equal(result.ownerName, 'File.Missing');
+    assert.equal(result.reason, 'missing-owner');
+  }
+  assert.ok(findingsFor(source).some((finding) => finding.code === 'checker/qualified-name-unresolved'));
+});

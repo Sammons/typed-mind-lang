@@ -74,7 +74,10 @@ export class QualifiedNameResolver {
         : { kind: 'entity', entity };
     }
     let separator = name.lastIndexOf('.');
-    while (separator > 0 && !this.#byName.has(name.slice(0, separator))) {
+    // A declared entity asserts its immediate owner's identity. Falling back
+    // to a shorter export owner here could redirect an exact hit to itself.
+    const isDeclaredEntity = this.#byName.has(name);
+    while (!isDeclaredEntity && separator > 0 && !this.#byName.has(name.slice(0, separator))) {
       separator = name.lastIndexOf('.', separator - 1);
     }
     const ownerName = separator > 0 ? name.slice(0, separator) : name.slice(0, name.indexOf('.'));

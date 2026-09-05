@@ -90,3 +90,11 @@ it('TM13 Q: LSP export suffixes navigate to the owning qualified declaration', a
     assert.equal(provideReferencesForName('file:///test.tmd', 'Private', state.nameIndex, state.names, exported?.exportingOwner).length, 2);
   }
 });
+
+it('TM13 Q: missing immediate owners do not recurse in LSP navigation', async () => {
+  const typedMind = await TypedMind.create();
+  const state = buildDocumentState(typedMind.parseWithCst('File @ file.ts:\n  -> [File.Missing.Member]\nFile.Missing.Member %\n'));
+  assert.equal(state.names.target('File.Missing.Member'), undefined);
+  assert.doesNotThrow(() => provideSemanticTokensForDocument(state));
+  assert.doesNotThrow(() => provideReferencesForName('file:///test.tmd', 'File.Missing.Member', state.nameIndex, state.names));
+});
