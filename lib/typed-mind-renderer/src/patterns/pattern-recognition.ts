@@ -403,7 +403,7 @@ class MVCPatternMatcher implements PatternMatcher {
     }
     // RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class/ClassFile member-body edges.
     if (entity1 instanceof ClassNode || entity1 instanceof ClassFileNode) {
-      if (entity1.calls.includes(entity2.name)) return true;
+      if (entity1.calls.some((call) => call === entity2.name || names.target(call) === entity2)) return true;
       if (entity1.consumes?.includes(entity2.name)) return true;
     }
 

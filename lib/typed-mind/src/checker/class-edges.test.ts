@@ -13,6 +13,7 @@ import { it } from 'node:test';
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { ClassNode } from '../ast/class-node.ts';
 import type { EntityNode } from '../ast/entity-node.ts';
+import { QualifiedNameResolver } from '../ast/qualified-name-resolver.ts';
 import { honestFieldsAcrossToggleOf } from '../emitter/honest-fields.ts';
 import { SyntaxEmitter } from '../emitter/syntax-emitter.ts';
 import { computeLinks } from '../pipeline/link-index.ts';
@@ -192,6 +193,31 @@ it('TM14 U3: Class calls follow Function legality and method checks', async () =
   const bareUnknown = await findingsOf(source.replaceAll('~> [helper, Widget.render]', '~> [helper, Widget.render, nope]'));
   assert.deepEqual(codes(bareUnknown, 'checker/unknown-call-target'), []);
   assert.deepEqual(codes(bareUnknown, 'checker/reference-to-illegal'), []);
+});
+
+it('TM14 U3+U2: a Class or ClassFile `~> [Other.constructor]` entry resolves through the constructor arm', async () => {
+  // U2 (feat/tm14-constructor-member) merged before this Quantum: the S2
+  // spelling on a Class/ClassFile caller resolves as a member of the target,
+  // credits the target, and trips neither unknown-method nor legality.
+  const text = source.replaceAll('~> [helper, Widget.render]', '~> [helper, Widget.constructor]');
+  const parser = await parserPromise;
+  const outcome = parser.parse(text);
+  assert.deepEqual(outcome.diagnostics, []);
+  const links = computeLinks(outcome.entities);
+  const findings = new AstValidator().validate(outcome, links).findings;
+  assert.deepEqual(findings, []);
+  assert.deepEqual(
+    links
+      .referencedBy('Widget')
+      .map((reference) => reference.from)
+      .filter((from) => from === 'Service' || from === 'Store')
+      .toSorted(),
+    ['Service', 'Store'],
+  );
+  const byName = new Map(outcome.entities.map((entity) => [entity.name, entity]));
+  const resolution = new QualifiedNameResolver(byName).resolve('Widget.constructor');
+  assert.equal(resolution.kind, 'member');
+  assert.equal(resolution.kind === 'member' ? resolution.member : undefined, 'constructor');
 });
 
 it('TM14 U3: scenario-32 `$< [NODE_ENV]` on a Class is a consumes edge, not an illegal continuation', async () => {

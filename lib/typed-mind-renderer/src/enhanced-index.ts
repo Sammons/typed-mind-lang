@@ -1325,7 +1325,7 @@ ${this.generateRendererJS()}
       // resolver so a `Owner.member` target lands on its owner (S2 shape).
       if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
         for (const call of entity.calls) {
-          const target = names.target(call)?.name;
+          const target = names.target(call)?.name ?? byName.get(call)?.name;
           if (target !== undefined) {
             links.push({ source: entity.name, target, type: 'call' });
           }

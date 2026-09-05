@@ -506,7 +506,9 @@ export class GraphMetricsAnalyzer {
     // edges are dependencies like a Function's calls/consumes. Outside the
     // chain above because ClassFile already took the File arm for imports.
     if (entity instanceof ClassNode || entity instanceof ClassFileNode) {
-      entity.calls.forEach(addDependency);
+      for (const call of entity.calls) {
+        addDependency(this.names.target(call)?.name ?? call);
+      }
       entity.consumes?.forEach(addDependency);
     }
   }

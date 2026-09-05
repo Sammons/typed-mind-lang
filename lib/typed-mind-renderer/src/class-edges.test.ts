@@ -53,11 +53,10 @@ it('TM14 U3: graph metrics count Class and ClassFile calls and consumes as depen
   const names = graph.entities.map((entity) => entity.name);
   const matrix = detailedMetrics['dependencyMatrix'] as number[][];
   const dependenciesOf = (name: string) => names.filter((_target, column) => matrix[names.indexOf(name)]?.[column] === 1);
-  // `Widget.render` is looked up by raw name here (Function-arm parity at
-  // this head); U2 migrates the metrics lookup to the qualified resolver.
-  const bareTargets = (name: string) => dependenciesOf(name).filter((target) => target !== 'Widget');
+  // `Widget.render` resolves to its owner through the qualified-name
+  // resolver (U2's S2 lookup, shared with the Function arm).
   assert.deepEqual(
-    { service: bareTargets('Service'), store: bareTargets('Store') },
-    { service: ['helper', 'LIMIT'], store: ['helper', 'LIMIT'] },
+    { service: dependenciesOf('Service'), store: dependenciesOf('Store') },
+    { service: ['helper', 'LIMIT', 'Widget'], store: ['helper', 'LIMIT', 'Widget'] },
   );
 });
