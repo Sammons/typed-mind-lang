@@ -1148,7 +1148,7 @@ export class TypeScriptAnalyzer {
           return {
             ...exp,
             name: exp.name === 'default' ? local.name : exp.name,
-            isDefault: exp.name === 'default',
+            isDefault: exp.isDefault || exp.name === 'default',
             declaration: local.declaration,
             type: local.type,
           };

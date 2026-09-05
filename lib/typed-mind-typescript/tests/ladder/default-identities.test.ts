@@ -182,3 +182,25 @@ it('TM13 D: local named aliases alone retain the source declaration and canonica
   assert.ok(program instanceof ProgramNode);
   assert.deepEqual(program.exports, ['ValueFile.default']);
 });
+
+it('TM13 D: named default declarations retain both import routes beside local clauses', async (context) => {
+  for (const declaration of ['export default function value() { return 1; }', 'export default class value {}']) {
+    for (const publicName of ['value', 'renamed']) {
+      const clause = publicName === 'value' ? 'export { value };' : 'export { value as renamed };';
+      for (const source of [`${declaration} ${clause}`, `${clause} ${declaration}`]) {
+        const { converted } = fixture(context, source, {
+          'main.ts': `import alias from "./value.js"; import { other } from "./other.js"; export function main() { return [alias, other]; }`,
+          'other.ts': `import { ${publicName} as alias } from "./value.js"; export function other() { return alias; }`,
+        });
+        assert.equal(converted.success, true);
+        assert.equal(converted.entities.filter((entity) => entity.name === 'ValueFile.default').length, 1);
+        for (const path of ['main.ts', 'other.ts']) {
+          const importer = converted.entities.find((entity) => entity instanceof FileNode && entity.path === path);
+          assert.ok(importer instanceof FileNode);
+          assert.ok(importer.imports.includes('ValueFile.default'));
+        }
+        assert.deepEqual((await TypedMind.create()).check(converted.tmdContent).diagnostics, []);
+      }
+    }
+  }
+});

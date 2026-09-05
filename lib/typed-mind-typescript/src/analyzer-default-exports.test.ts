@@ -98,3 +98,19 @@ it('TM13 D: anonymous and imported clause defaults report unsupported facts with
     );
   }
 });
+
+it('TM13 D: local clauses preserve existing named default declaration flags in either order', (context) => {
+  for (const declaration of ['export default function value() { return 1; }', 'export default class value {}']) {
+    for (const clause of ['export { value };', 'export { value as renamed };']) {
+      for (const source of [`${declaration} ${clause}`, `${clause} ${declaration}`]) {
+        const { analysis, module } = analyze(context, source);
+        assert.deepEqual(analysis.diagnostics, []);
+        const defaults = module.exports.filter((exp) => exp.isDefault);
+        assert.equal(defaults.length, 1);
+        assert.equal(defaults[0]?.name, 'value');
+        assert.deepEqual(defaults[0]?.declaration, [...module.functions, ...module.classes][0]?.declaration);
+        assert.equal(module.exports.filter((exp) => !exp.isDefault).length, 1);
+      }
+    }
+  }
+});
