@@ -14,13 +14,11 @@
 // the name in `exports:`, producing `checker/multi-exported` plus a silently
 // wrong shape. That converted a loud failure into semantic corruption.
 //
-// After PR 1, `reserveTypeEntityNames` resolves each collision to a
-// deterministic module-qualified name — `${sanitizedModuleBasename}__${declName}`,
-// byte-identical in convention to `reserveFunctionEntityNames`, collision-only
-// so the first declarer keeps its bare name. `sanitizeEntityName` collapses
-// every run of underscores to one and never re-inserts a separator, so a
-// literal `__` is provably outside its codomain and cannot collide with any
-// name derived from real source.
+// RFC-TM-13 E updates the same collision controls to checked File ownership.
+// The first source declaration keeps its bare name; later declarations use
+// their actual emitted File/ClassFile owner plus the source name. Source
+// underscores remain authored text, while generated identities share a
+// global reservation registry.
 //
 // Each fixture asserts four things: conversion COMPLETES, the second
 // declaration is renamed per the convention, the warning text is EXACT, and
@@ -51,7 +49,7 @@ const allEntityNames = (result: { entities: readonly unknown[] }): string[] => {
 const entityNames = (result: { entities: readonly unknown[] }, suffix: string): string[] => {
   return result.entities
     .map((entity) => (entity as { name: string }).name)
-    .filter((name) => name === suffix || name.endsWith(`__${suffix}`))
+    .filter((name) => name === suffix || name.endsWith(`.${suffix}`))
     .sort();
 };
 
@@ -119,31 +117,31 @@ const assertCollisionRenamed = async (options: {
 };
 
 describe('decision-same-named-entities PR 1: a cross-module name collision renames instead of aborting', () => {
-  it('102 — INTERFACE: the second `interface Config` becomes Settings__Config', async () => {
+  it('102 — INTERFACE: the second `interface Config` becomes SettingsFile.Config', async () => {
     await assertCollisionRenamed({
       fixture: '102-same-name-interface-collision',
       bareName: 'Config',
-      qualifiedName: 'Settings__Config',
+      qualifiedName: 'SettingsFile.Config',
       firstPath: 'src/main.ts',
       secondPath: 'src/settings.ts',
     });
   });
 
-  it('103 — TYPE ALIAS: the second `type Payload` becomes Storage__Payload', async () => {
+  it('103 — TYPE ALIAS: the second `type Payload` becomes StorageFile.Payload', async () => {
     await assertCollisionRenamed({
       fixture: '103-same-name-type-alias-collision',
       bareName: 'Payload',
-      qualifiedName: 'Storage__Payload',
+      qualifiedName: 'StorageFile.Payload',
       firstPath: 'src/main.ts',
       secondPath: 'src/storage.ts',
     });
   });
 
-  it('104 — ENUM: the second `enum Status` becomes Worker__Status', async () => {
+  it('104 — ENUM: the second `enum Status` becomes WorkerFile.Status', async () => {
     await assertCollisionRenamed({
       fixture: '104-same-name-enum-collision',
       bareName: 'Status',
-      qualifiedName: 'Worker__Status',
+      qualifiedName: 'WorkerFile.Status',
       firstPath: 'src/main.ts',
       secondPath: 'src/worker.ts',
     });
@@ -154,21 +152,21 @@ describe('decision-same-named-entities PR 1: a cross-module name collision renam
   // canonical path-sort rule gives THEM the bare name and renames `main.ts`.
   // That is the rule working, not a quirk: which file is the "entrypoint" has
   // no bearing on the assignment, only the path order does.
-  it('105 — CLASS: `class Recorder` in main.ts becomes Main__Recorder (audit.ts sorts first)', async () => {
+  it('105 — CLASS: `class Recorder` in main.ts becomes MainFile.Recorder (audit.ts sorts first)', async () => {
     await assertCollisionRenamed({
       fixture: '105-same-name-class-collision',
       bareName: 'Recorder',
-      qualifiedName: 'Main__Recorder',
+      qualifiedName: 'MainFile.Recorder',
       firstPath: 'src/audit.ts',
       secondPath: 'src/main.ts',
     });
   });
 
-  it('106 — CONSTANT: `const DEFAULTS` in main.ts becomes Main__DEFAULTS (limits.ts sorts first)', async () => {
+  it('106 — CONSTANT: `const DEFAULTS` in main.ts becomes MainFile.DEFAULTS (limits.ts sorts first)', async () => {
     await assertCollisionRenamed({
       fixture: '106-same-name-constant-collision',
       bareName: 'DEFAULTS',
-      qualifiedName: 'Main__DEFAULTS',
+      qualifiedName: 'MainFile.DEFAULTS',
       firstPath: 'src/limits.ts',
       secondPath: 'src/main.ts',
     });
@@ -185,7 +183,7 @@ describe('decision-same-named-entities PR 1: a cross-module name collision renam
       return (entity as { fields: { name: string }[] }).fields.map((field) => field.name);
     };
     assert.deepEqual(fieldsOf('Config'), ['endpoint'], 'main.ts keeps the bare name and its own field');
-    assert.deepEqual(fieldsOf('Settings__Config'), ['retries'], 'settings.ts is renamed and keeps ITS own field');
+    assert.deepEqual(fieldsOf('SettingsFile.Config'), ['retries'], 'settings.ts is renamed and keeps ITS own field');
   });
 
   it('104 — each surviving TypeDef keeps its own enum members', () => {
@@ -195,7 +193,7 @@ describe('decision-same-named-entities PR 1: a cross-module name collision renam
       return (entity as { members: readonly string[] }).members;
     };
     assert.deepEqual(membersOf('Status'), ['Pending', 'Done']);
-    assert.deepEqual(membersOf('Worker__Status'), ['Idle', 'Busy']);
+    assert.deepEqual(membersOf('WorkerFile.Status'), ['Idle', 'Busy']);
   });
 
   it("94 — the constant case: two entities with two DISTINCT paths, and neither file exports the other's", () => {
@@ -209,16 +207,16 @@ describe('decision-same-named-entities PR 1: a cross-module name collision renam
       return (entity as { path: string }).path;
     };
     assert.equal(pathOf('DEFAULTS'), 'src/limits.ts', 'limits.ts sorts first and keeps the bare name');
-    assert.equal(pathOf('Main__DEFAULTS'), 'src/main.ts', 'the renamed constant must carry its OWN module path');
+    assert.equal(pathOf('MainFile.DEFAULTS'), 'src/main.ts', 'the renamed constant must carry its OWN module path');
 
     const exportsOf = (name: string): string[] => {
       const entity = result.entities.find((candidate) => (candidate as { name: string }).name === name);
       return (entity as { exports: string[] }).exports;
     };
-    assert.ok(exportsOf('MainFile').includes('Main__DEFAULTS'), 'main.ts exports the RENAMED entity, not the bare name');
+    assert.ok(exportsOf('MainFile').includes('MainFile.DEFAULTS'), 'main.ts exports the RENAMED entity, not the bare name');
     assert.ok(!exportsOf('MainFile').includes('DEFAULTS'), "main.ts must not claim limits.ts's constant");
     assert.ok(exportsOf('LimitsFile').includes('DEFAULTS'), 'limits.ts sorts first and exports the bare name');
-    assert.ok(!exportsOf('LimitsFile').includes('Main__DEFAULTS'), "limits.ts must not claim main.ts's constant");
+    assert.ok(!exportsOf('LimitsFile').includes('MainFile.DEFAULTS'), "limits.ts must not claim main.ts's constant");
   });
 });
 
@@ -236,7 +234,7 @@ describe('decision-same-named-entities PR 1: the rename is order-independent (re
   const fixture = '107-collision-rename-order-independence';
 
   const sharedNames = (result: { entities: readonly unknown[] }): string[] =>
-    allEntityNames(result).filter((name) => name === 'Shared' || name.endsWith('__Shared'));
+    allEntityNames(result).filter((name) => name === 'Shared' || name.endsWith('.Shared'));
 
   it('reversing the import order does not change which declaration keeps the bare name', () => {
     const forward = convertFixture(fixture, 'main.ts');
@@ -245,7 +243,7 @@ describe('decision-same-named-entities PR 1: the rename is order-independent (re
     // `src/alpha.ts` sorts before `src/zulu.ts`, so alpha keeps the bare name
     // under BOTH traversal orders. Before the fix the reversed entrypoint
     // produced `Alpha__Shared` instead — same source, different answer.
-    assert.deepEqual(sharedNames(forward), ['Shared', 'Zulu__Shared'], 'alpha sorts first, so it keeps the bare name');
+    assert.deepEqual(sharedNames(forward), ['Shared', 'ZuluFile.Shared'], 'alpha sorts first, so it keeps the bare name');
     assert.deepEqual(sharedNames(reversed), sharedNames(forward), 'reversing the import order must not change the assignment');
   });
 
@@ -275,7 +273,7 @@ describe('decision-same-named-entities PR 1: the rename is order-independent (re
     assert.deepEqual(
       collisionWarnings(result),
       [
-        "Duplicate entity name 'Shared' declared in both 'src/alpha.ts' and 'src/zulu.ts'; the declaration whose file path sorts first kept the bare name, so 'src/zulu.ts' was renamed to 'Zulu__Shared'. TypedMind entity names are global to a document.",
+        "Duplicate entity name 'Shared' declared in both 'src/alpha.ts' and 'src/zulu.ts'; the declaration whose file path sorts first kept the bare name, so 'src/zulu.ts' was renamed to 'ZuluFile.Shared'. TypedMind entity names are global to a document.",
       ],
       'the warning must name both paths, the resulting name, AND the deciding rule',
     );
@@ -306,7 +304,10 @@ describe('decision-same-named-entities PR 1: every assigned name is unique (revi
     // The hand-authored declaration keeps its own literal name, and the
     // collision loser steps past the taken tier onto the parent-directory one.
     assert.ok(names.includes('Settings__Options'), "collide.ts's own hand-authored name must survive");
-    assert.ok(names.includes('Src__Options'), 'the renamed loser must fall through to the next free tier');
+    assert.ok(
+      names.includes('SettingsFile.Options'),
+      'the renamed loser uses its real File owner while authored underscores remain distinct',
+    );
     assert.ok(names.includes('Options'), 'config.ts sorts first and keeps the bare name');
   });
 
