@@ -48,7 +48,7 @@ const indent = (lines: string[]): string[] => lines.map((line) => `  ${line}`);
 // shape so a Dependency block header always round-trips.
 const IDENTIFIER_PATTERN = /^[A-Za-z_]\w*$/;
 const dependencyHeaderName = (name: string): string => {
-  return IDENTIFIER_PATTERN.test(name) ? name : `"${name}"`;
+  return IDENTIFIER_PATTERN.test(name) ? name : quoteStringLiteral(name);
 };
 
 // The shared description/purpose property lines for the six kinds whose

@@ -50,6 +50,14 @@ it('TM13 CP: both grammar string tokens accept escapes and reject unclosed strin
   const header = parser.parseCst(`dependency ${quoted} {\n}\n`).longformBlockChildren()[0].blockHeaderChildren()[0];
   assert.equal(header.headerName(), quoted.slice(1, -1));
   assert.equal(outcome.imports[0]?.path, value);
+  let dependency = parser.parse(`dependency ${quoted} {\n  purpose: ${quoted}\n}\n`);
+  for (const forceForm of ['longform', 'shortform', 'longform'] as const) {
+    const emitted = emitter.emitWithDiagnostics(dependency, { forceForm });
+    assert.deepEqual(emitted.diagnostics, []);
+    dependency = parser.parse(emitted.text);
+    assert.deepEqual(dependency.diagnostics, [], emitted.text);
+    assert.equal(dependency.entities[0]?.name, value);
+  }
 
   for (const raw of ['"unclosed', '"odd\\"', '"physical\nnewline"', '"physical\rcarriage"', '"escaped\\\nnewline"']) {
     for (const malformed of [`Broken % ${raw}\n`, `function broken {\n  signature: mode ${raw}\n}\n`]) {

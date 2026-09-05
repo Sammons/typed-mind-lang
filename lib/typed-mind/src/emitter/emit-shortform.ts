@@ -361,6 +361,9 @@ export const shortformCannotExpress = (entity: EntityNode): boolean => {
     }
     case 'ClassFile':
       return (entity as ClassFileNode).purpose !== undefined;
+    case 'Dependency':
+      // A quoted longform name can contain text outside dependency_name.
+      return !/^[@\w\-/]+$/.test(entity.name);
     case 'UIComponent': {
       const uiComponent = entity as UiComponentNode;
       return uiComponent.declaredAffectedBy !== undefined && uiComponent.declaredAffectedBy.length > 0;
