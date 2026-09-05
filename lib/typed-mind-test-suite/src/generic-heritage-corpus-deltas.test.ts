@@ -43,6 +43,11 @@ for (const [path, names] of cases) {
       return `${head}${remaining.length > 0 ? ` <: ${remaining.join(', ')}` : head.includes('#:') ? '' : ' <:'}`;
     });
     assert.notEqual(control, source);
+    assert.deepEqual(
+      parser.parse(control).entities.map(({ kind, name }) => [kind, name]),
+      parser.parse(source).entities.map(({ kind, name }) => [kind, name]),
+      'removing heritage must preserve every declaration identity and kind',
+    );
     const orphanMessages = (text: string) => {
       const outcome = parser.parse(text);
       // Q's separate call-removal control proves AIController still has a
