@@ -168,3 +168,13 @@ surrounding prose must match.
 | `semantics/unsupported-generic-declaration` | generic-declaration-syntax.ts / cst-to-ast.ts | `Enum 'Choice' does not accept type parameters; remove them or use an alias declaration.` | Diagnostic | PASS | Names the unsupported declaration and gives an applicable alternative. |
 
 Emission-only diagnostic `emitter/unsupported-multiline-type-parameter` (generic-declaration-emission.ts) is outside the suppressible checker registry. Grade: PASS. It names the parameter and declaration, identifies the unsupported multiline value, and asks for a single-line literal before emission.
+
+| `checker/conflicting-signature-type-parameters` | check-generic-declarations.ts | Function signature type parameters disagree with its declaration. | CheckerFinding | PASS | Aligns full binding facts. |
+| `checker/duplicate-type-parameter` | check-generic-declarations.ts | Duplicate type parameter T. | CheckerFinding | PASS | Names the repeated binding and requests a distinct name. |
+| `checker/invalid-type-parameter-modifiers` | check-generic-declarations.ts | Invalid modifier combination on a type parameter. | CheckerFinding | PASS | Lists supported combinations. |
+| `checker/generic-arity` | check-generic-declarations.ts | Type Pair received 0 arguments for 2 declared parameters. | CheckerFinding | PASS | Requests required arguments and permits defaulted omissions. |
+| `checker/generic-unknown-type` | check-generic-declarations.ts | Generic declaration references undefined type Missing. | CheckerFinding | PASS | Requests declaration or import. |
+| `checker/generic-non-data-type` | check-generic-declarations.ts | Generic declaration references Function work as a type. | CheckerFinding | PASS | Requests a data type. |
+| `checker/unsupported-generic-type` | check-generic-declarations.ts | Generic constraint is retained as opaque type text. | CheckerFinding | PASS | States the reference-checking limitation. |
+| `checker/unsupported-heritage` | check-generic-declarations.ts | Heritage is retained as opaque type text. | CheckerFinding | PASS | Requests a named base for reference checking. |
+| `checker/type-parameter-heritage-base` | check-generic-declarations.ts | Declaration cannot extend local type parameter T. | CheckerFinding | PASS | Requests a declared base with parameters as arguments. |
