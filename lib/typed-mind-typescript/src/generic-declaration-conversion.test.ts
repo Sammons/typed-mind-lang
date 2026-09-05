@@ -119,3 +119,69 @@ export class Child extends outer(inner(Base)) {}
   assert.equal(child.extends, 'Base');
   assert.equal(child.heritage.extends?.kind, 'named');
 });
+
+it('G.5 nested synthesized DTOs inherit outer generic bindings without creating global parameter references', async () => {
+  const { result } = convert(
+    'export interface Box<T> { inner: { value: T; nested: { other: T } } }\nexport type Alias<U> = { inner: { value: U } };\nexport function use(box: Box<string>, alias: Alias<number>): void {}',
+  );
+  assert.equal(result.success, true);
+  const mind = await TypedMind.create();
+  assert.deepEqual(mind.check(result.tmdContent).diagnostics, []);
+  const nested = result.entities.filter((entity) => entity instanceof DtoNode && entity.name !== 'Box' && entity.name !== 'Alias');
+  assert.equal(nested.length, 3);
+  assert.ok(nested.every((entity) => entity instanceof DtoNode && entity.typeParameters?.length === 1));
+  assert.equal(
+    result.entities.some((entity) => entity.name === 'T' || entity.name === 'U'),
+    false,
+  );
+});
+
+it('G.5 generic function synthesized input and return DTOs keep local bindings and literal values', async () => {
+  const { result } = convert(
+    'export function wrap<T>(input: { value: T }, tag: "a   b"): { nested: { value: T } } { return { nested: input }; }',
+  );
+  assert.equal(result.success, true);
+  const mind = await TypedMind.create();
+  assert.deepEqual(mind.check(result.tmdContent).diagnostics, []);
+  const fn = result.entities.find((entity) => entity.name === 'wrap');
+  assert.ok(fn instanceof FunctionNode);
+  assert.equal(fn.input, undefined);
+  assert.equal(fn.output, undefined);
+  assert.match(fn.signature, /"a {3}b"/);
+  assert.match(fn.signature, /<T>/);
+  const synthesized = result.entities.filter((entity) => entity instanceof DtoNode);
+  assert.equal(synthesized.length, 3);
+  assert.ok(synthesized.every((entity) => entity instanceof DtoNode && entity.typeParameters?.[0]?.name === 'T'));
+});
+
+it('G.5 constraints and defaults use exact A2 origins while raw source aliases remain inspectable', () => {
+  const root = mkdtempSync(join(tmpdir(), 'tm13-g-origins-'));
+  try {
+    writeFileSync(
+      join(root, 'tsconfig.json'),
+      JSON.stringify({ compilerOptions: { target: 'esnext', module: 'esnext' }, include: ['*.ts'] }),
+    );
+    writeFileSync(join(root, 'a.ts'), 'export interface Model { a: string }');
+    writeFileSync(
+      join(root, 'index.ts'),
+      'import { Model as Imported } from "./a"; export interface Model { b: string } export interface Box<T extends Imported = Imported> { value: T } export function use(value: Box): void {}',
+    );
+    const analysis = new TypeScriptAnalyzer(root).analyzeFromEntrypoint(join(root, 'index.ts'));
+    const result = new TypeScriptToTypedMindConverter().convert(analysis);
+    assert.equal(result.success, true);
+    const box = result.entities.find((entity) => entity.name === 'Box');
+    assert.ok(box instanceof DtoNode);
+    const parameter = box.typeParameters?.[0];
+    assert.equal(parameter?.constraint?.kind === 'named' && parameter.constraint.name, 'Model');
+    assert.equal(parameter?.defaultType?.kind === 'named' && parameter.defaultType.name, 'Model');
+    assert.equal(parameter?.raw, 'T extends Imported = Imported');
+    assert.ok(result.entities.some((entity) => entity.name === 'IndexFile.Model'));
+    assert.equal(
+      analysis.modules.find((module) => module.filePath === join(root, 'index.ts'))?.interfaces.find((iface) => iface.name === 'Box')
+        ?.typeParameters?.[0]?.constraint?.text,
+      'Imported',
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

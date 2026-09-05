@@ -4,6 +4,7 @@ import {
   ClassFileNode,
   ClassNode,
   ConstantsNode,
+  canonicalizeTypeText,
   DependencyNode,
   DtoFieldNode,
   DtoNode,
@@ -18,6 +19,7 @@ import {
   SyntaxEmitter,
   TypeDefNode,
   type TypeExprNode,
+  type TypeParameterNode,
 } from '@sammons/typed-mind';
 import { convertSourceHeritage, convertSourceTypeParameters, type GenericMetadataContext } from './convert-generic-metadata.ts';
 import { EmittedNameAllocator } from './emitted-name-allocator.ts';
@@ -2225,21 +2227,37 @@ export class TypeScriptToTypedMindConverter {
         if (entity instanceof ClassFileNode) {
           this.entities[index] = new ClassFileNode({
             ...entity,
+            ...(entity.members === undefined
+              ? { members: undefined, methods: entity.methods }
+              : { members: entity.members, methods: undefined }),
             extends: undefined,
             implements: undefined,
             heritage: {
               ...entity.heritage,
-              extends: { kind: 'named', base: { kind: 'named', name: target, span: entity.span }, args: [], span: entity.span },
+              extends: {
+                kind: 'named',
+                base: { kind: 'named', name: target, span: entity.span },
+                args: entity.heritage.extends?.kind === 'named' ? entity.heritage.extends.args : [],
+                span: entity.span,
+              },
             },
           });
         } else if (entity instanceof ClassNode) {
           this.entities[index] = new ClassNode({
             ...entity,
+            ...(entity.members === undefined
+              ? { members: undefined, methods: entity.methods }
+              : { members: entity.members, methods: undefined }),
             extends: undefined,
             implements: undefined,
             heritage: {
               ...entity.heritage,
-              extends: { kind: 'named', base: { kind: 'named', name: target, span: entity.span }, args: [], span: entity.span },
+              extends: {
+                kind: 'named',
+                base: { kind: 'named', name: target, span: entity.span },
+                args: entity.heritage.extends?.kind === 'named' ? entity.heritage.extends.args : [],
+                span: entity.span,
+              },
             },
           });
         }
@@ -2517,7 +2535,8 @@ export class TypeScriptToTypedMindConverter {
     }
   }
 
-  private convertFunction(func: ParsedFunction, module: ParsedModule): void {
+  private convertFunction(sourceFunction: ParsedFunction, module: ParsedModule): void {
+    let func = sourceFunction;
     const moduleFilePath = module.filePath;
     const remapKey = `${moduleFilePath}::${func.name}`;
     const entityName = this.functionNameRemap.get(remapKey);
@@ -2532,6 +2551,31 @@ export class TypeScriptToTypedMindConverter {
     if (entityName === undefined) {
       this.addError(`Duplicate entity name: ${createEntityName(func.name)}`);
       return;
+    }
+
+    const typeParameters = convertSourceTypeParameters(func.typeParameters, this.genericMetadataContext(module.filePath));
+    if (typeParameters !== undefined) {
+      const convertSlot = (text: string, name: string): string => {
+        const canonical = canonicalizeTypeText(text);
+        if (typeof canonical === 'string') {
+          this.addError(`Unsupported signature type in '${entityName}': ${canonical}; source text retained`, module.filePath);
+          return text;
+        }
+        return isInlineObjectLiteralType(canonical.text) ? this.synthesizeInlineDTO(canonical.text, name, typeParameters) : canonical.text;
+      };
+      const parameters = func.parameters.map((parameter) => ({
+        ...parameter,
+        type: convertSlot(parameter.type, `${entityName}${parameter.name}Input`),
+      }));
+      const returnType = convertSlot(func.returnType, `${entityName}Output`);
+      // Source parameter slots are authoritative after A2 rewriting. This
+      // preserves literal bytes and names synthesized generic DTO arguments.
+      func = {
+        ...func,
+        parameters,
+        returnType,
+        signature: `${func.isAsync ? 'async ' : ''}${func.name}(${parameters.map((parameter) => `${parameter.name}${parameter.isOptional ? '?' : ''}: ${parameter.type}`).join(', ')}) => ${returnType}`,
+      };
     }
 
     // Extract input/output DTOs from signature. `entityName` (the
@@ -2557,7 +2601,7 @@ export class TypeScriptToTypedMindConverter {
       raw: `${entityName} :: ${func.signature}`,
       sourceForm: 'shortform',
       signature: func.signature,
-      typeParameters: convertSourceTypeParameters(func.typeParameters, this.genericMetadataContext(module.filePath)),
+      typeParameters,
       calls: this.resolveSameFileCallEdges(func, module),
       pendingDependencies: [],
       description: func.description ? collapseDescription(func.description) : undefined,
@@ -2910,6 +2954,7 @@ export class TypeScriptToTypedMindConverter {
 
     this.addEntityName(entityName, 'convertInterfaceToDTO');
 
+    const typeParameters = convertSourceTypeParameters(iface.typeParameters, this.genericMetadataContext(module?.filePath));
     const fields = iface.properties.map((prop) => {
       // RC-D (ladder-diagnostic-disposition-2026-08-29.md rank 3, issue
       // #101) — issue #72's nested-inline-object-literal recursion
@@ -2936,7 +2981,7 @@ export class TypeScriptToTypedMindConverter {
       // `parseInlineObjectLiteralToFields` already establishes for a
       // function-signature-originated nested DTO.
       if (isInlineObjectLiteralType(prop.type)) {
-        const nestedDtoName = this.synthesizeInlineDTO(prop.type, this.sanitizeEntityName(`${entityName}_${prop.name}`));
+        const nestedDtoName = this.synthesizeInlineDTO(prop.type, this.sanitizeEntityName(`${entityName}_${prop.name}`), typeParameters);
         const typeExpr = parseTypeExprText(nestedDtoName).typeExpr;
         return new DtoFieldNode({
           name: prop.name,
@@ -2956,7 +3001,11 @@ export class TypeScriptToTypedMindConverter {
       const genericWrapped = splitGenericWrappedObjectLiteral(prop.type);
 
       if (genericWrapped) {
-        const nestedDtoName = this.synthesizeInlineDTO(genericWrapped.inner, this.sanitizeEntityName(`${entityName}_${prop.name}`));
+        const nestedDtoName = this.synthesizeInlineDTO(
+          genericWrapped.inner,
+          this.sanitizeEntityName(`${entityName}_${prop.name}`),
+          typeParameters,
+        );
         const wrappedType = `${genericWrapped.wrapper}<${nestedDtoName}>`;
         const typeExpr = parseTypeExprText(wrappedType).typeExpr;
         this.walkGenericArgsForExternalStubs(typeExpr);
@@ -3000,7 +3049,7 @@ export class TypeScriptToTypedMindConverter {
       sourceForm: 'shortform',
       fields,
       purpose: iface.description ? collapseDescription(iface.description) : undefined,
-      typeParameters: convertSourceTypeParameters(iface.typeParameters, this.genericMetadataContext(module?.filePath)),
+      typeParameters,
       extendsReferences:
         iface.extends.length === 0
           ? undefined
@@ -3080,7 +3129,11 @@ export class TypeScriptToTypedMindConverter {
         span: SYNTHETIC_SPAN,
         raw: `${entityName} %`,
         sourceForm: 'shortform',
-        fields: this.parseInlineObjectLiteralToFields(typeAlias.type, entityName),
+        fields: this.parseInlineObjectLiteralToFields(
+          typeAlias.type,
+          entityName,
+          convertSourceTypeParameters(typeAlias.typeParameters, this.genericMetadataContext(module?.filePath)),
+        ),
         purpose: typeAlias.description ? collapseDescription(typeAlias.description) : undefined,
         typeParameters: convertSourceTypeParameters(typeAlias.typeParameters, this.genericMetadataContext(module?.filePath)),
       });
@@ -3437,7 +3490,7 @@ export class TypeScriptToTypedMindConverter {
             path: sourceEntity.path,
             heritage: sourceEntity.heritage,
             typeParameters: sourceEntity.typeParameters,
-            methods: sourceEntity.methods,
+            ...(sourceEntity.members === undefined ? { methods: sourceEntity.methods } : { members: sourceEntity.members }),
             imports: [...sourceEntity.imports, ...newNames],
             exports: sourceEntity.exports,
             purpose: sourceEntity.purpose,
@@ -3552,7 +3605,7 @@ export class TypeScriptToTypedMindConverter {
                 path: sourceEntity.path,
                 heritage: sourceEntity.heritage,
                 typeParameters: sourceEntity.typeParameters,
-                methods: sourceEntity.methods,
+                ...(sourceEntity.members === undefined ? { methods: sourceEntity.methods } : { members: sourceEntity.members }),
                 imports: [...sourceEntity.imports, ...newNames],
                 exports: sourceEntity.exports,
                 purpose: sourceEntity.purpose,
@@ -4722,21 +4775,29 @@ export class TypeScriptToTypedMindConverter {
   // supported (`check-dto-fields.ts`'s `PRIMITIVES`-gated resolution accepts
   // DTO/Class/TypeDef kinds) — so recursing preserves strictly more
   // information than an opaque leaf would, at zero grammar cost.
-  private synthesizeInlineDTO(objectLiteralType: string, baseName: string): string {
+  private synthesizeInlineDTO(objectLiteralType: string, baseName: string, outerParameters?: readonly TypeParameterNode[]): string {
     const dtoName = this.reserveSynthesizedDTOName(this.sanitizeEntityName(baseName));
     this.addEntityName(dtoName, 'synthesizeInlineDTO');
 
+    const typeParameters = outerParameters?.map((parameter) => ({
+      ...parameter,
+      modifiers: [],
+      constraint: undefined,
+      defaultType: undefined,
+      raw: parameter.name,
+    }));
     const dtoEntity = new DtoNode({
       name: dtoName,
+      typeParameters,
       span: SYNTHETIC_SPAN,
       raw: `${dtoName} %`,
       sourceForm: 'shortform',
-      fields: this.parseInlineObjectLiteralToFields(objectLiteralType, dtoName),
+      fields: this.parseInlineObjectLiteralToFields(objectLiteralType, dtoName, typeParameters),
       purpose: 'Synthesized from an inline object-literal parameter/return type (issue #72).',
     });
 
     this.entities.push(dtoEntity);
-    return dtoName;
+    return typeParameters?.length ? `${dtoName}<${typeParameters.map((parameter) => parameter.name).join(', ')}>` : dtoName;
   }
 
   // Collision resolution shared by `synthesizeInlineDTO`'s two call sites
@@ -4871,7 +4932,11 @@ export class TypeScriptToTypedMindConverter {
     return { name: match[1], type: match[3].trim(), optional: !!match[2] };
   }
 
-  private parseInlineObjectLiteralToFields(objectLiteralType: string, dtoName: string): DtoFieldNode[] {
+  private parseInlineObjectLiteralToFields(
+    objectLiteralType: string,
+    dtoName: string,
+    typeParameters?: readonly TypeParameterNode[],
+  ): DtoFieldNode[] {
     const trimmed = objectLiteralType.trim();
     if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
       return [];
@@ -4895,7 +4960,7 @@ export class TypeScriptToTypedMindConverter {
       // reused rather than re-derived.
       if (isInlineObjectLiteralType(prop.type)) {
         const nestedBaseName = this.sanitizeEntityName(`${dtoName}_${prop.name}`);
-        const nestedDtoName = this.synthesizeInlineDTO(prop.type, nestedBaseName);
+        const nestedDtoName = this.synthesizeInlineDTO(prop.type, nestedBaseName, typeParameters);
         const typeExpr = parseTypeExprText(nestedDtoName).typeExpr;
         fields.push(
           new DtoFieldNode({
