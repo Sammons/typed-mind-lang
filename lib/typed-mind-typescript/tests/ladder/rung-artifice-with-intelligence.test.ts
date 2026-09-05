@@ -184,7 +184,8 @@ describe('artifice rung, gap 96: same type alias in two files — declaration re
 
   it('STILL THE GAP (PR 2): no duplicate-name or multi-exported finding; the residual is the aliased import', async () => {
     const result = convert('96-same-name-type-alias-two-files');
-    const codes = (await diagnose(result.tmdContent)).map((diagnostic) => diagnostic.code);
+    const diagnostics = await diagnose(result.tmdContent);
+    const codes = diagnostics.map((diagnostic) => diagnostic.code);
 
     // The rename's whole purpose: the global namespace is genuinely
     // collision-free now, so neither check fires.
@@ -195,14 +196,28 @@ describe('artifice rung, gap 96: same type alias in two files — declaration re
     );
 
     // Residuals pinned exactly so any OTHER finding appearing here fails.
-    // Two orphans (the renamed TypeDef and its bare sibling are referenced
-    // only from raw signature text the orphan check does not walk) plus the
-    // aliased-import `StoredPublishState` shape this fixture was built for —
-    // all three are PR 2's territory.
+    // B1 recognizes the bare PublishState signature use. The renamed
+    // TypeDef and aliased StoredPublishState output still require A2.
     assert.deepEqual(
       codes.sort(),
-      ['checker/orphaned-entity', 'checker/orphaned-entity', 'checker/output-dto-not-found'],
+      ['checker/orphaned-entity', 'checker/output-dto-not-found'],
       `unexpected residual diagnostics: ${JSON.stringify(codes)}`,
+    );
+    assert.deepEqual(
+      diagnostics.filter((diagnostic) => diagnostic.code === 'checker/orphaned-entity').map((diagnostic) => diagnostic.message),
+      ["Orphaned entity 'Lifecycle__PublishState'"],
+    );
+    const control = await diagnose(
+      result.tmdContent
+        .replace('advance(state: PublishState)', 'advance(state: string)')
+        .replace('nextState(current: PublishState) => PublishState', 'nextState(current: string) => string'),
+    );
+    const restored = control.filter((diagnostic) => diagnostic.message === "Orphaned entity 'PublishState'");
+    assert.equal(restored.length, 1);
+    assert.equal(restored[0]?.code, 'checker/orphaned-entity');
+    assert.deepEqual(
+      control.filter((diagnostic) => !restored.includes(diagnostic)).map(({ code, message }) => ({ code, message })),
+      diagnostics.map(({ code, message }) => ({ code, message })),
     );
   });
 });

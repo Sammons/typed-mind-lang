@@ -61,20 +61,8 @@ export { TypeDefNode } from './ast/type-def-node.ts';
 // into lib/typed-mind/src for sibling workspace packages).
 export type { TypeExprNode } from './ast/type-expr-node.ts';
 export { UiComponentNode } from './ast/ui-component-node.ts';
-// Issue #130 (git.tail4ea214.ts.net/sammons/typed-mind-lang), PR #141 review
-// blocker 3 — `QUOTE_SWAP_CODE` ('emitter/quote-swap') joins `Diagnostic`
-// (already exported above) on the public surface so a consumer can filter
-// for this code (`diagnostics.filter((d) => d.code === QUOTE_SWAP_CODE)`)
-// without string-matching a literal the package could rename without
-// warning. Same no-barrel-house-rule rationale as every other targeted
-// re-export in this file: index.ts is the only path into lib/typed-mind/src
-// for sibling workspace packages (the LSP, the VS Code extension) and for
-// external consumers.
-// `UNREPRESENTABLE_ALIAS_CODE` ('emitter/unrepresentable-alias') joins it on
-// the same surface for the same reason: issue #130's second face, where a
-// TypeDef alias opening with a string literal has no longform spelling. A
-// consumer that toggles a document to longform filters for this code to know
-// the emission cannot reparse.
+// Historical diagnostic identifiers remain exported for compatibility.
+// RFC-TM-13 C-prime preserves quotes and nested aliases, so neither fires.
 export { QUOTE_SWAP_CODE, UNREPRESENTABLE_ALIAS_CODE } from './emitter/emitter-diagnostics.ts';
 // RFC-TM-6 §3 (rfc-tm-6-diamond.md) — the TypeScript converter builds a
 // synthetic ParseOutcome directly (it never runs source through the parser),
@@ -90,6 +78,14 @@ export { type EmitOptions, SyntaxEmitter } from './emitter/syntax-emitter.ts';
 // `LinkReference` for call-site stability.
 export { LinkIndex, type Reference as LinkReference } from './pipeline/link-index.ts';
 export type { ParseOutcome } from './pipeline/parse-outcome.ts';
+export {
+  type ParsedSignature,
+  type ParseSignatureTextOptions,
+  parseSignatureText,
+  type SignatureParameter,
+  type SignatureParseResult,
+  type SignatureTypePosition,
+} from './pipeline/parse-signature-text.ts';
 export { type ParseTypeExprTextOptions, type ParseTypeExprTextResult, parseTypeExprText } from './pipeline/type-expr-from-text.ts';
 // RFC-TM-4 §3 (rfc-tm-4-diamond.md) — the new primary surface (the flip's
 // original new export). This is the only checker/parser entry point left —

@@ -1245,7 +1245,7 @@
       "type": "IMMEDIATE_TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "[^\"\\n]*\""
+        "value": "([^\"\\\\\\r\\n]|\\\\[^\\r\\n])*\""
       }
     },
     "header_name_rest": {
@@ -1985,7 +1985,7 @@
           },
           {
             "type": "PATTERN",
-            "value": "\"[^\"\\n]*\""
+            "value": "\"([^\"\\\\\\r\\n]|\\\\[^\\r\\n])*\""
           }
         ]
       }
@@ -5096,7 +5096,7 @@
     },
     "string": {
       "type": "PATTERN",
-      "value": "\"[^\"\\n]*\""
+      "value": "\"([^\"\\\\\\r\\n]|\\\\[^\\r\\n])*\""
     },
     "version": {
       "type": "PATTERN",
@@ -5211,7 +5211,7 @@
           },
           {
             "type": "PATTERN",
-            "value": "[^\"\\n]*"
+            "value": "([^\"\\\\\\r\\n]|\\\\[^\\r\\n])*"
           },
           {
             "type": "STRING",

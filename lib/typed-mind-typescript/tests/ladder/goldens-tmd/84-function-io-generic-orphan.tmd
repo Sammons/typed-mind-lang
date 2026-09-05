@@ -1,0 +1,25 @@
+program Index__App {
+  type: Program
+  entry: IndexFile
+  version: 1.0.0
+  exports: [boot]
+}
+
+IndexFile @ src/index.ts:
+  <- [fetchWrapped, countBoxes]
+  -> [boot]
+
+ApiFile @ src/api.ts:
+  -> [Wrapped, Boxed, fetchWrapped, countBoxes]
+
+boot :: async boot() => Promise<number>
+
+fetchWrapped :: async fetchWrapped() => Promise<Wrapped[]>
+
+countBoxes :: countBoxes(boxes: ReadonlyArray<Boxed>) => number
+
+Wrapped %
+  - value: string
+
+Boxed %
+  - count: number

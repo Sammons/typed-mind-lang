@@ -28,7 +28,9 @@ import type {
   CstDtoFieldsBlock,
   CstLongformBlock,
 } from '../ast/gen/cst-nodes.ts';
+import { CstHeaderQuotedName } from '../ast/gen/cst-nodes.ts';
 import type { Span } from '../ast/span.ts';
+import { decodeQuotedString } from '../quoted-string.ts';
 import { illegalContinuationDiagnostic } from './attachment-rules.ts';
 import { EntityAccumulator } from './entity-accumulator.ts';
 import { tokenSpanOf } from './spans.ts';
@@ -60,10 +62,6 @@ const LONGFORM_KIND_BY_KEYWORD: Record<string, EntityKind> = {
   dependency: 'Dependency',
   // X-TYPE-7 (rfc-tm-8-diamond.md §5): `typedef Name { ... }` longform.
   typedef: 'TypeDef',
-};
-
-const unquote = (text: string): string => {
-  return text.replace(/^"/, '').replace(/"$/, '');
 };
 
 interface ScalarProperty {
@@ -141,7 +139,7 @@ const dtoFieldOf = (fieldBlock: CstDtoFieldBlock): DtoFieldNode => {
       const key = pair.propertyKeyChildren().at(0)?.text ?? '';
       const stringValue = pair.stringChildren().at(0)?.text;
       if (stringValue !== undefined) {
-        return { kind: 'scalar', key, value: unquote(stringValue), span: pairSpan } satisfies ScalarProperty;
+        return { kind: 'scalar', key, value: decodeQuotedString(stringValue), span: pairSpan } satisfies ScalarProperty;
       }
       const boolValue = pair.boolLiteralChildren().at(0)?.text;
       if (boolValue !== undefined) {
@@ -192,7 +190,7 @@ const classifyBlockProperty = (property: CstBlockProperty): LongformProperty | u
     return {
       kind: 'scalar',
       key: stringProperty.propertyKeyChildren().at(0)?.text ?? '',
-      value: unquote(stringProperty.stringChildren().at(0)?.text ?? '""'),
+      value: decodeQuotedString(stringProperty.stringChildren().at(0)?.text ?? '""'),
       span,
     };
   }
@@ -499,9 +497,11 @@ export const buildFromLongformBlock = (block: CstLongformBlock): LongformBuildRe
     return undefined;
   }
   const collected = collectProperties(block.blockPropertyChildren());
+  const nameField = header.nameField();
+  const name = nameField instanceof CstHeaderQuotedName ? decodeQuotedString(`"${nameField.text}`) : header.headerName();
   const accumulator = new EntityAccumulator({
     kind,
-    name: header.headerName(),
+    name,
     span: tokenSpanOf(block.syntaxNode),
     raw: block.syntaxNode.text.trimEnd(),
     // Legacy longform comment = the description property (longform-parser.ts:183).
