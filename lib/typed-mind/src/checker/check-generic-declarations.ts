@@ -9,6 +9,7 @@ import { parseSignatureText } from '../pipeline/parse-signature-text.ts';
 import { walkEntityTypeReferences } from '../pipeline/type-reference-walk.ts';
 import type { CheckContext } from './check-context.ts';
 import { checkSingleReference } from './check-reference-legality.ts';
+import { isDataTypeKind } from './data-type-kinds.ts';
 import { isImplicitPlatformDataType, isPrimitiveType } from './type-builtins.ts';
 
 const semanticParameters = (parameters: readonly TypeParameterNode[]): string =>
@@ -100,7 +101,7 @@ export const checkGenericDeclarations = (context: CheckContext): void => {
             message: `Generic declaration '${entity.name}' references undefined type '${node.name}'`,
             suggestion: 'Declare or import this type',
           });
-        } else if (!['DTO', 'Class', 'ClassFile', 'TypeDef', 'Dependency'].includes(target.kind)) {
+        } else if (!isDataTypeKind(target.kind) && target.kind !== 'Dependency') {
           context.addFinding({
             code: 'checker/generic-non-data-type',
             severity: 'error',

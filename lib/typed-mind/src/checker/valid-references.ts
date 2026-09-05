@@ -5,6 +5,7 @@
 // for the from-side / to-side legality checks in check-reference-legality.ts.
 
 import type { EntityKind } from '../ast/entity-kind.ts';
+import { DATA_TYPE_KINDS } from './data-type-kinds.ts';
 
 export type ReferenceKind =
   | 'imports'
@@ -139,6 +140,9 @@ export const VALID_REFERENCES: Record<ReferenceKind, ReferenceLegality> = {
     // RFC-TM-8 §5 (rfc-tm-8-diamond.md, X-TYPE-7): TypeDef joins the legal
     // schema-reference targets — a Constants entity's schema may now name an
     // enum or alias TypeDef, not only a Class or DTO.
-    to: ['Class', 'DTO', 'TypeDef'], // Schema can reference a type definition
+    // RFC-TM-13 burndown Q1: the list is DATA_TYPE_KINDS (data-type-kinds.ts),
+    // shared with check-dto-fields.ts, so the two enforcement points cannot
+    // drift again; ClassFile joins via that list.
+    to: DATA_TYPE_KINDS, // Schema can reference a type definition
   },
 };

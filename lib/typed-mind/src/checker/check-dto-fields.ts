@@ -13,8 +13,13 @@
 // DTO, Class, or TypeDef (the new named-type entity kind) — both enforcement
 // points the doc names gain the kind: this file's inline kind check (was
 // `referenced.kind !== 'DTO' && referenced.kind !== 'Class'`) AND
-// VALID_REFERENCES.schema.to (valid-references.ts, a distinct reference verb,
-// edited separately). The enum closed-set rule also lives here: a union
+// VALID_REFERENCES.schema.to (valid-references.ts, a distinct reference verb).
+// RFC-TM-13 burndown Q1 (PR #182, sammons/typed-mind-lang): ClassFile joins
+// the set. The converter fuses a single-class file into a ClassFile, so a DTO
+// field typed as that class raised `checker/dto-field-non-data-type` falsely
+// (13 live findings, rfc-tm-13-evidence/self-core-dispositions.md). Both
+// enforcement points now read the one list in data-type-kinds.ts.
+// The enum closed-set rule also lives here: a union
 // field type mixing a named reference to an enum-variant TypeDef with string
 // literals flags any literal absent from that enum's member set
 // (`checker/enum-literal-outside-members`, severity error) — the FAQ's
@@ -29,14 +34,8 @@ import { TypeDefNode } from '../ast/type-def-node.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { walkTypeReferences } from '../pipeline/type-reference-walk.ts';
 import type { CheckContext } from './check-context.ts';
+import { isDataTypeKind } from './data-type-kinds.ts';
 import { isImplicitPlatformDataType, isPrimitiveType } from './type-builtins.ts';
-
-// The two kinds a field-type reference may resolve to (doc §5's second
-// enforcement point). Extracted so the enum closed-set walk (below) and the
-// per-part walk share one definition of "is this a legal data-type kind."
-const isDataTypeKind = (kind: string): boolean => {
-  return kind === 'DTO' || kind === 'Class' || kind === 'TypeDef';
-};
 
 const checkNamedPart = (context: CheckContext, entity: DtoNode, fieldName: string, name: string, span: Span): void => {
   if (isPrimitiveType(name)) {
