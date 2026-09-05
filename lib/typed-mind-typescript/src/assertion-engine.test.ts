@@ -1,15 +1,22 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { ClassFileNode, DtoFieldNode, DtoNode, FunctionNode, ProgramNode, parseTypeExprText, type Span } from '@sammons/typed-mind';
+import {
+  ClassFileNode,
+  DtoFieldNode,
+  DtoNode,
+  FunctionNode,
+  ProgramNode,
+  parseTypeExprText,
+  type Span,
+  TypedMind,
+} from '@sammons/typed-mind';
 import { AssertionEngine } from './assertion-engine.ts';
 import type { ConversionResult } from './types.ts';
 
-// RFC-TM-6 §3 (rfc-tm-6-diamond.md) — this fixture now builds real
-// EntityNode subclasses (the converter's own construction shape post-flip)
-// instead of legacy bridge-type object literals (`type: 'ClassFile'` +
-// `position`). SYNTHETIC_SPAN mirrors the converter's own zero-width span
-// per the M8 disposition — this fixture is not itself a converter output,
-// but it stands in for one in these (currently skipped) assertion tests.
+// RFC-TM-6 §3 (rfc-tm-6-diamond.md) — this fixture builds real EntityNode
+// subclasses (the converter's own construction shape post-flip). SYNTHETIC_SPAN
+// mirrors the converter's zero-width span per the M8 disposition — the fixture
+// is not itself a converter output, but it stands in for one here.
 const SYNTHETIC_SPAN: Span = { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } };
 
 // RFC-TM-8 §2 (rfc-tm-8-diamond.md, X-TYPE-2) — DtoFieldNode.typeExpr via the
@@ -21,6 +28,57 @@ const stringField = (name: string): DtoFieldNode =>
     typeExpr: parseTypeExprText('string').typeExpr,
     optionalityMarker: 'none',
     span: SYNTHETIC_SPAN,
+  });
+
+// Checker-clean reference document. `assert()` gates on `check().valid`
+// before it compares graphs, so every expected document in this suite must
+// clear the checker; this one is the baseline the mock ConversionResult
+// mirrors entity-for-entity. What keeps it clean: the Program's entry is a
+// declared ClassFile, every ClassFile is reached (entry, `extends`,
+// `implements`, or an import), every method name resolves to a declared
+// Function, and every DTO is imported or is a Function input/output.
+// `should validate the shared fixture` proves zero findings on this text.
+const CHECKER_CLEAN_TMD = `
+IndexApp -> UserService v1.0.0
+
+UserService #: src/services/user-service.ts <: BaseService, IUserService
+  <- [UserDTO, CreateUserDTO]
+  => [createUser, findUser]
+
+BaseService #: src/services/base-service.ts
+
+IUserService #: src/services/user-service-interface.ts
+
+createUser :: async createUser(data: CreateUserDTO) => Promise<UserDTO>
+  <- CreateUserDTO
+  -> UserDTO
+
+findUser :: findUser(id: string) => Promise<UserDTO>
+  -> UserDTO
+
+UserDTO %
+  - id: string
+  - name: string
+  - email: string
+
+CreateUserDTO %
+  - name: string
+  - email: string
+`.trim();
+
+const classFile = (name: string, path: string): ClassFileNode =>
+  new ClassFileNode({
+    name,
+    span: SYNTHETIC_SPAN,
+    raw: `${name} #: ${path}`,
+    sourceForm: 'shortform',
+    path,
+    implements: [],
+    methods: [],
+    imports: [],
+    // A shortform ClassFile exports itself (class-file-node.ts:46); the
+    // parser produces the same list, so the mock must carry it to compare equal.
+    exports: [name],
   });
 
 const createMockConversionResult = (): ConversionResult => ({
@@ -36,8 +94,10 @@ const createMockConversionResult = (): ConversionResult => ({
       implements: ['IUserService'],
       methods: ['createUser', 'findUser'],
       imports: ['UserDTO', 'CreateUserDTO'],
-      exports: [],
+      exports: ['UserService'],
     }),
+    classFile('BaseService', 'src/services/base-service.ts'),
+    classFile('IUserService', 'src/services/user-service-interface.ts'),
     new FunctionNode({
       name: 'createUser',
       span: SYNTHETIC_SPAN,
@@ -49,6 +109,16 @@ const createMockConversionResult = (): ConversionResult => ({
       input: 'CreateUserDTO',
       output: 'UserDTO',
     }),
+    new FunctionNode({
+      name: 'findUser',
+      span: SYNTHETIC_SPAN,
+      raw: 'findUser :: findUser(id: string) => Promise<UserDTO>',
+      sourceForm: 'shortform',
+      signature: 'findUser(id: string) => Promise<UserDTO>',
+      calls: [],
+      pendingDependencies: [],
+      output: 'UserDTO',
+    }),
     new DtoNode({
       name: 'UserDTO',
       span: SYNTHETIC_SPAN,
@@ -56,127 +126,109 @@ const createMockConversionResult = (): ConversionResult => ({
       sourceForm: 'shortform',
       fields: [stringField('id'), stringField('name'), stringField('email')],
     }),
+    new DtoNode({
+      name: 'CreateUserDTO',
+      span: SYNTHETIC_SPAN,
+      raw: 'CreateUserDTO %',
+      sourceForm: 'shortform',
+      fields: [stringField('name'), stringField('email')],
+    }),
     new ProgramNode({
       name: 'IndexApp',
       span: SYNTHETIC_SPAN,
-      raw: 'IndexApp -> main v1.0.0',
+      raw: 'IndexApp -> UserService v1.0.0',
       sourceForm: 'shortform',
-      entry: 'main',
+      entry: 'UserService',
       version: '1.0.0',
     }),
   ],
-  tmdContent: `
-# Programs
-IndexApp -> main v1.0.0
-
-# ClassFiles
-UserService #: src/services/user-service.ts <: BaseService, IUserService
-  <- [UserDTO, CreateUserDTO]
-  => [createUser, findUser]
-
-# Functions  
-createUser :: async createUser(data: CreateUserDTO) => Promise<UserDTO>
-  <- CreateUserDTO
-  -> UserDTO
-
-# DTOs
-UserDTO %
-  - id: string
-  - name: string
-  - email: string
-  `.trim(),
+  tmdContent: CHECKER_CLEAN_TMD,
   errors: [],
   warnings: [],
 });
 
-// This suite was `describe.skip`, which hid all ten tests from the runner's
-// skip count entirely — they reported as neither passing, failing, nor
-// skipped, so nothing signalled that the coverage was gone. Two independent
-// defects were behind the skip:
-//
-// 1. Mechanical, now FIXED: `assert()` is async (RFC-TM-6 §3 moved it onto
-//    `TypedMind.create()`, which needs a wasm init), but every test called it
-//    without `await` and read `.success` off the Promise — always `undefined`.
-//    All ten now await it.
-//
-// 2. Substantive, still OPEN: the shared `expectedTMD` fixture is not a
-//    checker-valid document. `check()` reports six errors against it
-//    (orphaned `UserService`, undefined entry point `main`, and missing
-//    `BaseService` / `IUserService` / `CreateUserDTO`), so the checker-gated
-//    `assert()` short-circuits on `!validationResult.valid` and returns
-//    `success: false` with EMPTY `missingEntities` / `extraEntities` before
-//    `compareGraphs` ever runs. Every comparison assertion is therefore
-//    reading the parse-failure result, not a comparison result.
-//
-// Fixing (2) means rebuilding the fixture into a checker-clean document —
-// which changes what each test exercises and is a real piece of design work,
-// not a mechanical repair. Those nine are `it.skip` with per-test reasons so
-// they COUNT as skipped and stay visible. `should handle invalid TMD syntax`
-// is not affected: it asserts the invalid-document path deliberately, so it
-// passes and runs.
+// Every expected document below is checker-clean by construction, so each
+// test exercises `compareGraphs`, not the `!validationResult.valid` short
+// circuit. The suite was `describe.skip` (commit ca02cff) and then nine
+// `it.skip` (PR #151) until the fixtures were rebuilt against the checker.
 describe('AssertionEngine', () => {
-  // SKIP: the shared expectedTMD fixture is not a checker-valid document (orphaned UserService, undefined entry `main`, missing BaseService/IUserService/CreateUserDTO), so RFC-TM-6's checker-gated assert() short-circuits on !valid and never reaches compareGraphs.
-  it.skip('should pass assertion when TypeScript matches expected TMD', async () => {
+  it('should validate the shared fixture', async () => {
+    const typedMind = await TypedMind.create();
+
+    const validationResult = typedMind.check(CHECKER_CLEAN_TMD, 'test.tmd');
+
+    assert.equal(validationResult.valid, true);
+    assert.deepEqual(validationResult.diagnostics, []);
+  });
+
+  it('should pass assertion when TypeScript matches expected TMD', async () => {
     const engine = new AssertionEngine();
     const conversionResult = createMockConversionResult();
 
+    const result = await engine.assert(conversionResult, 'test.tmd', CHECKER_CLEAN_TMD);
+
+    // Mock and document carry the same eight entities, so nothing deviates.
+    assert.deepEqual(result, { success: true, deviations: [], missingEntities: [], extraEntities: [] });
+  });
+
+  it('should detect missing entities', async () => {
+    const engine = new AssertionEngine();
+    const conversionResult = createMockConversionResult();
+
+    // AdminService is imported by UserService so it is not orphaned; deleteUser
+    // is declared so the method name resolves.
     const expectedTMD = `
-IndexApp -> main v1.0.0
+IndexApp -> UserService v1.0.0
 
 UserService #: src/services/user-service.ts <: BaseService, IUserService
-  <- [UserDTO, CreateUserDTO]
+  <- [UserDTO, CreateUserDTO, AdminService]
   => [createUser, findUser]
+
+BaseService #: src/services/base-service.ts
+
+IUserService #: src/services/user-service-interface.ts
+
+AdminService #: src/services/admin-service.ts
+  => [deleteUser]
 
 createUser :: async createUser(data: CreateUserDTO) => Promise<UserDTO>
   <- CreateUserDTO
   -> UserDTO
 
-UserDTO %
-  - id: string
-  - name: string  
-  - email: string
-    `.trim();
+findUser :: findUser(id: string) => Promise<UserDTO>
+  -> UserDTO
 
-    const result = await engine.assert(conversionResult, 'test.tmd', expectedTMD);
-
-    assert.equal(result.success, true);
-    assert.equal(result.deviations.length, 0);
-    assert.equal(result.missingEntities.length, 0);
-    assert.equal(result.extraEntities.length, 0);
-  });
-
-  // SKIP: the shared expectedTMD fixture is not a checker-valid document (orphaned UserService, undefined entry `main`, missing BaseService/IUserService/CreateUserDTO), so RFC-TM-6's checker-gated assert() short-circuits on !valid and never reaches compareGraphs.
-  it.skip('should detect missing entities', async () => {
-    const engine = new AssertionEngine();
-    const conversionResult = createMockConversionResult();
-
-    const expectedTMD = `
-IndexApp -> main v1.0.0
-
-UserService #: src/services/user-service.ts <: BaseService
-  => [createUser, findUser]
-
-AdminService #: src/services/admin-service.ts
-  => [deleteUser]
+deleteUser :: deleteUser(id: string) => Promise<void>
 
 UserDTO %
   - id: string
   - name: string
+  - email: string
+
+CreateUserDTO %
+  - name: string
+  - email: string
     `.trim();
 
     const result = await engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
     assert.equal(result.success, false);
-    assert.ok(result.missingEntities.includes('AdminService'));
+    // deleteUser joins AdminService: the clean fixture must declare it as a Function.
+    assert.deepEqual(result.missingEntities, ['AdminService', 'deleteUser']);
+    assert.deepEqual(result.extraEntities, []);
   });
 
-  // SKIP: the shared expectedTMD fixture is not a checker-valid document (orphaned UserService, undefined entry `main`, missing BaseService/IUserService/CreateUserDTO), so RFC-TM-6's checker-gated assert() short-circuits on !valid and never reaches compareGraphs.
-  it.skip('should detect extra entities', async () => {
+  it('should detect extra entities', async () => {
     const engine = new AssertionEngine();
     const conversionResult = createMockConversionResult();
 
+    // A Program needs a declared entry and a DTO needs an importer, so the
+    // minimal clean document is one File importing the DTO.
     const expectedTMD = `
-IndexApp -> main v1.0.0
+IndexApp -> Main v1.0.0
+
+Main @ src/main.ts:
+  <- [UserDTO]
 
 UserDTO %
   - id: string
@@ -188,16 +240,37 @@ UserDTO %
     assert.equal(result.success, false);
     assert.ok(result.extraEntities.includes('UserService'));
     assert.ok(result.extraEntities.includes('createUser'));
+    // Main exists only in the expected document.
+    assert.deepEqual(result.missingEntities, ['Main']);
   });
 
-  // SKIP: the shared expectedTMD fixture is not a checker-valid document (orphaned UserService, undefined entry `main`, missing BaseService/IUserService/CreateUserDTO), so RFC-TM-6's checker-gated assert() short-circuits on !valid and never reaches compareGraphs.
-  it.skip('should detect entity type mismatches', async () => {
+  it('should detect entity type mismatches', async () => {
     const engine = new AssertionEngine();
     const conversionResult = createMockConversionResult();
 
+    // A Class must be exported by a File and imported by another to pass the
+    // orphan and class-not-exported checks.
     const expectedTMD = `
+IndexApp -> App v1.0.0
+
+App @ src/app.ts:
+  <- [UserService]
+
+UserModule @ src/services/user-service.ts:
+  <- [UserDTO]
+  -> [UserService]
+
 UserService <: BaseService
   => [createUser, findUser]
+
+BaseService #: src/services/base-service.ts
+
+createUser :: async createUser(data: UserDTO) => Promise<UserDTO>
+  <- UserDTO
+  -> UserDTO
+
+findUser :: findUser(id: string) => Promise<UserDTO>
+  -> UserDTO
 
 UserDTO %
   - id: string
@@ -208,20 +281,38 @@ UserDTO %
     assert.equal(result.success, false);
 
     const typeDeviation = result.deviations.find((d) => d.entityName === 'UserService' && d.property === 'type');
-    assert.notEqual(typeDeviation, undefined);
-    assert.equal(typeDeviation?.expected, 'Class');
-    assert.equal(typeDeviation?.actual, 'ClassFile');
-    assert.equal(typeDeviation?.severity, 'error');
+    assert.deepEqual(typeDeviation, {
+      entityName: 'UserService',
+      property: 'type',
+      expected: 'Class',
+      actual: 'ClassFile',
+      severity: 'error',
+    });
   });
 
-  // SKIP: the shared expectedTMD fixture is not a checker-valid document (orphaned UserService, undefined entry `main`, missing BaseService/IUserService/CreateUserDTO), so RFC-TM-6's checker-gated assert() short-circuits on !valid and never reaches compareGraphs.
-  it.skip('should detect method differences', async () => {
+  it('should detect method differences', async () => {
     const engine = new AssertionEngine();
     const conversionResult = createMockConversionResult();
 
+    // updateUser and deleteUser are declared so every listed method resolves.
     const expectedTMD = `
+IndexApp -> UserService v1.0.0
+
 UserService #: src/services/user-service.ts
+  <- [UserDTO]
   => [createUser, findUser, updateUser, deleteUser]
+
+createUser :: async createUser(data: UserDTO) => Promise<UserDTO>
+  <- UserDTO
+  -> UserDTO
+
+findUser :: findUser(id: string) => Promise<UserDTO>
+  -> UserDTO
+
+updateUser :: updateUser(id: string) => Promise<UserDTO>
+  -> UserDTO
+
+deleteUser :: deleteUser(id: string) => Promise<void>
 
 UserDTO %
   - id: string
@@ -232,17 +323,25 @@ UserDTO %
     assert.equal(result.success, false);
 
     const methodDeviation = result.deviations.find((d) => d.entityName === 'UserService' && d.property === 'methods.missing');
-    assert.notEqual(methodDeviation, undefined);
-    assert.ok(methodDeviation?.expected.includes('updateUser'));
-    assert.ok(methodDeviation?.expected.includes('deleteUser'));
+    assert.deepEqual(methodDeviation, {
+      entityName: 'UserService',
+      property: 'methods.missing',
+      expected: 'updateUser, deleteUser',
+      actual: 'not present',
+      severity: 'error',
+    });
   });
 
-  // SKIP: the shared expectedTMD fixture is not a checker-valid document (orphaned UserService, undefined entry `main`, missing BaseService/IUserService/CreateUserDTO), so RFC-TM-6's checker-gated assert() short-circuits on !valid and never reaches compareGraphs.
-  it.skip('should detect DTO field differences', async () => {
+  it('should detect DTO field differences', async () => {
     const engine = new AssertionEngine();
     const conversionResult = createMockConversionResult();
 
     const expectedTMD = `
+IndexApp -> Main v1.0.0
+
+Main @ src/main.ts:
+  <- [UserDTO]
+
 UserDTO %
   - id: string
   - name: string
@@ -255,21 +354,36 @@ UserDTO %
 
     assert.equal(result.success, false);
 
-    const missingFieldDeviation = result.deviations.find((d) => d.entityName === 'UserDTO' && d.property === 'field.createdAt');
-    assert.notEqual(missingFieldDeviation, undefined);
-    assert.equal(missingFieldDeviation?.expected, 'field exists');
-    assert.equal(missingFieldDeviation?.actual, 'field missing');
+    const fieldDeviations = result.deviations.filter((d) => d.entityName === 'UserDTO');
+    // updatedAt is also absent from the mock, so it deviates alongside createdAt.
+    assert.deepEqual(fieldDeviations, [
+      { entityName: 'UserDTO', property: 'field.createdAt', expected: 'field exists', actual: 'field missing', severity: 'error' },
+      { entityName: 'UserDTO', property: 'field.updatedAt', expected: 'field exists', actual: 'field missing', severity: 'error' },
+    ]);
   });
 
-  // SKIP: the shared expectedTMD fixture is not a checker-valid document (orphaned UserService, undefined entry `main`, missing BaseService/IUserService/CreateUserDTO), so RFC-TM-6's checker-gated assert() short-circuits on !valid and never reaches compareGraphs.
-  it.skip('should detect function signature mismatches', async () => {
+  it('should detect function signature mismatches', async () => {
     const engine = new AssertionEngine();
     const conversionResult = createMockConversionResult();
 
+    // createUser needs an owner (the ClassFile lists it as a method) and its
+    // input/output DTOs must be declared.
     const expectedTMD = `
+IndexApp -> UserService v1.0.0
+
+UserService #: src/services/user-service.ts
+  <- [User, UserCreateData]
+  => [createUser]
+
 createUser :: createUser(data: UserCreateData) => User
   <- UserCreateData
   -> User
+
+User %
+  - id: string
+
+UserCreateData %
+  - name: string
     `.trim();
 
     const result = await engine.assert(conversionResult, 'test.tmd', expectedTMD);
@@ -277,8 +391,13 @@ createUser :: createUser(data: UserCreateData) => User
     assert.equal(result.success, false);
 
     const signatureDeviation = result.deviations.find((d) => d.entityName === 'createUser' && d.property === 'signature');
-    assert.notEqual(signatureDeviation, undefined);
-    assert.equal(signatureDeviation?.severity, 'error');
+    assert.deepEqual(signatureDeviation, {
+      entityName: 'createUser',
+      property: 'signature',
+      expected: 'createUser(data: UserCreateData) => User',
+      actual: 'async createUser(data: CreateUserDTO) => Promise<UserDTO>',
+      severity: 'error',
+    });
   });
 
   it('should handle invalid TMD syntax', async () => {
@@ -301,38 +420,34 @@ createUser :: createUser(data: UserCreateData) => User
     assert.equal(syntaxDeviation?.severity, 'error');
   });
 
-  // SKIP: the shared expectedTMD fixture is not a checker-valid document (orphaned UserService, undefined entry `main`, missing BaseService/IUserService/CreateUserDTO), so RFC-TM-6's checker-gated assert() short-circuits on !valid and never reaches compareGraphs.
-  it.skip('should distinguish between errors and warnings', async () => {
+  it('should distinguish between errors and warnings', async () => {
     const engine = new AssertionEngine();
     const conversionResult = createMockConversionResult();
 
-    const expectedTMD = `
-IndexApp -> main v2.0.0
-
-UserService #: different/path/user-service.ts <: BaseService
-  => [createUser, findUser]
-
-UserDTO %
-  - id: string
-  - name: string
-  - email: string
-    `.trim();
+    // Same entity set as the clean fixture; only the Program version and the
+    // ClassFile path differ, and both compare at warning severity.
+    const expectedTMD = CHECKER_CLEAN_TMD.replace('v1.0.0', 'v2.0.0').replace(
+      'UserService #: src/services/user-service.ts',
+      'UserService #: different/path/user-service.ts',
+    );
 
     const result = await engine.assert(conversionResult, 'test.tmd', expectedTMD);
 
     assert.equal(result.success, true); // No errors, only warnings
-
-    const warnings = result.deviations.filter((d) => d.severity === 'warning');
-    assert.ok(warnings.length > 0);
-
-    const versionWarning = warnings.find((d) => d.entityName === 'IndexApp' && d.property === 'version');
-    assert.notEqual(versionWarning, undefined);
-    assert.equal(versionWarning?.expected, '2.0.0');
-    assert.equal(versionWarning?.actual, '1.0.0');
+    // Exactly the two warning-severity deviations the fixture edits introduce.
+    assert.deepEqual(result.deviations, [
+      { entityName: 'IndexApp', property: 'version', expected: '2.0.0', actual: '1.0.0', severity: 'warning' },
+      {
+        entityName: 'UserService',
+        property: 'path',
+        expected: 'different/path/user-service.ts',
+        actual: 'src/services/user-service.ts',
+        severity: 'warning',
+      },
+    ]);
   });
 
-  // SKIP: the shared expectedTMD fixture is not a checker-valid document (orphaned UserService, undefined entry `main`, missing BaseService/IUserService/CreateUserDTO), so RFC-TM-6's checker-gated assert() short-circuits on !valid and never reaches compareGraphs.
-  it.skip('should handle empty conversion results', async () => {
+  it('should handle empty conversion results', async () => {
     const engine = new AssertionEngine();
     const emptyResult: ConversionResult = {
       success: true,
@@ -342,9 +457,14 @@ UserDTO %
       warnings: [],
     };
 
+    // The Program makes UserService the entry so it is not orphaned.
     const expectedTMD = `
+IndexApp -> UserService v1.0.0
+
 UserService #: src/user.ts
   => [createUser]
+
+createUser :: createUser() => void
     `.trim();
 
     const result = await engine.assert(emptyResult, 'test.tmd', expectedTMD);
