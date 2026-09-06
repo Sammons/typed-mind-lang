@@ -122,7 +122,7 @@ it('TM14 U1: function-body Constants reads emit consumes', async (context) => {
   assert.deepEqual(checked.diagnostics, []);
 });
 
-it('TM14 D16: a class constructed only inside a private function stays orphaned and is documented', async (context) => {
+it('D-16: a class constructed inside a private function is credited transitively through the caller', async (context) => {
   const { converted } = convert(context, '125-private-helper-chain');
   assert.ok(converted.entities.find((entity) => entity.name === 'Source') instanceof ClassFileNode, 'Source fused into a ClassFile');
   assert.equal(
@@ -130,11 +130,17 @@ it('TM14 D16: a class constructed only inside a private function stays orphaned 
     false,
     'the private function has no entity (P8)',
   );
-  assert.deepEqual(functionNamed(converted, 'parseText').calls, [], 'no transitive edge is stated');
-  assert.deepEqual(await findingsOf(converted.tmdContent, 'checker/orphaned-entity'), ["Orphaned entity 'Source'"]);
-  const readme = readFileSync(join(reprosDir, '125-private-helper-chain', 'README.md'), 'utf8');
-  assert.ok(readme.includes('D-16'), 'README names the deferral');
-  assert.ok(readme.includes('ParameterSource'), 'README names the live instance');
+  assert.deepEqual(functionNamed(converted, 'parseText').calls, ['Source.constructor'], 'transitive construct edge through private parse');
+  assert.deepEqual(await findingsOf(converted.tmdContent, 'checker/orphaned-entity'), []);
+  const checked = await check(converted.tmdContent);
+  assert.equal(checked.valid, true);
+
+  // Removal control: dropping the `new Source()` in parse restores the orphan.
+  const withoutConstruct = convert(context, '125-private-helper-chain', [
+    { file: join('src', 'source.ts'), from: 'new Source()', to: 'undefined' },
+  ]);
+  assert.deepEqual(functionNamed(withoutConstruct.converted, 'parseText').calls, []);
+  assert.deepEqual(await findingsOf(withoutConstruct.converted.tmdContent, 'checker/orphaned-entity'), ["Orphaned entity 'Source'"]);
 });
 
 it('TM14 U3b: class member bodies emit calls and construct edges (R1c-conv)', async (context) => {

@@ -27,7 +27,7 @@ const analyzeAndCheck = async (projectDir: string, configPath: string, entrypoin
 };
 
 describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
-  it('self has 12 orphan diagnostics (down from 23 at Q2; U4a closes AccumulatorSlots)', async () => {
+  it('self has 11 orphan diagnostics (down from 23 at Q2; U4a closes AccumulatorSlots, D-16 closes ParameterSource)', async () => {
     const result = await analyzeAndCheck(
       join(repoRoot, 'lib/typed-mind-typescript'),
       join(repoRoot, 'lib/typed-mind-typescript/tsconfig.json'),
@@ -35,8 +35,8 @@ describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
     );
     assert.equal(
       result.orphans.length,
-      12,
-      `expected 12 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
+      11,
+      `expected 11 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
     );
   });
 
@@ -52,7 +52,6 @@ describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
       'CST_FINAL_TWIN_COUNT',
       'CST_LOGICAL_CLASS_COUNT',
       'CST_NAMED_NODE_TYPE_COUNT',
-      'ParameterSource',
       'ParsedCallReference',
       'collapseToSingleLineType',
       'isImportDeclaration',
@@ -65,7 +64,7 @@ describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
 });
 
 describe('TM14/15 EXIT: core (typed-mind)', () => {
-  it('core has 6 orphan diagnostics (down from 19 at Q2; U4a closes AccumulatorSlots)', async () => {
+  it('core has 5 orphan diagnostics (down from 19 at Q2; U4a closes AccumulatorSlots, D-16 closes ParameterSource)', async () => {
     const result = await analyzeAndCheck(
       join(repoRoot, 'lib/typed-mind'),
       join(repoRoot, 'lib/typed-mind/tsconfig.json'),
@@ -73,8 +72,8 @@ describe('TM14/15 EXIT: core (typed-mind)', () => {
     );
     assert.equal(
       result.orphans.length,
-      6,
-      `expected 6 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
+      5,
+      `expected 5 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
     );
   });
 
@@ -89,7 +88,6 @@ describe('TM14/15 EXIT: core (typed-mind)', () => {
       'CST_FINAL_TWIN_COUNT',
       'CST_LOGICAL_CLASS_COUNT',
       'CST_NAMED_NODE_TYPE_COUNT',
-      'ParameterSource',
       'spanCoversLine',
       'toValidationErrors',
     ]);

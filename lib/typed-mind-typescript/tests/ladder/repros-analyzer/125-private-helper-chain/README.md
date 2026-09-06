@@ -1,7 +1,7 @@
-# 125 — a class constructed only inside a private function stays orphaned (D-16 pin)
+# 125 — transitive construct edge through a private function (D-16)
 
-RFC-TM-14 (`rfc-tm-14-diamond.md`) Deferral **D-16**, leaf **R16-pin**, Quantum U1.
-The doc assigns this fixture number 125.
+RFC-TM-14 (`rfc-tm-14-diamond.md`) Deferral **D-16**, closed by transitive
+body-reference propagation in `foldBodyReferences`.
 
 ## Shape
 
@@ -10,16 +10,11 @@ The doc assigns this fixture number 125.
 Source()` (private function), `export const parseText = () => parse()`. Entry
 `src/main.ts` imports `parseText`.
 
-## Pinned verdict
+## Verdict (post D-16)
 
-`Source` is reported as `checker/orphaned-entity`. This is the deferred R16
-mechanism: a non-exported function never becomes an entity (P8,
-`converter.ts` `isFunctionExported`), so the `new Source()` inside `parse` has no
-carrier. The truthful carrier is a qualified private Function entity
-(`SourceFile.parse`), a document-shape decision D-16 defers to the typedmind
-lead. The transitive alternative (`parseText ~> [Source.constructor]`) would
-state a construction that does not occur in `parseText` and is a rejected
-alternative in the doc.
+`parseText ~> [Source.constructor]` — the transitive propagation step in
+`foldBodyReferences` walks through private function `parse` and credits
+`Source` via the construct edge. `Source` is no longer orphaned.
 
-Live instances pinned: `ParameterSource` in the self and core captures
+Live instances closed: `ParameterSource` in the self and core captures
 (`core/pipeline/parse-type-parameters.ts:81-83`).
