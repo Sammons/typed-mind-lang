@@ -27,7 +27,7 @@ const analyzeAndCheck = async (projectDir: string, configPath: string, entrypoin
 };
 
 describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
-  it('self has 13 orphan diagnostics (down from 23 at Q2)', async () => {
+  it('self has 12 orphan diagnostics (down from 23 at Q2; U4a closes AccumulatorSlots)', async () => {
     const result = await analyzeAndCheck(
       join(repoRoot, 'lib/typed-mind-typescript'),
       join(repoRoot, 'lib/typed-mind-typescript/tsconfig.json'),
@@ -35,8 +35,8 @@ describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
     );
     assert.equal(
       result.orphans.length,
-      13,
-      `expected 13 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
+      12,
+      `expected 12 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
     );
   });
 
@@ -48,7 +48,6 @@ describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
     );
     const orphanNames = result.orphans.map((d) => d.message.replace("Orphaned entity '", '').replace("'", '')).sort();
     assert.deepEqual(orphanNames, [
-      'AccumulatorSlots',
       'CONSTRUCTOR_MEMBER',
       'CST_FINAL_TWIN_COUNT',
       'CST_LOGICAL_CLASS_COUNT',
@@ -66,7 +65,7 @@ describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
 });
 
 describe('TM14/15 EXIT: core (typed-mind)', () => {
-  it('core has 7 orphan diagnostics (down from 19 at Q2)', async () => {
+  it('core has 6 orphan diagnostics (down from 19 at Q2; U4a closes AccumulatorSlots)', async () => {
     const result = await analyzeAndCheck(
       join(repoRoot, 'lib/typed-mind'),
       join(repoRoot, 'lib/typed-mind/tsconfig.json'),
@@ -74,8 +73,8 @@ describe('TM14/15 EXIT: core (typed-mind)', () => {
     );
     assert.equal(
       result.orphans.length,
-      7,
-      `expected 7 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
+      6,
+      `expected 6 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
     );
   });
 
@@ -87,7 +86,6 @@ describe('TM14/15 EXIT: core (typed-mind)', () => {
     );
     const orphanNames = result.orphans.map((d) => d.message.replace("Orphaned entity '", '').replace("'", '')).sort();
     assert.deepEqual(orphanNames, [
-      'AccumulatorSlots',
       'CST_FINAL_TWIN_COUNT',
       'CST_LOGICAL_CLASS_COUNT',
       'CST_NAMED_NODE_TYPE_COUNT',
