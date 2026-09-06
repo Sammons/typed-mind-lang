@@ -1,6 +1,6 @@
 {
   "name": "@sammons/typed-mind-renderer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Enterprise-grade interactive renderer for TypedMind DSL with advanced visualization, performance optimization, pattern recognition, and comprehensive architectural analysis",
   "type": "module",
   "keywords": [
