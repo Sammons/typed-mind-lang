@@ -19,7 +19,7 @@ import { TypeScriptAnalyzer } from '../../src/typescript-analyzer.ts';
 import { TypeScriptToTypedMindConverter } from '../../src/typescript-to-typedmind-converter.ts';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
-const fixture = join(testDir, 'repros-analyzer', '109-ambient-builtin-io');
+const fixture = join(testDir, 'repros-analyzer', '128-ambient-builtin-io');
 
 const convertFixture = () => {
   const analyzer = new TypeScriptAnalyzer(fixture);
@@ -33,7 +33,7 @@ const functionByName = (result: ReturnType<typeof convertFixture>, name: string)
   return entity;
 };
 
-describe('109-ambient-builtin-io', () => {
+describe('128-ambient-builtin-io', () => {
   it('emits no input/output edge for ambient builtin parameter and return types', () => {
     const result = convertFixture();
     const slots = ['formatUtcDate', 'fetchThing', 'readBody', 'byId'].map((name) => {

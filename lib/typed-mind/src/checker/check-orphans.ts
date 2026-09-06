@@ -30,7 +30,7 @@ import { type QualifiedNameResolver, resolvedNameTarget } from '../ast/qualified
 import { UiComponentNode } from '../ast/ui-component-node.ts';
 import { walkEntityTypeReferences } from '../pipeline/type-reference-walk.ts';
 import type { CheckContext } from './check-context.ts';
-import { isPrimitiveType } from './type-builtins.ts';
+import { isAmbientPlatformType, isPrimitiveType } from './type-builtins.ts';
 
 const importsOf = (entity: EntityNode): readonly string[] | undefined => {
   if (entity instanceof FileNode || entity instanceof ClassFileNode) {
@@ -111,7 +111,8 @@ const collectReferencedNames = (context: CheckContext): Set<string> => {
     }
     walkEntityTypeReferences(entity, {
       reference: (node, args) => {
-        if (args.length === 0 || !isPrimitiveType(node.name)) addReference(node.name, referenced, context.names);
+        if (args.length === 0 || (!isPrimitiveType(node.name) && !isAmbientPlatformType(node.name)))
+          addReference(node.name, referenced, context.names);
       },
       // RFC-TM-14 §S4 R4b: a `(typeof X)` leaf uses the value X names.
       valueReference: (name) => addReference(name, referenced, context.names),
