@@ -23,6 +23,7 @@ import {
   type LinkIndex,
   ProgramNode,
   printHeritage,
+  printPropertyDeclaration,
   printSignature,
   printTypeExpr,
   printTypeParameter,
@@ -125,6 +126,8 @@ const renderClass = (entity: ClassNode): string[] => {
       'Constructors',
       entity.members?.constructors.map((member) => printSignature(member.signature)),
     ),
+    // RFC-TM-14 §S4 R3a: typed properties, printed as their longform payload.
+    listSection('Properties', entity.members?.properties.map(printPropertyDeclaration)),
     // RFC-TM-14 §S3: member-body edges, same sections as renderFunction.
     listSection('Calls', entity.calls),
     listSection('Consumes', entity.consumes),
@@ -150,6 +153,8 @@ const renderClassFile = (entity: ClassFileNode): string[] => {
       'Constructors',
       entity.members?.constructors.map((member) => printSignature(member.signature)),
     ),
+    // RFC-TM-14 §S4 R3a: typed properties, printed as their longform payload.
+    listSection('Properties', entity.members?.properties.map(printPropertyDeclaration)),
     // RFC-TM-14 §S3: member-body edges, same sections as renderFunction.
     listSection('Calls', entity.calls),
     listSection('Consumes', entity.consumes),

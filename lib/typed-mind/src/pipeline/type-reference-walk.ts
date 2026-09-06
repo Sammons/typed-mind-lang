@@ -166,6 +166,9 @@ export const walkClassMemberTypeReferences = (entity: ClassNode | ClassFileNode,
     const signature = constructorSignature(member);
     if (signature !== undefined) walkSignatureTypes(signature, binders, hooks, 'member-signature');
   }
+  // RFC-TM-14 §S4 R3a: property types share the member position, which the
+  // generic check treats as today's member position (G2-2).
+  for (const member of entity.members?.properties ?? []) walkTypeReferences(member.typeExpr, binders, hooks, 'member-signature');
 };
 
 export const walkEntityTypeReferences = (entity: EntityNode, hooks: TypeReferenceHooks): void => {

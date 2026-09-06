@@ -10,6 +10,7 @@ file main {
 UserService #: src/services/user.ts {
   extends: BaseService
   methods: [createUser, findUser]
+  property: "readonly cache: UserDTO[]"
 }
 
 file base {

@@ -19,6 +19,7 @@ export {
   type ConstructorDeclarationNode,
   legacyMethodNames,
   type MethodDeclarationNode,
+  type PropertyDeclarationNode,
 } from './ast/class-members.ts';
 export { ClassNode } from './ast/class-node.ts';
 export { ConstantsNode } from './ast/constants-node.ts';
@@ -75,6 +76,7 @@ export { UiComponentNode } from './ast/ui-component-node.ts';
 // RFC-TM-13 C-prime preserves quotes and nested aliases, so neither fires.
 export { QUOTE_SWAP_CODE, UNREPRESENTABLE_ALIAS_CODE } from './emitter/emitter-diagnostics.ts';
 export { printHeritage, printTypeParameter } from './emitter/generic-declaration-emission.ts';
+export { printPropertyDeclaration } from './emitter/print-property-declaration.ts';
 export { printSignature } from './emitter/print-signature.ts';
 // RFC-TM-14 R6a (rfc-tm-14-diamond.md §S5, U2-9): the LSP hover prints a
 // Constants schema through the canonical TypeExprNode printer. X-TYPE-7

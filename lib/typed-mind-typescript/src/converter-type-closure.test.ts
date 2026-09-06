@@ -224,7 +224,10 @@ it('TM13 EXIT: only a whole balanced object alias becomes a DTO', (context) => {
   assert.equal(fn.output, undefined);
 });
 
-it('TM13 EXIT: omitted class properties and private members never seed type retention', (context) => {
+// RFC-TM-14 §S4 R3a: emitted class properties are reference surfaces, so a
+// public property's type IS retained now (`PropertyOnly`); private members and
+// the interface lane's dropped properties (`PrivateNested`) still are not.
+it('TM13 EXIT: private members and interface-lane properties never seed type retention; emitted class properties do', (context) => {
   const analysis = project(context, {
     'index.ts': [
       'interface PropertyOnly { value: string }',
@@ -236,7 +239,7 @@ it('TM13 EXIT: omitted class properties and private members never seed type rete
   });
   const result = new TypeScriptToTypedMindConverter().convert(analysis);
   assert.equal(
-    result.entities.some((entity) => ['PropertyOnly', 'PrivateOnly', 'PrivateNested'].includes(entity.name)),
+    result.entities.some((entity) => ['PrivateOnly', 'PrivateNested'].includes(entity.name)),
     false,
   );
   // RFC-TM-14 S7: a retained private method-bearing interface is declared
@@ -245,10 +248,13 @@ it('TM13 EXIT: omitted class properties and private members never seed type rete
     result.entities.some((entity) => entity.name === 'IndexFile.Selected'),
     true,
   );
+  assert.ok(result.entities.some((entity) => entity.name === 'PropertyOnly'));
+  assert.match(result.tmdContent, /^ {2}property: "field: PropertyOnly"$/m);
   const include = new TypeScriptToTypedMindConverter({ includePrivateMembers: true }).convert(analysis);
   assert.ok(include.entities.some((entity) => entity.name === 'PrivateOnly'));
+  assert.ok(include.entities.some((entity) => entity.name === 'PropertyOnly'));
   assert.equal(
-    include.entities.some((entity) => ['PropertyOnly', 'PrivateNested'].includes(entity.name)),
+    include.entities.some((entity) => entity.name === 'PrivateNested'),
     false,
   );
 });

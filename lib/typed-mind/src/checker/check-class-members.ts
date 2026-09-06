@@ -1,6 +1,7 @@
 import { ClassFileNode } from '../ast/class-file-node.ts';
 import { constructorSignature, methodSignature } from '../ast/class-members.ts';
 import { ClassNode } from '../ast/class-node.ts';
+import { parseSignatureText } from '../pipeline/parse-signature-text.ts';
 import type { CheckContext } from './check-context.ts';
 
 export const checkClassMembers = (context: CheckContext): void => {
@@ -18,6 +19,19 @@ export const checkClassMembers = (context: CheckContext): void => {
         span: member.span,
       })),
     ];
+    // RFC-TM-14 §S4 R3a: a property whose whole type is an opaque leaf that
+    // is not a callable signature is retained like an opaque signature — the
+    // same warning, one member kind over (the walker's own callable rule).
+    for (const member of entity.members.properties) {
+      if (member.typeExpr.kind !== 'opaque' || parseSignatureText(member.typeExpr.text).kind === 'parsed') continue;
+      context.addFinding({
+        code: 'checker/unsupported-member-signature',
+        severity: 'warning',
+        span: member.span,
+        message: `Property '${member.name}' in '${entity.name}' is retained as opaque type text`,
+        suggestion: 'Use a named, generic, array, union or literal type so its references can be checked',
+      });
+    }
     for (const member of members) {
       if (member.result.kind === 'opaque')
         context.addFinding({

@@ -1,4 +1,5 @@
 import { legacyMethodNames } from '../ast/class-members.ts';
+import { printPropertyDeclaration } from './print-property-declaration.ts';
 import { printSignature } from './print-signature.ts';
 // RFC-TM-4 §2 (rfc-tm-4-diamond.md) — longform emission, ported from the
 // legacy per-kind longform converters (syntax-generator.ts:733-1011) with the
@@ -192,9 +193,16 @@ const classToLongform = (entity: ClassNode): string[] => {
   }
   for (const constructorMember of entity.members?.constructors ?? [])
     body.push(`constructor: ${quoteStringLiteral(printSignature(constructorMember.signature))}`);
+  body.push(...propertyLines(entity));
   body.push(...classEdgeLines(entity));
   return [`class ${entity.name} {`, ...indent(body), '}'];
 };
+
+// RFC-TM-14 §S4 R3a (rfc-tm-14-diamond.md): typed properties print as
+// `property: "[readonly] name[?]: Type"` after the method and constructor
+// lines (the DTO field shape, quoted through the CP codec).
+const propertyLines = (entity: ClassNode | ClassFileNode): string[] =>
+  (entity.members?.properties ?? []).map((member) => `property: ${quoteStringLiteral(printPropertyDeclaration(member))}`);
 
 // RFC-TM-14 §S3 (rfc-tm-14-diamond.md): Class and ClassFile carry the
 // Function-shaped `calls:` / `consumes:` keys after the member lines. Same
@@ -225,6 +233,7 @@ const classFileToLongform = (entity: ClassFileNode): string[] => {
   }
   for (const constructorMember of entity.members?.constructors ?? [])
     body.push(`constructor: ${quoteStringLiteral(printSignature(constructorMember.signature))}`);
+  body.push(...propertyLines(entity));
   body.push(...classEdgeLines(entity));
   // The auto-self-export (ClassFileNode constructor) reconstructs itself on
   // re-parse even if omitted; emit the full declared list including it (the

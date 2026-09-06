@@ -79,6 +79,13 @@ export const honestFieldsOf = (entity: EntityNode): Record<string, unknown> => {
         signature: signature === undefined ? undefined : honestSignatureOf(signature),
       })),
       constructors: entity.members.constructors.map(({ signature }) => ({ signature: honestSignatureOf(signature) })),
+      // RFC-TM-14 §S4 R3a (G-7): properties are part of the AST-equality bar.
+      properties: entity.members.properties.map(({ name, optionality, readonly, typeExpr }) => ({
+        name,
+        optionality,
+        readonly,
+        typeExpr: honestTypeExprOf(typeExpr),
+      })),
     };
   if (entity instanceof DtoNode && entity.extendsReferences !== undefined)
     fields['extendsReferences'] = entity.extendsReferences.map(honestHeritageOf);

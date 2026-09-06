@@ -1,14 +1,17 @@
 import type { ParsedSignature, SignatureParseResult, SignatureTypePosition } from '../ast/callable-signature.ts';
+import type { PropertyDeclarationNode } from '../ast/class-members.ts';
 import type { Span } from '../ast/span.ts';
 import type { TypeExprNode } from '../ast/type-expr-node.ts';
 import { decodeQuotedString } from '../quoted-string.ts';
 import { parseSignatureText } from './parse-signature-text.ts';
+import { parseTypeExprText } from './type-expr-from-text.ts';
 
 // Quoted member payloads are single-line strings. Map decoded offsets back to
 // their actual token columns, including the outer quote and escaped quotes or
 // backslashes; unknown escape pairs remain two decoded characters in the codec.
-export const parseQuotedSignature = (raw: string, tokenSpan: Span, isConstructor: boolean): SignatureParseResult => {
-  const decoded = decodeQuotedString(raw);
+// `quotedPayloadMapper` is shared by the signature parser (`method:` /
+// `constructor:`) and the property parser (`property:`, RFC-TM-14 §S4 R3a).
+const quotedPayloadMapper = (raw: string, tokenSpan: Span) => {
   const offsets = [1];
   for (let index = 1; index < raw.length - 1; ) {
     index += raw[index] === '\\' && (raw[index + 1] === '"' || raw[index + 1] === '\\') ? 2 : 1;
@@ -41,6 +44,12 @@ export const parseQuotedSignature = (raw: string, tokenSpan: Span, isConstructor
         return { ...node, span: span(node.span) };
     }
   };
+  return { span, type };
+};
+
+export const parseQuotedSignature = (raw: string, tokenSpan: Span, isConstructor: boolean): SignatureParseResult => {
+  const decoded = decodeQuotedString(raw);
+  const { span, type } = quotedPayloadMapper(raw, tokenSpan);
   const position = (value: SignatureTypePosition): SignatureTypePosition =>
     value.kind === 'type'
       ? { ...value, span: span(value.span), typeExpr: type(value.typeExpr) }
@@ -67,4 +76,26 @@ export const parseQuotedSignature = (raw: string, tokenSpan: Span, isConstructor
   });
   const parsed = parseSignatureText(decoded, { allowMissingReturnType: isConstructor });
   return parsed.kind === 'opaque' ? { ...parsed, span: span(parsed.span) } : { kind: 'parsed', signature: signature(parsed.signature) };
+};
+
+// RFC-TM-14 §S4 R3a: `property: "[readonly] name[?]: Type"`. The type text is
+// parsed at its decoded column and mapped through the same offset table, so
+// spans inside an escaped payload land on real source columns (G-7).
+// `undefined` means the payload is not a property declaration.
+const PROPERTY_HEAD = /^\s*(readonly\s+)?([A-Za-z_]\w*)\s*(\?)?\s*:\s*/;
+
+export const parseQuotedTypeExpr = (raw: string, tokenSpan: Span, memberSpan: Span): PropertyDeclarationNode | undefined => {
+  const decoded = decodeQuotedString(raw);
+  const head = PROPERTY_HEAD.exec(decoded);
+  if (head === null || head[0].length === decoded.length) return undefined;
+  const { type } = quotedPayloadMapper(raw, tokenSpan);
+  const parsed = parseTypeExprText(decoded.slice(head[0].length), { baseLine: 1, baseColumn: head[0].length + 1 });
+  if (parsed.remainder.trim() !== '') return undefined;
+  return {
+    name: head[2] ?? '',
+    optionality: head[3] === undefined ? 'none' : 'question',
+    readonly: head[1] !== undefined,
+    typeExpr: type(parsed.typeExpr),
+    span: memberSpan,
+  };
 };

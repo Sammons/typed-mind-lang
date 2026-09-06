@@ -23,7 +23,7 @@
 // imports per the §2.2 F3 ruling, so the property becomes
 // `semantics/illegal-continuation` instead of silent data loss.
 
-import type { ConstructorDeclarationNode, MethodDeclarationNode } from '../ast/class-members.ts';
+import type { ConstructorDeclarationNode, MethodDeclarationNode, PropertyDeclarationNode } from '../ast/class-members.ts';
 import type { Diagnostic } from '../ast/diagnostic.ts';
 import { DtoFieldNode } from '../ast/dto-field-node.ts';
 import type { EntityKind } from '../ast/entity-kind.ts';
@@ -41,7 +41,7 @@ import { illegalContinuationDiagnostic } from './attachment-rules.ts';
 import { EntityAccumulator } from './entity-accumulator.ts';
 import { attachHeaderTypeParameters, attachParameterProperties, heritageFromCst } from './generic-declaration-syntax.ts';
 import { parseHeritageText } from './parse-heritage-text.ts';
-import { parseQuotedSignature } from './parse-quoted-signature.ts';
+import { parseQuotedSignature, parseQuotedTypeExpr } from './parse-quoted-signature.ts';
 import { tokenSpanOf } from './spans.ts';
 import { parseTypeExprText } from './type-expr-from-text.ts';
 
@@ -556,7 +556,9 @@ const buildResult = (accumulator: EntityAccumulator, collected: CollectedPropert
       implements: collected.all.some((property) => property.key === 'implements') ? implementsReferences : (existing?.implements ?? []),
     };
   }
-  const memberProperties = collected.all.filter((property) => property.key === 'method' || property.key === 'constructor');
+  const memberProperties = collected.all.filter(
+    (property) => property.key === 'method' || property.key === 'constructor' || property.key === 'property',
+  );
   if (memberProperties.length > 0) {
     const methods: MethodDeclarationNode[] = (accumulator.slots.methods ?? []).map((name) => ({
       name,
@@ -564,14 +566,28 @@ const buildResult = (accumulator: EntityAccumulator, collected: CollectedPropert
       span: accumulator.span,
     }));
     const constructors: ConstructorDeclarationNode[] = [];
+    const properties: PropertyDeclarationNode[] = [];
     for (const property of memberProperties) {
       if ((accumulator.kind !== 'Class' && accumulator.kind !== 'ClassFile') || property.kind !== 'scalar' || !property.quoted) {
         diagnostics.push({
           code: 'semantics/invalid-member-property',
           severity: 'error',
           span: property.span,
-          message: `Invalid member property in '${accumulator.name}'; use a quoted method or constructor property on a Class or ClassFile.`,
+          message: `Invalid member property in '${accumulator.name}'; use a quoted method, constructor or property member on a Class or ClassFile.`,
         });
+        continue;
+      }
+      if (property.key === 'property') {
+        // RFC-TM-14 §S4 R3a: `property: "[readonly] name[?]: Type"`.
+        const declaration = parseQuotedTypeExpr(property.quoted.text, property.quoted.span, property.span);
+        if (declaration === undefined)
+          diagnostics.push({
+            code: 'semantics/invalid-member-property',
+            severity: 'error',
+            span: property.span,
+            message: `Invalid property member in '${accumulator.name}'; spell it "[readonly] name[?]: Type".`,
+          });
+        else properties.push(declaration);
         continue;
       }
       const signature = parseQuotedSignature(property.quoted.text, property.quoted.span, property.key === 'constructor');
@@ -586,7 +602,8 @@ const buildResult = (accumulator: EntityAccumulator, collected: CollectedPropert
           span: property.span,
         });
     }
-    if (accumulator.kind === 'Class' || accumulator.kind === 'ClassFile') accumulator.slots.classMembers = { methods, constructors };
+    if (accumulator.kind === 'Class' || accumulator.kind === 'ClassFile')
+      accumulator.slots.classMembers = { methods, constructors, properties };
   }
   const attachments = collected.all.map((property) => ({
     entityName: accumulator.name,
