@@ -1621,10 +1621,7 @@ export class TypeScriptToTypedMindConverter {
     // D-16: collect the effective body references for a function, propagating
     // through same-file private function calls transitively. The `visited` set
     // prevents cycles (a private function calling itself or a mutual recursion).
-    const effectiveReferences = (
-      fn: ParsedFunction,
-      visited: ReadonlySet<string>,
-    ): readonly ParsedBodyReference[] => {
+    const effectiveReferences = (fn: ParsedFunction, visited: ReadonlySet<string>): readonly ParsedBodyReference[] => {
       const result: ParsedBodyReference[] = [...fn.bodyReferences];
       for (const reference of fn.bodyReferences) {
         if (reference.kind !== 'call' || reference.origin.kind !== 'project') continue;
