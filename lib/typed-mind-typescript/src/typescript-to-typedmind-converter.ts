@@ -1605,6 +1605,41 @@ export class TypeScriptToTypedMindConverter {
   // entity), so no valid document changes verdict.
   private foldBodyReferences(modules: readonly ParsedModule[]): void {
     const { byName, targets, isUnique, key } = this.buildBodyReferenceTargets(modules);
+
+    // D-16: build a map of private (non-entity) functions so the fold can
+    // propagate their body references transitively through callers. A private
+    // function has a declaration but no matching entity in `this.entities`.
+    const privateFunctions = new Map<string, ParsedFunction>();
+    for (const module of modules) {
+      for (const fn of module.functions) {
+        if (fn.declaration === undefined) continue;
+        const fnKey = key(fn.declaration);
+        if (!targets.has(fnKey)) privateFunctions.set(fnKey, fn);
+      }
+    }
+
+    // D-16: collect the effective body references for a function, propagating
+    // through same-file private function calls transitively. The `visited` set
+    // prevents cycles (a private function calling itself or a mutual recursion).
+    const effectiveReferences = (
+      fn: ParsedFunction,
+      visited: ReadonlySet<string>,
+    ): readonly ParsedBodyReference[] => {
+      const result: ParsedBodyReference[] = [...fn.bodyReferences];
+      for (const reference of fn.bodyReferences) {
+        if (reference.kind !== 'call' || reference.origin.kind !== 'project') continue;
+        if (fn.declaration !== undefined && reference.origin.declaration.filePath !== fn.declaration.filePath) continue;
+        const calleeKey = key(reference.origin.declaration);
+        if (visited.has(calleeKey)) continue;
+        const callee = privateFunctions.get(calleeKey);
+        if (callee === undefined) continue;
+        const deeper = new Set(visited);
+        deeper.add(calleeKey);
+        result.push(...effectiveReferences(callee, deeper));
+      }
+      return result;
+    };
+
     for (const module of modules) {
       for (const fn of module.functions) {
         if (fn.declaration === undefined) continue;
@@ -1616,7 +1651,8 @@ export class TypeScriptToTypedMindConverter {
         const crossFile = fn.origin === 'callable-initializer';
         const calls = new Set(entity.calls);
         const consumes = new Set(entity.consumes ?? []);
-        for (const reference of fn.bodyReferences) {
+        const refs = effectiveReferences(fn, new Set([selfKey]));
+        for (const reference of refs) {
           if (reference.origin.kind !== 'project') continue;
           if (!crossFile && reference.origin.declaration.filePath !== fn.declaration.filePath) continue;
           const targetKey = key(reference.origin.declaration);
