@@ -1,13 +1,13 @@
 # Changelog
 
-## [1.0.0] - 2025-01-15
+## [1.1.0] - 2026-09-05
 
-### Breaking Changes
-- Requires Node.js >= 22.0.0
-- Dual ESM/CJS package format
+### Changed
+- Requires Node.js >= 26.0.0
+- Version aligned with typed-mind ecosystem 1.1.0
+
+## [1.0.0] - 2025-01-15
 
 ### Added
 - Stable API
 - Dual module support (ESM/CJS)
-- Improved TypeScript types
-- Better error messages
