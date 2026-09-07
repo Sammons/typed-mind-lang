@@ -12,6 +12,7 @@ coverage/
 .vscode/
 .idea/
 .DS_Store
+*.vsix
 .claude/worktrees/
 
 # Generated documentation
