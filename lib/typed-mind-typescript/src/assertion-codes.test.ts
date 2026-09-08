@@ -47,8 +47,7 @@ describe('RFC-TM-16: frozen assertion-code registry', () => {
     const referencedCodes: string[] = [];
     const unregistered: string[] = [];
 
-    let match: RegExpExecArray | null;
-    while ((match = codeStringPattern.exec(engineSource)) !== null) {
+    for (const match of engineSource.matchAll(codeStringPattern)) {
       referencedCodes.push(match[1]);
       if (!registeredCodes.has(match[1])) {
         unregistered.push(match[1]);
@@ -56,19 +55,11 @@ describe('RFC-TM-16: frozen assertion-code registry', () => {
     }
 
     assert.ok(referencedCodes.length > 0, 'no assertion/ code strings found — check the regex');
-    assert.deepEqual(
-      unregistered,
-      [],
-      `unregistered codes found in assertion-engine.ts: ${unregistered.join(', ')}`,
-    );
+    assert.deepEqual(unregistered, [], `unregistered codes found in assertion-engine.ts: ${unregistered.join(', ')}`);
 
     const usedCodes = new Set(referencedCodes);
     const unusedCodes = [...registeredCodes].filter((c) => !usedCodes.has(c));
-    assert.deepEqual(
-      unusedCodes,
-      [],
-      `registered codes not referenced in assertion-engine.ts: ${unusedCodes.join(', ')}`,
-    );
+    assert.deepEqual(unusedCodes, [], `registered codes not referenced in assertion-engine.ts: ${unusedCodes.join(', ')}`);
   });
 
   it('the registry has exactly 23 codes', () => {

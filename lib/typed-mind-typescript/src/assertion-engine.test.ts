@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   ClassFileNode,
-  ClassNode,
   DtoFieldNode,
   DtoNode,
   FileNode,
@@ -372,8 +371,24 @@ UserDTO %
     const fieldDeviations = result.deviations.filter((d) => d.entityName === 'UserDTO');
     // updatedAt is also absent from the mock, so it deviates alongside createdAt.
     assert.deepEqual(fieldDeviations, [
-      { code: 'assertion/field-missing', entityName: 'UserDTO', property: 'field.createdAt', expected: 'field exists', actual: 'field missing', severity: 'error', suggestion: 'Add the missing field to the TypeScript type, or remove it from the TMD.' },
-      { code: 'assertion/field-missing', entityName: 'UserDTO', property: 'field.updatedAt', expected: 'field exists', actual: 'field missing', severity: 'error', suggestion: 'Add the missing field to the TypeScript type, or remove it from the TMD.' },
+      {
+        code: 'assertion/field-missing',
+        entityName: 'UserDTO',
+        property: 'field.createdAt',
+        expected: 'field exists',
+        actual: 'field missing',
+        severity: 'error',
+        suggestion: 'Add the missing field to the TypeScript type, or remove it from the TMD.',
+      },
+      {
+        code: 'assertion/field-missing',
+        entityName: 'UserDTO',
+        property: 'field.updatedAt',
+        expected: 'field exists',
+        actual: 'field missing',
+        severity: 'error',
+        suggestion: 'Add the missing field to the TypeScript type, or remove it from the TMD.',
+      },
     ]);
   });
 
@@ -616,9 +631,7 @@ ClientIp %
 
     const result = await engine.assert(conversionResult, 'test.tmd', tmd);
 
-    const exportDeviations = result.deviations.filter(
-      (d) => d.entityName === 'ClientIpFile' && d.property.startsWith('exports'),
-    );
+    const exportDeviations = result.deviations.filter((d) => d.entityName === 'ClientIpFile' && d.property.startsWith('exports'));
     assert.deepEqual(exportDeviations, []);
   });
 
@@ -784,10 +797,7 @@ Context %
           span: SYNTHETIC_SPAN,
           raw: 'Context %',
           sourceForm: 'shortform',
-          fields: [
-            typedField('fetch', '(req: FetchRequest) => Promise<Response>'),
-            typedField('logger', '(msg: string) => void'),
-          ],
+          fields: [typedField('fetch', '(req: FetchRequest) => Promise<Response>'), typedField('logger', '(msg: string) => void')],
         }),
       ],
       tmdContent: tmd,
@@ -878,9 +888,7 @@ provision :: (input: string) => void
 
     const result = await engine.assert(conversionResult, 'test.tmd', tmd);
 
-    const kindDeviation = result.deviations.find(
-      (d) => d.entityName === 'Provisioner' && d.property === 'type',
-    );
+    const kindDeviation = result.deviations.find((d) => d.entityName === 'Provisioner' && d.property === 'type');
     assert.notEqual(kindDeviation, undefined);
     assert.equal(kindDeviation?.severity, 'warning');
     assert.equal(result.success, true);

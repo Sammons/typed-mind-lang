@@ -458,7 +458,9 @@ async function handleAssert(values: CliValues): Promise<void> {
   if (errors.length > 0) {
     console.error(`\nErrors (${errors.length}):`);
     for (const deviation of errors) {
-      console.error(`  [${deviation.code}] ${deviation.entityName}.${deviation.property}: expected ${JSON.stringify(deviation.expected)}, actual ${JSON.stringify(deviation.actual)}`);
+      console.error(
+        `  [${deviation.code}] ${deviation.entityName}.${deviation.property}: expected ${JSON.stringify(deviation.expected)}, actual ${JSON.stringify(deviation.actual)}`,
+      );
       console.error(`    Suggestion: ${deviation.suggestion}`);
       console.error(`    Run \`typed-mind-ts explain ${deviation.code}\` for details.`);
     }
@@ -467,7 +469,9 @@ async function handleAssert(values: CliValues): Promise<void> {
   if (warnings.length > 0 && values.verbose) {
     console.warn(`\nWarnings (${warnings.length}):`);
     for (const deviation of warnings) {
-      console.warn(`  [${deviation.code}] ${deviation.entityName}.${deviation.property}: expected ${JSON.stringify(deviation.expected)}, actual ${JSON.stringify(deviation.actual)}`);
+      console.warn(
+        `  [${deviation.code}] ${deviation.entityName}.${deviation.property}: expected ${JSON.stringify(deviation.expected)}, actual ${JSON.stringify(deviation.actual)}`,
+      );
       console.warn(`    Suggestion: ${deviation.suggestion}`);
       console.warn(`    Run \`typed-mind-ts explain ${deviation.code}\` for details.`);
     }

@@ -27,7 +27,7 @@ const analyzeAndCheck = async (projectDir: string, configPath: string, entrypoin
 };
 
 describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
-  it('self has 11 orphan diagnostics (down from 23 at Q2; U4a closes AccumulatorSlots, D-16 closes ParameterSource)', async () => {
+  it('self has 13 orphan diagnostics (down from 23 at Q2; U4a closes AccumulatorSlots, D-16 closes ParameterSource, TM-16 adds AssertionCode/AssertionCodeEntry)', async () => {
     const result = await analyzeAndCheck(
       join(repoRoot, 'lib/typed-mind-typescript'),
       join(repoRoot, 'lib/typed-mind-typescript/tsconfig.json'),
@@ -35,8 +35,8 @@ describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
     );
     assert.equal(
       result.orphans.length,
-      11,
-      `expected 11 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
+      13,
+      `expected 13 orphans, got ${result.orphans.length}: ${result.orphans.map((d) => d.message).join(', ')}`,
     );
   });
 
@@ -48,6 +48,8 @@ describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
     );
     const orphanNames = result.orphans.map((d) => d.message.replace("Orphaned entity '", '').replace("'", '')).sort();
     assert.deepEqual(orphanNames, [
+      'AssertionCode',
+      'AssertionCodeEntry',
       'CONSTRUCTOR_MEMBER',
       'CST_FINAL_TWIN_COUNT',
       'CST_LOGICAL_CLASS_COUNT',
