@@ -104,7 +104,7 @@ export const ASSERTION_CODES = {
     docBody:
       'The TMD declares a function signature that does not match the TypeScript source ' +
       'after normalization (whitespace, async prefix, and function name are stripped ' +
-      'before comparison). This is an error because the signature is the function\'s ' +
+      "before comparison). This is an error because the signature is the function's " +
       'contract.',
   },
   'assertion/input-mismatch': {

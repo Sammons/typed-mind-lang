@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ASSERTION_CODES, type AssertionCodeEntry } from '../typed-mind-typescript/src/assertion-codes.ts';
 
@@ -7,11 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = join(__dirname, 'dist');
 
 function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function anchorId(code: string): string {
@@ -53,7 +49,7 @@ function groupByNamespace(codes: Record<string, AssertionCodeEntry>): Map<string
 
 const groups = groupByNamespace(ASSERTION_CODES as Record<string, AssertionCodeEntry>);
 const totalCodes = Object.keys(ASSERTION_CODES).length;
-const errorCount = Object.values(ASSERTION_CODES).filter(e => (e as AssertionCodeEntry).severity === 'error').length;
+const errorCount = Object.values(ASSERTION_CODES).filter((e) => (e as AssertionCodeEntry).severity === 'error').length;
 const warningCount = totalCodes - errorCount;
 
 let codeListHtml = '';
@@ -254,7 +250,7 @@ const html = `<!DOCTYPE html>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2025-<script>document.write(new Date().getFullYear())<\/script> Sammons Software LLC. Open source under MIT License.</p>
+                <p>&copy; 2025-<script>document.write(new Date().getFullYear())</script> Sammons Software LLC. Open source under MIT License.</p>
             </div>
         </div>
     </footer>
