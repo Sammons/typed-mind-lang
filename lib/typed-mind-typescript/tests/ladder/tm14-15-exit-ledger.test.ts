@@ -27,7 +27,7 @@ const analyzeAndCheck = async (projectDir: string, configPath: string, entrypoin
 };
 
 describe('TM14/15 EXIT: self (typed-mind-typescript)', () => {
-  it('self has 11 orphan diagnostics (down from 23 at Q2; U4a closes AccumulatorSlots, D-16 closes ParameterSource)', async () => {
+  it('self has 13 orphan diagnostics (down from 23 at Q2; U4a closes AccumulatorSlots, D-16 closes ParameterSource, TM-16 adds AssertionCode/AssertionCodeEntry)', async () => {
     const result = await analyzeAndCheck(
       join(repoRoot, 'lib/typed-mind-typescript'),
       join(repoRoot, 'lib/typed-mind-typescript/tsconfig.json'),
