@@ -102,7 +102,7 @@ export class AssertionEngine {
       const actualEntity = actualEntityMap.get(name);
 
       if (actualEntity) {
-        const entityDeviations = this.compareEntities(actualEntity, expectedEntity);
+        const entityDeviations = this.compareEntities(actualEntity, expectedEntity, expectedEntityMap);
         deviations.push(...entityDeviations);
       }
     }
@@ -118,10 +118,13 @@ export class AssertionEngine {
     };
   }
 
-  private compareEntities(actual: EntityNode, expected: EntityNode): Deviation[] {
+  private compareEntities(
+    actual: EntityNode,
+    expected: EntityNode,
+    expectedEntityMap: Map<string, EntityNode>,
+  ): Deviation[] {
     const deviations: Deviation[] = [];
 
-    // Compare entity kind
     if (actual.kind !== expected.kind) {
       deviations.push({
         entityName: actual.name,
@@ -132,13 +135,12 @@ export class AssertionEngine {
       });
     }
 
-    // Type-specific comparisons
     switch (expected.kind) {
       case 'Program':
         this.compareProgramEntities(actual, expected, deviations);
         break;
       case 'File':
-        this.compareFileEntities(actual, expected, deviations);
+        this.compareFileEntities(actual, expected, deviations, expectedEntityMap);
         break;
       case 'Function':
         this.compareFunctionEntities(actual, expected, deviations);
@@ -147,7 +149,7 @@ export class AssertionEngine {
         this.compareClassEntities(actual, expected, deviations);
         break;
       case 'ClassFile':
-        this.compareClassFileEntities(actual, expected, deviations);
+        this.compareClassFileEntities(actual, expected, deviations, expectedEntityMap);
         break;
       case 'DTO':
         this.compareDTOEntities(actual, expected, deviations);
@@ -155,7 +157,6 @@ export class AssertionEngine {
       case 'Constants':
         this.compareConstantsEntities(actual, expected, deviations);
         break;
-      // Add other entity types as needed
     }
 
     return deviations;
@@ -187,7 +188,12 @@ export class AssertionEngine {
     }
   }
 
-  private compareFileEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
+  private compareFileEntities(
+    actual: EntityNode,
+    expected: EntityNode,
+    deviations: Deviation[],
+    expectedEntityMap: Map<string, EntityNode>,
+  ): void {
     if (!(actual instanceof FileNode) || !(expected instanceof FileNode)) {
       return;
     }
@@ -202,8 +208,8 @@ export class AssertionEngine {
       });
     }
 
-    this.compareArrayProperty(actual.name, 'imports', actual.imports, expected.imports, deviations);
-    this.compareArrayProperty(actual.name, 'exports', actual.exports, expected.exports, deviations);
+    this.compareModuleBoundary(actual.name, 'imports', actual.imports, expected.imports, deviations, expectedEntityMap);
+    this.compareModuleBoundary(actual.name, 'exports', actual.exports, expected.exports, deviations, expectedEntityMap);
   }
 
   private compareFunctionEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
@@ -237,7 +243,12 @@ export class AssertionEngine {
     this.compareArrayProperty(actual.name, 'methods', actual.methods, expected.methods, deviations);
   }
 
-  private compareClassFileEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
+  private compareClassFileEntities(
+    actual: EntityNode,
+    expected: EntityNode,
+    deviations: Deviation[],
+    expectedEntityMap: Map<string, EntityNode>,
+  ): void {
     if (!(actual instanceof ClassFileNode) || !(expected instanceof ClassFileNode)) {
       return;
     }
@@ -255,8 +266,8 @@ export class AssertionEngine {
     this.compareStringProperty(actual.name, 'extends', actual.extends, expected.extends, deviations);
     this.compareArrayProperty(actual.name, 'implements', actual.implements, expected.implements, deviations);
     this.compareArrayProperty(actual.name, 'methods', actual.methods, expected.methods, deviations);
-    this.compareArrayProperty(actual.name, 'imports', actual.imports, expected.imports, deviations);
-    this.compareArrayProperty(actual.name, 'exports', actual.exports, expected.exports, deviations);
+    this.compareModuleBoundary(actual.name, 'imports', actual.imports, expected.imports, deviations, expectedEntityMap);
+    this.compareModuleBoundary(actual.name, 'exports', actual.exports, expected.exports, deviations, expectedEntityMap);
   }
 
   private compareDTOEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
@@ -361,6 +372,48 @@ export class AssertionEngine {
     }
   }
 
+  private compareModuleBoundary(
+    entityName: string,
+    propertyName: string,
+    actual: readonly string[] | undefined,
+    expected: readonly string[] | undefined,
+    deviations: Deviation[],
+    expectedEntityMap: Map<string, EntityNode>,
+  ): void {
+    const actualSet = new Set(actual || []);
+    const expectedSet = new Set(expected || []);
+
+    const expectedEntityNames = new Set<string>();
+    for (const name of expectedSet) {
+      if (expectedEntityMap.has(name)) expectedEntityNames.add(name);
+    }
+
+    const filteredExpected = new Set([...expectedSet].filter((n) => !expectedEntityNames.has(n)));
+
+    const missing = [...filteredExpected].filter((item) => !actualSet.has(item));
+    const extra = [...actualSet].filter((item) => !filteredExpected.has(item) && !expectedEntityNames.has(item));
+
+    if (missing.length > 0) {
+      deviations.push({
+        entityName,
+        property: `${propertyName}.missing`,
+        expected: missing.join(', '),
+        actual: 'not present',
+        severity: 'error',
+      });
+    }
+
+    if (extra.length > 0) {
+      deviations.push({
+        entityName,
+        property: `${propertyName}.extra`,
+        expected: 'not present',
+        actual: extra.join(', '),
+        severity: 'warning',
+      });
+    }
+  }
+
   private compareArrayProperty(
     entityName: string,
     propertyName: string,
@@ -396,8 +449,12 @@ export class AssertionEngine {
   }
 
   private signaturesMatch(actual: string, expected: string): boolean {
-    // Normalize signatures for comparison (remove extra whitespace, etc.)
-    const normalize = (sig: string) => sig.replace(/\s+/g, ' ').trim();
+    const normalize = (sig: string) => {
+      let s = sig.replace(/\s+/g, ' ').trim();
+      s = s.replace(/^async\s+/, '');
+      s = s.replace(/^[a-zA-Z_$][a-zA-Z0-9_$]*\s*(?=\()/, '');
+      return s;
+    };
     return normalize(actual) === normalize(expected);
   }
 }

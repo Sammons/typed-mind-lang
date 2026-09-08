@@ -4,6 +4,7 @@ import {
   ClassFileNode,
   DtoFieldNode,
   DtoNode,
+  FileNode,
   FunctionNode,
   ProgramNode,
   parseTypeExprText,
@@ -445,6 +446,154 @@ UserCreateData %
         severity: 'warning',
       },
     ]);
+  });
+
+  it('should normalize async prefix and function name in signatures (#211)', async () => {
+    const engine = new AssertionEngine();
+
+    const tmd = `
+IndexApp -> UserService v1.0.0
+
+UserService #: src/services/user-service.ts
+  <- [UserDTO]
+  => [createUser, findUser]
+
+createUser :: (data: CreateUserDTO) => Promise<UserDTO>
+  <- CreateUserDTO
+  -> UserDTO
+
+findUser :: (id: string) => Promise<UserDTO>
+  -> UserDTO
+
+UserDTO %
+  - id: string
+
+CreateUserDTO %
+  - name: string
+    `.trim();
+
+    const conversionResult: ConversionResult = {
+      success: true,
+      entities: [
+        new ClassFileNode({
+          name: 'UserService',
+          span: SYNTHETIC_SPAN,
+          raw: 'UserService #: src/services/user-service.ts',
+          sourceForm: 'shortform',
+          path: 'src/services/user-service.ts',
+          methods: ['createUser', 'findUser'],
+          imports: ['UserDTO', 'CreateUserDTO'],
+          exports: ['UserService'],
+          implements: [],
+        }),
+        new FunctionNode({
+          name: 'createUser',
+          span: SYNTHETIC_SPAN,
+          raw: 'createUser :: async createUser(data: CreateUserDTO) => Promise<UserDTO>',
+          sourceForm: 'shortform',
+          signature: 'async createUser(data: CreateUserDTO) => Promise<UserDTO>',
+          calls: [],
+          pendingDependencies: [],
+          input: 'CreateUserDTO',
+          output: 'UserDTO',
+        }),
+        new FunctionNode({
+          name: 'findUser',
+          span: SYNTHETIC_SPAN,
+          raw: 'findUser :: findUser(id: string) => Promise<UserDTO>',
+          sourceForm: 'shortform',
+          signature: 'findUser(id: string) => Promise<UserDTO>',
+          calls: [],
+          pendingDependencies: [],
+          output: 'UserDTO',
+        }),
+        new DtoNode({
+          name: 'UserDTO',
+          span: SYNTHETIC_SPAN,
+          raw: 'UserDTO %',
+          sourceForm: 'shortform',
+          fields: [stringField('id')],
+        }),
+        new DtoNode({
+          name: 'CreateUserDTO',
+          span: SYNTHETIC_SPAN,
+          raw: 'CreateUserDTO %',
+          sourceForm: 'shortform',
+          fields: [stringField('name')],
+        }),
+        new ProgramNode({
+          name: 'IndexApp',
+          span: SYNTHETIC_SPAN,
+          raw: 'IndexApp -> UserService v1.0.0',
+          sourceForm: 'shortform',
+          entry: 'UserService',
+          version: '1.0.0',
+        }),
+      ],
+      tmdContent: tmd,
+      errors: [],
+      warnings: [],
+    };
+
+    const result = await engine.assert(conversionResult, 'test.tmd', tmd);
+
+    const signatureDeviations = result.deviations.filter((d) => d.property === 'signature');
+    assert.deepEqual(signatureDeviations, []);
+  });
+
+  it('should skip entity-level exports/imports in module boundary comparison (#212)', async () => {
+    const engine = new AssertionEngine();
+
+    const tmd = `
+IndexApp -> ClientIpFile v1.0.0
+
+ClientIpFile @ src/client-ip.ts:
+  -> [ClientIp]
+
+ClientIp %
+  - address: string
+    `.trim();
+
+    const conversionResult: ConversionResult = {
+      success: true,
+      entities: [
+        new ProgramNode({
+          name: 'IndexApp',
+          span: SYNTHETIC_SPAN,
+          raw: 'IndexApp -> ClientIpFile v1.0.0',
+          sourceForm: 'shortform',
+          entry: 'ClientIpFile',
+          version: '1.0.0',
+        }),
+        new FileNode({
+          name: 'ClientIpFile',
+          span: SYNTHETIC_SPAN,
+          raw: 'ClientIpFile @ src/client-ip.ts:',
+          sourceForm: 'longform',
+          path: 'src/client-ip.ts',
+          imports: [],
+          exports: ['CidrsFailure', 'ClientIpRequest', 'toClientIpRequest'],
+          reExports: [],
+        }),
+        new DtoNode({
+          name: 'ClientIp',
+          span: SYNTHETIC_SPAN,
+          raw: 'ClientIp %',
+          sourceForm: 'shortform',
+          fields: [stringField('address')],
+        }),
+      ],
+      tmdContent: tmd,
+      errors: [],
+      warnings: [],
+    };
+
+    const result = await engine.assert(conversionResult, 'test.tmd', tmd);
+
+    const exportDeviations = result.deviations.filter(
+      (d) => d.entityName === 'ClientIpFile' && d.property.startsWith('exports'),
+    );
+    assert.deepEqual(exportDeviations, []);
   });
 
   it('should handle empty conversion results', async () => {
