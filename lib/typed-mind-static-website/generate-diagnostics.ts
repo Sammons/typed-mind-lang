@@ -43,9 +43,7 @@ function renderCode(code: string, entry: AssertionCodeEntry): string {
 function groupByNamespace(codes: Record<string, AssertionCodeEntry>): Map<string, [string, AssertionCodeEntry][]> {
   const groups = new Map<string, [string, AssertionCodeEntry][]>();
   for (const [code, entry] of Object.entries(codes)) {
-    const parts = code.split('/');
-    const ns = parts[0];
-    const suffix = parts.slice(1).join('/');
+    const ns = code.split('/')[0];
     const group = groups.get(ns) ?? [];
     group.push([code, entry]);
     groups.set(ns, group);
