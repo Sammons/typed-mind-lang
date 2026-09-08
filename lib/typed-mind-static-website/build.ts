@@ -1,7 +1,7 @@
-import fs from 'node:fs';
-import path, { dirname } from 'node:path';
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import path, { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
