@@ -432,6 +432,10 @@ async function handleAssert(values: CliValues): Promise<void> {
   const assertionResult = await assertionEngine.assert(conversionResult, tmdFilePath, tmdContent);
 
   // Report results
+  if (values.format && values.format !== 'human' && values.format !== 'json') {
+    console.error(`Error: --format must be "human" or "json", got "${values.format}"`);
+    process.exit(1);
+  }
   const useJson = values.format === 'json';
 
   if (useJson) {
@@ -482,7 +486,7 @@ function handleExplain(positionals: string[]): void {
     process.exit(1);
   }
 
-  if (!(codeArg in ASSERTION_CODES)) {
+  if (!Object.hasOwn(ASSERTION_CODES, codeArg)) {
     console.error(`Unknown diagnostic code: ${codeArg}`);
     console.error('\nAvailable assertion codes:');
     for (const code of Object.keys(ASSERTION_CODES)) {
