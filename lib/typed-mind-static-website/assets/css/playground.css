@@ -4,7 +4,7 @@
   flex-direction: column;
   height: 100vh;
   padding-top: 70px;
-  background: var(--color-background);
+  background: var(--bg);
 }
 
 /* Toolbar */
@@ -13,8 +13,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem 2rem;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .toolbar-left {
@@ -38,9 +38,9 @@
 .syntax-toggle {
   display: flex;
   gap: 4px;
-  background: var(--color-background);
+  background: var(--bg);
   padding: 4px;
-  border-radius: 8px;
+  border-radius: 0;
 }
 
 .syntax-toggle .toggle-btn {
@@ -48,25 +48,25 @@
   font-size: 14px;
   background: transparent;
   border: none;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 0;
   transition: all 0.2s;
 }
 
 .syntax-toggle .toggle-btn.active {
-  background: var(--color-surface);
-  color: var(--color-text);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 .example-select {
   padding: 8px 12px;
   font-size: 14px;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  color: var(--color-text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -91,7 +91,7 @@
   width: 400px;
   display: flex;
   flex-direction: column;
-  background: var(--color-surface);
+  background: var(--surface);
   min-height: 200px;
   overflow: hidden;
 }
@@ -99,7 +99,7 @@
 /* Resizable Splitter */
 .splitter {
   width: 6px;
-  background: var(--color-border);
+  background: var(--border);
   cursor: ew-resize;
   position: relative;
   display: flex;
@@ -110,18 +110,18 @@
 }
 
 .splitter:hover {
-  background: var(--color-primary);
+  background: var(--accent);
 }
 
 .splitter.dragging {
-  background: var(--color-primary);
+  background: var(--accent);
 }
 
 .splitter-handle {
   width: 2px;
   height: 40px;
-  background: var(--color-text-muted);
-  border-radius: 1px;
+  background: var(--text-muted);
+  border-radius: 0;
   opacity: 0.6;
   transition: opacity 0.2s ease;
 }
@@ -148,16 +148,16 @@ body.dragging-splitter * {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   font-size: 14px;
   font-weight: 500;
 }
 
 .file-name {
   font-size: 12px;
-  color: var(--color-text-muted);
-  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
 /* Monaco Editor Container */
@@ -173,16 +173,16 @@ body.dragging-splitter * {
 .panel-tabs {
   display: flex;
   gap: 1px;
-  background: var(--color-border);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .tab-btn {
   flex: 1;
   padding: 10px 16px;
-  background: var(--color-background);
+  background: var(--bg);
   border: none;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -190,12 +190,12 @@ body.dragging-splitter * {
 }
 
 .tab-btn.active {
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .tab-btn:hover {
-  color: var(--color-text);
+  color: var(--text);
 }
 
 /* Tab Content */
@@ -219,7 +219,7 @@ body.dragging-splitter * {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--color-success);
+  color: var(--success);
 }
 
 .no-problems svg {
@@ -232,7 +232,7 @@ body.dragging-splitter * {
   align-items: flex-start;
   gap: 8px;
   padding: 8px 0;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .problem-item:last-child {
@@ -247,11 +247,11 @@ body.dragging-splitter * {
 }
 
 .problem-icon.error {
-  color: var(--color-error);
+  color: var(--error);
 }
 
 .problem-icon.warning {
-  color: var(--color-warning);
+  color: var(--warning);
 }
 
 .problem-content {
@@ -260,24 +260,24 @@ body.dragging-splitter * {
 
 .problem-message {
   font-size: 14px;
-  color: var(--color-text);
+  color: var(--text);
   margin-bottom: 4px;
 }
 
 .problem-location {
   font-size: 12px;
-  color: var(--color-text-muted);
-  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
 /* AST Tab */
 .ast-output {
   padding: 1rem;
   margin: 0;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
-  color: var(--color-text);
+  color: var(--text);
   white-space: pre-wrap;
   word-wrap: break-word;
 }
@@ -293,7 +293,7 @@ body.dragging-splitter * {
 
 .visualization-placeholder {
   text-align: center;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 /* Share Modal */
@@ -315,12 +315,12 @@ body.dragging-splitter * {
 }
 
 .modal-content {
-  background: var(--color-surface);
-  border-radius: 12px;
+  background: var(--surface);
+  border-radius: 0;
   padding: 2rem;
   max-width: 500px;
   width: 90%;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
 }
 
 .modal-header {
@@ -339,7 +339,7 @@ body.dragging-splitter * {
   background: none;
   border: none;
   font-size: 24px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -347,13 +347,13 @@ body.dragging-splitter * {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 0;
   transition: all 0.2s;
 }
 
 .modal-close:hover {
-  background: var(--color-background);
-  color: var(--color-text);
+  background: var(--bg);
+  color: var(--text);
 }
 
 .share-url-container {
@@ -365,12 +365,12 @@ body.dragging-splitter * {
 .share-url {
   flex: 1;
   padding: 10px 12px;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  font-family: var(--font-mono);
   font-size: 14px;
-  color: var(--color-text);
+  color: var(--text);
 }
 
 /* Responsive Design */
@@ -399,22 +399,22 @@ body.dragging-splitter * {
     width: 100%;
     height: 300px;
     border-left: none;
-    border-top: 1px solid var(--color-border);
+    border-top: 1px solid var(--border);
   }
 }
 
 /* Monaco Editor Theme Overrides */
 .monaco-editor .margin {
-  background-color: var(--color-surface) !important;
+  background-color: var(--surface) !important;
 }
 
 .monaco-editor,
 .monaco-editor .inputarea.ime-input {
-  background-color: var(--color-background) !important;
+  background-color: var(--bg) !important;
 }
 
 .monaco-editor .line-numbers {
-  color: var(--color-text-muted) !important;
+  color: var(--text-muted) !important;
 }
 
 /* Chat Interface Styles */
@@ -427,8 +427,8 @@ body.dragging-splitter * {
 
 /* Chat Configuration */
 .chat-config {
-  background: var(--color-background);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 
 .config-header {
@@ -444,7 +444,7 @@ body.dragging-splitter * {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--text);
 }
 
 .config-toggle {
@@ -453,18 +453,18 @@ body.dragging-splitter * {
   font-size: 16px;
   cursor: pointer;
   padding: 4px;
-  border-radius: 4px;
+  border-radius: 0;
   transition: background 0.2s;
 }
 
 .config-toggle:hover {
-  background: var(--color-border);
+  background: var(--border);
 }
 
 .config-content {
   display: none;
   padding: 16px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border);
 }
 
 .config-section {
@@ -475,7 +475,7 @@ body.dragging-splitter * {
   display: block;
   font-size: 12px;
   font-weight: 500;
-  color: var(--color-text);
+  color: var(--text);
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -486,17 +486,17 @@ body.dragging-splitter * {
   width: 100%;
   padding: 8px 12px;
   font-size: 14px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  color: var(--color-text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--text);
   transition: border-color 0.2s;
 }
 
 .config-select:focus,
 .config-input:focus {
   outline: none;
-  border-color: var(--color-primary);
+  border-color: var(--accent);
 }
 
 .token-input-group {
@@ -518,17 +518,17 @@ body.dragging-splitter * {
   cursor: pointer;
   font-size: 14px;
   padding: 4px;
-  border-radius: 4px;
+  border-radius: 0;
   transition: background 0.2s;
 }
 
 .token-toggle:hover {
-  background: var(--color-background);
+  background: var(--bg);
 }
 
 .config-help {
   font-size: 11px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   margin-top: 6px;
   line-height: 1.4;
 }
@@ -544,7 +544,7 @@ body.dragging-splitter * {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  background: var(--color-background);
+  background: var(--bg);
   scroll-behavior: smooth;
 }
 
@@ -563,20 +563,20 @@ body.dragging-splitter * {
 .assistant-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 16px;
-  background: var(--color-surface);
+  border-radius: 0;
+  background: var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
   flex-shrink: 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
 }
 
 .user-avatar {
-  background: var(--color-primary);
+  background: var(--accent);
   color: white;
-  border-color: var(--color-primary);
+  border-color: var(--accent);
 }
 
 .message-content {
@@ -589,29 +589,29 @@ body.dragging-splitter * {
 }
 
 .message-text {
-  background: var(--color-surface);
+  background: var(--surface);
   padding: 12px 16px;
-  border-radius: 12px;
+  border-radius: 0;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--color-text);
+  color: var(--text);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 
 .chat-message.user .message-text {
-  background: var(--color-primary);
+  background: var(--accent);
   color: white;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 0;
 }
 
 .chat-message.assistant .message-text {
-  border-bottom-left-radius: 4px;
+  border-bottom-left-radius: 0;
 }
 
 .message-time {
   font-size: 11px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   margin-top: 6px;
   padding: 0 4px;
 }
@@ -624,11 +624,11 @@ body.dragging-splitter * {
 }
 
 .welcome-message .message-content {
-  background: var(--color-surface);
+  background: var(--surface);
   padding: 16px;
-  border-radius: 12px;
-  border-bottom-left-radius: 4px;
-  border: 1px solid var(--color-border);
+  border-radius: 0;
+  border-bottom-left-radius: 0;
+  border: 1px solid var(--border);
 }
 
 .welcome-message ul {
@@ -644,26 +644,26 @@ body.dragging-splitter * {
 
 /* Code Blocks */
 .code-block {
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 12px;
   margin: 12px 0;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
-  color: var(--color-text);
+  color: var(--text);
   overflow-x: auto;
 }
 
 .inline-code {
-  background: var(--color-background);
+  background: var(--bg);
   padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace;
+  border-radius: 0;
+  font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 .code-actions {
@@ -676,16 +676,16 @@ body.dragging-splitter * {
 .insert-code-btn {
   font-size: 12px;
   padding: 6px 12px;
-  background: var(--color-primary);
+  background: var(--accent);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 0;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .insert-code-btn:hover {
-  background: var(--color-primary-dark);
+  filter: brightness(0.9);
   transform: translateY(-1px);
 }
 
@@ -700,8 +700,8 @@ body.dragging-splitter * {
 .typing-indicator span {
   width: 6px;
   height: 6px;
-  background: var(--color-text-muted);
-  border-radius: 50%;
+  background: var(--text-muted);
+  border-radius: 0;
   animation: typing 1.4s infinite ease-in-out;
 }
 
@@ -726,8 +726,8 @@ body.dragging-splitter * {
 
 /* Chat Input */
 .chat-input-container {
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
   padding: 16px;
 }
 
@@ -747,12 +747,12 @@ body.dragging-splitter * {
 .chat-input {
   flex: 1;
   padding: 12px 16px;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0;
   font-size: 14px;
   line-height: 1.4;
-  color: var(--color-text);
+  color: var(--text);
   resize: none;
   min-height: 48px;
   max-height: 150px;
@@ -762,7 +762,7 @@ body.dragging-splitter * {
 
 .chat-input:focus {
   outline: none;
-  border-color: var(--color-primary);
+  border-color: var(--accent);
 }
 
 .chat-input:disabled {
@@ -773,10 +773,10 @@ body.dragging-splitter * {
 .chat-send {
   width: 48px;
   height: 48px;
-  background: var(--color-primary);
+  background: var(--accent);
   color: white;
   border: none;
-  border-radius: 12px;
+  border-radius: 0;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -786,7 +786,7 @@ body.dragging-splitter * {
 }
 
 .chat-send:hover:not(:disabled) {
-  background: var(--color-primary-dark);
+  filter: brightness(0.9);
   transform: translateY(-1px);
 }
 
@@ -802,29 +802,29 @@ body.dragging-splitter * {
   top: 20px;
   right: 20px;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: 0;
   font-size: 14px;
   font-weight: 500;
   z-index: 1000;
   max-width: 300px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border);
   animation: slideIn 0.3s ease-out;
 }
 
 .chat-notification.success {
-  background: var(--color-success);
+  background: var(--success);
   color: white;
 }
 
 .chat-notification.error {
-  background: var(--color-error);
+  background: var(--error);
   color: white;
 }
 
 .chat-notification.info {
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 @keyframes slideIn {
@@ -879,19 +879,19 @@ body.dragging-splitter * {
   right: 20px;
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: 0;
   border: none;
-  background: var(--color-primary);
+  background: var(--accent);
   color: white;
   font-size: 18px;
   cursor: pointer;
   z-index: 1001;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
   transition: all 0.2s ease;
 }
 
 .checkpoint-toggle:hover {
-  background: var(--color-primary-dark);
+  filter: brightness(0.9);
   transform: scale(1.05);
 }
 
@@ -901,10 +901,9 @@ body.dragging-splitter * {
   right: 20px;
   width: 350px;
   max-height: 500px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0;
   z-index: 1000;
   overflow: hidden;
   display: flex;
@@ -913,7 +912,7 @@ body.dragging-splitter * {
 
 .checkpoint-header {
   padding: 16px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -923,7 +922,7 @@ body.dragging-splitter * {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--text);
 }
 
 .checkpoint-actions {
@@ -933,15 +932,15 @@ body.dragging-splitter * {
 
 .checkpoint-stats {
   padding: 12px 16px;
-  background: var(--color-background);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
   display: flex;
   gap: 16px;
   font-size: 12px;
 }
 
 .stats-item {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 .checkpoint-list {
@@ -952,9 +951,9 @@ body.dragging-splitter * {
 }
 
 .checkpoint-item {
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0;
   margin-bottom: 8px;
   padding: 12px;
   transition: all 0.2s ease;
@@ -962,12 +961,11 @@ body.dragging-splitter * {
 }
 
 .checkpoint-item:hover {
-  border-color: var(--color-primary);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-color: var(--accent);
 }
 
 .checkpoint-item.current {
-  border-color: var(--color-success);
+  border-color: var(--success);
   background: rgba(34, 197, 94, 0.05);
 }
 
@@ -980,7 +978,7 @@ body.dragging-splitter * {
 
 .checkpoint-description {
   font-weight: 500;
-  color: var(--color-text);
+  color: var(--text);
   flex: 1;
   margin-right: 8px;
   font-size: 14px;
@@ -994,20 +992,20 @@ body.dragging-splitter * {
 
 .checkpoint-meta {
   font-size: 11px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   margin-bottom: 8px;
 }
 
 .checkpoint-preview {
   margin-top: 8px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border);
   padding-top: 8px;
 }
 
 .checkpoint-preview pre {
-  background: var(--color-code-background, var(--color-background));
+  background: var(--surface);
   padding: 8px;
-  border-radius: 4px;
+  border-radius: 0;
   font-size: 11px;
   line-height: 1.2;
   margin: 0;
@@ -1015,20 +1013,20 @@ body.dragging-splitter * {
 }
 
 .checkpoint-preview code {
-  color: var(--color-text);
-  font-family: 'JetBrains Mono', monospace;
+  color: var(--text);
+  font-family: var(--font-mono);
 }
 
 .preview-more {
   font-size: 11px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   text-align: center;
   margin-top: 4px;
 }
 
 .no-checkpoints {
   text-align: center;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-style: italic;
   padding: 20px;
 }
@@ -1037,33 +1035,33 @@ body.dragging-splitter * {
 .tool-results {
   margin: 12px 0;
   padding: 12px;
-  background: var(--color-background);
-  border-radius: 6px;
-  border-left: 3px solid var(--color-primary);
+  background: var(--bg);
+  border-radius: 0;
+  border-left: 3px solid var(--accent);
 }
 
 .tool-success {
-  color: var(--color-success);
+  color: var(--success);
   font-weight: 500;
   font-size: 14px;
 }
 
 .tool-success-item {
-  color: var(--color-success);
+  color: var(--success);
   font-size: 13px;
   margin-left: 16px;
   margin-top: 4px;
 }
 
 .tool-errors {
-  color: var(--color-error);
+  color: var(--error);
   font-weight: 500;
   font-size: 14px;
   margin-bottom: 8px;
 }
 
 .tool-error {
-  color: var(--color-error);
+  color: var(--error);
   font-size: 13px;
   margin-left: 16px;
   margin-top: 4px;
@@ -1072,33 +1070,33 @@ body.dragging-splitter * {
 .validation-results {
   margin: 12px 0;
   padding: 12px;
-  background: var(--color-background);
-  border-radius: 6px;
-  border-left: 3px solid var(--color-info, var(--color-primary));
+  background: var(--bg);
+  border-radius: 0;
+  border-left: 3px solid var(--accent);
 }
 
 .validation-success {
-  color: var(--color-success);
+  color: var(--success);
   font-weight: 500;
   font-size: 14px;
 }
 
 .validation-errors {
-  color: var(--color-error);
+  color: var(--error);
   font-weight: 500;
   font-size: 14px;
   margin-bottom: 8px;
 }
 
 .validation-error {
-  color: var(--color-error);
+  color: var(--error);
   font-size: 13px;
   margin-left: 16px;
   margin-top: 4px;
 }
 
 .validation-warnings {
-  color: var(--color-warning, #f59e0b);
+  color: var(--warning);
   font-weight: 500;
   font-size: 14px;
   margin-top: 8px;
@@ -1106,7 +1104,7 @@ body.dragging-splitter * {
 }
 
 .validation-warning {
-  color: var(--color-warning, #f59e0b);
+  color: var(--warning);
   font-size: 13px;
   margin-left: 16px;
   margin-top: 4px;
@@ -1115,29 +1113,28 @@ body.dragging-splitter * {
 /* Auto-fix Badge Styles */
 .auto-fix-badge {
   display: inline-block;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: var(--success);
   color: white;
   font-size: 11px;
   font-weight: 600;
   padding: 3px 8px;
-  border-radius: 12px;
+  border-radius: 0;
   margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);
 }
 
 /* Button size variants for checkpoint actions */
 .btn.btn-tiny {
   padding: 2px 6px;
   font-size: 10px;
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 .btn.btn-small {
   padding: 4px 8px;
   font-size: 12px;
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 /* Tool Action Messages */
@@ -1157,12 +1154,12 @@ body.dragging-splitter * {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 6px 16px;
   font-size: 13px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 .tool-action-icon {
@@ -1176,9 +1173,9 @@ body.dragging-splitter * {
 .tool-action-spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid var(--color-border);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 0;
   animation: spin 0.8s linear infinite;
 }
 
