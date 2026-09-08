@@ -457,11 +457,13 @@ export interface AssertionResult {
 }
 
 export interface Deviation {
+  readonly code: import('./assertion-codes.ts').AssertionCode;
   readonly entityName: string;
   readonly property: string;
   readonly expected: unknown;
   readonly actual: unknown;
   readonly severity: 'error' | 'warning';
+  readonly suggestion: string;
 }
 
 // Type predicates for narrowing
