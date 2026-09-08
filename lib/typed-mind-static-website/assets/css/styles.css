@@ -52,6 +52,10 @@
   box-sizing: border-box;
 }
 
+button, select, input, textarea {
+  font: inherit;
+}
+
 /* Code toggle styles */
 .code-toggle {
   display: flex;
@@ -276,6 +280,9 @@ body {
 .btn-small {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
+  background-color: white;
+  color: var(--ink);
+  border: 1px solid var(--border);
 }
 
 .hero-code {
