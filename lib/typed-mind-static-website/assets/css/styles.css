@@ -247,6 +247,14 @@ body {
   border: none;
 }
 
+.btn-small {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  background-color: white;
+  color: var(--ink);
+  border: 1px solid var(--border);
+}
+
 .btn-primary {
   background-color: var(--accent);
   color: white;
@@ -275,14 +283,6 @@ body {
 
 .btn-danger:hover {
   filter: brightness(0.85);
-}
-
-.btn-small {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  background-color: white;
-  color: var(--ink);
-  border: 1px solid var(--border);
 }
 
 .hero-code {
