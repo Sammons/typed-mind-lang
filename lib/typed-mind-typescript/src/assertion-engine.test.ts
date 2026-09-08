@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   ClassFileNode,
+  ClassNode,
   DtoFieldNode,
   DtoNode,
   FileNode,
@@ -27,6 +28,15 @@ const stringField = (name: string): DtoFieldNode =>
     name,
     type: 'string',
     typeExpr: parseTypeExprText('string').typeExpr,
+    optionalityMarker: 'none',
+    span: SYNTHETIC_SPAN,
+  });
+
+const typedField = (name: string, type: string): DtoFieldNode =>
+  new DtoFieldNode({
+    name,
+    type,
+    typeExpr: parseTypeExprText(type).typeExpr,
     optionalityMarker: 'none',
     span: SYNTHETIC_SPAN,
   });
@@ -594,6 +604,270 @@ ClientIp %
       (d) => d.entityName === 'ClientIpFile' && d.property.startsWith('exports'),
     );
     assert.deepEqual(exportDeviations, []);
+  });
+
+  it('should downgrade undeclared type alias field deviations to warning (#210)', async () => {
+    const engine = new AssertionEngine();
+
+    const tmd = `
+IndexApp -> Main v1.0.0
+
+Main @ src/main.ts:
+  <- [Config]
+
+Config %
+  - edition: string
+  - kind: string
+    `.trim();
+
+    const conversionResult: ConversionResult = {
+      success: true,
+      entities: [
+        new ProgramNode({
+          name: 'IndexApp',
+          span: SYNTHETIC_SPAN,
+          raw: 'IndexApp -> Main v1.0.0',
+          sourceForm: 'shortform',
+          entry: 'Main',
+          version: '1.0.0',
+        }),
+        new FileNode({
+          name: 'Main',
+          span: SYNTHETIC_SPAN,
+          raw: 'Main @ src/main.ts:',
+          sourceForm: 'longform',
+          path: 'src/main.ts',
+          imports: ['Config'],
+          exports: [],
+          reExports: [],
+        }),
+        new DtoNode({
+          name: 'Config',
+          span: SYNTHETIC_SPAN,
+          raw: 'Config %',
+          sourceForm: 'shortform',
+          fields: [typedField('edition', 'Edition'), typedField('kind', 'PrincipalKind')],
+        }),
+      ],
+      tmdContent: tmd,
+      errors: [],
+      warnings: [],
+    };
+
+    const result = await engine.assert(conversionResult, 'test.tmd', tmd);
+
+    const fieldDeviations = result.deviations.filter((d) => d.property.startsWith('field.'));
+    assert.equal(fieldDeviations.length, 2);
+    for (const d of fieldDeviations) {
+      assert.equal(d.severity, 'warning');
+    }
+    assert.equal(result.success, true);
+  });
+
+  it('should normalize qualified names in field types (#213)', async () => {
+    const engine = new AssertionEngine();
+
+    const tmd = `
+IndexApp -> Main v1.0.0
+
+Main @ src/main.ts:
+  <- [Manifest, LoginProvider]
+
+LoginProvider %
+  - name: string
+
+Manifest %
+  - providers: LoginProvider[]
+    `.trim();
+
+    const conversionResult: ConversionResult = {
+      success: true,
+      entities: [
+        new ProgramNode({
+          name: 'IndexApp',
+          span: SYNTHETIC_SPAN,
+          raw: 'IndexApp -> Main v1.0.0',
+          sourceForm: 'shortform',
+          entry: 'Main',
+          version: '1.0.0',
+        }),
+        new FileNode({
+          name: 'Main',
+          span: SYNTHETIC_SPAN,
+          raw: 'Main @ src/main.ts:',
+          sourceForm: 'longform',
+          path: 'src/main.ts',
+          imports: ['Manifest', 'LoginProvider'],
+          exports: [],
+          reExports: [],
+        }),
+        new DtoNode({
+          name: 'LoginProvider',
+          span: SYNTHETIC_SPAN,
+          raw: 'LoginProvider %',
+          sourceForm: 'shortform',
+          fields: [typedField('name', 'string')],
+        }),
+        new DtoNode({
+          name: 'Manifest',
+          span: SYNTHETIC_SPAN,
+          raw: 'Manifest %',
+          sourceForm: 'shortform',
+          fields: [typedField('providers', 'TypesFile.LoginProvider[]')],
+        }),
+      ],
+      tmdContent: tmd,
+      errors: [],
+      warnings: [],
+    };
+
+    const result = await engine.assert(conversionResult, 'test.tmd', tmd);
+
+    const fieldDeviations = result.deviations.filter((d) => d.property.startsWith('field.'));
+    assert.deepEqual(fieldDeviations, []);
+    assert.equal(result.success, true);
+  });
+
+  it('should downgrade arrow-type field deviations to warning (#214)', async () => {
+    const engine = new AssertionEngine();
+
+    const tmd = `
+IndexApp -> Main v1.0.0
+
+Main @ src/main.ts:
+  <- [Context]
+
+Context %
+  - fetch: string
+  - logger: string
+    `.trim();
+
+    const conversionResult: ConversionResult = {
+      success: true,
+      entities: [
+        new ProgramNode({
+          name: 'IndexApp',
+          span: SYNTHETIC_SPAN,
+          raw: 'IndexApp -> Main v1.0.0',
+          sourceForm: 'shortform',
+          entry: 'Main',
+          version: '1.0.0',
+        }),
+        new FileNode({
+          name: 'Main',
+          span: SYNTHETIC_SPAN,
+          raw: 'Main @ src/main.ts:',
+          sourceForm: 'longform',
+          path: 'src/main.ts',
+          imports: ['Context'],
+          exports: [],
+          reExports: [],
+        }),
+        new DtoNode({
+          name: 'Context',
+          span: SYNTHETIC_SPAN,
+          raw: 'Context %',
+          sourceForm: 'shortform',
+          fields: [
+            typedField('fetch', '(req: FetchRequest) => Promise<Response>'),
+            typedField('logger', '(msg: string) => void'),
+          ],
+        }),
+      ],
+      tmdContent: tmd,
+      errors: [],
+      warnings: [],
+    };
+
+    const result = await engine.assert(conversionResult, 'test.tmd', tmd);
+
+    const fieldDeviations = result.deviations.filter((d) => d.property.startsWith('field.'));
+    assert.equal(fieldDeviations.length, 2);
+    for (const d of fieldDeviations) {
+      assert.equal(d.severity, 'warning');
+    }
+    assert.equal(result.success, true);
+  });
+
+  it('should downgrade Class-vs-DTO kind mismatch to warning when entity has methods (#215)', async () => {
+    const engine = new AssertionEngine();
+
+    const tmd = `
+IndexApp -> App v1.0.0
+
+App @ src/app.ts:
+  <- [Provisioner]
+
+ProvFile @ src/provisioner.ts:
+  -> [Provisioner]
+
+Provisioner <:
+  => [provision]
+
+provision :: (input: string) => void
+    `.trim();
+
+    const conversionResult: ConversionResult = {
+      success: true,
+      entities: [
+        new ProgramNode({
+          name: 'IndexApp',
+          span: SYNTHETIC_SPAN,
+          raw: 'IndexApp -> App v1.0.0',
+          sourceForm: 'shortform',
+          entry: 'App',
+          version: '1.0.0',
+        }),
+        new FileNode({
+          name: 'App',
+          span: SYNTHETIC_SPAN,
+          raw: 'App @ src/app.ts:',
+          sourceForm: 'longform',
+          path: 'src/app.ts',
+          imports: ['Provisioner'],
+          exports: [],
+          reExports: [],
+        }),
+        new FileNode({
+          name: 'ProvFile',
+          span: SYNTHETIC_SPAN,
+          raw: 'ProvFile @ src/provisioner.ts:',
+          sourceForm: 'longform',
+          path: 'src/provisioner.ts',
+          imports: [],
+          exports: ['Provisioner'],
+          reExports: [],
+        }),
+        new DtoNode({
+          name: 'Provisioner',
+          span: SYNTHETIC_SPAN,
+          raw: 'Provisioner %',
+          sourceForm: 'shortform',
+          fields: [],
+        }),
+        new FunctionNode({
+          name: 'provision',
+          span: SYNTHETIC_SPAN,
+          raw: 'provision :: (input: string) => void',
+          sourceForm: 'shortform',
+          signature: '(input: string) => void',
+          calls: [],
+          pendingDependencies: [],
+        }),
+      ],
+      tmdContent: tmd,
+      errors: [],
+      warnings: [],
+    };
+
+    const result = await engine.assert(conversionResult, 'test.tmd', tmd);
+
+    const kindDeviation = result.deviations.find(
+      (d) => d.entityName === 'Provisioner' && d.property === 'type',
+    );
+    assert.notEqual(kindDeviation, undefined);
+    assert.equal(kindDeviation?.severity, 'warning');
+    assert.equal(result.success, true);
   });
 
   it('should handle empty conversion results', async () => {
