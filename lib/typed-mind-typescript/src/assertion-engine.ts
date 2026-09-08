@@ -10,6 +10,7 @@ import {
   printTypeExpr,
   TypedMind,
 } from '@sammons/typed-mind';
+import { ASSERTION_CODES, type AssertionCode } from './assertion-codes.ts';
 import type { AssertionResult, ConversionResult, Deviation } from './types.ts';
 
 const printSchema = (entity: ConstantsNode): string | undefined =>
@@ -44,13 +45,7 @@ export class AssertionEngine {
           success: false,
           deviations: validationResult.diagnostics
             .filter((diagnostic) => diagnostic.severity === 'error')
-            .map((diagnostic) => ({
-              entityName: '<parsing>',
-              property: 'syntax',
-              expected: 'valid syntax',
-              actual: diagnostic.message,
-              severity: 'error' as const,
-            })),
+            .map((diagnostic) => this.deviation('assertion/parse-failure', '<parsing>', 'syntax', 'valid syntax', diagnostic.message)),
           missingEntities: [],
           extraEntities: [],
         };
@@ -62,13 +57,7 @@ export class AssertionEngine {
       return {
         success: false,
         deviations: [
-          {
-            entityName: '<assertion>',
-            property: 'execution',
-            expected: 'successful comparison',
-            actual: error instanceof Error ? error.message : String(error),
-            severity: 'error' as const,
-          },
+          this.deviation('assertion/engine-error', '<assertion>', 'execution', 'successful comparison', error instanceof Error ? error.message : String(error)),
         ],
         missingEntities: [],
         extraEntities: [],
@@ -82,18 +71,16 @@ export class AssertionEngine {
     const expectedEntityMap = new Map(expectedEntities.map((e) => [e.name, e]));
 
     // Find missing entities (in expected but not in actual)
-    const missingEntities: string[] = [];
     for (const name of expectedEntityMap.keys()) {
       if (!actualEntityMap.has(name)) {
-        missingEntities.push(name);
+        deviations.push(this.deviation('assertion/entity-missing', name, 'existence', 'entity exists', 'entity missing'));
       }
     }
 
     // Find extra entities (in actual but not in expected)
-    const extraEntities: string[] = [];
     for (const name of actualEntityMap.keys()) {
       if (!expectedEntityMap.has(name)) {
-        extraEntities.push(name);
+        deviations.push(this.deviation('assertion/entity-extra', name, 'existence', 'entity absent', 'entity present'));
       }
     }
 
@@ -107,8 +94,9 @@ export class AssertionEngine {
       }
     }
 
-    const success =
-      deviations.filter((d) => d.severity === 'error').length === 0 && missingEntities.length === 0 && extraEntities.length === 0;
+    const success = deviations.filter((d) => d.severity === 'error').length === 0;
+    const missingEntities = deviations.filter((d) => d.code === 'assertion/entity-missing').map((d) => d.entityName);
+    const extraEntities = deviations.filter((d) => d.code === 'assertion/entity-extra').map((d) => d.entityName);
 
     return {
       success,
@@ -126,14 +114,10 @@ export class AssertionEngine {
     const deviations: Deviation[] = [];
 
     if (actual.kind !== expected.kind) {
-      const kindSeverity = this.kindDeviationSeverity(actual, expected);
-      deviations.push({
-        entityName: actual.name,
-        property: 'type',
-        expected: expected.kind,
-        actual: actual.kind,
-        severity: kindSeverity,
-      });
+      const kindCode = this.kindDeviationSeverity(actual, expected) === 'warning'
+        ? 'assertion/entity-kind-downgraded' as const
+        : 'assertion/entity-kind-mismatch' as const;
+      deviations.push(this.deviation(kindCode, actual.name, 'type', expected.kind, actual.kind));
     }
 
     switch (expected.kind) {
@@ -169,23 +153,11 @@ export class AssertionEngine {
     }
 
     if (actual.entry !== expected.entry) {
-      deviations.push({
-        entityName: actual.name,
-        property: 'entry',
-        expected: expected.entry,
-        actual: actual.entry,
-        severity: 'error',
-      });
+      deviations.push(this.deviation('assertion/entry-mismatch', actual.name, 'entry', expected.entry, actual.entry));
     }
 
     if (actual.version !== expected.version) {
-      deviations.push({
-        entityName: actual.name,
-        property: 'version',
-        expected: expected.version,
-        actual: actual.version,
-        severity: 'warning',
-      });
+      deviations.push(this.deviation('assertion/version-mismatch', actual.name, 'version', expected.version, actual.version));
     }
   }
 
@@ -200,13 +172,7 @@ export class AssertionEngine {
     }
 
     if (actual.path !== expected.path) {
-      deviations.push({
-        entityName: actual.name,
-        property: 'path',
-        expected: expected.path,
-        actual: actual.path,
-        severity: 'warning',
-      });
+      deviations.push(this.deviation('assertion/path-mismatch', actual.name, 'path', expected.path, actual.path));
     }
 
     this.compareModuleBoundary(actual.name, 'imports', actual.imports, expected.imports, deviations, expectedEntityMap);
@@ -218,20 +184,13 @@ export class AssertionEngine {
       return;
     }
 
-    // Compare signature (allowing some flexibility in formatting)
     if (!this.signaturesMatch(actual.signature, expected.signature)) {
-      deviations.push({
-        entityName: actual.name,
-        property: 'signature',
-        expected: expected.signature,
-        actual: actual.signature,
-        severity: 'error',
-      });
+      deviations.push(this.deviation('assertion/signature-mismatch', actual.name, 'signature', expected.signature, actual.signature));
     }
 
-    this.compareStringProperty(actual.name, 'input', actual.input, expected.input, deviations);
-    this.compareStringProperty(actual.name, 'output', actual.output, expected.output, deviations);
-    this.compareArrayProperty(actual.name, 'calls', actual.calls, expected.calls, deviations);
+    this.compareOptionalStringProperty(actual.name, 'input', actual.input, expected.input, 'assertion/input-mismatch', deviations);
+    this.compareOptionalStringProperty(actual.name, 'output', actual.output, expected.output, 'assertion/output-mismatch', deviations);
+    this.compareArrayProperty(actual.name, 'calls', actual.calls, expected.calls, 'assertion/member-missing', 'assertion/member-extra', deviations);
   }
 
   private compareClassEntities(actual: EntityNode, expected: EntityNode, deviations: Deviation[]): void {
@@ -239,9 +198,9 @@ export class AssertionEngine {
       return;
     }
 
-    this.compareStringProperty(actual.name, 'extends', actual.extends, expected.extends, deviations);
-    this.compareArrayProperty(actual.name, 'implements', actual.implements, expected.implements, deviations);
-    this.compareArrayProperty(actual.name, 'methods', actual.methods, expected.methods, deviations);
+    this.compareOptionalStringProperty(actual.name, 'extends', actual.extends, expected.extends, 'assertion/extends-mismatch', deviations);
+    this.compareArrayProperty(actual.name, 'implements', actual.implements, expected.implements, 'assertion/member-missing', 'assertion/member-extra', deviations);
+    this.compareArrayProperty(actual.name, 'methods', actual.methods, expected.methods, 'assertion/member-missing', 'assertion/member-extra', deviations);
   }
 
   private compareClassFileEntities(
@@ -255,18 +214,12 @@ export class AssertionEngine {
     }
 
     if (actual.path !== expected.path) {
-      deviations.push({
-        entityName: actual.name,
-        property: 'path',
-        expected: expected.path,
-        actual: actual.path,
-        severity: 'warning',
-      });
+      deviations.push(this.deviation('assertion/path-mismatch', actual.name, 'path', expected.path, actual.path));
     }
 
-    this.compareStringProperty(actual.name, 'extends', actual.extends, expected.extends, deviations);
-    this.compareArrayProperty(actual.name, 'implements', actual.implements, expected.implements, deviations);
-    this.compareArrayProperty(actual.name, 'methods', actual.methods, expected.methods, deviations);
+    this.compareOptionalStringProperty(actual.name, 'extends', actual.extends, expected.extends, 'assertion/extends-mismatch', deviations);
+    this.compareArrayProperty(actual.name, 'implements', actual.implements, expected.implements, 'assertion/member-missing', 'assertion/member-extra', deviations);
+    this.compareArrayProperty(actual.name, 'methods', actual.methods, expected.methods, 'assertion/member-missing', 'assertion/member-extra', deviations);
     this.compareModuleBoundary(actual.name, 'imports', actual.imports, expected.imports, deviations, expectedEntityMap);
     this.compareModuleBoundary(actual.name, 'exports', actual.exports, expected.exports, deviations, expectedEntityMap);
   }
@@ -279,33 +232,18 @@ export class AssertionEngine {
     const actualFieldMap = new Map(actual.fields.map((field) => [field.name, field] as const));
     const expectedFieldMap = new Map(expected.fields.map((field) => [field.name, field] as const));
 
-    // Check for missing fields
     for (const [fieldName] of expectedFieldMap) {
       if (!actualFieldMap.has(fieldName)) {
-        deviations.push({
-          entityName: actual.name,
-          property: `field.${fieldName}`,
-          expected: 'field exists',
-          actual: 'field missing',
-          severity: 'error',
-        });
+        deviations.push(this.deviation('assertion/field-missing', actual.name, `field.${fieldName}`, 'field exists', 'field missing'));
       }
     }
 
-    // Check for extra fields
     for (const [fieldName] of actualFieldMap) {
       if (!expectedFieldMap.has(fieldName)) {
-        deviations.push({
-          entityName: actual.name,
-          property: `field.${fieldName}`,
-          expected: 'field absent',
-          actual: 'field present',
-          severity: 'warning',
-        });
+        deviations.push(this.deviation('assertion/field-extra', actual.name, `field.${fieldName}`, 'field absent', 'field present'));
       }
     }
 
-    // Compare common fields
     for (const [fieldName] of expectedFieldMap) {
       const expectedField = expectedFieldMap.get(fieldName);
       const actualField = actualFieldMap.get(fieldName);
@@ -314,23 +252,14 @@ export class AssertionEngine {
         const normActual = this.normalizeFieldType(actualField.type);
         const normExpected = this.normalizeFieldType(expectedField.type);
         if (normActual !== normExpected) {
-          deviations.push({
-            entityName: actual.name,
-            property: `field.${fieldName}.type`,
-            expected: expectedField.type,
-            actual: actualField.type,
-            severity: this.fieldTypeDeviationSeverity(expectedField.type, actualField.type),
-          });
+          const typeCode = this.fieldTypeDeviationSeverity(expectedField.type, actualField.type) === 'warning'
+            ? 'assertion/field-type-unrepresentable' as const
+            : 'assertion/field-type-mismatch' as const;
+          deviations.push(this.deviation(typeCode, actual.name, `field.${fieldName}.type`, expectedField.type, actualField.type));
         }
 
         if (actualField.isOptional !== expectedField.isOptional) {
-          deviations.push({
-            entityName: actual.name,
-            property: `field.${fieldName}.optional`,
-            expected: expectedField.isOptional,
-            actual: actualField.isOptional,
-            severity: 'warning',
-          });
+          deviations.push(this.deviation('assertion/field-optionality-mismatch', actual.name, `field.${fieldName}.optional`, expectedField.isOptional, actualField.isOptional));
         }
       }
     }
@@ -342,36 +271,23 @@ export class AssertionEngine {
     }
 
     if (actual.path !== expected.path) {
-      deviations.push({
-        entityName: actual.name,
-        property: 'path',
-        expected: expected.path,
-        actual: actual.path,
-        severity: 'warning',
-      });
+      deviations.push(this.deviation('assertion/path-mismatch', actual.name, 'path', expected.path, actual.path));
     }
 
-    // RFC-TM-14 R6a: compare the whole schema type expression as printed
-    // text, so `Record<string, Rule>` vs `Record<string, Other>` deviates.
-    this.compareStringProperty(actual.name, 'schema', printSchema(actual), printSchema(expected), deviations);
-    this.compareArrayProperty(actual.name, 'calls', actual.calls, expected.calls, deviations);
+    this.compareOptionalStringProperty(actual.name, 'schema', printSchema(actual), printSchema(expected), 'assertion/schema-mismatch', deviations);
+    this.compareArrayProperty(actual.name, 'calls', actual.calls, expected.calls, 'assertion/member-missing', 'assertion/member-extra', deviations);
   }
 
-  private compareStringProperty(
+  private compareOptionalStringProperty(
     entityName: string,
     propertyName: string,
     actual: string | undefined,
     expected: string | undefined,
+    code: AssertionCode,
     deviations: Deviation[],
   ): void {
     if (actual !== expected) {
-      deviations.push({
-        entityName,
-        property: propertyName,
-        expected,
-        actual,
-        severity: 'warning',
-      });
+      deviations.push(this.deviation(code, entityName, propertyName, expected, actual));
     }
   }
 
@@ -397,23 +313,11 @@ export class AssertionEngine {
     const extra = [...actualSet].filter((item) => !filteredExpected.has(item) && !expectedEntityNames.has(item));
 
     if (missing.length > 0) {
-      deviations.push({
-        entityName,
-        property: `${propertyName}.missing`,
-        expected: missing.join(', '),
-        actual: 'not present',
-        severity: 'error',
-      });
+      deviations.push(this.deviation('assertion/boundary-missing', entityName, `${propertyName}.missing`, missing.join(', '), 'not present'));
     }
 
     if (extra.length > 0) {
-      deviations.push({
-        entityName,
-        property: `${propertyName}.extra`,
-        expected: 'not present',
-        actual: extra.join(', '),
-        severity: 'warning',
-      });
+      deviations.push(this.deviation('assertion/boundary-extra', entityName, `${propertyName}.extra`, 'not present', extra.join(', ')));
     }
   }
 
@@ -422,6 +326,8 @@ export class AssertionEngine {
     propertyName: string,
     actual: readonly string[] | undefined,
     expected: readonly string[] | undefined,
+    missingCode: AssertionCode,
+    extraCode: AssertionCode,
     deviations: Deviation[],
   ): void {
     const actualSet = new Set(actual || []);
@@ -431,24 +337,17 @@ export class AssertionEngine {
     const extra = [...actualSet].filter((item) => !expectedSet.has(item));
 
     if (missing.length > 0) {
-      deviations.push({
-        entityName,
-        property: `${propertyName}.missing`,
-        expected: missing.join(', '),
-        actual: 'not present',
-        severity: 'error',
-      });
+      deviations.push(this.deviation(missingCode, entityName, `${propertyName}.missing`, missing.join(', '), 'not present'));
     }
 
     if (extra.length > 0) {
-      deviations.push({
-        entityName,
-        property: `${propertyName}.extra`,
-        expected: 'not present',
-        actual: extra.join(', '),
-        severity: 'warning',
-      });
+      deviations.push(this.deviation(extraCode, entityName, `${propertyName}.extra`, 'not present', extra.join(', ')));
     }
+  }
+
+  private deviation(code: AssertionCode, entityName: string, property: string, expected: unknown, actual: unknown): Deviation {
+    const entry = ASSERTION_CODES[code];
+    return { code, entityName, property, expected, actual, severity: entry.severity, suggestion: entry.suggestion };
   }
 
   private signaturesMatch(actual: string, expected: string): boolean {

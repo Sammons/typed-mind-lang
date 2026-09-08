@@ -4,6 +4,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { TypedMind } from '@sammons/typed-mind';
+import { ASSERTION_CODES, type AssertionCode } from './assertion-codes.ts';
 import { AssertionEngine } from './assertion-engine.ts';
 import type { ConversionOptions, RecognizerName } from './types.ts';
 import { TypeScriptAnalyzer } from './typescript-analyzer.ts';
@@ -62,6 +63,10 @@ const options = {
     multiple: true,
     description: "Enable a string-path recognizer convention (repeatable). Currently supported: 'sst-handler'",
   },
+  format: {
+    type: 'string' as const,
+    description: 'Output format for assert command: human (default) or json',
+  },
 };
 
 // Shared shape for the parsed `--flag` values passed to each command handler
@@ -76,9 +81,10 @@ TypedMind TypeScript Bridge - Extract architecture from TypeScript codebases
 Usage: typed-mind-ts <command> --project <dir|tsconfig.json> --entrypoint <file> [options]
 
 Commands:
-  export   Export TypeScript project to TypedMind DSL
-  assert   Assert TypeScript project matches TypedMind file
-  check    Check TypeScript project with TypedMind validator
+  export    Export TypeScript project to TypedMind DSL
+  assert    Assert TypeScript project matches TypedMind file
+  check     Check TypeScript project with TypedMind validator
+  explain   Print documentation for a diagnostic code (no --project/--entrypoint needed)
 
 Required Options:
   --project <path>       Project directory or tsconfig.json path
@@ -87,6 +93,7 @@ Required Options:
 Command-Specific Options:
   --input <file>         Input TypedMind file for assert command (required for assert)
   --output <file>        Output file for export command (optional, defaults to stdout)
+  --format <fmt>         Output format for assert: human (default) or json
 
 General Options:
   -h, --help             Show help
@@ -110,6 +117,12 @@ Examples:
   
   # Use tsconfig.json directly
   typed-mind-ts export --project ./tsconfig.build.json --entrypoint src/app.ts
+
+  # Explain a diagnostic code
+  typed-mind-ts explain assertion/field-type-mismatch
+
+  # Assert with JSON output (one JSONL line per deviation)
+  typed-mind-ts assert --project src/ --entrypoint index.ts --input expected.tmd --format json
 `);
 }
 
@@ -134,7 +147,7 @@ async function main() {
     process.exit(0);
   }
 
-  const [command] = positionals;
+  const [command, ...restPositionals] = positionals;
 
   if (!command) {
     console.error('Error: No command specified');
@@ -142,7 +155,12 @@ async function main() {
     process.exit(1);
   }
 
-  // Validate required parameters
+  if (command === 'explain') {
+    handleExplain(restPositionals);
+    return;
+  }
+
+  // Validate required parameters (not needed for explain)
   if (!values.project) {
     console.error('Error: --project parameter is required');
     showHelp();
@@ -414,51 +432,71 @@ async function handleAssert(values: CliValues): Promise<void> {
   const assertionResult = await assertionEngine.assert(conversionResult, tmdFilePath, tmdContent);
 
   // Report results
+  const useJson = values.format === 'json';
+
+  if (useJson) {
+    for (const deviation of assertionResult.deviations) {
+      console.log(JSON.stringify(deviation));
+    }
+    process.exit(assertionResult.success ? 0 : 1);
+  }
+
   if (assertionResult.success) {
     console.log('✓ TypeScript project matches expected TypedMind architecture');
     process.exit(0);
-  } else {
-    console.error('✗ TypeScript project deviates from expected architecture');
+  }
 
-    if (assertionResult.missingEntities.length > 0) {
-      console.error(`\nMissing entities (${assertionResult.missingEntities.length}):`);
-      for (const entity of assertionResult.missingEntities) {
-        console.error(`  - ${entity}`);
-      }
+  console.error('✗ TypeScript project deviates from expected architecture');
+
+  const errors = assertionResult.deviations.filter((d) => d.severity === 'error');
+  const warnings = assertionResult.deviations.filter((d) => d.severity === 'warning');
+
+  if (errors.length > 0) {
+    console.error(`\nErrors (${errors.length}):`);
+    for (const deviation of errors) {
+      console.error(`  [${deviation.code}] ${deviation.entityName}.${deviation.property}: expected ${JSON.stringify(deviation.expected)}, actual ${JSON.stringify(deviation.actual)}`);
+      console.error(`    Suggestion: ${deviation.suggestion}`);
+      console.error(`    Run \`typed-mind-ts explain ${deviation.code}\` for details.`);
     }
+  }
 
-    if (assertionResult.extraEntities.length > 0) {
-      console.error(`\nExtra entities (${assertionResult.extraEntities.length}):`);
-      for (const entity of assertionResult.extraEntities) {
-        console.error(`  + ${entity}`);
-      }
+  if (warnings.length > 0 && values.verbose) {
+    console.warn(`\nWarnings (${warnings.length}):`);
+    for (const deviation of warnings) {
+      console.warn(`  [${deviation.code}] ${deviation.entityName}.${deviation.property}: expected ${JSON.stringify(deviation.expected)}, actual ${JSON.stringify(deviation.actual)}`);
+      console.warn(`    Suggestion: ${deviation.suggestion}`);
     }
+  }
 
-    if (assertionResult.deviations.length > 0) {
-      const errors = assertionResult.deviations.filter((d) => d.severity === 'error');
-      const warnings = assertionResult.deviations.filter((d) => d.severity === 'warning');
+  process.exit(1);
+}
 
-      if (errors.length > 0) {
-        console.error(`\nErrors (${errors.length}):`);
-        for (const deviation of errors) {
-          console.error(`  ${deviation.entityName}.${deviation.property}:`);
-          console.error(`    Expected: ${JSON.stringify(deviation.expected)}`);
-          console.error(`    Actual:   ${JSON.stringify(deviation.actual)}`);
-        }
-      }
-
-      if (warnings.length > 0 && values.verbose) {
-        console.warn(`\nWarnings (${warnings.length}):`);
-        for (const deviation of warnings) {
-          console.warn(`  ${deviation.entityName}.${deviation.property}:`);
-          console.warn(`    Expected: ${JSON.stringify(deviation.expected)}`);
-          console.warn(`    Actual:   ${JSON.stringify(deviation.actual)}`);
-        }
-      }
+function handleExplain(positionals: string[]): void {
+  const [codeArg] = positionals;
+  if (!codeArg) {
+    console.error('Usage: typed-mind-ts explain <code>');
+    console.error('\nAvailable assertion codes:');
+    for (const code of Object.keys(ASSERTION_CODES)) {
+      console.error(`  ${code}`);
     }
-
     process.exit(1);
   }
+
+  if (!(codeArg in ASSERTION_CODES)) {
+    console.error(`Unknown diagnostic code: ${codeArg}`);
+    console.error('\nAvailable assertion codes:');
+    for (const code of Object.keys(ASSERTION_CODES)) {
+      console.error(`  ${code}`);
+    }
+    process.exit(1);
+  }
+
+  const entry = ASSERTION_CODES[codeArg as AssertionCode];
+  console.log(`${codeArg}\n`);
+  console.log(`Severity: ${entry.severity}`);
+  console.log(`Message:  ${entry.message}`);
+  console.log(`\nSuggestion: ${entry.suggestion}`);
+  console.log(`\n${entry.docBody}`);
 }
 
 async function handleCheck(values: CliValues): Promise<void> {

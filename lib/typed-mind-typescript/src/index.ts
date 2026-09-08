@@ -1,4 +1,6 @@
 export { AssertionEngine } from './assertion-engine.ts';
+export { ASSERTION_CODES } from './assertion-codes.ts';
+export type { AssertionCode, AssertionCodeEntry } from './assertion-codes.ts';
 export type {
   AnalyzerDiagnostic,
   AssertionResult,

@@ -293,11 +293,13 @@ UserDTO %
 
     const typeDeviation = result.deviations.find((d) => d.entityName === 'UserService' && d.property === 'type');
     assert.deepEqual(typeDeviation, {
+      code: 'assertion/entity-kind-mismatch',
       entityName: 'UserService',
       property: 'type',
       expected: 'Class',
       actual: 'ClassFile',
       severity: 'error',
+      suggestion: 'Change the entity declaration in the TMD to match the source kind.',
     });
   });
 
@@ -335,11 +337,13 @@ UserDTO %
 
     const methodDeviation = result.deviations.find((d) => d.entityName === 'UserService' && d.property === 'methods.missing');
     assert.deepEqual(methodDeviation, {
+      code: 'assertion/member-missing',
       entityName: 'UserService',
       property: 'methods.missing',
       expected: 'updateUser, deleteUser',
       actual: 'not present',
       severity: 'error',
+      suggestion: 'Add the missing member to the source, or remove it from the TMD.',
     });
   });
 
@@ -368,8 +372,8 @@ UserDTO %
     const fieldDeviations = result.deviations.filter((d) => d.entityName === 'UserDTO');
     // updatedAt is also absent from the mock, so it deviates alongside createdAt.
     assert.deepEqual(fieldDeviations, [
-      { entityName: 'UserDTO', property: 'field.createdAt', expected: 'field exists', actual: 'field missing', severity: 'error' },
-      { entityName: 'UserDTO', property: 'field.updatedAt', expected: 'field exists', actual: 'field missing', severity: 'error' },
+      { code: 'assertion/field-missing', entityName: 'UserDTO', property: 'field.createdAt', expected: 'field exists', actual: 'field missing', severity: 'error', suggestion: 'Add the missing field to the TypeScript type, or remove it from the TMD.' },
+      { code: 'assertion/field-missing', entityName: 'UserDTO', property: 'field.updatedAt', expected: 'field exists', actual: 'field missing', severity: 'error', suggestion: 'Add the missing field to the TypeScript type, or remove it from the TMD.' },
     ]);
   });
 
@@ -403,11 +407,13 @@ UserCreateData %
 
     const signatureDeviation = result.deviations.find((d) => d.entityName === 'createUser' && d.property === 'signature');
     assert.deepEqual(signatureDeviation, {
+      code: 'assertion/signature-mismatch',
       entityName: 'createUser',
       property: 'signature',
       expected: 'createUser(data: UserCreateData) => User',
       actual: 'async createUser(data: CreateUserDTO) => Promise<UserDTO>',
       severity: 'error',
+      suggestion: 'Update the function signature in the TMD to match the source.',
     });
   });
 
@@ -447,13 +453,23 @@ UserCreateData %
     assert.equal(result.success, true); // No errors, only warnings
     // Exactly the two warning-severity deviations the fixture edits introduce.
     assert.deepEqual(result.deviations, [
-      { entityName: 'IndexApp', property: 'version', expected: '2.0.0', actual: '1.0.0', severity: 'warning' },
       {
+        code: 'assertion/version-mismatch',
+        entityName: 'IndexApp',
+        property: 'version',
+        expected: '2.0.0',
+        actual: '1.0.0',
+        severity: 'warning',
+        suggestion: 'Update the version in the TMD Program declaration.',
+      },
+      {
+        code: 'assertion/path-mismatch',
         entityName: 'UserService',
         property: 'path',
         expected: 'different/path/user-service.ts',
         actual: 'src/services/user-service.ts',
         severity: 'warning',
+        suggestion: 'Update the file path in the TMD entity declaration.',
       },
     ]);
   });
