@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "pnpm exec wrangler pages dev dist --port 8080",
     "prebuild": "cd ../typed-mind && pnpm build && cd ../typed-mind-cli && pnpm build",
-    "build": "node build.js",
+    "build": "node build.ts",
     "serve": "pnpm build && pnpm dev",
     "deploy": "pnpm build && pnpm exec wrangler pages deploy dist --project-name=typedmind --branch=main --commit-dirty=true"
   },

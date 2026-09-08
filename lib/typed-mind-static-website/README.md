@@ -56,7 +56,7 @@ lib/typed-mind-static-website/
 │   ├── css/          # Stylesheets
 │   └── js/           # JavaScript files
 ├── dist/             # Built files (GitHub Pages ready)
-├── build.js          # Build script
+├── build.ts          # Build script
 └── package.json      # Project configuration
 ```
 

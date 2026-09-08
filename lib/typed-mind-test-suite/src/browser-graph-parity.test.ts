@@ -4,7 +4,7 @@
 // the tsc-emitted dist-browser/browser.js entry under Node (passing
 // wasmBytes, same wasm the CLI path uses) and runs check() over all 38
 // website snippets — combined with their supplementary content exactly as
-// build.js:34-49 combines them for the site's own validateSnippets() step —
+// build.ts:34-49 combines them for the site's own validateSnippets() step —
 // asserting verdict equality against the CLI path (@sammons/typed-mind's
 // TypedMind.create()) on the same combined inputs. Same code (the browser
 // facade composes the identical TypedMindParser/AstValidator/computeLinks
@@ -30,7 +30,7 @@ const SNIPPETS_DIR = join(REPO_ROOT, 'lib', 'typed-mind-static-website', 'snippe
 const SUPPLEMENTARY_DIR = join(REPO_ROOT, 'lib', 'typed-mind-static-website', 'snippets-supplementary');
 const BROWSER_ENTRY = join(REPO_ROOT, 'lib', 'typed-mind', 'dist-browser', 'browser.js');
 
-// Mirrors build.js's combineWithSupplementary: supplementary content (if any)
+// Mirrors build.ts's combineWithSupplementary: supplementary content (if any)
 // first, then the snippet's own content, so the snippet can reference
 // entities defined in the supplementary file.
 const combineWithSupplementary = (snippetPath: string): string => {

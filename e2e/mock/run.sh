@@ -6,7 +6,7 @@
 #
 # Precondition: lib/typed-mind-static-website/dist/ must already exist —
 # `pnpm --dir lib/typed-mind-static-website run build` (which itself builds
-# the browser bundle per build.js's Step 3). CI runs that build before this
+# the browser bundle per build.ts's Step 3). CI runs that build before this
 # script; a stale or missing dist/ fails fast below rather than smoke-testing
 # nothing.
 set -euo pipefail

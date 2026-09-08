@@ -268,7 +268,7 @@ CryptoUtils @ lib/typed-mind-static-website/assets/js/crypto-utils.js:
   -> [encrypt, decrypt]
 
 # Build and deployment configuration
-BuildScript @ lib/typed-mind-static-website/build.js:
+BuildScript @ lib/typed-mind-static-website/build.ts:
   -> [copyFiles, minifyAssets]
 
 NetlifyConfig ! lib/typed-mind-static-website/netlify.toml : DeploymentConfig
