@@ -43,7 +43,7 @@ jobs:
           mise exec -- pnpm --dir lib/typed-mind-cli build
 
       - name: Build site
-        run: cd lib/typed-mind-static-website && mise exec -- node build.js
+        run: cd lib/typed-mind-static-website && mise exec -- node build.ts
 
       - name: Build grammar wasm
         # RFC-TM-1 (rfc-tm-1-diamond.md) leaf L6. Guards on the frozen grammar path

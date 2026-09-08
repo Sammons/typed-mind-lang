@@ -76,11 +76,11 @@ jobs:
       - name: Install dependencies
         run: mise exec -- pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Build site (includes the browser bundle, per build.js)
+      - name: Build site (includes the browser bundle, per build.ts)
         run: |
           mise exec -- pnpm --dir lib/typed-mind build
           mise exec -- pnpm --dir lib/typed-mind-cli build
-          cd lib/typed-mind-static-website && mise exec -- node build.js
+          cd lib/typed-mind-static-website && mise exec -- node build.ts
 
       - name: Install e2e/mock's Playwright test runner
         run: cd e2e/mock && npm install --no-audit --no-fund

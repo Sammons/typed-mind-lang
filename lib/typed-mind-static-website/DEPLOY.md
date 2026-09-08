@@ -27,7 +27,7 @@ Required repo secrets (set with `pnpm gitea-admin secrets set` from claude-home)
    ```
 3. Build the site:
    ```bash
-   cd lib/typed-mind-static-website && node build.js
+   cd lib/typed-mind-static-website && node build.ts
    ```
 4. Deploy with wrangler (needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in the environment):
    ```bash

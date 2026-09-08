@@ -21,7 +21,7 @@ const BASE_URL = process.env.PLAYGROUND_URL ?? 'http://127.0.0.1:8080';
 // construction typedmind-browser-init.js uses, no skipOrphanCheck) before
 // landing here. This matters because EVERY one of the 38 website snippets
 // (lib/typed-mind-static-website/snippets/*.tmd) is only valid with
-// --skip-orphan-check (see build.js's validateSnippets(), which passes that
+// --skip-orphan-check (see build.ts's validateSnippets(), which passes that
 // flag to the CLI) — they are illustrative fragments, not complete programs,
 // so none of them work as a "known good, no flags" smoke fixture. The
 // original fixture here referenced a DTO ('Todo') that nothing consumed and

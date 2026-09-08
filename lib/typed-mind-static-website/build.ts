@@ -1,7 +1,11 @@
-const fs = require('node:fs');
-const path = require('node:path');
-const { execSync } = require('node:child_process');
-const Module = require('node:module');
+import fs from 'node:fs';
+import path, { dirname } from 'node:path';
+import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 // Colors for console output
 const colors = {
@@ -52,8 +56,8 @@ function combineWithSupplementary(snippetPath, supplementaryDir) {
 
 // Function to validate TypedMind snippets
 function validateSnippets() {
-  const snippetsDir = path.join(__dirname, 'snippets');
-  const supplementaryDir = path.join(__dirname, 'snippets-supplementary');
+  const snippetsDir = path.join(HERE, 'snippets');
+  const supplementaryDir = path.join(HERE, 'snippets-supplementary');
 
   if (!fs.existsSync(snippetsDir)) {
     console.log(`${colors.yellow}Warning: snippets directory not found${colors.reset}`);
@@ -77,7 +81,7 @@ function validateSnippets() {
     const filePath = path.join(snippetsDir, file);
 
     // Create temporary file with combined content for validation
-    const tempDir = path.join(__dirname, 'temp-validation');
+    const tempDir = path.join(HERE, 'temp-validation');
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
@@ -93,8 +97,8 @@ function validateSnippets() {
       // First try to find the CLI in the local project (tsc emits cli.js; cli.cjs was
       // the tsup-era filename and stays as a fallback for older built artifacts)
       const localCliCandidates = [
-        path.join(__dirname, '..', 'typed-mind-cli', 'dist', 'cli.js'),
-        path.join(__dirname, '..', 'typed-mind-cli', 'dist', 'cli.cjs'),
+        path.join(HERE, '..', 'typed-mind-cli', 'dist', 'cli.js'),
+        path.join(HERE, '..', 'typed-mind-cli', 'dist', 'cli.cjs'),
       ];
       const localCliPath = localCliCandidates.find((candidate) => fs.existsSync(candidate));
       if (localCliPath) {
@@ -138,7 +142,7 @@ function validateSnippets() {
 
   // Clean up temporary directory if empty
   try {
-    const tempDir = path.join(__dirname, 'temp-validation');
+    const tempDir = path.join(HERE, 'temp-validation');
     if (fs.existsSync(tempDir)) {
       fs.rmdirSync(tempDir);
     }
@@ -173,17 +177,17 @@ if (!validateSnippets()) {
 console.log(`\n${colors.bright}Step 2: Building website${colors.reset}`);
 
 // Ensure dist directory exists
-const distDir = path.join(__dirname, 'dist');
+const distDir = path.join(HERE, 'dist');
 if (!fs.existsSync(distDir)) {
   fs.mkdirSync(distDir, { recursive: true });
 }
 
 // Copy all files from src directory (including subdirectories)
-const srcDir = path.join(__dirname, 'src');
+const srcDir = path.join(HERE, 'src');
 copyDirectory(srcDir, distDir);
 
 // Copy assets
-const assetsDir = path.join(__dirname, 'assets');
+const assetsDir = path.join(HERE, 'assets');
 const distAssetsDir = path.join(distDir, 'assets');
 if (!fs.existsSync(distAssetsDir)) {
   fs.mkdirSync(distAssetsDir, { recursive: true });
@@ -198,6 +202,14 @@ if (!fs.existsSync(distCssDir)) {
 fs.readdirSync(cssDir).forEach((file) => {
   fs.copyFileSync(path.join(cssDir, file), path.join(distCssDir, file));
 });
+
+// Copy fonts (if present — guarded so the build succeeds before fonts are vendored)
+const fontsDir = path.join(assetsDir, 'fonts');
+if (fs.existsSync(fontsDir)) {
+  const distFontsDir = path.join(distAssetsDir, 'fonts');
+  copyDirectory(fontsDir, distFontsDir);
+  console.log('Copied assets/fonts/ to dist/assets/fonts/');
+}
 
 // Copy JS
 const jsDir = path.join(assetsDir, 'js');
@@ -219,7 +231,7 @@ fs.readdirSync(jsDir).forEach((item) => {
 });
 
 // Copy typed-mind library
-const typedMindSrc = path.join(__dirname, '..', 'typed-mind', 'dist');
+const typedMindSrc = path.join(HERE, '..', 'typed-mind', 'dist');
 const typedMindDist = path.join(distAssetsDir, 'typed-mind', 'dist');
 if (!fs.existsSync(typedMindDist)) {
   fs.mkdirSync(typedMindDist, { recursive: true });
@@ -235,7 +247,7 @@ typedMindFiles.forEach((file) => {
 });
 
 // Copy grammar.md from typed-mind root
-const grammarSrc = path.join(__dirname, '..', 'typed-mind', 'grammar.md');
+const grammarSrc = path.join(HERE, '..', 'typed-mind', 'grammar.md');
 const grammarDest = path.join(distAssetsDir, 'typed-mind', 'grammar.md');
 if (fs.existsSync(grammarSrc)) {
   fs.copyFileSync(grammarSrc, grammarDest);
@@ -252,7 +264,7 @@ if (fs.existsSync(grammarSrc)) {
 // from wherever the grammar-build step of the caller placed it.
 console.log(`\n${colors.bright}Step 3: Building the browser bundle${colors.reset}`);
 
-const typedMindPkgDir = path.join(__dirname, '..', 'typed-mind');
+const typedMindPkgDir = path.join(HERE, '..', 'typed-mind');
 execSync('node ../../node_modules/typescript/bin/tsc --build tsconfig.browser.json', {
   cwd: typedMindPkgDir,
   stdio: 'inherit',
@@ -272,7 +284,7 @@ console.log('Copied dist-browser/ to dist/assets/dist-browser/');
 // own node_modules (that package declares the dependency; this website
 // package does not) via the createRequire trick so pnpm's isolated
 // node_modules layout is followed regardless of hoisting.
-const typedMindRequire = Module.createRequire(path.join(typedMindPkgDir, 'package.json'));
+const typedMindRequire = createRequire(path.join(typedMindPkgDir, 'package.json'));
 const webTreeSitterWasmSrc = typedMindRequire.resolve('web-tree-sitter/web-tree-sitter.wasm');
 const webTreeSitterDir = path.dirname(webTreeSitterWasmSrc);
 const webTreeSitterJsSrc = path.join(webTreeSitterDir, 'web-tree-sitter.js');
@@ -303,7 +315,7 @@ if (fs.existsSync(grammarWasmSrc)) {
 }
 
 // Copy snippets directory to dist
-const snippetsDir = path.join(__dirname, 'snippets');
+const snippetsDir = path.join(HERE, 'snippets');
 const distSnippetsDir = path.join(distDir, 'snippets');
 if (fs.existsSync(snippetsDir)) {
   if (!fs.existsSync(distSnippetsDir)) {
@@ -376,8 +388,8 @@ console.log(`Copied prismjs files to dist/vendor/prism/`);
 // Generate diagnostics reference page from assertion-codes registry (RFC-TM-16).
 console.log(`\n${colors.bright}Step 5: Generating diagnostics reference page${colors.reset}`);
 try {
-  execSync('node --experimental-strip-types generate-diagnostics.ts', {
-    cwd: __dirname,
+  execSync('node generate-diagnostics.ts', {
+    cwd: HERE,
     stdio: 'inherit',
   });
 } catch (err) {
