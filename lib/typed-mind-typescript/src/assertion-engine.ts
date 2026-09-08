@@ -126,12 +126,13 @@ export class AssertionEngine {
     const deviations: Deviation[] = [];
 
     if (actual.kind !== expected.kind) {
+      const kindSeverity = this.kindDeviationSeverity(actual, expected);
       deviations.push({
         entityName: actual.name,
         property: 'type',
         expected: expected.kind,
         actual: actual.kind,
-        severity: 'error',
+        severity: kindSeverity,
       });
     }
 
@@ -310,13 +311,15 @@ export class AssertionEngine {
       const actualField = actualFieldMap.get(fieldName);
 
       if (actualField && expectedField) {
-        if (actualField.type !== expectedField.type) {
+        const normActual = this.normalizeFieldType(actualField.type);
+        const normExpected = this.normalizeFieldType(expectedField.type);
+        if (normActual !== normExpected) {
           deviations.push({
             entityName: actual.name,
             property: `field.${fieldName}.type`,
             expected: expectedField.type,
             actual: actualField.type,
-            severity: 'error',
+            severity: this.fieldTypeDeviationSeverity(expectedField.type, actualField.type),
           });
         }
 
@@ -456,5 +459,43 @@ export class AssertionEngine {
       return s;
     };
     return normalize(actual) === normalize(expected);
+  }
+
+  private kindDeviationSeverity(actual: EntityNode, expected: EntityNode): 'error' | 'warning' {
+    const kinds = new Set([actual.kind, expected.kind]);
+    if (kinds.has('Class') && kinds.has('DTO')) {
+      const classEntity = actual.kind === 'Class' ? actual : expected;
+      if (classEntity instanceof ClassNode && classEntity.methods.length > 0) return 'warning';
+    }
+    if (kinds.has('ClassFile') && kinds.has('DTO')) {
+      const cfEntity = actual.kind === 'ClassFile' ? actual : expected;
+      if (cfEntity instanceof ClassFileNode && cfEntity.methods.length > 0) return 'warning';
+    }
+    return 'error';
+  }
+
+  private normalizeFieldType(type: string): string {
+    let t = type.replace(/\s+/g, ' ').trim();
+    t = t.replace(/^readonly\s+/, '');
+    const dotIdx = t.lastIndexOf('.');
+    if (dotIdx !== -1 && !t.includes('<')) t = t.slice(dotIdx + 1);
+    return t;
+  }
+
+  private fieldTypeDeviationSeverity(expectedType: string, actualType: string): 'error' | 'warning' {
+    const normExpected = this.normalizeFieldType(expectedType);
+    const normActual = this.normalizeFieldType(actualType);
+
+    if (normExpected === normActual) return 'warning';
+
+    if (normExpected === 'string') {
+      if (normActual.includes('=>')) return 'warning';
+      if (normActual.includes('<')) return 'warning';
+      if (normActual.includes('|')) return 'warning';
+      if (/^[A-Z]/.test(normActual)) return 'warning';
+      if (/^"[^"]*"$/.test(normActual)) return 'warning';
+    }
+
+    return 'error';
   }
 }
