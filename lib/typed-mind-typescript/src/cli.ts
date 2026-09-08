@@ -469,6 +469,7 @@ async function handleAssert(values: CliValues): Promise<void> {
     for (const deviation of warnings) {
       console.warn(`  [${deviation.code}] ${deviation.entityName}.${deviation.property}: expected ${JSON.stringify(deviation.expected)}, actual ${JSON.stringify(deviation.actual)}`);
       console.warn(`    Suggestion: ${deviation.suggestion}`);
+      console.warn(`    Run \`typed-mind-ts explain ${deviation.code}\` for details.`);
     }
   }
 
