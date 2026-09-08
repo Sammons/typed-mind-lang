@@ -45,7 +45,7 @@
                 <li><a href="refactored-playground.html" class="active">Refactored</a></li>
                 <li><a href="index.html#getting-started">Get Started</a></li>
                 <li><a href="https://github.com/sammons/typed-mind-lang" target="_blank">GitHub</a></li>
-                <li><button class="theme-toggle" id="themeToggle">🌙</button></li>
+                <!-- TODO: dark mode when brand kit defines a dark palette -->
             </ul>
         </div>
     </nav>
@@ -235,19 +235,6 @@
     <script src="assets/js/typedmind-monaco-simple.js"></script>
     
     <script>
-        // Theme toggle functionality
-        const themeToggle = document.getElementById('themeToggle');
-        const currentTheme = localStorage.getItem('theme') || 'light';
-        document.documentElement.setAttribute('data-theme', currentTheme);
-        themeToggle.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
-        
-        themeToggle.addEventListener('click', () => {
-            const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('theme', theme);
-            themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
-        });
-        
         // Mobile navigation toggle
         const navToggle = document.getElementById('navToggle');
         const navMenu = document.getElementById('navMenu');

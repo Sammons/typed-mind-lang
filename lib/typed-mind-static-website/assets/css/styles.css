@@ -17,20 +17,6 @@
   --success: #28a745;
 }
 
-[data-theme="dark"] {
-  --color-primary: #58a6ff;
-  --color-primary-dark: #1f6feb;
-  --color-secondary: #3fb950;
-  --color-background: #0d1117;
-  --color-surface: #161b22;
-  --color-text: #c9d1d9;
-  --color-text-muted: #8b949e;
-  --color-border: #30363d;
-  --color-code-bg: #161b22;
-  --color-error: #f85149;
-  --color-warning: #d29922;
-  --color-success: #3fb950;
-}
 
 /* Reset and base styles */
 * {
@@ -145,6 +131,7 @@ body {
 }
 
 .nav-toggle {
+  border-radius: 0;
   display: none;
   flex-direction: column;
   cursor: pointer;
@@ -158,25 +145,12 @@ body {
   transition: var(--transition);
 }
 
-.theme-toggle {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 0;
-  transition: var(--transition);
-}
-
-.theme-toggle:hover {
-  background-color: var(--surface);
-}
-
 /* Hero Section */
 .hero {
   padding: 120px 0 80px;
   text-align: center;
-  background: linear-gradient(135deg, var(--surface) 0%, var(--bg) 100%);
+  background-image: repeating-linear-gradient(0deg, transparent, transparent 39px, var(--grid-line) 39px, var(--grid-line) 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, var(--grid-line) 39px, var(--grid-line) 40px);
+  background-color: var(--bg);
 }
 
 .hero-logo {
@@ -193,11 +167,22 @@ body {
   transform: scale(1.05);
 }
 
+.eyebrow {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-size: 0.875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
 .hero-title {
   font-size: 4rem;
   font-weight: 800;
   margin-bottom: 1rem;
-  color: var(--accent);
+  color: var(--ink);
+  letter-spacing: -0.02em;
 }
 
 .hero-subtitle {
@@ -242,14 +227,13 @@ body {
 }
 
 .btn-secondary {
-  background-color: transparent;
-  color: var(--accent);
-  border: 2px solid var(--accent);
+  background-color: white;
+  color: var(--ink);
+  border: 1px solid var(--border);
 }
 
 .btn-secondary:hover {
-  background-color: var(--accent);
-  color: white;
+  filter: brightness(0.9);
 }
 
 .btn-danger {
@@ -319,10 +303,6 @@ body {
   text-align: center;
   transition: var(--transition);
   border: 1px solid var(--border);
-}
-
-[data-theme="dark"] .feature-card {
-  background-color: var(--color-surface);
 }
 
 .feature-card:hover {
@@ -737,17 +717,4 @@ pre code {
 
 .language-typedmind .token.function {
   color: #e06c75;
-}
-
-/* Dark mode specific Prism overrides */
-[data-theme="dark"] .language-typedmind .token.keyword {
-  color: #58a6ff;
-}
-
-[data-theme="dark"] .language-typedmind .token.class-name {
-  color: #3fb950;
-}
-
-[data-theme="dark"] .language-typedmind .token.function {
-  color: #f78c6c;
 }
