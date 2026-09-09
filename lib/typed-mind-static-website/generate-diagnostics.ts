@@ -94,12 +94,12 @@ const html = `<!DOCTYPE html>
             margin-bottom: 0.5rem;
         }
         .diagnostics-stats {
-            color: var(--text-secondary, #666);
+            color: var(--text-muted);
             font-size: 0.9rem;
         }
         .toc {
-            background: var(--bg-secondary, #f5f5f5);
-            border-radius: 8px;
+            background: var(--surface);
+            border-radius: 0;
             padding: 1.5rem;
             margin-bottom: 2rem;
         }
@@ -120,22 +120,22 @@ const html = `<!DOCTYPE html>
         }
         .toc a {
             text-decoration: none;
-            color: var(--text-primary, #333);
-            font-family: monospace;
+            color: var(--text);
+            font-family: var(--font-mono);
             font-size: 0.85rem;
         }
         .toc a:hover {
-            color: var(--accent, #0066cc);
+            color: var(--accent);
         }
         .diagnostic-entry {
-            border: 1px solid var(--border, #e0e0e0);
-            border-radius: 8px;
+            border: 1px solid var(--border);
+            border-radius: 0;
             padding: 1.5rem;
             margin-bottom: 1.5rem;
         }
         .diagnostic-entry h3 {
             margin-top: 0;
-            font-family: monospace;
+            font-family: var(--font-mono);
             font-size: 1.1rem;
         }
         .anchor-link {
@@ -143,7 +143,7 @@ const html = `<!DOCTYPE html>
             color: inherit;
         }
         .anchor-link:hover {
-            color: var(--accent, #0066cc);
+            color: var(--accent);
         }
         .diagnostic-meta {
             display: flex;
@@ -154,25 +154,25 @@ const html = `<!DOCTYPE html>
         .severity-badge {
             display: inline-block;
             padding: 0.15rem 0.5rem;
-            border-radius: 4px;
+            border-radius: 0;
             font-size: 0.8rem;
             font-weight: 600;
             text-transform: uppercase;
         }
         .severity-error {
-            background: #fee;
-            color: #c00;
+            background: var(--error-bg);
+            color: var(--error-text);
         }
         .severity-warning {
-            background: #fff8e1;
-            color: #b8860b;
+            background: var(--warning-bg);
+            color: var(--warning-text);
         }
         .diagnostic-message {
-            color: var(--text-secondary, #666);
+            color: var(--text-muted);
         }
         .diagnostic-suggestion {
-            background: var(--bg-secondary, #f5f5f5);
-            border-radius: 4px;
+            background: var(--surface);
+            border-radius: 0;
             padding: 0.75rem 1rem;
             margin-bottom: 1rem;
             font-size: 0.9rem;
@@ -184,12 +184,12 @@ const html = `<!DOCTYPE html>
         .diagnostic-cli {
             margin-top: 0.75rem;
             font-size: 0.85rem;
-            color: var(--text-secondary, #666);
+            color: var(--text-muted);
         }
         .diagnostic-cli code {
-            background: var(--bg-secondary, #f5f5f5);
+            background: var(--surface);
             padding: 0.2rem 0.4rem;
-            border-radius: 3px;
+            border-radius: 0;
             font-size: 0.85rem;
         }
     </style>
