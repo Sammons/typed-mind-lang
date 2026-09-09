@@ -1,30 +1,27 @@
 code[class*="language-"],
 pre[class*="language-"] {
   color: var(--text);
-  background: none;
-  text-align: left;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 1em;
+  line-height: 1.6;
+  tab-size: 2;
+  hyphens: none;
   white-space: pre;
   word-spacing: normal;
   word-break: normal;
   word-wrap: normal;
-  line-height: 1.5;
-  tab-size: 4;
-  hyphens: none;
-  font-family: var(--font-mono);
-  font-size: 1em;
+  text-align: left;
 }
 
 pre[class*="language-"] {
-  padding: 1em;
+  padding: 1.5rem;
   overflow: auto;
-  background: var(--surface);
   font-size: 0.9em;
 }
 
 :not(pre) > code[class*="language-"] {
-  padding: 0.1em 0.3em;
-  border-radius: 0;
-  background: var(--surface);
+  padding: 0.2rem 0.4rem;
 }
 
 .token.comment,
@@ -40,14 +37,10 @@ pre[class*="language-"] {
 
 .token.property,
 .token.tag,
-.token.constant,
-.token.symbol,
-.token.deleted {
-  color: var(--ink);
-}
-
 .token.boolean,
-.token.number {
+.token.number,
+.token.constant,
+.token.symbol {
   color: var(--ink);
 }
 
@@ -56,22 +49,19 @@ pre[class*="language-"] {
 .token.string,
 .token.char,
 .token.builtin,
-.token.inserted {
-  color: var(--ink);
-}
-
 .token.operator,
 .token.entity,
 .token.url,
-.language-css .token.string,
-.style .token.string,
-.token.variable {
+.token.variable,
+.token.module,
+.token.type {
   color: var(--text);
 }
 
 .token.atrule,
 .token.attr-value,
-.token.function {
+.token.function,
+.token.class-name {
   color: var(--ink);
 }
 

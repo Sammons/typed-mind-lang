@@ -8,6 +8,7 @@
   --border: #E5E7EB;
   --font-body: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  --comment-text: #5F6672;
   --transition: all 0.2s ease;
   --ink: #0B1020;
   --paper: #FAFAF7;
@@ -15,10 +16,6 @@
   --error: #dc3545;
   --warning: #ffc107;
   --success: #28a745;
-  --error-text: #a32633;
-  --error-bg: #fce4e4;
-  --warning-text: #7a5200;
-  --warning-bg: #fef9e7;
 }
 
 @font-face {
