@@ -15,6 +15,10 @@
   --error: #dc3545;
   --warning: #ffc107;
   --success: #28a745;
+  --error-text: #a32633;
+  --error-bg: #fce4e4;
+  --warning-text: #7a5200;
+  --warning-bg: #fef9e7;
 }
 
 @font-face {
