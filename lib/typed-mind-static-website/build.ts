@@ -358,11 +358,6 @@ if (!fs.existsSync(prismVendorDir)) {
   fs.mkdirSync(prismVendorDir, { recursive: true });
 }
 
-const prismThemesVendorDir = path.join(prismVendorDir, 'themes');
-if (!fs.existsSync(prismThemesVendorDir)) {
-  fs.mkdirSync(prismThemesVendorDir, { recursive: true });
-}
-
 // prismjs does not publish a minified combined-default bundle at its
 // package root the way cdnjs's prism.min.js build does; the closest
 // equivalent shipped by the npm package is the unminified `prism.js`
@@ -373,7 +368,6 @@ const prismFileMap = [
   { src: path.join(prismDir, 'prism.js'), dest: path.join(prismVendorDir, 'prism.min.js') },
   { src: path.join(prismDir, 'components', 'prism-typescript.min.js'), dest: path.join(prismVendorDir, 'prism-typescript.min.js') },
   { src: path.join(prismDir, 'components', 'prism-bash.min.js'), dest: path.join(prismVendorDir, 'prism-bash.min.js') },
-  { src: path.join(prismDir, 'themes', 'prism-tomorrow.min.css'), dest: path.join(prismThemesVendorDir, 'prism-tomorrow.min.css') },
 ];
 
 prismFileMap.forEach(({ src, dest }) => {
