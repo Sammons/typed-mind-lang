@@ -747,9 +747,10 @@ pre code {
 }
 
 .language-typedmind .token.class-name {
-  color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .language-typedmind .token.function {
-  color: #e06c75;
+  color: var(--ink);
 }
