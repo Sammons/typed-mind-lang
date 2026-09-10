@@ -34,7 +34,7 @@
     "build": "tsc --build && chmod +x dist/cli.js",
     "clean": "rm -rf dist *.tsbuildinfo",
     "prebuild": "node scripts/build-wasm.mjs",
-    "pretest": "pnpm --filter @sammons/typed-mind run build && pnpm --filter @sammons/typed-mind-tree-sitter-common run build",
+    "pretest": "pnpm --filter @sammons/typed-mind run build && pnpm --filter @sammons/typed-mind-tree-sitter-common run build && node scripts/build-wasm.mjs",
     "test": "node --test 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },

@@ -175,6 +175,21 @@ importers:
       '@sammons/typed-mind':
         specifier: workspace:*
         version: link:../typed-mind
+      '@sammons/typed-mind-csharp':
+        specifier: workspace:*
+        version: link:../typed-mind-csharp
+      '@sammons/typed-mind-java':
+        specifier: workspace:*
+        version: link:../typed-mind-java
+      '@sammons/typed-mind-python':
+        specifier: workspace:*
+        version: link:../typed-mind-python
+      '@sammons/typed-mind-rust':
+        specifier: workspace:*
+        version: link:../typed-mind-rust
+      '@sammons/typed-mind-tree-sitter-common':
+        specifier: workspace:*
+        version: link:../typed-mind-tree-sitter-common
     devDependencies:
       '@types/node':
         specifier: ^26.4.1
