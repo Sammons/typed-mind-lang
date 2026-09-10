@@ -54,7 +54,7 @@ describe('RustConverter', () => {
     const result = converter.convert(analysis);
     const programs = result.entities.filter((e) => e.kind === 'Program');
     assert.ok(programs.length >= 1, 'Expected at least one Program entity');
-    assert.equal(programs[0]?.name, 'test-fixture');
+    assert.equal(programs[0]?.name, 'test_fixture');
   });
 
   it('generates Dependency entities from Cargo.toml', () => {
@@ -240,6 +240,6 @@ describe('RustConverter', () => {
     const result = converter.convert(analysis);
     assert.ok(result.success);
     // Verify TMD content has expected structure markers.
-    assert.ok(result.tmdContent.includes('test-fixture'), 'TMD should mention program name');
+    assert.ok(result.tmdContent.includes('test_fixture'), 'TMD should mention program name');
   });
 });

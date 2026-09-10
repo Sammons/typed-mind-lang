@@ -62,7 +62,7 @@ describe('JavaAnalyzer', () => {
     assert.strictEqual(cls.name, 'User');
 
     // Record components become readonly properties
-    assert.strictEqual(cls.properties.length, 3);
+    assert.strictEqual(cls.properties.length, 4);
     const nameField = cls.properties.find((p) => p.name === 'name');
     assert.ok(nameField !== undefined);
     assert.strictEqual(nameField.type, 'String');

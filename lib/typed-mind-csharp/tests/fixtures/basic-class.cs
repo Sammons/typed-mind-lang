@@ -27,7 +27,7 @@ namespace MyApp.Services
         void DeleteUser(int id);
     }
 
-    public record User(string Name, string Email);
+    public record User(string Name, string Email, UserRole Role);
 
     public enum UserRole
     {

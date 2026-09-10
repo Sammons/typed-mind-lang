@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { TypedMind } from '@sammons/typed-mind';
@@ -68,6 +68,13 @@ General Options:
 `);
 }
 
+function validateEntrypoint(resolvedPath: string, originalEntrypoint: string): void {
+  if (!existsSync(resolvedPath)) {
+    console.error(`Error: entrypoint '${originalEntrypoint}' does not exist (resolved to ${resolvedPath})`);
+    process.exit(1);
+  }
+}
+
 function buildConversionOptions(values: CliValues): ConversionOptions {
   return {
     includePrivateMembers: values['include-private'] || false,
@@ -80,6 +87,7 @@ function buildConversionOptions(values: CliValues): ConversionOptions {
 async function handleExport(config: LanguageCliConfig, values: CliValues): Promise<void> {
   const { projectPath, configPath } = config.resolveProjectPath(values.project as string);
   const resolvedEntrypoint = config.resolveEntrypoint(projectPath, values.entrypoint as string);
+  validateEntrypoint(resolvedEntrypoint, values.entrypoint as string);
   const outputPath = values.output as string | undefined;
 
   if (values.verbose) {
@@ -157,6 +165,7 @@ async function handleAssert(config: LanguageCliConfig, values: CliValues): Promi
   const { projectPath, configPath } = config.resolveProjectPath(values.project as string);
   const tmdFilePath = resolve(values.input as string);
   const resolvedEntrypoint = config.resolveEntrypoint(projectPath, values.entrypoint as string);
+  validateEntrypoint(resolvedEntrypoint, values.entrypoint as string);
 
   if (values.verbose) {
     console.log(`Comparing ${config.languageName} project ${projectPath} against ${tmdFilePath}`);
@@ -261,6 +270,7 @@ function handleExplain(config: LanguageCliConfig, positionals: string[]): void {
 async function handleCheck(config: LanguageCliConfig, values: CliValues): Promise<void> {
   const { projectPath, configPath } = config.resolveProjectPath(values.project as string);
   const resolvedEntrypoint = config.resolveEntrypoint(projectPath, values.entrypoint as string);
+  validateEntrypoint(resolvedEntrypoint, values.entrypoint as string);
 
   if (values.verbose) {
     console.log(`Checking ${config.languageName} project: ${projectPath}`);

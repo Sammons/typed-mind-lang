@@ -49,10 +49,10 @@ describe('JavaConverter', () => {
 
     // Check fields
     const dtoNode = dto as import('@sammons/typed-mind').DtoNode;
-    assert.strictEqual(dtoNode.fields.length, 3);
+    assert.strictEqual(dtoNode.fields.length, 4);
     const nameField = dtoNode.fields.find((f) => f.name === 'name');
     assert.ok(nameField !== undefined);
-    assert.strictEqual(nameField.type, 'String');
+    assert.strictEqual(nameField.type, 'string');
   });
 
   it('converts UserRole enum to TypeDefNode', () => {

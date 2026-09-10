@@ -64,10 +64,16 @@ async function main(): Promise<void> {
       if (existsSync(cwdRelative)) return cwdRelative;
 
       const libRs = join(projectPath, 'src', 'lib.rs');
-      if (existsSync(libRs)) return libRs;
+      if (existsSync(libRs)) {
+        console.error(`Warning: entrypoint '${entrypoint}' not found, falling back to src/lib.rs`);
+        return libRs;
+      }
 
       const mainRs = join(projectPath, 'src', 'main.rs');
-      if (existsSync(mainRs)) return mainRs;
+      if (existsSync(mainRs)) {
+        console.error(`Warning: entrypoint '${entrypoint}' not found, falling back to src/main.rs`);
+        return mainRs;
+      }
 
       throw new Error(`Entry point not found: ${entrypoint}. Tried ${projectRelative} and ${cwdRelative}`);
     },

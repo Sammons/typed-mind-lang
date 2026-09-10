@@ -2,7 +2,8 @@
 pub struct User {
     pub name: String,
     pub email: String,
-    pub id: u64,
+    pub id: UserId,
+    pub role: UserRole,
 }
 
 pub enum UserRole {

@@ -21,6 +21,7 @@ import {
   type Converter,
   EmittedNameAllocator,
   emitTmd,
+  fixupEntitiesForRoundTrip,
   type ParsedClass,
   type ParsedEnum,
   type ParsedInterface,
@@ -30,6 +31,29 @@ import {
   sortIntoLegacySectionOrder,
 } from '@sammons/typed-mind-tree-sitter-common';
 import { type PackageReference, parseCsproj } from './csharp-project.ts';
+
+const CSHARP_TYPE_NORMALIZATION: ReadonlyMap<string, string> = new Map([
+  ['String', 'string'],
+  ['Int32', 'number'],
+  ['Int64', 'number'],
+  ['Int16', 'number'],
+  ['Byte', 'number'],
+  ['SByte', 'number'],
+  ['UInt16', 'number'],
+  ['UInt32', 'number'],
+  ['UInt64', 'number'],
+  ['Single', 'number'],
+  ['Double', 'number'],
+  ['Decimal', 'number'],
+  ['Boolean', 'boolean'],
+  ['Char', 'string'],
+  ['Object', 'any'],
+  ['Void', 'void'],
+]);
+
+const normalizeCSharpType = (typeText: string): string => {
+  return CSHARP_TYPE_NORMALIZATION.get(typeText) ?? typeText;
+};
 
 function isStructWithoutMethods(cls: ParsedClass): boolean {
   return cls.description === 'struct' && cls.methods.length === 0;
@@ -75,9 +99,14 @@ export class CSharpConverter implements Converter {
       );
     }
 
-    // Generate Dependency entities from package references
+    // Generate Dependency entities from package references.
+    // Replace dots in NuGet package names with underscores: the checker treats
+    // dots as qualified-name separators and expects each segment to be a
+    // declared entity (e.g. Microsoft.Extensions.Logging → Microsoft_Extensions_Logging).
+    const depNameMap = new Map<string, string>();
     for (const ref of packageRefs) {
-      const depName = this.#names.reserve(`dep:${ref.name}`, [ref.name]);
+      const depName = this.#names.reserve(`dep:${ref.name}`, [ref.name.replace(/\./g, '_')]);
+      depNameMap.set(ref.name, depName);
       const depArgs = {
         name: depName,
         span: SYNTHETIC_SPAN,
@@ -91,8 +120,10 @@ export class CSharpConverter implements Converter {
 
     // Process each module (file)
     for (const mod of analysis.modules) {
-      this.#processModule(mod, entities, warnings);
+      this.#processModule(mod, entities, warnings, depNameMap);
     }
+
+    fixupEntitiesForRoundTrip(entities);
 
     const sorted = sortIntoLegacySectionOrder(entities);
     const tmdContent = emitTmd(sorted);
@@ -106,7 +137,11 @@ export class CSharpConverter implements Converter {
     };
   }
 
-  #processModule(mod: ParsedModule, entities: EntityNode[], _warnings: ConversionWarning[]): void {
+  #remapImports(imports: readonly { specifier: string }[], depNameMap: ReadonlyMap<string, string>): string[] {
+    return imports.map((i) => depNameMap.get(i.specifier) ?? i.specifier);
+  }
+
+  #processModule(mod: ParsedModule, entities: EntityNode[], _warnings: ConversionWarning[], depNameMap: ReadonlyMap<string, string>): void {
     const filePath = mod.filePath;
 
     // Determine if this is a single-class file (ClassFile fusion)
@@ -115,7 +150,7 @@ export class CSharpConverter implements Converter {
 
     // Create File entity if the file has multiple types
     if (!isSingleClassFile && (publicClasses.length > 0 || mod.interfaces.length > 0 || mod.enums.length > 0)) {
-      const fileImports = mod.imports.map((i) => i.specifier);
+      const fileImports = this.#remapImports(mod.imports, depNameMap);
       const fileExports = mod.exports.map((e) => e.name);
       const fileName = this.#names.reserve(`file:${filePath}`, [this.#fileBaseName(filePath)]);
 
@@ -138,7 +173,7 @@ export class CSharpConverter implements Converter {
       if (isStructWithoutMethods(cls) || isRecordLike(cls)) {
         this.#emitDto(cls, filePath, entities);
       } else if (isSingleClassFile && publicClasses[0] === cls) {
-        this.#emitClassFile(cls, mod, filePath, entities);
+        this.#emitClassFile(cls, mod, filePath, entities, depNameMap);
       } else {
         this.#emitClass(cls, entities);
       }
@@ -173,10 +208,10 @@ export class CSharpConverter implements Converter {
     }
   }
 
-  #emitClassFile(cls: ParsedClass, mod: ParsedModule, filePath: string, entities: EntityNode[]): void {
+  #emitClassFile(cls: ParsedClass, mod: ParsedModule, filePath: string, entities: EntityNode[], depNameMap: ReadonlyMap<string, string>): void {
     const className = this.#names.reserve(`class:${cls.name}`, [cls.name]);
     const methods = this.#filterMethods(cls).map((m) => m.name);
-    const imports = mod.imports.map((i) => i.specifier);
+    const imports = this.#remapImports(mod.imports, depNameMap);
     const exports = [className];
     const implementsList = cls.implements.map((i) => {
       const baseName = i.includes('<') ? i.substring(0, i.indexOf('<')) : i;
@@ -247,10 +282,11 @@ export class CSharpConverter implements Converter {
     const fields = cls.properties
       .filter((p) => !p.isPrivate || this.#options.includePrivateMembers)
       .map((p) => {
-        const typeResult = parseTypeExprText(p.type);
+        const normalizedType = normalizeCSharpType(p.type);
+        const typeResult = parseTypeExprText(normalizedType);
         return new DtoFieldNode({
           name: p.name,
-          type: p.type,
+          type: normalizedType,
           typeExpr: typeResult.typeExpr,
           optionalityMarker: p.isOptional ? 'question' : 'none',
           span: SYNTHETIC_SPAN,
