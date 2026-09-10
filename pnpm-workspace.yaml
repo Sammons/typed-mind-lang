@@ -5,6 +5,7 @@ allowBuilds:
   '@vscode/vsce-sign': false
   esbuild: false
   keytar: false
+  tree-sitter-c-sharp: false
   tree-sitter-java: true
   tree-sitter-rust: true
   workerd: false
