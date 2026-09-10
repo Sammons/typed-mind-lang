@@ -61,13 +61,6 @@ describe('EmittedNameAllocator', () => {
   it('uses Generated as default base when all candidates empty', () => {
     const allocator = new EmittedNameAllocator();
     const name = allocator.reserve('key1', ['']);
-    // base is last candidate ('') which is empty, so falls back to 'Generated'
-    // but '' is skipped in the find, so it goes to suffix logic with base 'Generated'
-    // Actually base = candidates.at(-1) || 'Generated' = '' || 'Generated' = 'Generated'
-    // No candidate matches ('' has length 0), so suffix starts at 2: 'Generated2'
-    // Wait, the first try with no name taken should be 'Generated2'? Let's check:
-    // Actually the find loop skips '' (length === 0), name is undefined, suffix logic:
-    // base = 'Generated', suffix = 2, 'Generated2' is not taken, name = 'Generated2'
     assert.equal(name, 'Generated2');
   });
 

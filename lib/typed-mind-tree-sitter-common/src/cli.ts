@@ -21,7 +21,6 @@ export interface LanguageCliConfig {
   createConverter: (options: ConversionOptions) => Converter;
   resolveProjectPath: (input: string) => { projectPath: string; configPath?: string };
   resolveEntrypoint: (projectPath: string, entrypoint: string) => string;
-  projectFileNames: string[];
 }
 
 const CLI_OPTIONS = {

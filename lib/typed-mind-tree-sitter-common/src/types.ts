@@ -1,4 +1,5 @@
 import type { EntityNode } from '@sammons/typed-mind';
+import type { AssertionCode } from './assertion-codes.ts';
 
 export interface ParsedModule {
   readonly filePath: string;
@@ -147,7 +148,7 @@ export interface AssertionResult {
 }
 
 export interface Deviation {
-  readonly code: string;
+  readonly code: AssertionCode;
   readonly entityName: string;
   readonly property: string;
   readonly expected: unknown;

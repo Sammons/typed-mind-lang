@@ -1,8 +1,6 @@
 import { Language, Parser, type Tree } from 'web-tree-sitter';
 
 export interface TreeSitterParserOptions {
-  wasmPath?: string;
-  wasmBytes?: Uint8Array;
   runtimeWasmPath?: string;
 }
 

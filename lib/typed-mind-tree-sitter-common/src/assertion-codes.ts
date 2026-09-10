@@ -124,8 +124,7 @@ export const ASSERTION_CODES = {
     message: 'Class extends clause differs between TMD and source.',
     suggestion: 'Update the extends clause in the TMD class declaration.',
     docBody:
-      'The TMD class or class-file entity declares a different base class (or no base ' +
-      'class) than the converter found in the source.',
+      'The TMD class or class-file entity declares a different base class (or no base ' + 'class) than the converter found in the source.',
   },
   'assertion/schema-mismatch': {
     severity: 'warning',

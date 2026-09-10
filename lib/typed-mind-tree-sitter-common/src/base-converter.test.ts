@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { DtoNode, FunctionNode, ProgramNode } from '@sammons/typed-mind';
-import { collapseDescription, emitTmd, sortIntoLegacySectionOrder, SYNTHETIC_SPAN } from './base-converter.ts';
+import { FunctionNode, ProgramNode } from '@sammons/typed-mind';
+import { collapseDescription, emitTmd, SYNTHETIC_SPAN, sortIntoLegacySectionOrder } from './base-converter.ts';
 
 const makeFunction = (name: string): FunctionNode =>
   new FunctionNode({
