@@ -468,6 +468,12 @@ export class PythonAnalyzer implements Analyzer {
     this.#projectPath = resolve(projectPath);
   }
 
+  static async create(projectPath: string, configPath?: string): Promise<PythonAnalyzer> {
+    const analyzer = new PythonAnalyzer(projectPath, configPath);
+    analyzer.#parser = await TreeSitterParser.create(WASM_PATH);
+    return analyzer;
+  }
+
   async #ensureParser(): Promise<TreeSitterParser> {
     if (!this.#parser) {
       this.#parser = await TreeSitterParser.create(WASM_PATH);
@@ -475,12 +481,19 @@ export class PythonAnalyzer implements Analyzer {
     return this.#parser;
   }
 
-  analyzeFromEntrypoint(_entrypoint: string): ProjectAnalysis {
-    throw new Error('PythonAnalyzer requires async WASM initialization. Use analyzeFromEntrypointAsync instead.');
+  analyzeFromEntrypoint(entrypoint: string): ProjectAnalysis {
+    if (!this.#parser) {
+      throw new Error('PythonAnalyzer requires async WASM initialization. Call PythonAnalyzer.create() first.');
+    }
+    return this.#analyzeWithParser(this.#parser, entrypoint);
   }
 
   async analyzeFromEntrypointAsync(entrypoint: string): Promise<ProjectAnalysis> {
     const parser = await this.#ensureParser();
+    return this.#analyzeWithParser(parser, entrypoint);
+  }
+
+  #analyzeWithParser(parser: TreeSitterParser, entrypoint: string): ProjectAnalysis {
     const projectInfo = resolveProject(this.#projectPath);
     const diagnostics: AnalyzerDiagnostic[] = [];
 
