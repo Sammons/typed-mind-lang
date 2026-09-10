@@ -6,6 +6,7 @@ allowBuilds:
   esbuild: false
   keytar: false
   tree-sitter-java: true
+  tree-sitter-rust: true
   workerd: false
 
 ignoredBuiltDependencies:

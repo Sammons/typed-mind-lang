@@ -32,6 +32,7 @@
     { "path": "./lib/typed-mind-lsp" },
     { "path": "./lib/typed-mind-tree-sitter-common" },
     { "path": "./lib/typed-mind-typescript" },
+    { "path": "./lib/typed-mind-rust" },
     { "path": "./lib/typed-mind-vscode-extension" }
   ]
 }
