@@ -6,6 +6,7 @@ import {
   DtoNode,
   type EntityNode,
   parseTypeExprText,
+  ProgramNode,
   TypeDefNode,
   type TypeExprNode,
 } from '@sammons/typed-mind';
@@ -16,6 +17,7 @@ import {
   type Converter,
   EmittedNameAllocator,
   emitTmd,
+  fixupEntitiesForRoundTrip,
   type ParsedClass,
   type ParsedModule,
   type ProjectAnalysis,
@@ -23,8 +25,34 @@ import {
 } from '@sammons/typed-mind-tree-sitter-common';
 import type { JavaDependency } from './java-project.ts';
 
+const JAVA_TYPE_NORMALIZATION: ReadonlyMap<string, string> = new Map([
+  ['String', 'string'],
+  ['Integer', 'number'],
+  ['int', 'number'],
+  ['Long', 'number'],
+  ['long', 'number'],
+  ['Double', 'number'],
+  ['double', 'number'],
+  ['Float', 'number'],
+  ['float', 'number'],
+  ['Short', 'number'],
+  ['short', 'number'],
+  ['Byte', 'number'],
+  ['byte', 'number'],
+  ['Character', 'string'],
+  ['char', 'string'],
+  ['Boolean', 'boolean'],
+  ['Object', 'any'],
+  ['Void', 'void'],
+]);
+
+const normalizeJavaType = (typeText: string): string => {
+  return JAVA_TYPE_NORMALIZATION.get(typeText) ?? typeText;
+};
+
 const makeTypeExpr = (typeText: string): TypeExprNode => {
-  const result = parseTypeExprText(typeText);
+  const normalized = normalizeJavaType(typeText);
+  const result = parseTypeExprText(normalized);
   return result.typeExpr;
 };
 
@@ -52,6 +80,25 @@ export class JavaConverter implements Converter {
     const warnings: ConversionWarning[] = [];
 
     try {
+      // Generate Program entity if enabled
+      if (this.#options.generatePrograms && analysis.entryPoints.length > 0) {
+        const programName = this.#nameAllocator.reserve('program', ['JavaProject']);
+        const entryName = analysis.entryPoints[0] ?? '';
+        const programArgs: ConstructorParameters<typeof ProgramNode>[0] = {
+          name: programName,
+          span: SYNTHETIC_SPAN,
+          raw: '',
+          sourceForm: 'shortform',
+          entry: entryName,
+        };
+        if (this.#options.programVersion !== undefined) {
+          programArgs.version = this.#options.programVersion;
+        } else {
+          programArgs.version = '1.0.0';
+        }
+        entities.push(new ProgramNode(programArgs));
+      }
+
       for (const mod of analysis.modules) {
         this.#convertModule(mod, entities, warnings);
       }
@@ -69,6 +116,8 @@ export class JavaConverter implements Converter {
         warnings,
       };
     }
+
+    fixupEntitiesForRoundTrip(entities);
 
     return {
       success: true,
@@ -189,14 +238,16 @@ export class JavaConverter implements Converter {
         return !p.isPrivate;
       })
       .map(
-        (p) =>
-          new DtoFieldNode({
+        (p) => {
+          const normalizedType = normalizeJavaType(p.type);
+          return new DtoFieldNode({
             name: p.name,
-            type: p.type,
+            type: normalizedType,
             typeExpr: makeTypeExpr(p.type),
             optionalityMarker: p.isOptional ? 'question' : 'none',
             span: SYNTHETIC_SPAN,
-          }),
+          });
+        },
       );
 
     entities.push(

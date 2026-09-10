@@ -18,6 +18,7 @@ import {
   type Converter,
   EmittedNameAllocator,
   emitTmd,
+  fixupEntitiesForRoundTrip,
   type ProjectAnalysis,
   SYNTHETIC_SPAN,
 } from '@sammons/typed-mind-tree-sitter-common';
@@ -27,6 +28,20 @@ const DTO_DECORATORS = new Set(['dataclass']);
 
 /** Base classes that indicate a DTO pattern. */
 const DTO_BASE_CLASSES = new Set(['BaseModel', 'TypedDict']);
+
+const PYTHON_TYPE_NORMALIZATION: ReadonlyMap<string, string> = new Map([
+  ['str', 'string'],
+  ['int', 'number'],
+  ['float', 'number'],
+  ['bool', 'boolean'],
+  ['bytes', 'string'],
+  ['None', 'void'],
+  ['NoneType', 'void'],
+]);
+
+const normalizePythonType = (typeText: string): string => {
+  return PYTHON_TYPE_NORMALIZATION.get(typeText) ?? typeText;
+};
 
 /** Build an opaque TypeExprNode from a raw type string. */
 const opaqueType = (text: string): TypeExprNode => ({
@@ -84,14 +99,16 @@ export class PythonConverter implements Converter {
           if (isDto) {
             const name = this.#names.reserve(`dto:${cls.name}`, [cls.name]);
             const fields = cls.properties.map(
-              (prop) =>
-                new DtoFieldNode({
+              (prop) => {
+                const normalizedType = prop.type ? normalizePythonType(prop.type) : 'Any';
+                return new DtoFieldNode({
                   name: prop.name,
-                  type: prop.type || 'Any',
-                  typeExpr: prop.type ? opaqueType(prop.type) : namedType('Any'),
+                  type: normalizedType,
+                  typeExpr: normalizedType !== 'Any' ? opaqueType(normalizedType) : namedType('Any'),
                   optionalityMarker: prop.isOptional ? 'question' : 'none',
                   span: SYNTHETIC_SPAN,
-                }),
+                });
+              },
             );
             entities.push(
               new DtoNode({
@@ -260,6 +277,8 @@ export class PythonConverter implements Converter {
           }),
         );
       }
+
+      fixupEntitiesForRoundTrip(entities);
 
       const tmdContent = emitTmd(entities);
 

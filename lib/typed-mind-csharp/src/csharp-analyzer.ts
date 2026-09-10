@@ -225,14 +225,19 @@ function extractMethod(node: SyntaxNode): ParsedMethod {
 }
 
 function extractProperty(node: SyntaxNode): ParsedProperty {
-  const nameNode = firstChildOfType(node, 'identifier');
+  // The last identifier is the property name; for user-defined types like
+  // `Color FillColor`, both type and name are identifiers in the AST.
+  let nameNode: SyntaxNode | undefined;
+  for (let i = node.childCount - 1; i >= 0; i--) {
+    const c = node.child(i);
+    if (c !== null && c.type === 'identifier') { nameNode = c; break; }
+  }
   const name = nodeText(nameNode);
   const isStatic = hasModifier(node, 'static');
   const isPrivate = hasModifier(node, 'private');
   const isProtected = hasModifier(node, 'protected');
   const isReadonly = hasModifier(node, 'readonly');
 
-  // Extract type - it's before the name
   let type = '';
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i);
@@ -373,11 +378,18 @@ function extractClass(node: SyntaxNode, isStruct: boolean): ParsedClass {
     if (paramList !== undefined) {
       const paramNodes = childrenOfType(paramList, 'parameter');
       for (const paramNode of paramNodes) {
-        const pName = nodeText(firstChildOfType(paramNode, 'identifier'));
+        // The last identifier is the parameter name; everything before it
+        // (excluding modifiers/attributes) is the type. For user-defined
+        // types like `UserRole Role`, both the type and name are identifiers.
+        let lastIdentifierIdx = -1;
+        for (let i = paramNode.childCount - 1; i >= 0; i--) {
+          if (paramNode.child(i)?.type === 'identifier') { lastIdentifierIdx = i; break; }
+        }
+        const pName = lastIdentifierIdx >= 0 ? nodeText(paramNode.child(lastIdentifierIdx)!) : '';
         let pType = '';
         for (let i = 0; i < paramNode.childCount; i++) {
+          if (i === lastIdentifierIdx) break;
           const c = paramNode.child(i);
-          if (c !== null && c.type === 'identifier') break;
           if (c !== null && c.type !== 'modifier' && c.type !== 'attribute_list') {
             pType = c.text;
           }

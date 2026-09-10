@@ -6,6 +6,7 @@ namespace MyApp.Models
     {
         public double X;
         public double Y;
+        public Color Label;
     }
 
     public struct Vector3

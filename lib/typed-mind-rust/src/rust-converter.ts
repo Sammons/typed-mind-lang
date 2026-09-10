@@ -30,10 +30,36 @@ import {
   collapseDescription,
   EmittedNameAllocator,
   emitTmd,
+  fixupEntitiesForRoundTrip,
   SYNTHETIC_SPAN,
   sortIntoLegacySectionOrder,
 } from '@sammons/typed-mind-tree-sitter-common';
 import type { RustAnalyzer } from './rust-analyzer.ts';
+
+const RUST_TYPE_NORMALIZATION: ReadonlyMap<string, string> = new Map([
+  ['String', 'string'],
+  ['&str', 'string'],
+  ['i8', 'number'],
+  ['i16', 'number'],
+  ['i32', 'number'],
+  ['i64', 'number'],
+  ['i128', 'number'],
+  ['u8', 'number'],
+  ['u16', 'number'],
+  ['u32', 'number'],
+  ['u64', 'number'],
+  ['u128', 'number'],
+  ['f32', 'number'],
+  ['f64', 'number'],
+  ['isize', 'number'],
+  ['usize', 'number'],
+  ['bool', 'boolean'],
+  ['char', 'string'],
+]);
+
+const normalizeRustType = (typeText: string): string => {
+  return RUST_TYPE_NORMALIZATION.get(typeText) ?? typeText;
+};
 
 export class RustConverter implements Converter {
   readonly #options: ConversionOptions;
@@ -124,6 +150,8 @@ export class RustConverter implements Converter {
         filePath: undefined,
       });
     }
+
+    fixupEntitiesForRoundTrip(entities);
 
     const sorted = sortIntoLegacySectionOrder(entities);
     const tmdContent = emitTmd(sorted);
@@ -224,10 +252,11 @@ export class RustConverter implements Converter {
     } else {
       // Struct without methods -> DtoNode.
       const fields = cls.properties.map((prop) => {
-        const parsed = parseTypeExprText(prop.type);
+        const normalizedType = normalizeRustType(prop.type);
+        const parsed = parseTypeExprText(normalizedType);
         return new DtoFieldNode({
           name: prop.name,
-          type: prop.type,
+          type: normalizedType,
           typeExpr: parsed.typeExpr,
           optionalityMarker: prop.isOptional ? 'question' : 'none',
           span: SYNTHETIC_SPAN,

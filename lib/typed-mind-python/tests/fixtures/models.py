@@ -8,6 +8,7 @@ class User:
     name: str
     email: str
     id: int
+    role: UserRole
 
 
 class UserRole(Enum):

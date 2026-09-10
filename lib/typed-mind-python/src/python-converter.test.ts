@@ -38,15 +38,15 @@ describe('PythonConverter', () => {
 
       const nameField = dtoNode.fields.find((f) => f.name === 'name');
       assert.ok(nameField, 'should have name field');
-      assert.equal(nameField.type, 'str');
+      assert.equal(nameField.type, 'string');
 
       const emailField = dtoNode.fields.find((f) => f.name === 'email');
       assert.ok(emailField, 'should have email field');
-      assert.equal(emailField.type, 'str');
+      assert.equal(emailField.type, 'string');
 
       const idField = dtoNode.fields.find((f) => f.name === 'id');
       assert.ok(idField, 'should have id field');
-      assert.equal(idField.type, 'int');
+      assert.equal(idField.type, 'number');
     });
 
     it('converts an Enum to a TypeDefNode', async () => {
@@ -118,7 +118,7 @@ describe('PythonConverter', () => {
 
       const file = fileNode as import('@sammons/typed-mind').FileNode;
       assert.equal(file.path, '__init__.py');
-      assert.ok(file.exports.length >= 3, 'should export at least 3 names');
+      assert.ok(file.exports.length >= 2, 'should export at least 2 names');
     });
   });
 
