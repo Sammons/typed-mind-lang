@@ -11,5 +11,12 @@
     "rewriteRelativeImportExtensions": false
   },
   "include": ["src"],
-  "references": [{ "path": "../typed-mind" }]
+  "references": [
+    { "path": "../typed-mind" },
+    { "path": "../typed-mind-tree-sitter-common" },
+    { "path": "../typed-mind-java" },
+    { "path": "../typed-mind-rust" },
+    { "path": "../typed-mind-csharp" },
+    { "path": "../typed-mind-python" }
+  ]
 }

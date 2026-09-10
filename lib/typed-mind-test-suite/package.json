@@ -7,12 +7,17 @@
   },
   "type": "module",
   "scripts": {
-    "pretest": "pnpm --filter @sammons/typed-mind run build",
+    "pretest": "pnpm --filter @sammons/typed-mind run build && pnpm --filter @sammons/typed-mind-tree-sitter-common run build && pnpm --filter @sammons/typed-mind-java run build && pnpm --filter @sammons/typed-mind-rust run build && pnpm --filter @sammons/typed-mind-csharp run build && pnpm --filter @sammons/typed-mind-python run build",
     "test": "node --test 'src/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@sammons/typed-mind": "workspace:*"
+    "@sammons/typed-mind": "workspace:*",
+    "@sammons/typed-mind-tree-sitter-common": "workspace:*",
+    "@sammons/typed-mind-java": "workspace:*",
+    "@sammons/typed-mind-rust": "workspace:*",
+    "@sammons/typed-mind-csharp": "workspace:*",
+    "@sammons/typed-mind-python": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
