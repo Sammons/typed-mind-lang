@@ -1,0 +1,68 @@
+{
+  "name": "@sammons/typed-mind-rust",
+  "version": "1.2.0",
+  "description": "Rust analysis and bridge to TypedMind DSL - extract architecture from Rust codebases",
+  "type": "module",
+  "keywords": [
+    "rust",
+    "typedmind",
+    "ast",
+    "analyzer",
+    "architecture",
+    "extraction",
+    "tree-sitter"
+  ],
+  "author": "sammons",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sammons/typed-mind-lang.git",
+    "directory": "lib/typed-mind-rust"
+  },
+  "homepage": "https://typedmind.sammons.io",
+  "bugs": {
+    "url": "https://github.com/Sammons/typed-mind-lang/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "typed-mind-rs": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "scripts": {
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "build": "tsc --build && chmod +x dist/cli.js",
+    "dev": "tsc --build --watch",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "pretest": "pnpm --filter @sammons/typed-mind run build && pnpm run build:wasm",
+    "test": "node --test 'src/**/*.test.ts'",
+    "typecheck": "tsc --noEmit",
+    "guard:npm-publish": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\"",
+    "prepublishOnly": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\" && pnpm run clean && pnpm run build && pnpm test"
+  },
+  "dependencies": {
+    "@sammons/typed-mind": "workspace:*",
+    "@sammons/typed-mind-tree-sitter-common": "workspace:*",
+    "web-tree-sitter": "0.27.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "tree-sitter-rust": "0.24.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
