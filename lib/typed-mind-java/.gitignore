@@ -1,0 +1,4 @@
+grammar/tree-sitter-java.wasm
+dist/
+*.tsbuildinfo
+node_modules/

@@ -1,0 +1,60 @@
+{
+  "name": "@sammons/typed-mind-java",
+  "version": "1.2.0",
+  "description": "Java analysis and bridge to TypedMind DSL - extract architecture from Java codebases",
+  "type": "module",
+  "keywords": [
+    "java",
+    "typedmind",
+    "ast",
+    "analyzer",
+    "architecture",
+    "extraction",
+    "tree-sitter"
+  ],
+  "author": "sammons",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sammons/typed-mind-lang.git",
+    "directory": "lib/typed-mind-java"
+  },
+  "homepage": "https://typedmind.sammons.io",
+  "bugs": {
+    "url": "https://github.com/Sammons/typed-mind-lang/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "typed-mind-java": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "scripts": {
+    "build": "node scripts/build-wasm.mjs && tsc --build && chmod +x dist/cli.js",
+    "dev": "tsc --build --watch",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "pretest": "pnpm --filter @sammons/typed-mind run build && pnpm --filter @sammons/typed-mind-tree-sitter-common run build && node scripts/build-wasm.mjs",
+    "test": "node --test 'src/**/*.test.ts'",
+    "test:watch": "node --test --watch 'src/**/*.test.ts'",
+    "typecheck": "tsc --noEmit",
+    "guard:npm-publish": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\"",
+    "prepublishOnly": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\" && pnpm run clean && pnpm run build && pnpm test"
+  },
+  "dependencies": {
+    "@sammons/typed-mind": "workspace:*",
+    "@sammons/typed-mind-tree-sitter-common": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "tree-sitter-java": "0.23.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
