@@ -1,0 +1,69 @@
+{
+  "name": "@sammons/typed-mind-python",
+  "version": "1.2.0",
+  "description": "Python analysis and bridge to TypedMind DSL - extract architecture from Python codebases",
+  "type": "module",
+  "keywords": [
+    "python",
+    "typedmind",
+    "ast",
+    "analyzer",
+    "architecture",
+    "extraction",
+    "tree-sitter"
+  ],
+  "author": "sammons",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sammons/typed-mind-lang.git",
+    "directory": "lib/typed-mind-python"
+  },
+  "homepage": "https://typedmind.sammons.io",
+  "bugs": {
+    "url": "https://github.com/Sammons/typed-mind-lang/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "typed-mind-py": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "grammar/tree-sitter-python.wasm",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "scripts": {
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "build": "pnpm run build:wasm && tsc --build && chmod +x dist/cli.js",
+    "dev": "tsc --build --watch",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "pretest": "pnpm --filter @sammons/typed-mind run build && pnpm run build:wasm",
+    "test": "node --test 'src/**/*.test.ts'",
+    "typecheck": "tsc --noEmit",
+    "guard:npm-publish": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\"",
+    "prepublishOnly": "node -e \"if (!(process.env.npm_config_user_agent||'').startsWith('pnpm/')) { console.error('publish with pnpm, not npm (workspace:* would ship verbatim)'); process.exit(1); }\" && pnpm run clean && pnpm run build && pnpm test"
+  },
+  "dependencies": {
+    "@sammons/typed-mind": "workspace:*",
+    "@sammons/typed-mind-tree-sitter-common": "workspace:*",
+    "web-tree-sitter": "0.27.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "tree-sitter-python": "0.25.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -34,6 +34,7 @@
     { "path": "./lib/typed-mind-typescript" },
     { "path": "./lib/typed-mind-rust" },
     { "path": "./lib/typed-mind-csharp" },
+    { "path": "./lib/typed-mind-python" },
     { "path": "./lib/typed-mind-vscode-extension" }
   ]
 }

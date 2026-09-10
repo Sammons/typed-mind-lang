@@ -8,6 +8,7 @@ allowBuilds:
   tree-sitter-c-sharp: false
   tree-sitter-java: true
   tree-sitter-rust: true
+  tree-sitter-python: false
   workerd: false
 
 ignoredBuiltDependencies:
