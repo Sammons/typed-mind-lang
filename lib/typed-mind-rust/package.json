@@ -44,6 +44,7 @@
   },
   "scripts": {
     "build:wasm": "node scripts/build-wasm.mjs",
+    "prebuild": "node scripts/build-wasm.mjs",
     "build": "tsc --build && chmod +x dist/cli.js",
     "dev": "tsc --build --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
