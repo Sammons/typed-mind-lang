@@ -372,18 +372,21 @@ describe('cycle checks (validator.ts:408-653)', () => {
         self: ["Class 'D' inherits from itself"],
         unknownBase: ["Class 'C' extends 'Missing' which does not exist"],
         unknownInterface: ["Class 'E' implements 'IGhost' which does not exist"],
-        // The legacy walk reports the A/B cycle once (sort-normalized), the
-        // self-extends D also lands in the cycle walk (validator.ts:608-652),
-        // and E -> A is the STALE-RECURSION-STACK quirk ported as-is: the
-        // legacy DFS never unwinds recursionStack after an early cycle return,
-        // so a later root pointing INTO a reported cycle reads as a new cycle.
-        circular: [
-          "Class 'A' has circular inheritance: A -> B -> A",
-          "Class 'D' has circular inheritance: D -> D",
-          "Class 'E' has circular inheritance: E -> A",
-        ],
+        // E points into an already reported cycle without forming a new one.
+        circular: ["Class 'A' has circular inheritance: A -> B -> A", "Class 'D' has circular inheritance: D -> D"],
       },
     );
+  });
+
+  it('continues checking import branches after finding a cycle', async () => {
+    const { outcome, result } = await check(
+      ['A @ a.ts:', '  <- [B, C]', 'B @ b.ts:', '  <- [A]', 'C @ c.ts:', '  <- [A]', 'D @ d.ts:', '  <- [A]', ''].join('\n'),
+    );
+    assert.deepEqual(outcome.diagnostics, []);
+    assert.deepEqual(messagesByCode(result, 'checker/circular-import'), [
+      'Circular import detected: A -> B -> A',
+      'Circular import detected: A -> C -> A',
+    ]);
   });
 });
 

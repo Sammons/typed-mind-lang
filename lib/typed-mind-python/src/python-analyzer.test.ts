@@ -125,5 +125,18 @@ describe('PythonAnalyzer', () => {
       assert.ok(analysis.entryPoints.includes('models.py'));
       assert.equal(analysis.projectRoot, FIXTURES_DIR);
     });
+
+    it('preserves names and rest metadata for annotated variadic parameters', async () => {
+      const analysis = await analyzer.analyzeFromEntrypointAsync('variadic.py');
+      assert.deepEqual(analysis.diagnostics, []);
+      const module = analysis.modules.find((m) => m.filePath === 'variadic.py');
+      assert.ok(module);
+      const expected = [
+        { name: 'args', type: 'int', isOptional: true, hasDefaultValue: false, isRest: true },
+        { name: 'kwargs', type: 'str', isOptional: true, hasDefaultValue: false, isRest: true },
+      ];
+      assert.deepEqual(module.functions[0]?.parameters, expected);
+      assert.deepEqual(module.classes[0]?.methods[0]?.parameters, expected);
+    });
   });
 });

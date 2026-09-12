@@ -6,8 +6,8 @@
 //   - checkInheritanceChains (validator.ts:554-653): extends existence,
 //     self-inheritance, implements existence, and the single-inheritance
 //     cycle walk.
-// Each replicates the legacy DFS shape: shared visited set, recursion stack,
-// first-found cycle reported once per sort-normalized cycle key, error at the
+// Each uses a shared visited set and recursion stack, with cycles reported
+// once per sort-normalized cycle key and an error at the
 // walk's ROOT entity (not the cycle's entry), messages + suggestions verbatim.
 
 import { ClassFileNode } from '../ast/class-file-node.ts';
@@ -25,7 +25,7 @@ interface CycleWalkArgs {
   readonly nodes: readonly string[];
 }
 
-// The shared legacy DFS shape (validator.ts:424-472 and twins): `visited`
+// The shared DFS shape (validator.ts:424-472 and twins): `visited`
 // persists across roots, so a node explored from an earlier root is never
 // re-walked; `recursionStack` detects the back edge; the reported path is the
 // path from the CURRENT root into the cycle plus the closing node.
@@ -34,9 +34,9 @@ const walkForCycles = (args: CycleWalkArgs): void => {
   const recursionStack = new Set<string>();
   const reportedCycles = new Set<string>();
 
-  const hasCycle = (node: string, path: string[]): string[] | null => {
+  const visit = (node: string, path: string[], root: string): void => {
     if (args.neighborsOf(node) === undefined) {
-      return null;
+      return;
     }
     visited.add(node);
     recursionStack.add(node);
@@ -48,31 +48,25 @@ const walkForCycles = (args: CycleWalkArgs): void => {
         continue;
       }
       if (!visited.has(neighbor)) {
-        const cycle = hasCycle(neighbor, [...path]);
-        if (cycle) {
-          return cycle;
-        }
+        visit(neighbor, [...path], root);
       } else if (recursionStack.has(neighbor)) {
-        return [...path, neighbor];
+        const cycle = [...path, neighbor];
+        const cycleKey = [...cycle].sort().join('->');
+        if (!reportedCycles.has(cycleKey)) {
+          reportedCycles.add(cycleKey);
+          args.onCycle(root, cycle);
+        }
       }
     }
 
     recursionStack.delete(node);
-    return null;
   };
 
   for (const node of args.nodes) {
     if (visited.has(node)) {
       continue;
     }
-    const cycle = hasCycle(node, []);
-    if (cycle) {
-      const cycleKey = [...cycle].sort().join('->');
-      if (!reportedCycles.has(cycleKey)) {
-        reportedCycles.add(cycleKey);
-        args.onCycle(node, cycle);
-      }
-    }
+    visit(node, [], node);
   }
 };
 

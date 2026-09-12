@@ -296,11 +296,25 @@ const scanOpaqueRun = (cursor: TextCursor, inGenericArgs = false): string => {
   while (cursor.index < cursor.text.length) {
     const ch = cursor.text[cursor.index];
     const prevCh = cursor.index > startIndex ? cursor.text[cursor.index - 1] : undefined;
-    if (ch === '"' && stack.length === 0) {
+    if (ch === '"' && stack.length === 0 && angleDepth === 0) {
       break;
     }
     if (ch === undefined) {
       break;
+    }
+    // Quoted delimiters are literal content and cannot change nesting depth.
+    if (ch === '"' || ch === "'" || ch === '`') {
+      cursor.index += 1;
+      while (cursor.index < cursor.text.length) {
+        const inner = cursor.text[cursor.index];
+        cursor.index += 1;
+        if (inner === '\\') {
+          cursor.index = Math.min(cursor.index + 1, cursor.text.length);
+        } else if (inner === ch) {
+          break;
+        }
+      }
+      continue;
     }
     if (ch === '(' || ch === '[' || ch === '{') {
       stack.push(closerFor[ch] ?? '');
