@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="preload" href="assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/JetBrainsMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypedMind Skill - Agent Prompt &amp; Grammar Reference</title>
+    <meta name="description" content="Copy-pasteable prompt and compact grammar reference for teaching AI agents to write TypedMind (.tmd) architecture files.">
+
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="assets/css/prism-typedmind.css">
+    <style>
+        .skill-section { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+        .prompt-block {
+            position: relative;
+            background: var(--surface, #1E293B);
+            border: 1px solid var(--border, #334155);
+            border-radius: 4px;
+            padding: 20px;
+            margin: 16px 0 32px;
+            font-family: var(--font-mono, 'JetBrains Mono', monospace);
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text, #E2E8F0);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        #promptText { white-space: pre-wrap; }
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--accent, #3B5BFF);
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 1;
+        }
+        .copy-btn:hover { opacity: 0.9; }
+        .copy-btn.copied { background: #22C55E; }
+        .ref-table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 14px; }
+        .ref-table th, .ref-table td {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border, #334155);
+        }
+        .ref-table th { color: var(--text-muted, #94A3B8); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .ref-table code { font-size: 13px; background: var(--surface, #1E293B); padding: 2px 6px; border-radius: 2px; }
+        .skill-heading { margin-top: 40px; margin-bottom: 12px; font-size: 20px; font-weight: 700; }
+        .skill-subheading { margin-top: 28px; margin-bottom: 8px; font-size: 16px; font-weight: 600; }
+        .skill-intro { color: var(--text-muted, #94A3B8); margin-bottom: 24px; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="index.html" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 12px;">
+                    <img src="images/typedmind_transparent.png" alt="TypedMind Logo" class="nav-logo">
+                    TypedMind
+                </a>
+            </div>
+            <div class="nav-toggle" id="navToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="index.html#overview">Overview</a></li>
+                <li><a href="index.html#syntax">Syntax</a></li>
+                <li><a href="playground.html">Playground</a></li>
+                <li><a href="skill.html" class="active">Skill</a></li>
+                <li><a href="index.html#getting-started">Get Started</a></li>
+                <li><a href="https://github.com/sammons/typed-mind-lang" target="_blank">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <section class="skill-section" style="padding-top: 100px; padding-bottom: 60px;">
+        <h1 class="skill-heading" style="font-size: 28px;">Agent Skill</h1>
+        <p class="skill-intro">Copy the prompt below into your agent's system instructions to teach it TypedMind syntax. The grammar reference below covers all entity types and operators.</p>
+
+        <h2 class="skill-heading">Prompt</h2>
+        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 8px;">Paste this into your agent's system prompt or skill file.</p>
+
+        <div class="prompt-block">
+            <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy</button>
+            <div id="promptText">You write TypedMind (.tmd) files — a DSL for describing software architecture.
+Every entity must be referenced bidirectionally: a function must be exported by a file,
+imported by its consumers, and called by at least one caller. The checker validates these
+constraints; orphaned entities are errors unless suppressed.
+
+## Shortform declarations (one entity per line)
+
+Program:       Name -> entryFile [version]
+File:          Name @ path/to/file:
+Function:      Name :: (params) => ReturnType
+Class:         Name <: [ParentClass]
+ClassFile:     Name #: path/to/file [<: ParentClass]
+DTO:           Name % ["description"]
+Constants:     Name ! path/to/file
+Asset:         Name ~ "description"
+UIComponent:   Name &! "description"  (root)  or  Name & "description"
+RunParameter:  Name $env|$iam|$runtime|$config "description" [(required)]
+Dependency:    Name ^ "description" [version]
+TypeDef enum:  Name = enum [MemberA, MemberB]
+TypeDef alias: Name = targetType
+
+## Continuation operators (indented, attach to the entity above)
+
+<- [A, B]      imports
+-> [A, B]      exports
+<-> [A, B]     re-exports (File only)
+~> [A, B]      calls (function/method references)
+=> [A, B]      methods
+~ [A, B]       affects
+> [A, B]       contains (UI)
+< [A, B]       contained by (UI)
+>> Name        contains program
+$< [A, B]      consumes (run parameters, assets)
+= "value"      default value
+# text         comment
+
+## DTO fields (indented under a DTO)
+
+- name: type "description"
+- name?: type "description"          optional field
+- name: type "desc" (optional)       also optional
+
+## Suppression
+
+suppress EntityName checker/orphaned-entity "reason text"
+
+## Rules
+- Every entity must be imported by at least one file (or suppressed).
+- File exports must name entities declared in the document.
+- Function calls entries: fn, File.fn, Class.method, or Class.constructor.
+- Import entries: bare name if unambiguous, Owner.name if multiple files export it.
+- Programs need an entry file. Files need a path and at least one import or export.
+- Use shortform by default; longform (brace blocks) when typed class members are needed.</div>
+        </div>
+
+        <h2 class="skill-heading">Grammar Reference</h2>
+
+        <h3 class="skill-subheading">Shortform Declarations</h3>
+        <table class="ref-table">
+            <thead><tr><th>Entity</th><th>Syntax</th></tr></thead>
+            <tbody>
+                <tr><td>Program</td><td><code>Name -&gt; entryFile [version]</code></td></tr>
+                <tr><td>File</td><td><code>Name @ path:</code></td></tr>
+                <tr><td>Function</td><td><code>Name :: signature</code></td></tr>
+                <tr><td>Class</td><td><code>Name &lt;: [Parent]</code></td></tr>
+                <tr><td>ClassFile</td><td><code>Name #: path [&lt;: Parent]</code></td></tr>
+                <tr><td>DTO</td><td><code>Name % ["desc"]</code></td></tr>
+                <tr><td>Constants</td><td><code>Name ! path [: type]</code></td></tr>
+                <tr><td>Asset</td><td><code>Name ~ "desc"</code></td></tr>
+                <tr><td>UIComponent</td><td><code>Name &amp;! "desc"</code> or <code>Name &amp; "desc"</code></td></tr>
+                <tr><td>RunParameter</td><td><code>Name $env "desc" [(required)]</code></td></tr>
+                <tr><td>Dependency</td><td><code>Name ^ "desc" [version]</code></td></tr>
+                <tr><td>TypeDef (enum)</td><td><code>Name = enum [A, B, C]</code></td></tr>
+                <tr><td>TypeDef (alias)</td><td><code>Name = targetType</code></td></tr>
+            </tbody>
+        </table>
+
+        <h3 class="skill-subheading">Continuation Operators</h3>
+        <table class="ref-table">
+            <thead><tr><th>Operator</th><th>Meaning</th><th>Attaches to</th></tr></thead>
+            <tbody>
+                <tr><td><code>&lt;- [...]</code></td><td>Imports</td><td>File, ClassFile, Function</td></tr>
+                <tr><td><code>-&gt; [...]</code></td><td>Exports</td><td>File, ClassFile, Dependency</td></tr>
+                <tr><td><code>&lt;-&gt; [...]</code></td><td>Re-exports</td><td>File</td></tr>
+                <tr><td><code>~&gt; [...]</code></td><td>Calls</td><td>Function, Class, ClassFile, Constants</td></tr>
+                <tr><td><code>=&gt; [...]</code></td><td>Methods</td><td>Class, ClassFile</td></tr>
+                <tr><td><code>~ [...]</code></td><td>Affects</td><td>Function</td></tr>
+                <tr><td><code>&gt; [...]</code></td><td>Contains</td><td>UIComponent</td></tr>
+                <tr><td><code>&lt; [...]</code></td><td>Contained by</td><td>UIComponent</td></tr>
+                <tr><td><code>&gt;&gt; Name</code></td><td>Contains program</td><td>Asset</td></tr>
+                <tr><td><code>$&lt; [...]</code></td><td>Consumes</td><td>Function, Class, ClassFile</td></tr>
+                <tr><td><code>= "..."</code></td><td>Default value</td><td>RunParameter</td></tr>
+                <tr><td><code># text</code></td><td>Comment</td><td>Any</td></tr>
+            </tbody>
+        </table>
+
+        <h3 class="skill-subheading">Quick Reference Example</h3>
+        <pre><code class="language-typedmind">TodoApp -> main v1.0.0
+main @ src/index.ts:
+  <- [UserService, Config, App, Logger, createLogger]
+  -> [startApp]
+
+UserService #: src/services/user.ts
+  <- [UserDTO, startApp]
+  => [createUser, findUser]
+
+startApp :: () => void
+  ~> [createUser]
+  ~ [App]
+  $< [DATABASE_URL, Logo]
+
+createUser :: (data: UserDTO) => UserDTO
+  <- UserDTO
+  -> UserDTO
+  ~> [createLogger, Logger.info]
+
+UserDTO %
+  - name: string "User name"
+  - email: string "Email"
+
+App &! "Root component"
+DATABASE_URL $env "DB connection" (required)
+Config ! src/config.ts
+Logo ~ "Company logo"
+winston ^ "Logging library" v3.0.0
+  -> [Logger, createLogger]
+
+Logger <:
+  => [info]
+
+createLogger :: (options?: object) => Logger</code></pre>
+
+        <h3 class="skill-subheading">Suppression</h3>
+        <pre><code class="language-typedmind">suppress LegacyHelper checker/orphaned-entity "kept for integration tests"
+suppress {
+  OtherLegacy checker/orphaned-entity "also for tests"
+}</code></pre>
+    </section>
+
+    <footer style="text-align: center; padding: 24px; color: var(--text-muted, #94A3B8); font-size: 13px; border-top: 1px solid var(--border, #334155);">
+        <a href="https://sammons.io/" style="color: var(--text-muted); text-decoration: none;">Sammons Software</a>
+    </footer>
+
+    <script src="vendor/prism/prism.min.js"></script>
+    <script src="assets/js/typedmind-syntax.js"></script>
+    <script>
+        function copyPrompt() {
+            const text = document.getElementById('promptText').textContent.trim();
+            const btn = document.getElementById('copyBtn');
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = 'Copied';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+            }, () => {
+                btn.textContent = 'Failed';
+                setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+            });
+        }
+
+        const navToggle = document.getElementById('navToggle');
+        const navMenu = document.getElementById('navMenu');
+        navToggle.addEventListener('click', () => {
+            navMenu.classList.toggle('active');
+            navToggle.classList.toggle('active');
+        });
+    </script>
+</body>
+</html>
