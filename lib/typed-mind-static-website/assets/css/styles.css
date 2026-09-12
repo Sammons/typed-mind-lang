@@ -2,6 +2,7 @@
 :root {
   color-scheme: light dark;
   --accent: #3B5BFF;
+  --on-accent: #FFFFFF;
   --bg: #FFFFFF;
   --surface: #F4F6FB;
   --text: #1F2430;
@@ -28,6 +29,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --accent: #5B7BFF;
+    --on-accent: #0B1020;
     --bg: #0F1219;
     --surface: #1A1F2E;
     --text: #E2E8F0;
@@ -119,7 +121,7 @@ button, select, input, textarea {
 
 .toggle-btn.active {
   background-color: var(--accent);
-  color: white;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
@@ -295,7 +297,7 @@ body {
 
 .btn-primary {
   background-color: var(--accent);
-  color: white;
+  color: var(--on-accent);
 }
 
 .btn-primary:hover {
@@ -311,6 +313,12 @@ body {
 
 .btn-secondary:hover {
   filter: brightness(0.9);
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn-secondary:hover {
+    filter: brightness(1.2);
+  }
 }
 
 .btn-danger {
@@ -626,7 +634,7 @@ pre code {
   width: 50px;
   height: 50px;
   background-color: var(--accent);
-  color: white;
+  color: var(--on-accent);
   border-radius: 0;
   display: flex;
   align-items: center;

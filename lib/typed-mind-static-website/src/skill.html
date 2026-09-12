@@ -34,8 +34,8 @@
             position: absolute;
             top: 8px;
             right: 8px;
-            background: var(--accent, #3B5BFF);
-            color: white;
+            background: var(--accent);
+            color: var(--on-accent);
             border: none;
             padding: 6px 14px;
             border-radius: 3px;
@@ -45,7 +45,7 @@
             z-index: 1;
         }
         .copy-btn:hover { opacity: 0.9; }
-        .copy-btn.copied { background: #22C55E; }
+        .copy-btn.copied { background: var(--success); }
         .ref-table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 14px; }
         .ref-table th, .ref-table td {
             text-align: left;
@@ -232,7 +232,7 @@ suppress {
 }</code></pre>
     </section>
 
-    <footer style="text-align: center; padding: 24px; color: var(--text-muted, #94A3B8); font-size: 13px; border-top: 1px solid var(--border, #334155);">
+    <footer style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; border-top: 1px solid var(--border);">
         <a href="https://sammons.io/" style="color: var(--text-muted); text-decoration: none;">Sammons Software</a>
     </footer>
 
