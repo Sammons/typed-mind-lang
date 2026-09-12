@@ -86,6 +86,26 @@ describe('parseTypeExprText: the shared string-based type-expression parser', ()
     }
   });
 
+  it('ignores quoted delimiters while scanning opaque union members', () => {
+    for (const text of ['{ tag: "}" }', "{ tag: '[' }", '{ tag: `]` }', String.raw`{ tag: "\"}" }`, '(x: string) => Box<"a > b">']) {
+      const result = parseTypeExprText(`${text} | Other`);
+      assert.equal(result.remainder, '', text);
+      assert.equal(result.typeExpr.kind, 'union', text);
+      if (result.typeExpr.kind !== 'union') continue;
+      assert.deepEqual(
+        result.typeExpr.members.map((member) => member.kind),
+        ['opaque', 'named'],
+        text,
+      );
+      const first = result.typeExpr.members[0];
+      assert.ok(first?.kind === 'opaque');
+      assert.equal(first.text, text);
+      const last = result.typeExpr.members[1];
+      assert.ok(last?.kind === 'named');
+      assert.equal(last.name, 'Other');
+    }
+  });
+
   it('parses a readonly-prefixed named-type array (the identifier-rest reassembly shape)', () => {
     const result = parseTypeExprText('readonly DtoFieldNode[]');
     assert.deepEqual(

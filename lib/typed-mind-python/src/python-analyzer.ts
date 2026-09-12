@@ -76,11 +76,18 @@ const parseParameters = (paramsNode: Node | undefined): ParsedParameter[] => {
       if (name === 'self' || name === 'cls') continue;
       params.push({ name, type: '', isOptional: false, hasDefaultValue: false });
     } else if (child.type === 'typed_parameter') {
-      const nameNode = child.namedChildren.find((c: Node) => c.type === 'identifier');
+      const splat = child.namedChildren.find((c: Node) => c.type === 'list_splat_pattern' || c.type === 'dictionary_splat_pattern');
+      const nameNode = (splat ?? child).namedChildren.find((c: Node) => c.type === 'identifier');
       const typeNode = child.namedChildren.find((c: Node) => c.type === 'type');
       const name = nameNode?.text ?? '';
       if (name === 'self' || name === 'cls') continue;
-      params.push({ name, type: typeText(typeNode), isOptional: false, hasDefaultValue: false });
+      params.push({
+        name,
+        type: typeText(typeNode),
+        isOptional: splat !== undefined,
+        hasDefaultValue: false,
+        ...(splat === undefined ? {} : { isRest: true }),
+      });
     } else if (child.type === 'typed_default_parameter') {
       const nameNode = child.namedChildren.find((c: Node) => c.type === 'identifier');
       const typeNode = child.namedChildren.find((c: Node) => c.type === 'type');
