@@ -129,7 +129,7 @@
 .splitter:hover .splitter-handle,
 .splitter.dragging .splitter-handle {
   opacity: 1;
-  background: white;
+  background: var(--bg);
 }
 
 /* Disable text selection during drag */

@@ -1,6 +1,8 @@
 /* CSS Variables for theming */
 :root {
+  color-scheme: light dark;
   --accent: #3B5BFF;
+  --on-accent: #FFFFFF;
   --bg: #FFFFFF;
   --surface: #F4F6FB;
   --text: #1F2430;
@@ -21,6 +23,30 @@
   --error-bg: #fce4e4;
   --warning-text: #7a5200;
   --warning-bg: #fef9e7;
+}
+
+/* Dark mode is system-driven only — no manual toggle. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #6B8AFF;
+    --on-accent: #0B1020;
+    --bg: #0F1219;
+    --surface: #1A1F2E;
+    --text: #E2E8F0;
+    --text-muted: #94A3B8;
+    --border: #2D3548;
+    --comment-text: #8B95A5;
+    --ink: #F1F5F9;
+    --paper: #161B26;
+    --grid-line: rgba(91,123,255,0.08);
+    --error: #F87171;
+    --warning: #FBBF24;
+    --success: #4ADE80;
+    --error-text: #FCA5A5;
+    --error-bg: #2A1215;
+    --warning-text: #FDE68A;
+    --warning-bg: #2A2210;
+  }
 }
 
 @font-face {
@@ -95,7 +121,7 @@ button, select, input, textarea {
 
 .toggle-btn.active {
   background-color: var(--accent);
-  color: white;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
@@ -264,14 +290,14 @@ body {
 .btn-small {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
-  background-color: white;
+  background-color: var(--bg);
   color: var(--ink);
   border: 1px solid var(--border);
 }
 
 .btn-primary {
   background-color: var(--accent);
-  color: white;
+  color: var(--on-accent);
 }
 
 .btn-primary:hover {
@@ -280,13 +306,19 @@ body {
 }
 
 .btn-secondary {
-  background-color: white;
+  background-color: var(--bg);
   color: var(--ink);
   border: 1px solid var(--border);
 }
 
 .btn-secondary:hover {
   filter: brightness(0.9);
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn-secondary:hover {
+    background-color: var(--surface);
+  }
 }
 
 .btn-danger {
@@ -602,7 +634,7 @@ pre code {
   width: 50px;
   height: 50px;
   background-color: var(--accent);
-  color: white;
+  color: var(--on-accent);
   border-radius: 0;
   display: flex;
   align-items: center;

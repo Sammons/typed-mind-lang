@@ -334,4 +334,15 @@ dto Todo {
     // reformatted document.
     expect(afterToggle).toBe(brokenEntryDoc);
   });
+
+  test('Monaco theme follows system color scheme preference', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await waitForReady(page);
+
+    const editorEl = page.locator('.monaco-editor').first();
+    await expect(editorEl).toHaveClass(/vs-dark/);
+
+    await page.emulateMedia({ colorScheme: 'light' });
+    await expect(editorEl).not.toHaveClass(/vs-dark/);
+  });
 });
