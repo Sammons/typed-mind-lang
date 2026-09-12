@@ -417,4 +417,25 @@ body.dragging-splitter * {
   color: var(--text-muted) !important;
 }
 
+/* Visualization */
+.visualization-container {
+  overflow: auto;
+  height: 100%;
+  padding: 0;
+}
+
+.visualization-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.viz-svg {
+  display: block;
+  min-width: 100%;
+}
+
 }
