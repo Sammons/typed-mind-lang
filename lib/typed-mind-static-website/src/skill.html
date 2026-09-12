@@ -12,7 +12,7 @@
     <link rel="shortcut icon" href="favicon.ico">
 
     <link rel="stylesheet" href="assets/css/styles.css">
-    <link rel="stylesheet" href="vendor/prism/prism.css">
+    <link rel="stylesheet" href="assets/css/prism-typedmind.css">
     <link rel="stylesheet" href="assets/css/prism-typedmind.css">
     <style>
         .skill-section { max-width: 860px; margin: 0 auto; padding: 0 24px; }
@@ -92,8 +92,9 @@
         <h2 class="skill-heading">Prompt</h2>
         <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 8px;">Paste this into your agent's system prompt or skill file.</p>
 
-        <div class="prompt-block" id="promptBlock">
-            <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy</button>You write TypedMind (.tmd) files — a DSL for describing software architecture.
+        <div class="prompt-block">
+            <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy</button>
+            <div id="promptText">You write TypedMind (.tmd) files — a DSL for describing software architecture.
 Every entity must be referenced bidirectionally: a function must be exported by a file,
 imported by its consumers, and called by at least one caller. The checker validates these
 constraints; orphaned entities are errors unless suppressed.
@@ -146,6 +147,7 @@ suppress EntityName checker/orphaned-entity "reason text"
 - Import entries: bare name if unambiguous, Owner.name if multiple files export it.
 - Programs need an entry file. Files need a path and at least one import or export.
 - Use shortform by default; longform (brace blocks) when typed class members are needed.</div>
+        </div>
 
         <h2 class="skill-heading">Grammar Reference</h2>
 
@@ -173,8 +175,8 @@ suppress EntityName checker/orphaned-entity "reason text"
         <table class="ref-table">
             <thead><tr><th>Operator</th><th>Meaning</th><th>Attaches to</th></tr></thead>
             <tbody>
-                <tr><td><code>&lt;- [...]</code></td><td>Imports</td><td>File, ClassFile</td></tr>
-                <tr><td><code>-&gt; [...]</code></td><td>Exports</td><td>File, ClassFile, Program</td></tr>
+                <tr><td><code>&lt;- [...]</code></td><td>Imports</td><td>File, ClassFile, Function</td></tr>
+                <tr><td><code>-&gt; [...]</code></td><td>Exports</td><td>File, ClassFile, Dependency</td></tr>
                 <tr><td><code>&lt;-&gt; [...]</code></td><td>Re-exports</td><td>File</td></tr>
                 <tr><td><code>~&gt; [...]</code></td><td>Calls</td><td>Function, Class, ClassFile, Constants</td></tr>
                 <tr><td><code>=&gt; [...]</code></td><td>Methods</td><td>Class, ClassFile</td></tr>
@@ -235,17 +237,19 @@ suppress {
         <a href="https://sammons.io/" style="color: var(--text-muted); text-decoration: none;">Sammons Software</a>
     </footer>
 
-    <script src="vendor/prism/prism.js"></script>
+    <script src="vendor/prism/prism.min.js"></script>
     <script src="assets/js/typedmind-syntax.js"></script>
     <script>
         function copyPrompt() {
-            const block = document.getElementById('promptBlock');
+            const text = document.getElementById('promptText').textContent.trim();
             const btn = document.getElementById('copyBtn');
-            const text = block.textContent.replace('Copy', '').trim();
             navigator.clipboard.writeText(text).then(() => {
                 btn.textContent = 'Copied';
                 btn.classList.add('copied');
                 setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+            }, () => {
+                btn.textContent = 'Failed';
+                setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
             });
         }
 
