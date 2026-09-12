@@ -255,6 +255,7 @@ Todo % "Todo entity"
                     <button class="tab-button" data-tab="constants">Constants</button>
                     <button class="tab-button" data-tab="runparameter">RunParameter</button>
                     <button class="tab-button" data-tab="dependency">Dependency</button>
+                    <button class="tab-button" data-tab="typedef">TypeDef</button>
                     <button class="tab-button" data-tab="import">Import</button>
                 </div>
                 
@@ -827,7 +828,35 @@ start :: () => void
   "Starts the server"
   ~> [express^.listen]</code></pre>
                     </div>
-                    
+
+                    <div class="tab-pane" id="typedef-tab">
+                        <h3>TypeDef</h3>
+                        <p>Named type aliases and enum declarations.</p>
+                        <div class="code-toggle">
+                            <button class="toggle-btn active" data-syntax="longform">Longform</button>
+                            <button class="toggle-btn" data-syntax="shortform">Shortform</button>
+                        </div>
+                        <pre class="longform-code"><code class="language-typedmind"># Longform syntax
+typedef StatusType {
+  variant: enum
+  members: [Active, Pending, Archived]
+}
+
+typedef UserId {
+  variant: alias
+  type: "string"
+}
+
+typedef Priority {
+  variant: enum
+  members: [Low, Medium, High, Critical]
+}</code></pre>
+                        <pre class="shortform-code" style="display:none;"><code class="language-typedmind"># Shortform syntax
+StatusType = enum [Active, Pending, Archived]
+UserId = string
+Priority = enum [Low, Medium, High, Critical]</code></pre>
+                    </div>
+
                     <div class="tab-pane" id="import-tab">
                         <h3>Import System</h3>
                         <p>Import entities from other TypedMind files with aliasing.</p>
@@ -939,7 +968,7 @@ bun add -g @sammons/typed-mind-cli</code></pre>
                         </div>
                         <pre class="longform-code"><code class="language-typedmind"># Longform syntax is for humans
 program MyFirstApp {
-  entryPoint: main
+  entry: main
   version: "1.0.0"
 }
 
