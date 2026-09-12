@@ -28,7 +28,7 @@
 /* Dark mode is system-driven only — no manual toggle. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --accent: #5B7BFF;
+    --accent: #6B8AFF;
     --on-accent: #0B1020;
     --bg: #0F1219;
     --surface: #1A1F2E;
@@ -317,7 +317,7 @@ body {
 
 @media (prefers-color-scheme: dark) {
   .btn-secondary:hover {
-    filter: brightness(1.2);
+    background-color: var(--surface);
   }
 }
 

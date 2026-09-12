@@ -339,20 +339,10 @@ dto Todo {
     await page.emulateMedia({ colorScheme: 'dark' });
     await waitForReady(page);
 
-    const darkBg = await page.evaluate(() => {
-      const el = document.querySelector('.monaco-editor');
-      return el ? getComputedStyle(el).backgroundColor : null;
-    });
-    expect(darkBg).not.toBeNull();
-    expect(darkBg).not.toBe('rgb(255, 255, 255)');
+    const editorEl = page.locator('.monaco-editor').first();
+    await expect(editorEl).toHaveClass(/vs-dark/);
 
     await page.emulateMedia({ colorScheme: 'light' });
-    await page.waitForTimeout(200);
-
-    const lightBg = await page.evaluate(() => {
-      const el = document.querySelector('.monaco-editor');
-      return el ? getComputedStyle(el).backgroundColor : null;
-    });
-    expect(lightBg).toBe('rgb(255, 255, 255)');
+    await expect(editorEl).not.toHaveClass(/vs-dark/);
   });
 });
