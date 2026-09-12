@@ -102,7 +102,6 @@
                     <button class="tab-btn active" data-tab="problems">Problems</button>
                     <button class="tab-btn" data-tab="ast">AST</button>
                     <button class="tab-btn" data-tab="visualization">Visualization</button>
-                    <button class="tab-btn" data-tab="assistant">AI Assistant</button>
                 </div>
                 
                 <div class="tab-content active" id="problems-tab">
@@ -128,78 +127,6 @@
                     </div>
                 </div>
                 
-                <div class="tab-content" id="assistant-tab">
-                    <div class="chat-container">
-                        <!-- API Configuration Panel -->
-                        <div class="chat-config" id="chatConfig">
-                            <div class="config-header">
-                                <h3>AI Assistant Configuration</h3>
-                                <button class="config-toggle" id="configToggle" aria-label="Toggle configuration"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
-                            </div>
-                            <div class="config-content" id="configContent" style="display: none;">
-                                <div class="config-section">
-                                    <label for="apiProvider">AI Provider:</label>
-                                    <select id="apiProvider" class="config-select">
-                                        <option value="openai">OpenAI ChatGPT</option>
-                                        <option value="anthropic">Anthropic Claude</option>
-                                    </select>
-                                </div>
-                                <div class="config-section">
-                                    <label for="apiToken">API Token:</label>
-                                    <div class="token-input-group">
-                                        <input type="password" id="apiToken" class="config-input" placeholder="Enter your API token">
-                                        <button class="token-toggle" id="tokenToggle" aria-label="Toggle token visibility"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></button>
-                                    </div>
-                                    <div class="config-help">
-                                        Your token is encrypted and stored locally in your browser. It is never sent to our servers.
-                                    </div>
-                                </div>
-                                <div class="config-actions">
-                                    <button class="btn btn-small" id="saveConfig">Save Configuration</button>
-                                    <button class="btn btn-small btn-secondary" id="clearConfig">Clear Token</button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Chat Messages -->
-                        <div class="chat-messages" id="chatMessages">
-                            <div class="welcome-message">
-                                <div class="assistant-avatar"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg></div>
-                                <div class="message-content">
-                                    <p>Hello! I'm your TypedMind AI assistant with enhanced capabilities. I can help you:</p>
-                                    <ul>
-                                        <li>Generate TypedMind code from your descriptions</li>
-                                        <li>Explain TypedMind syntax and patterns</li>
-                                        <li>Convert between longform and shortform syntax</li>
-                                        <li>Review and improve your architecture definitions</li>
-                                        <li>Fix validation errors automatically</li>
-                                        <li>Manage code checkpoints and history</li>
-                                    </ul>
-                                    <p><strong>This is the refactored version with improved architecture and better error handling!</strong></p>
-                                    <p>Configure your API token above to get started!</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Chat Input -->
-                        <div class="chat-input-container">
-                            <div class="chat-actions">
-                                <button class="btn btn-small btn-secondary" id="clearChat" disabled>Clear History</button>
-                                <button class="btn btn-small btn-secondary" id="fixProblems">Fix Problems</button>
-                                <button class="btn btn-small btn-secondary" id="manageCheckpoints">Manage Checkpoints</button>
-                            </div>
-                            <div class="chat-input-wrapper">
-                                <textarea id="chatInput" class="chat-input" placeholder="Configure your API token above to start chatting..." rows="3" disabled></textarea>
-                                <button class="chat-send" id="chatSend" disabled>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                                        <polygon points="22,2 15,22 11,13 2,9"></polygon>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -216,21 +143,6 @@
     </script>
     <script type="module" src="assets/js/typedmind-browser-init.js"></script>
     <script src="assets/js/playground-examples-standalone.js"></script>
-    <script src="assets/js/token-manager.js"></script>
-    <script src="assets/js/code-checkpoint-manager.js"></script>
-    <script src="assets/js/lucide-icons.js"></script>
-    <script src="assets/js/chat-service.js"></script>
-
-    <!-- Refactored Architecture Components -->
-    <script src="assets/js/refactored/event-emitter.js"></script>
-    <script src="assets/js/refactored/base-ui-component.js"></script>
-    <script src="assets/js/refactored/notification-system.js"></script>
-    <script src="assets/js/refactored/configuration-panel.js"></script>
-    <script src="assets/js/refactored/chat-ui-manager.js"></script>
-    <script src="assets/js/refactored/services.js"></script>
-    <script src="assets/js/refactored/initialization.js"></script>
-    
-    <!-- Keep existing functionality for comparison -->
     <script src="assets/js/playground-splitter.js"></script>
     <script src="assets/js/typedmind-monaco-simple.js"></script>
     
@@ -242,41 +154,6 @@
         navToggle.addEventListener('click', () => {
             navMenu.classList.toggle('active');
             navToggle.classList.toggle('active');
-        });
-        
-        // Add initialization status indicator
-        window.addEventListener('typedmind:initialized', (event) => {
-            console.log('TypedMind refactored playground initialized:', event.detail);
-            
-            // Show initialization success notification
-            if (window.refactoredServices?.notificationSystem) {
-                window.refactoredServices.notificationSystem.showSuccess(
-                    'Refactored playground initialized successfully!',
-                    { duration: 3000 }
-                );
-            }
-        });
-        
-        // Add keyboard shortcuts info
-        document.addEventListener('keydown', (e) => {
-            // Show help on Ctrl+?
-            if ((e.ctrlKey || e.metaKey) && e.key === '/') {
-                e.preventDefault();
-                if (window.refactoredServices?.notificationSystem) {
-                    window.refactoredServices.notificationSystem.showInfo(
-                        'Keyboard Shortcuts:\n' +
-                        '• Ctrl+Enter: Send message\n' +
-                        '• Ctrl+K: Focus chat input\n' +
-                        '• Escape: Close configuration panel\n' +
-                        '• Ctrl+/: Show this help',
-                        { 
-                            title: 'Keyboard Shortcuts',
-                            duration: 8000,
-                            autoRemove: true
-                        }
-                    );
-                }
-            }
         });
     </script>
 </body>
