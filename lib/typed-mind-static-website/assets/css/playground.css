@@ -380,26 +380,45 @@ body.dragging-splitter * {
     gap: 1rem;
     padding: 1rem;
   }
-  
+
   .toolbar-left,
   .toolbar-right {
     width: 100%;
     justify-content: center;
+    flex-wrap: wrap;
   }
-  
+
+  .toolbar-left h1 {
+    font-size: 1rem;
+  }
+
   .playground-main {
     flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 180px);
   }
-  
+
   .splitter {
-    display: none; /* Hide splitter on mobile */
+    display: none;
   }
-  
+
+  .editor-panel {
+    min-height: 300px;
+  }
+
+  .monaco-editor-container {
+    min-height: 300px;
+  }
+
   .output-panel {
     width: 100%;
     height: 300px;
     border-left: none;
     border-top: 1px solid var(--border);
+  }
+
+  .example-select {
+    width: 100%;
   }
 }
 

@@ -372,7 +372,7 @@ body {
 /* Features Grid */
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 2rem;
 }
 
@@ -414,7 +414,9 @@ body {
 
 .tab-buttons {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background-color: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -427,6 +429,8 @@ body {
   font-weight: 500;
   color: var(--text-muted);
   transition: var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab-button:hover {
@@ -472,6 +476,10 @@ code {
   padding: 0.2rem 0.4rem;
   border-radius: 0;
   font-size: 0.9em;
+}
+
+pre {
+  max-width: 100%;
 }
 
 pre code {
@@ -577,7 +585,7 @@ pre code {
 /* Examples Grid */
 .examples-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(350px, 100%), 1fr));
   gap: 2rem;
 }
 
@@ -664,7 +672,7 @@ pre code {
 /* Documentation Grid */
 .docs-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
   gap: 2rem;
 }
 
@@ -750,39 +758,99 @@ pre code {
     border: 1px solid var(--border);
     padding: 2rem 0;
   }
-  
+
   .nav-menu.active {
     left: 0;
   }
-  
+
   .nav-toggle {
     display: flex;
   }
-  
+
   .hero-title {
-    font-size: 3rem;
+    font-size: 2.5rem;
   }
-  
+
   .hero-subtitle {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
   }
-  
+
+  .hero-description {
+    font-size: 1rem;
+  }
+
   .hero-actions {
     flex-direction: column;
     align-items: center;
   }
-  
+
+  .section {
+    padding: 48px 0;
+  }
+
+  .section-title {
+    font-size: 1.75rem;
+    margin-bottom: 2rem;
+  }
+
+  .section-subtitle {
+    font-size: 1rem;
+    margin-top: -1rem;
+    margin-bottom: 2rem;
+  }
+
+  .tab-content {
+    padding: 1rem;
+  }
+
+  .tab-button {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+
   .playground {
     grid-template-columns: 1fr;
   }
-  
+
   .step {
     flex-direction: column;
     text-align: center;
   }
-  
+
   .step-number {
     margin: 0 auto 1rem;
+  }
+
+  .hero-code {
+    max-width: 100%;
+  }
+
+  .hero-code pre {
+    padding: 1rem;
+    font-size: 0.8rem;
+  }
+
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+
+  .feature-card {
+    padding: 1.25rem;
+  }
+
+  .feature-card h3 {
+    font-size: 1.25rem;
   }
 }
 

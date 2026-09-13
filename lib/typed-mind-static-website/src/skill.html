@@ -46,11 +46,13 @@
         }
         .copy-btn:hover { opacity: 0.9; }
         .copy-btn.copied { background: var(--success); }
+        .ref-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .ref-table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 14px; }
         .ref-table th, .ref-table td {
             text-align: left;
             padding: 8px 12px;
             border-bottom: 1px solid var(--border);
+            white-space: nowrap;
         }
         .ref-table th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
         .ref-table code { font-size: 13px; background: var(--surface); padding: 2px 6px; border-radius: 2px; }
@@ -151,6 +153,7 @@ suppress EntityName checker/orphaned-entity "reason text"
         <h2 class="skill-heading">Grammar Reference</h2>
 
         <h3 class="skill-subheading">Shortform Declarations</h3>
+        <div class="ref-table-wrap">
         <table class="ref-table">
             <thead><tr><th>Entity</th><th>Syntax</th></tr></thead>
             <tbody>
@@ -169,8 +172,10 @@ suppress EntityName checker/orphaned-entity "reason text"
                 <tr><td>TypeDef (alias)</td><td><code>Name = targetType</code></td></tr>
             </tbody>
         </table>
+        </div>
 
         <h3 class="skill-subheading">Continuation Operators</h3>
+        <div class="ref-table-wrap">
         <table class="ref-table">
             <thead><tr><th>Operator</th><th>Meaning</th><th>Attaches to</th></tr></thead>
             <tbody>
@@ -188,6 +193,7 @@ suppress EntityName checker/orphaned-entity "reason text"
                 <tr><td><code># text</code></td><td>Comment</td><td>Any</td></tr>
             </tbody>
         </table>
+        </div>
 
         <h3 class="skill-subheading">Quick Reference Example</h3>
         <pre><code class="language-typedmind">TodoApp -> main v1.0.0
